@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "aqua_sonar_loc/sonar_cloud_preprocessor.hpp"
@@ -62,6 +63,12 @@ public:
     const sensor_msgs::msg::PointCloud2 & cloud,
     const CloudSummary & summary) = 0;
   virtual std::string backend_name() const = 0;
+  // Set the initial guess for the next match() call only (consume-once). Expressed as
+  // current_to_previous in the sonar/registration frame: maps points in the new fan
+  // back into the previous fan. Overrides the constant-velocity prior. Cleared
+  // automatically after match() runs. Default: no-op (used by the noop matcher).
+  virtual void set_external_prior(const Eigen::Matrix4f & /*current_to_previous*/) {}
+  virtual void clear_external_prior() {}
 };
 
 class NoopScanMatcher final : public ScanMatcher
@@ -85,6 +92,8 @@ public:
     const sensor_msgs::msg::PointCloud2 & cloud,
     const CloudSummary & summary) override;
   std::string backend_name() const override;
+  void set_external_prior(const Eigen::Matrix4f & current_to_previous) override;
+  void clear_external_prior() override;
 
 private:
   using PointCloud = pcl::PointCloud<pcl::PointXYZ>;
@@ -93,6 +102,7 @@ private:
   std::deque<PointCloud::Ptr> previous_clouds_;
   Eigen::Matrix4f accumulated_transform_{Eigen::Matrix4f::Identity()};
   Eigen::Matrix4f last_current_to_previous_{Eigen::Matrix4f::Identity()};
+  std::optional<Eigen::Matrix4f> external_prior_;
 };
 
 class GicpScanMatcher final : public ScanMatcher
@@ -103,6 +113,8 @@ public:
     const sensor_msgs::msg::PointCloud2 & cloud,
     const CloudSummary & summary) override;
   std::string backend_name() const override;
+  void set_external_prior(const Eigen::Matrix4f & current_to_previous) override;
+  void clear_external_prior() override;
 
 private:
   using PointCloud = pcl::PointCloud<pcl::PointXYZ>;
@@ -111,6 +123,7 @@ private:
   std::deque<PointCloud::Ptr> previous_clouds_;
   Eigen::Matrix4f accumulated_transform_{Eigen::Matrix4f::Identity()};
   Eigen::Matrix4f last_current_to_previous_{Eigen::Matrix4f::Identity()};
+  std::optional<Eigen::Matrix4f> external_prior_;
 };
 
 std::unique_ptr<ScanMatcher> create_scan_matcher(const std::string & backend);

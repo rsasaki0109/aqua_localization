@@ -23,6 +23,7 @@ This checklist tracks the first usable `aqua_localization` milestone.
 - `aqua_sonar_loc` supports `noop`, PCL ICP, and PCL GICP backends.
 - `aqua_sonar_loc` applies post-registration quality gates (`max_fitness_score`, `max_translation_step_m`, `max_rotation_step_rad`).
 - `aqua_sonar_loc` ships a submap front end (`scan_matching.submap_size > 1` with optional `use_motion_prior`).
+- `aqua_sonar_loc` accepts an external IMU/DVL motion prior on a `nav_msgs/Odometry` topic (`motion_prior.topic`) and uses the relative SE(3) between bracketing samples as the registration initial guess.
 - `aqua_imu_loc` exposes optional AHRS hooks (yaw observation, gyro_z bias from AHRS yaw rate, 3-axis gyro bias) and a static-bias initializer.
 - `aqua_fusion` loosely fuses IMU/depth odometry with fresh sonar odometry.
 - Top-level launch starts IMU, sonar, and fusion nodes.
@@ -63,10 +64,8 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
 
 ## Still Research/Next Milestones
 
-- IMU/DVL motion-prior subscription in `aqua_sonar_loc` to make submap mode useful on
-  geometrically degenerate single-fan multibeam data (the submap registration code is
-  already shipped; only the prior wiring is missing).
-- Microstrain-IMU-only `aqua_imu_loc` profile for the MBES-SLAM bag (no pressure, depth=0).
+- Microstrain-IMU-only `aqua_imu_loc` profile for the MBES-SLAM bag (no pressure, depth=0)
+  so the new `motion_prior.topic` wiring can be exercised end-to-end on the public bag.
 - `aqua_fusion` end-to-end run on a real public bag (it currently has unit + runtime tests but no public-data benchmark).
 - ESKF backend with error-state IMU propagation and bias handling.
 - Validated sonar covariance estimation.

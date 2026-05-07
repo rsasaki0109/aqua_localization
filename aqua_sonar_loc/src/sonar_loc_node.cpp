@@ -1,6 +1,14 @@
+#include <algorithm>
+#include <cmath>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
+
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 #include "aqua_msgs/msg/scan_matching_status.hpp"
 #include "aqua_sonar_loc/scan_matcher.hpp"
@@ -30,11 +38,18 @@ public:
     status_pub_ = create_publisher<aqua_msgs::msg::ScanMatchingStatus>(
       status_topic_, rclcpp::SystemDefaultsQoS());
 
+    if (!motion_prior_topic_.empty()) {
+      motion_prior_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+        motion_prior_topic_, rclcpp::SystemDefaultsQoS(),
+        std::bind(&SonarLocNode::on_motion_prior, this, std::placeholders::_1));
+    }
+
     RCLCPP_INFO(
       get_logger(),
-      "aqua_sonar_loc started: points=%s filtered=%s odom=%s sonar_frame=%s backend=%s",
+      "aqua_sonar_loc started: points=%s filtered=%s odom=%s sonar_frame=%s backend=%s prior=%s",
       points_topic_.c_str(), filtered_points_topic_.c_str(), odometry_topic_.c_str(),
-      sonar_frame_.c_str(), scan_matcher_->backend_name().c_str());
+      sonar_frame_.c_str(), scan_matcher_->backend_name().c_str(),
+      motion_prior_topic_.empty() ? "(disabled)" : motion_prior_topic_.c_str());
   }
 
 private:
@@ -90,6 +105,92 @@ private:
     const int min_points = declare_parameter<int>("preprocessing.min_points", 20);
     config.min_points = min_points > 0 ? static_cast<size_t>(min_points) : 1U;
     preprocessor_.configure(config);
+
+    motion_prior_topic_ =
+      declare_parameter<std::string>("motion_prior.topic", "");
+    motion_prior_max_time_diff_s_ =
+      declare_parameter<double>("motion_prior.max_time_diff_s", 0.5);
+    motion_prior_buffer_seconds_ =
+      declare_parameter<double>("motion_prior.buffer_seconds", 10.0);
+  }
+
+  void on_motion_prior(const nav_msgs::msg::Odometry::SharedPtr msg)
+  {
+    Eigen::Affine3d pose = Eigen::Affine3d::Identity();
+    pose.translation() << msg->pose.pose.position.x, msg->pose.pose.position.y,
+      msg->pose.pose.position.z;
+    Eigen::Quaterniond q(
+      msg->pose.pose.orientation.w,
+      msg->pose.pose.orientation.x,
+      msg->pose.pose.orientation.y,
+      msg->pose.pose.orientation.z);
+    if (q.norm() < 1.0e-9) {
+      return;
+    }
+    q.normalize();
+    pose.linear() = q.toRotationMatrix();
+
+    const rclcpp::Time stamp(msg->header.stamp);
+    std::lock_guard<std::mutex> lock(motion_prior_mutex_);
+    if (!motion_prior_buffer_.empty() && stamp <= motion_prior_buffer_.back().first) {
+      // Out-of-order or duplicate sample; drop.
+      return;
+    }
+    motion_prior_buffer_.emplace_back(stamp, pose);
+    // Trim to motion_prior_buffer_seconds_ relative to the newest sample.
+    const auto cutoff =
+      stamp - rclcpp::Duration::from_seconds(motion_prior_buffer_seconds_);
+    while (motion_prior_buffer_.size() > 1 &&
+      motion_prior_buffer_.front().first < cutoff)
+    {
+      motion_prior_buffer_.pop_front();
+    }
+  }
+
+  // Linearly interpolate translation and slerp rotation between bracketing buffer
+  // samples. Returns std::nullopt if the requested time is outside the buffer or the
+  // closest sample is older than max_time_diff_s.
+  std::optional<Eigen::Affine3d> interpolate_motion_prior(const rclcpp::Time & query) const
+  {
+    if (motion_prior_buffer_.empty()) {
+      return std::nullopt;
+    }
+    if (query < motion_prior_buffer_.front().first) {
+      const double age = (motion_prior_buffer_.front().first - query).seconds();
+      if (age > motion_prior_max_time_diff_s_) {
+        return std::nullopt;
+      }
+      return motion_prior_buffer_.front().second;
+    }
+    if (query > motion_prior_buffer_.back().first) {
+      const double age = (query - motion_prior_buffer_.back().first).seconds();
+      if (age > motion_prior_max_time_diff_s_) {
+        return std::nullopt;
+      }
+      return motion_prior_buffer_.back().second;
+    }
+    // Find the first sample with timestamp >= query (binary search).
+    auto upper = std::lower_bound(
+      motion_prior_buffer_.begin(), motion_prior_buffer_.end(), query,
+      [](const std::pair<rclcpp::Time, Eigen::Affine3d> & lhs, const rclcpp::Time & rhs) {
+        return lhs.first < rhs;
+      });
+    if (upper == motion_prior_buffer_.begin()) {
+      return upper->second;
+    }
+    auto lower = std::prev(upper);
+    const double dt_total = (upper->first - lower->first).seconds();
+    if (dt_total <= 0.0) {
+      return upper->second;
+    }
+    const double alpha = (query - lower->first).seconds() / dt_total;
+    Eigen::Affine3d out = Eigen::Affine3d::Identity();
+    out.translation() = (1.0 - alpha) * lower->second.translation() +
+      alpha * upper->second.translation();
+    Eigen::Quaterniond q_lo(lower->second.linear());
+    Eigen::Quaterniond q_hi(upper->second.linear());
+    out.linear() = q_lo.slerp(alpha, q_hi).toRotationMatrix();
+    return out;
   }
 
   void on_points(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
@@ -110,7 +211,12 @@ private:
       summary.total_points, summary.finite_xyz_points, summary.in_range_points);
     filtered_points_pub_->publish(*msg);
 
+    apply_motion_prior_if_available(rclcpp::Time(msg->header.stamp));
+
     const auto match_result = scan_matcher_->match(*msg, summary);
+    if (match_result.success) {
+      previous_fan_time_ = rclcpp::Time(msg->header.stamp);
+    }
     if (!match_result.success) {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 2000,
@@ -121,6 +227,33 @@ private:
     }
     odometry_pub_->publish(make_odometry(*msg, match_result));
     status_pub_->publish(make_status(*msg, summary, match_result));
+  }
+
+  // Compute the relative SE(3) between previous_fan_time_ and the current fan stamp
+  // from the buffered IMU odometry, and stage it on the scan matcher as the initial
+  // guess. Skip silently when the prior is disabled, no previous fan exists yet, or
+  // the buffer cannot bracket the requested timestamps.
+  void apply_motion_prior_if_available(const rclcpp::Time & current_stamp)
+  {
+    if (motion_prior_topic_.empty() || !previous_fan_time_.has_value()) {
+      return;
+    }
+    std::lock_guard<std::mutex> lock(motion_prior_mutex_);
+    const auto prev_pose = interpolate_motion_prior(*previous_fan_time_);
+    const auto curr_pose = interpolate_motion_prior(current_stamp);
+    if (!prev_pose.has_value() || !curr_pose.has_value()) {
+      RCLCPP_DEBUG(
+        get_logger(),
+        "Motion prior unavailable: buffer does not bracket fan timestamps "
+        "(buffer_size=%zu)", motion_prior_buffer_.size());
+      return;
+    }
+    // ICP convention: current_to_previous maps points in the new fan back into the
+    // previous fan's frame. Approximation: the sonar is rigidly mounted on base_link
+    // with a small lever arm, so we use the relative base_link motion as the prior.
+    const Eigen::Affine3d relative = curr_pose->inverse() * (*prev_pose);
+    Eigen::Matrix4f prior = relative.matrix().cast<float>();
+    scan_matcher_->set_external_prior(prior);
   }
 
   aqua_msgs::msg::ScanMatchingStatus make_status(
@@ -186,7 +319,15 @@ private:
   std::string base_frame_;
   std::string sonar_frame_;
 
+  std::string motion_prior_topic_;
+  double motion_prior_max_time_diff_s_{0.5};
+  double motion_prior_buffer_seconds_{10.0};
+  std::deque<std::pair<rclcpp::Time, Eigen::Affine3d>> motion_prior_buffer_;
+  mutable std::mutex motion_prior_mutex_;
+  std::optional<rclcpp::Time> previous_fan_time_;
+
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr points_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr motion_prior_sub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr filtered_points_pub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_pub_;
   rclcpp::Publisher<aqua_msgs::msg::ScanMatchingStatus>::SharedPtr status_pub_;

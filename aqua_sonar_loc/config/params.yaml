@@ -48,6 +48,26 @@ aqua_sonar_loc:
       # identity, so the submap is forced to provide along-track structure).
       use_motion_prior: false
 
+    motion_prior:
+      # External motion prior that gets staged on the scan matcher as the registration
+      # initial guess. Subscribe to a `nav_msgs/Odometry` topic (e.g. the IMU/pressure
+      # estimate from `aqua_imu_loc`); on each accepted sonar fan the node interpolates
+      # the buffered odometry at the previous and current fan timestamps and computes
+      # the relative SE(3) used to bootstrap PCL ICP/GICP. Empty string disables the
+      # subscriber and falls back to the `scan_matching.use_motion_prior` constant-
+      # velocity prior. Approximation: the relative base_link motion is used directly
+      # as the prior in the sonar frame (assumes a small lever-arm rotation between
+      # sonar and base_link; refine with a TF lookup if your platform mounts the sonar
+      # with a non-identity orientation).
+      topic: ""
+      # Reject buffered samples that are farther than this many seconds from a fan
+      # timestamp. Set well above the IMU/odometry period and below the bag's typical
+      # gap so stale samples don't poison registration.
+      max_time_diff_s: 0.5
+      # Trim the rolling odometry buffer to this many seconds relative to the newest
+      # sample. Bound on memory; should comfortably exceed the worst-case fan period.
+      buffer_seconds: 10.0
+
     preprocessing:
       # Require x/y/z numeric fields before scan matching.
       require_xyz: true

@@ -432,6 +432,92 @@ TEST(IcpScanMatcher, SubmapZeroFallsBackToScanToScan)
   EXPECT_NEAR(shifted_result.odom_to_base.translation.x, 0.3, 0.03);
 }
 
+TEST(IcpScanMatcher, ExternalPriorIsConsumedOnce)
+{
+  // Verify the external prior path: a deliberately-bad initial guess on the second
+  // fan should be overridden by a good external prior so ICP converges in fewer
+  // iterations. Use a configuration where ICP with a zero initial guess would
+  // diverge or fail to converge inside the iteration budget.
+  aqua_sonar_loc::IcpScanMatcher matcher;
+  aqua_sonar_loc::ScanMatcherConfig config;
+  config.backend = "icp";
+  config.max_correspondence_distance = 0.3;  // tight: needs a good prior
+  config.max_iterations = 5;
+  config.transformation_epsilon = 1.0e-10;
+  matcher.configure(config);
+
+  const std::vector<std::array<float, 3>> reference_points = {{
+    {0.0F, 0.0F, 0.0F}, {0.8F, 0.1F, 0.2F}, {-0.4F, 1.1F, 0.3F},
+    {1.5F, -0.6F, 0.7F}, {-1.2F, -0.4F, 1.1F}, {0.2F, 1.8F, -0.5F},
+    {1.9F, 1.2F, 0.4F}, {-0.9F, 0.7F, -0.8F}, {0.6F, -1.4F, 1.3F}, {1.1F, 0.4F, -1.0F},
+  }};
+  const auto shifted_points = translated(reference_points, 0.5F, 0.0F, 0.0F);
+
+  ASSERT_TRUE(matcher.match(make_cloud(reference_points), accepted_summary(reference_points.size())).success);
+
+  // Stage a near-perfect external prior: current_to_previous shifts +0.5 m back.
+  Eigen::Matrix4f prior = Eigen::Matrix4f::Identity();
+  prior(0, 3) = -0.5F;  // current frame is 0.5 m ahead of previous; bring it back
+  matcher.set_external_prior(prior);
+
+  const auto shifted_result =
+    matcher.match(make_cloud(shifted_points), accepted_summary(shifted_points.size()));
+  ASSERT_TRUE(shifted_result.success) << shifted_result.status;
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, 0.5, 0.05);
+
+  // Prior is consume-once: a second fan at the same location should NOT carry the
+  // prior over. Use a fresh fan at the same offset; without a stale prior the
+  // accumulated transform should keep tracking the actual cloud motion.
+  const auto third_points = translated(reference_points, 1.0F, 0.0F, 0.0F);
+  matcher.set_external_prior(prior);  // -0.5 again
+  const auto third_result =
+    matcher.match(make_cloud(third_points), accepted_summary(third_points.size()));
+  ASSERT_TRUE(third_result.success) << third_result.status;
+  EXPECT_NEAR(third_result.odom_to_base.translation.x, 1.0, 0.05);
+}
+
+TEST(IcpScanMatcher, ExternalPriorIsClearedAfterRejectedSummary)
+{
+  // If the cloud is rejected by preprocessing the external prior must still be
+  // discarded — otherwise it would silently apply to a later, valid fan whose
+  // timestamp no longer matches.
+  aqua_sonar_loc::IcpScanMatcher matcher;
+  aqua_sonar_loc::ScanMatcherConfig config;
+  config.backend = "icp";
+  config.max_correspondence_distance = 2.0;
+  config.max_iterations = 100;
+  config.transformation_epsilon = 1.0e-10;
+  matcher.configure(config);
+
+  const std::vector<std::array<float, 3>> reference_points = {{
+    {0.0F, 0.0F, 0.0F}, {0.8F, 0.1F, 0.2F}, {-0.4F, 1.1F, 0.3F},
+    {1.5F, -0.6F, 0.7F}, {-1.2F, -0.4F, 1.1F},
+  }};
+  ASSERT_TRUE(matcher.match(make_cloud(reference_points),
+                            accepted_summary(reference_points.size())).success);
+
+  // Stage a clearly-wrong prior, then feed a rejected summary. The prior must be
+  // consumed/discarded by this call.
+  Eigen::Matrix4f wrong_prior = Eigen::Matrix4f::Identity();
+  wrong_prior(0, 3) = -10.0F;
+  matcher.set_external_prior(wrong_prior);
+
+  aqua_sonar_loc::CloudSummary rejected;
+  rejected.accepted = false;
+  rejected.rejection_reason = "preproc dropped this fan";
+  const auto rejected_result =
+    matcher.match(make_cloud(reference_points), rejected);
+  EXPECT_FALSE(rejected_result.success);
+
+  // A small subsequent shift should now resolve correctly without the wrong prior
+  // bleeding in.
+  const auto shifted = translated(reference_points, 0.2F, 0.0F, 0.0F);
+  const auto next_result =
+    matcher.match(make_cloud(shifted), accepted_summary(shifted.size()));
+  ASSERT_TRUE(next_result.success) << next_result.status;
+  EXPECT_NEAR(next_result.odom_to_base.translation.x, 0.2, 0.03);
+}
+
 TEST(IcpScanMatcher, NegativeGateValuesAreDisabled)
 {
   aqua_sonar_loc::IcpScanMatcher matcher;

@@ -176,6 +176,29 @@ ros2 run aqua_localization compare_trajectories.py \
   /tmp/beach_pond_aqua_sonar_loc.tum
 ```
 
+## Generate the README demo GIF
+
+`scripts/make_demo_gif.py` records a side-by-side GIF of (a) the accumulated multibeam
+fans transformed into world coordinates by an external reference odometry, and (b)
+the live `aqua_sonar_loc` estimate alongside that reference. With the localization
+stack running and the bag streaming, in a third terminal:
+
+```bash
+ros2 run aqua_localization make_demo_gif.py \
+  --use-sim-time \
+  --reference-odometry /nav/processed/odometry \
+  --duration-s 8.0 \
+  --max-frames 80 \
+  --fps 10 \
+  --out aqua_localization/docs/media/mbes_slam_beach_pond.gif
+```
+
+The script self-exits when the bag clock advances past `--duration-s` and writes
+~50 frames at 10 fps. On geometrically degenerate single-fan multibeam bags the
+estimator stays near origin (the GIF makes this honest about the current state of
+the system); plug in an IMU-only `aqua_imu_loc` profile and set
+`motion_prior.topic` in `aqua_sonar_loc` to feed a real prior.
+
 ## Measured numbers (60 s slice, GICP backend)
 
 A 60 s window starting at `--start-offset 60 --rate 1.0 --playback-duration 60`
