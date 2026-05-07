@@ -31,11 +31,11 @@ aqua_sonar_loc:
       # With an IMU motion prior the ICP solution tracks the prior more
       # aggressively and the fitness scores rise, so this is loosened from the
       # previous prior-disabled value of 1.5.
-      max_fitness_score: 5.0
-      # ~1 m/s surface vessel × 1/13 s ping period ≈ 0.08 m, but the IMU prior
-      # can momentarily over-shoot during transients; 1.5 m absorbs that without
-      # admitting outright runaway solutions.
-      max_translation_step_m: 1.5
+      max_fitness_score: 3.0
+      # ~1 m/s surface vessel × 1/13 s ping period ≈ 0.08 m. With an IMU prior
+      # the ICP can occasionally land farther; 1.0 m is a good compromise that
+      # admits prior-aligned solutions while still rejecting outright runaway.
+      max_translation_step_m: 1.0
       # Surface vessel yaw rate stays well under 1 rad/s; a 0.4 rad per-step gate
       # rejects bad correspondences without clipping legitimate turns.
       max_rotation_step_rad: 0.4
