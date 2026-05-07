@@ -8,6 +8,13 @@ aqua_imu_loc:
       # Optional geometry_msgs/TwistStamped water-current velocity in odom frame.
       # Leave empty to use only dynamics.current_velocity_xyz from this file.
       current_velocity: ""
+      # Optional tightly-coupled feedback path: nav_msgs/Odometry from the
+      # sonar registration node, fed into the UKF as a 3D position observation.
+      # Leave empty for IMU-only dead reckoning.
+      sonar_odometry: ""
+      # Optional DVL bottom-track velocity input as geometry_msgs/TwistStamped
+      # (twist.linear.{x,y,z} in body frame). Leave empty when no DVL.
+      dvl_velocity: ""
       # Published dead-reckoning odometry topic.
       odometry: /aqua_imu_loc/odometry
       # Lightweight estimator health/status diagnostics.
@@ -92,6 +99,28 @@ aqua_imu_loc:
         z: 1.0e-2
       ahrs_gyro_bias_xyz_subsample: 20
       ahrs_gyro_bias_xyz_max_dt_s: 0.5
+
+      # Tightly-coupled sonar position fusion knobs. Active when
+      # `topics.sonar_odometry` is set. position_variance_floor caps the
+      # smallest published sonar covariance so an over-confident registration
+      # cannot collapse the UKF position uncertainty; max_age_s drops samples
+      # older than this many seconds relative to the latest IMU stamp.
+      sonar:
+        position_variance_floor: 0.04
+        max_age_s: 1.0
+
+      # DVL velocity fusion. Active when `topics.dvl_velocity` is set. The
+      # DVL message is `geometry_msgs/TwistStamped` carrying body-frame
+      # velocity in `twist.linear`. mount.rotation_rpy_rad pre-rotates the raw
+      # sample into base_link before the body-frame measurement update so DVLs
+      # mounted in non-REP-145 orientations work without driver changes.
+      # velocity_variance_floor is published as a diagonal isotropic
+      # covariance because TwistStamped carries no covariance field.
+      dvl:
+        mount:
+          rotation_rpy_rad: [0.0, 0.0, 0.0]
+        velocity_variance_floor: 0.01
+        max_age_s: 0.5
 
     init:
       # Estimate initial gyro bias from a short static window at startup.

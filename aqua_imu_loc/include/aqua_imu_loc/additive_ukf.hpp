@@ -55,6 +55,15 @@ public:
   void update_position(
     const Eigen::Vector3d & position, const Eigen::Matrix3d & covariance);
 
+  // Body-frame velocity observation, e.g. from a DVL bottom-track sample.
+  // Measurement model is non-linear: predicted body velocity is
+  // R(rpy)^T * v_world, so sigma-point cross-covariance properly couples the
+  // observation back into both the world-frame velocity state and the
+  // rotation state. Pre-rotate the raw DVL sample into base_link frame
+  // before calling if the DVL is mounted with a non-identity orientation.
+  void update_body_velocity(
+    const Eigen::Vector3d & velocity_body, const Eigen::Matrix3d & covariance);
+
   const StateVector & state() const;
   const StateMatrix & covariance() const;
 

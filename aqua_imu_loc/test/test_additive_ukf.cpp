@@ -234,6 +234,66 @@ TEST(AdditiveUkf, PositionUpdatePropagatesIntoBiasStatesAfterMotion)
   EXPECT_GT(std::abs(ukf.state()(9)), 1.0e-4);
 }
 
+TEST(AdditiveUkf, BodyVelocityUpdateMovesVelocityTowardMeasurementAtZeroRotation)
+{
+  // With identity rotation, the body-frame velocity equals the world-frame
+  // velocity. A tight body-velocity observation should pull state[3..5]
+  // toward the measurement.
+  aqua_imu_loc::AdditiveUkf ukf;
+  ukf.configure(0.2, 2.0, 0.0);
+  ukf.set_initial_covariance(diagonal(1.0));
+  ukf.set_process_noise(diagonal(0.0));
+
+  const Eigen::Vector3d measurement(0.7, -0.3, 0.05);
+  const Eigen::Matrix3d covariance = Eigen::Matrix3d::Identity() * 1.0e-4;
+
+  ukf.update_body_velocity(measurement, covariance);
+
+  EXPECT_NEAR(ukf.state()(3), measurement.x(), 0.05);
+  EXPECT_NEAR(ukf.state()(4), measurement.y(), 0.05);
+  EXPECT_NEAR(ukf.state()(5), measurement.z(), 0.05);
+}
+
+TEST(AdditiveUkf, BodyVelocityUpdateRespectsYawRotation)
+{
+  // Boat is rotated 90° yaw (state[8] = pi/2). A body-frame velocity of
+  // (1, 0, 0) means "forward in body" which in world coordinates is
+  // (0, 1, 0). The UKF should pull world-frame velocity toward (0, 1, 0).
+  aqua_imu_loc::AdditiveUkf ukf;
+  ukf.configure(0.2, 2.0, 0.0);
+  ukf.set_initial_covariance(diagonal(1.0));
+  ukf.set_process_noise(diagonal(0.0));
+
+  aqua_imu_loc::StateVector state = aqua_imu_loc::StateVector::Zero();
+  state(8) = aqua_imu_loc::kPi / 2.0;
+  ukf.set_state(state);
+
+  const Eigen::Vector3d measurement_body(1.0, 0.0, 0.0);
+  const Eigen::Matrix3d covariance = Eigen::Matrix3d::Identity() * 1.0e-3;
+  ukf.update_body_velocity(measurement_body, covariance);
+
+  EXPECT_NEAR(ukf.state()(3), 0.0, 0.10);
+  EXPECT_NEAR(ukf.state()(4), 1.0, 0.10);
+  EXPECT_NEAR(ukf.state()(5), 0.0, 0.10);
+}
+
+TEST(AdditiveUkf, BodyVelocityUpdateRejectsNonFiniteInputs)
+{
+  aqua_imu_loc::AdditiveUkf ukf;
+  ukf.configure(0.2, 2.0, 0.0);
+  ukf.set_initial_covariance(diagonal(0.1));
+  ukf.set_process_noise(diagonal(0.0));
+
+  const aqua_imu_loc::StateVector before = ukf.state();
+  ukf.update_body_velocity(
+    Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0),
+    Eigen::Matrix3d::Identity() * 1.0e-3);
+  ukf.update_body_velocity(
+    Eigen::Vector3d(0.0, 0.0, 0.0),
+    Eigen::Matrix3d::Constant(std::numeric_limits<double>::quiet_NaN()));
+  EXPECT_NEAR((ukf.state() - before).norm(), 0.0, 1.0e-12);
+}
+
 TEST(AdditiveUkf, PositionUpdateRejectsNonFiniteInputs)
 {
   aqua_imu_loc::AdditiveUkf ukf;
