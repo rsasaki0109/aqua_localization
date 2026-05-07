@@ -29,6 +29,8 @@ This checklist tracks the first usable `aqua_localization` milestone.
 - `aqua_imu_loc` exposes optional AHRS hooks (yaw observation, gyro_z bias from AHRS yaw rate, 3-axis gyro bias) and a static-bias initializer.
 - `aqua_fusion` loosely fuses IMU/depth odometry with fresh sonar odometry.
 - `aqua_fusion` MBES-SLAM `beach_pond` profile (`aqua_fusion/config/mbes_slam.yaml`) ships and is exercised end-to-end alongside IMU + sonar; the loose-coupling weighted average follows the IMU input on this geometrically degenerate dataset (the trajectory improvement requires both inputs to be reasonable, see Next Milestones for the tightly-coupled follow-up).
+- `aqua_imu_loc` supports a static IMU mounting rotation (`imu.mount.rotation_rpy_rad`) so bags whose IMU axes do not match REP-145 (e.g. AQUALOC harbor sequences read gravity on -Y) can be replayed with the correct gravity subtraction.
+- AQUALOC harbor sequence 07 starter profile (`aqua_imu_loc/config/aqualoc.yaml`) and bring-up doc (`datasets/aqualoc_demo.md`) ship; the bag download + ROS 2 conversion + topic discovery flow is fully documented. End-to-end accuracy on this bag is not yet validated (still-window-free start means the static-bias initializer cannot observe sensor biases).
 - Top-level launch starts IMU, sonar, and fusion nodes.
 - Replay launch supports `ros2 bag play`, topic remapping, `use_sim_time`, and subsystem toggles.
 - Replay launch can optionally start the depth-to-pressure adapter.

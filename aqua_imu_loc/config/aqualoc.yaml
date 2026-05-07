@@ -1,0 +1,104 @@
+aqua_imu_loc:
+  ros__parameters:
+    topics:
+      # AQUALOC harbor sequences are published from the LIRMM ROV "Dumbo" on
+      # an RTIMULib stack (`/rtimulib_node/imu` carries `sensor_msgs/Imu`)
+      # and the Blue Robotics barometer (`/barometer_node/pressure` is a
+      # `sensor_msgs/FluidPressure` at ~10 Hz). rosbags-convert preserves
+      # these topic names when migrating to ROS 2 mcap.
+      imu: /rtimulib_node/imu
+      pressure: /barometer_node/pressure
+      current_velocity: ""
+      odometry: /aqua_imu_loc/odometry
+      status: /aqua_imu_loc/status
+
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+
+    publish:
+      tf: true
+      odometry: true
+
+    services:
+      reset: /aqua_imu_loc/reset
+
+    ukf:
+      alpha: 0.2
+      beta: 2.0
+      kappa: 0.0
+      # AQUALOC harbor sequences are recorded from a small ROV moving slowly
+      # near the seabed (max ~1 m/s, low yaw rate). Use a tighter velocity
+      # process noise than the BlueROV2 starter and a slightly looser yaw
+      # process noise to absorb the ROV's frequent small heading corrections.
+      initial_covariance_diagonal:
+        [0.25, 0.25, 0.25,
+         0.10, 0.10, 0.10,
+         0.05, 0.05, 0.10,
+         0.05, 0.05, 0.05,
+         0.01, 0.01, 0.01]
+      process_noise_diagonal:
+        [0.02, 0.02, 0.02,
+         0.15, 0.15, 0.10,
+         0.01, 0.01, 0.03,
+         0.0005, 0.0005, 0.0005,
+         0.0001, 0.0001, 0.0001]
+      max_prediction_dt: 0.05
+      min_prediction_dt: 0.0005
+
+    pressure:
+      use_first_pressure_as_reference: true
+      reference_pressure_pa: 101325.0
+      # Harbor of La Ciotat — Mediterranean, near-surface (a few meters depth).
+      # Mediterranean is ~1027 kg/m^3; ~1025 is a reasonable starter.
+      water_density_kg_m3: 1025.0
+      depth_variance: 0.04
+      depth_offset_m: 0.0
+
+    imu:
+      mount:
+        # AQUALOC reads gravity on the body's -Y axis when stationary
+        # (linear_acceleration ≈ (0, -9.71, 0) m/s²) — the IMU is mounted on
+        # its side. Rotate -π/2 around the body-X axis so that body-Y becomes
+        # body-Z and body-Z becomes -body-Y, restoring the REP-145 "Z up"
+        # convention the UKF assumes. (No yaw/pitch correction needed.)
+        rotation_rpy_rad: [-1.5707963267948966, 0.0, 0.0]
+
+      # AQUALOC IMU is a low-cost MEMS without an internal AHRS, so the bags
+      # carry raw accel/gyro and *no* orientation field. Disable the AHRS
+      # hooks; the UKF integrates orientation purely from the gyro.
+      use_orientation_yaw: false
+      orientation_yaw_variance_rad2: 0.05
+      orientation_yaw_subsample: 5
+      use_ahrs_gyro_bias_z: false
+      ahrs_gyro_bias_z_variance_rad2_s2: 1.0e-2
+      ahrs_gyro_bias_z_subsample: 20
+      ahrs_gyro_bias_z_max_dt_s: 0.5
+      use_ahrs_gyro_bias_xyz: false
+      ahrs_gyro_bias_xyz_variance_rad2_s2:
+        x: 1.0e-2
+        y: 1.0e-2
+        z: 1.0e-2
+      ahrs_gyro_bias_xyz_subsample: 20
+      ahrs_gyro_bias_xyz_max_dt_s: 0.5
+
+    init:
+      static_bias:
+        # AQUALOC harbor sequences typically include a few seconds of stillness
+        # at the surface before the dive begins; use it to anchor the IMU
+        # biases.
+        enable: true
+        window_seconds: 3.0
+        gyro_motion_threshold_radps: 0.10
+        accel_motion_threshold_mps2: 0.50
+        minimum_samples: 50
+
+    dynamics:
+      gravity_mps2: 9.80665
+      # Small ROV in shallow water; light linear drag is realistic.
+      enable_linear_drag: true
+      linear_drag_coeff: 0.05
+      enable_buoyancy: false
+      buoyancy_accel_z_mps2: 0.0
+      current_velocity_xyz: [0.0, 0.0, 0.0]
