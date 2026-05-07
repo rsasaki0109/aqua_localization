@@ -1,0 +1,115 @@
+aqua_imu_loc:
+  ros__parameters:
+    topics:
+      # Tank Dataset (Xu et al., IJRR 2025) — IMU on /imu/data, depth via the
+      # `convert_tank_dataset_bag.py` adapter as /pressure (FluidPressure
+      # synthesised from the source bag's nav_msgs/Odometry depth track), and
+      # DVL bottom-track velocity adapted to /dvl/twist (TwistStamped) by the
+      # same converter (the source uses a custom waterlinked_a50_ros_driver/DVL
+      # message that rosbags-convert cannot preserve directly).
+      imu: /imu/data
+      pressure: /pressure
+      current_velocity: ""
+      sonar_odometry: ""
+      dvl_velocity: /dvl/twist
+      odometry: /aqua_imu_loc/odometry
+      status: /aqua_imu_loc/status
+
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+
+    publish:
+      tf: true
+      odometry: true
+
+    services:
+      reset: /aqua_imu_loc/reset
+
+    ukf:
+      alpha: 0.2
+      beta: 2.0
+      kappa: 0.0
+      # The tank ROV moves slowly (sub-1 m/s) and the bag covers a small
+      # 15-180 s window; tighter velocity covariance + standard yaw process
+      # noise are reasonable starters. Tune per sequence (Easy/Medium/Hard).
+      initial_covariance_diagonal:
+        [0.10, 0.10, 0.05,
+         0.05, 0.05, 0.02,
+         0.05, 0.05, 0.10,
+         0.05, 0.05, 0.05,
+         0.01, 0.01, 0.01]
+      process_noise_diagonal:
+        [0.01, 0.01, 0.005,
+         0.10, 0.10, 0.05,
+         0.01, 0.01, 0.02,
+         0.0005, 0.0005, 0.0005,
+         0.0001, 0.0001, 0.0001]
+      max_prediction_dt: 0.05
+      min_prediction_dt: 0.0005
+
+    pressure:
+      use_first_pressure_as_reference: true
+      reference_pressure_pa: 101325.0
+      # Tank water — fresh water density.
+      water_density_kg_m3: 1000.0
+      depth_variance: 0.01
+      depth_offset_m: 0.0
+
+    imu:
+      # Microstrain 3DM-GX5-AHRS publishes orientation alongside the raw
+      # accel/gyro stream, so the AHRS yaw observation hook can pull yaw
+      # toward the magnetometer-anchored quaternion. Roll/pitch is gravity-
+      # anchored on this IMU so the gyro_z bias soft observation also helps.
+      use_orientation_yaw: false
+      orientation_yaw_variance_rad2: 0.05
+      orientation_yaw_subsample: 5
+      use_ahrs_gyro_bias_z: true
+      ahrs_gyro_bias_z_variance_rad2_s2: 1.0e-2
+      ahrs_gyro_bias_z_subsample: 20
+      ahrs_gyro_bias_z_max_dt_s: 0.5
+      use_ahrs_gyro_bias_xyz: false
+      ahrs_gyro_bias_xyz_variance_rad2_s2:
+        x: 1.0e-2
+        y: 1.0e-2
+        z: 1.0e-2
+      ahrs_gyro_bias_xyz_subsample: 20
+      ahrs_gyro_bias_xyz_max_dt_s: 0.5
+
+      # No sonar source on this dataset.
+      sonar:
+        position_variance_floor: 0.04
+        max_age_s: 1.0
+
+      # WaterLinked A50 DVL bottom-track. The Tank Dataset paper provides the
+      # extrinsic between the DVL and the camera; the IMU↔DVL relative
+      # orientation is small and assumed identity here. If you need a tighter
+      # baseline, fill imu.dvl.mount.rotation_rpy_rad below.
+      dvl:
+        mount:
+          rotation_rpy_rad: [0.0, 0.0, 0.0]
+        # WaterLinked A50 specs the bottom-track velocity precision at ~1% of
+        # measured speed; on a slow tank ROV that comes out to centimetric
+        # one-sigma. 0.01 m²/s² ≈ 10 cm/s std-dev is a sensible starter.
+        velocity_variance_floor: 0.01
+        max_age_s: 0.5
+
+    init:
+      static_bias:
+        # The bag begins with a brief still-stand period before the ROV
+        # starts driving; 2 s is enough on the short_test sequence.
+        enable: true
+        window_seconds: 2.0
+        gyro_motion_threshold_radps: 0.10
+        accel_motion_threshold_mps2: 0.50
+        minimum_samples: 50
+
+    dynamics:
+      gravity_mps2: 9.80665
+      # Tank ROV in still water; small linear drag.
+      enable_linear_drag: true
+      linear_drag_coeff: 0.05
+      enable_buoyancy: false
+      buoyancy_accel_z_mps2: 0.0
+      current_velocity_xyz: [0.0, 0.0, 0.0]
