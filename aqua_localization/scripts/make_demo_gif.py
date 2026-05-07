@@ -107,6 +107,17 @@ class DemoGifRecorder(Node):
         else:
             self.reference_sub = None
 
+        self.fusion_traj: list[tuple[float, float, float, float]] = []
+        if args.fusion_odometry:
+            self.fusion_sub = self.create_subscription(
+                Odometry,
+                args.fusion_odometry,
+                self.on_fusion_odom,
+                QoSProfile(depth=200),
+            )
+        else:
+            self.fusion_sub = None
+
         # Single matplotlib figure reused across frames; renders to an in-memory
         # PNG and decoded into a PIL frame so we never hit the filesystem.
         self.fig, (self.ax_points, self.ax_traj) = plt.subplots(
@@ -147,6 +158,11 @@ class DemoGifRecorder(Node):
         q = msg.pose.pose.orientation
         self.reference_traj.append((t, p.x, p.y, p.z))
         self.latest_reference_pose = (t, p.x, p.y, p.z, q.x, q.y, q.z, q.w)
+
+    def on_fusion_odom(self, msg: Odometry) -> None:
+        t = stamp_to_seconds(msg.header.stamp)
+        p = msg.pose.pose.position
+        self.fusion_traj.append((t, p.x, p.y, p.z))
 
     def on_points(self, msg: PointCloud2) -> None:
         # Wait until we have a pose to ground the accumulated map and the trajectory
@@ -283,8 +299,16 @@ class DemoGifRecorder(Node):
                 traj[:, 0], traj[:, 1], "-", color="#1f77b4", linewidth=1.5,
                 label="aqua_sonar_loc",
             )
-            ax_t.plot(traj[-1, 0], traj[-1, 1], "o", color="#d62728", markersize=6)
-        if self.reference_traj or self.trajectory:
+            ax_t.plot(traj[-1, 0], traj[-1, 1], "o", color="#1f77b4", markersize=5)
+        if self.fusion_traj:
+            fused = np.asarray([(x, y) for _, x, y, _ in self.fusion_traj])
+            fused = fused - fused[0]
+            ax_t.plot(
+                fused[:, 0], fused[:, 1], "-", color="#ff7f0e", linewidth=1.5,
+                label="aqua_fusion",
+            )
+            ax_t.plot(fused[-1, 0], fused[-1, 1], "o", color="#d62728", markersize=6)
+        if self.reference_traj or self.trajectory or self.fusion_traj:
             ax_t.legend(loc="best", fontsize=8)
         ax_t.set_aspect("equal")
         ax_t.set_xlabel("x (m)")
@@ -342,6 +366,12 @@ def parse_args(argv) -> argparse.Namespace:
         default="",
         help="Optional reference odometry topic (e.g. /nav/processed/odometry from "
         "the MBES-SLAM bag) drawn alongside the aqua_sonar_loc estimate.",
+    )
+    parser.add_argument(
+        "--fusion-odometry",
+        default="",
+        help="Optional fusion odometry topic (e.g. /aqua_fusion/odometry) drawn as "
+        "a third trajectory line in orange.",
     )
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument(

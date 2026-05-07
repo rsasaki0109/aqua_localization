@@ -96,6 +96,43 @@ Roles for `aqua_sonar_loc`:
 It is installed automatically by `aqua_sonar_loc` (the whole `config/` directory is
 exported in `CMakeLists.txt`).
 
+## Three-node bring-up (IMU + sonar + fusion)
+
+For the full stack, also run `aqua_fusion` with the matching MBES profile. The
+fusion node loosely combines the IMU pose and the sonar pose at each IMU
+update. Bring-up commands:
+
+```bash
+# Terminal A: aqua_imu_loc.
+ros2 run aqua_imu_loc imu_loc_node --ros-args \
+  --params-file $(ros2 pkg prefix aqua_imu_loc)/share/aqua_imu_loc/config/mbes_slam.yaml \
+  -p use_sim_time:=true
+
+# Terminal B: aqua_sonar_loc.
+ros2 run aqua_sonar_loc sonar_loc_node --ros-args \
+  --params-file $(ros2 pkg prefix aqua_sonar_loc)/share/aqua_sonar_loc/config/mbes_slam.yaml \
+  -p use_sim_time:=true
+
+# Terminal C: aqua_fusion.
+ros2 run aqua_fusion fusion_node --ros-args \
+  --params-file $(ros2 pkg prefix aqua_fusion)/share/aqua_fusion/config/mbes_slam.yaml \
+  -p use_sim_time:=true
+
+# Terminal D: bag.
+ros2 bag play aqua_localization/datasets/public/mbes_slam/beach_pond_ros2 \
+  --clock --start-offset 60 --playback-duration 120
+```
+
+`/aqua_fusion/odometry` will be published throughout. **Loose-coupling caveat**
+— on this dataset the published `/aqua_fusion/odometry` follows the IMU dead
+reckoning closely (sonar registration on the geometrically degenerate Norbit
+fan barely moves, so the weighted-average fusion is dominated by the IMU input
+which itself drifts without GPS/DVL aiding). The wiring is exercised
+end-to-end and is correct; the trajectory accuracy improvement that loose
+coupling normally delivers requires both inputs to be reasonable, which is not
+yet the case here. Tightly-coupled fusion (sonar-residual feedback into the
+IMU bias states) is tracked in `docs/mvp_checklist.md` as the next step.
+
 ## IMU + sonar replay (with motion prior)
 
 The MBES-SLAM bag has a Microstrain IMU at 100 Hz but no pressure sensor. Run

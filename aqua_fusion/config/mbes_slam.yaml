@@ -1,0 +1,34 @@
+aqua_fusion:
+  ros__parameters:
+    topics:
+      imu_odometry: /aqua_imu_loc/odometry
+      sonar_odometry: /aqua_sonar_loc/odometry
+      fused_odometry: /aqua_fusion/odometry
+      status: /aqua_fusion/status
+
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+
+    publish:
+      # MBES-SLAM bringup runs aqua_imu_loc with publish.tf already true; let the
+      # IMU node own map->odom->base_link and keep fusion TF off so two
+      # broadcasters do not race for the same transform.
+      tf: false
+
+    fusion:
+      mode: loosely_coupled
+      # Sonar registration on the geometrically degenerate Norbit fan is
+      # comparatively unreliable (we already documented that scan-to-scan
+      # collapses to near-zero motion without the IMU prior). Pull more weight
+      # from the IMU dead reckoning than the BlueROV2 default and let the sonar
+      # pose nudge horizontal position when it converges.
+      sonar_pose_weight: 0.20
+      max_sonar_age_s: 1.0
+      use_sonar_orientation: false
+      # The post-registration covariance on this dataset is uncalibrated, so
+      # floor the sonar position variance fairly loose to keep the fusion
+      # conservative until aqua_sonar_loc publishes a validated covariance.
+      sonar_position_variance_floor: 0.50
+      sonar_yaw_variance_floor: 0.05
