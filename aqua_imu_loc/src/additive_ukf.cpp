@@ -242,6 +242,48 @@ void AdditiveUkf::update_yaw(double yaw_rad, double variance)
   covariance_ = 0.5 * (covariance_ + covariance_.transpose());
 }
 
+void AdditiveUkf::update_position(
+  const Eigen::Vector3d & position, const Eigen::Matrix3d & covariance)
+{
+  if (!position.allFinite() || !covariance.allFinite()) {
+    return;
+  }
+  const auto sigma_points = make_sigma_points();
+
+  Eigen::Vector3d predicted = Eigen::Vector3d::Zero();
+  for (size_t i = 0; i < sigma_points.size(); ++i) {
+    predicted += mean_weights_[i] * sigma_points[i].segment<3>(0);
+  }
+
+  Eigen::Matrix3d innovation_covariance = covariance;
+  Eigen::Matrix<double, kStateDim, 3> cross_covariance =
+    Eigen::Matrix<double, kStateDim, 3>::Zero();
+  for (size_t i = 0; i < sigma_points.size(); ++i) {
+    const Eigen::Vector3d measurement_delta = sigma_points[i].segment<3>(0) - predicted;
+    StateVector state_delta = sigma_points[i] - state_;
+    state_delta.segment<3>(6) = normalize_angles(state_delta.segment<3>(6));
+
+    innovation_covariance +=
+      covariance_weights_[i] * measurement_delta * measurement_delta.transpose();
+    cross_covariance +=
+      covariance_weights_[i] * state_delta * measurement_delta.transpose();
+  }
+
+  // Reject pathological innovation covariance (e.g. floored to zero).
+  Eigen::LLT<Eigen::Matrix3d> llt(innovation_covariance);
+  if (llt.info() != Eigen::Success) {
+    return;
+  }
+
+  const Eigen::Matrix<double, kStateDim, 3> kalman_gain =
+    cross_covariance * innovation_covariance.inverse();
+  const Eigen::Vector3d innovation = position - predicted;
+  state_ += kalman_gain * innovation;
+  state_.segment<3>(6) = normalize_angles(state_.segment<3>(6));
+  covariance_ -= kalman_gain * innovation_covariance * kalman_gain.transpose();
+  covariance_ = 0.5 * (covariance_ + covariance_.transpose());
+}
+
 void AdditiveUkf::update_depth(double depth_m, double variance)
 {
   const auto sigma_points = make_sigma_points();

@@ -170,6 +170,87 @@ TEST(AdditiveUkf, GyroBiasXyzUpdateMovesAllThreeAxesTowardObservation)
   EXPECT_NEAR(ukf.state()(14), truth.z(), 1.0e-3);
 }
 
+TEST(AdditiveUkf, PositionUpdateMovesStateTowardMeasurement)
+{
+  // A 3D position observation with a tight covariance must pull the UKF
+  // position toward the measurement and shrink the diagonal of the position
+  // covariance block.
+  aqua_imu_loc::AdditiveUkf ukf;
+  ukf.configure(0.2, 2.0, 0.0);
+  ukf.set_initial_covariance(diagonal(1.0));
+  ukf.set_process_noise(diagonal(0.0));
+
+  const Eigen::Matrix3d covariance = Eigen::Matrix3d::Identity() * 1.0e-4;
+  const Eigen::Vector3d measurement(2.0, -1.5, 0.7);
+
+  ukf.update_position(measurement, covariance);
+
+  EXPECT_NEAR(ukf.state()(0), measurement.x(), 0.05);
+  EXPECT_NEAR(ukf.state()(1), measurement.y(), 0.05);
+  EXPECT_NEAR(ukf.state()(2), measurement.z(), 0.05);
+  // Position covariance must shrink.
+  EXPECT_LT(ukf.covariance()(0, 0), 0.5);
+  EXPECT_LT(ukf.covariance()(1, 1), 0.5);
+  EXPECT_LT(ukf.covariance()(2, 2), 0.5);
+}
+
+TEST(AdditiveUkf, PositionUpdatePropagatesIntoBiasStatesAfterMotion)
+{
+  // The whole point of tightly-coupled fusion: a sonar position observation
+  // should correct not just position but also the cross-correlated bias
+  // states. Run a non-zero IMU prediction first so cross-covariance between
+  // position and the accel-bias states builds up, then observe a position
+  // that disagrees with the integrated motion. The accel-bias state should
+  // shift in response.
+  aqua_imu_loc::AdditiveUkf ukf;
+  ukf.configure(0.2, 2.0, 0.0);
+  ukf.set_initial_covariance(diagonal(0.1));
+  ukf.set_process_noise(diagonal(1.0e-4));
+  aqua_imu_loc::DynamicsParams dynamics;
+  dynamics.gravity_mps2 = 9.80665;
+  dynamics.enable_linear_drag = false;
+
+  // Accelerate forward at 1 m/s^2 along body-x for 1 s. The IMU sample
+  // includes the constant +g on body-z (REP-145 stationary-up convention).
+  aqua_imu_loc::ImuSample sample;
+  sample.linear_acceleration = Eigen::Vector3d(1.0, 0.0, 9.80665);
+  sample.angular_velocity = Eigen::Vector3d::Zero();
+  for (int i = 0; i < 100; ++i) {
+    ukf.predict(0.01, sample, dynamics);
+  }
+
+  const aqua_imu_loc::StateVector before = ukf.state();
+  EXPECT_GT(before(0), 0.3);  // sanity: position grew along x
+
+  // Observe a position that says the boat is at the origin: this is a strong
+  // contradiction with the integrated motion, so the bias states should
+  // adjust to absorb part of the residual.
+  const Eigen::Vector3d measurement(0.0, 0.0, 0.0);
+  const Eigen::Matrix3d covariance = Eigen::Matrix3d::Identity() * 1.0e-3;
+  ukf.update_position(measurement, covariance);
+
+  // accel_bias_x is state[9]; it should have moved (no requirement on sign,
+  // only that the cross-covariance pulled it away from zero).
+  EXPECT_GT(std::abs(ukf.state()(9)), 1.0e-4);
+}
+
+TEST(AdditiveUkf, PositionUpdateRejectsNonFiniteInputs)
+{
+  aqua_imu_loc::AdditiveUkf ukf;
+  ukf.configure(0.2, 2.0, 0.0);
+  ukf.set_initial_covariance(diagonal(0.1));
+  ukf.set_process_noise(diagonal(0.0));
+
+  const aqua_imu_loc::StateVector before = ukf.state();
+  ukf.update_position(
+    Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0),
+    Eigen::Matrix3d::Identity() * 1.0e-3);
+  ukf.update_position(
+    Eigen::Vector3d(0.0, 0.0, 0.0),
+    Eigen::Matrix3d::Constant(std::numeric_limits<double>::quiet_NaN()));
+  EXPECT_NEAR((ukf.state() - before).norm(), 0.0, 1.0e-12);
+}
+
 TEST(AdditiveUkf, GyroBiasXyzUpdateRejectsNonPositiveVariance)
 {
   aqua_imu_loc::AdditiveUkf ukf;

@@ -46,6 +46,14 @@ public:
   void update_gyro_bias_xyz(
     const Eigen::Vector3d & observed_bias_rad_s,
     const Eigen::Vector3d & variance_diagonal);
+  // Tightly-coupled position observation: feeds an external (x, y, z) into
+  // the UKF as a 3D measurement update. The 3x3 covariance is the position
+  // block of the source's published pose covariance (e.g. from
+  // /aqua_sonar_loc/odometry); the cross-correlations between position and
+  // the IMU bias states are exactly what closes the bias loop. Pass any
+  // positive-definite covariance — tests and runtime currently use a diagonal.
+  void update_position(
+    const Eigen::Vector3d & position, const Eigen::Matrix3d & covariance);
 
   const StateVector & state() const;
   const StateMatrix & covariance() const;
