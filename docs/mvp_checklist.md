@@ -30,6 +30,7 @@ This checklist tracks the first usable `aqua_localization` milestone.
 - `aqua_fusion` loosely fuses IMU/depth odometry with fresh sonar odometry.
 - `aqua_fusion` MBES-SLAM `beach_pond` profile (`aqua_fusion/config/mbes_slam.yaml`) ships and is exercised end-to-end alongside IMU + sonar; the loose-coupling weighted average follows the IMU input on this geometrically degenerate dataset (the trajectory improvement requires both inputs to be reasonable, see Next Milestones for the tightly-coupled follow-up).
 - `aqua_imu_loc` supports a static IMU mounting rotation (`imu.mount.rotation_rpy_rad`) so bags whose IMU axes do not match REP-145 (e.g. AQUALOC harbor sequences read gravity on -Y) can be replayed with the correct gravity subtraction.
+- `aqua_sonar_loc` publishes a fitness/inliers-derived diagonal pose covariance when `scan_matching.covariance.enable_estimation` is true (default: legacy 0.25 m² / 0.10 rad² for backward compatibility). Position variance scales as `position_scale * fitness_score / inliers` and rotation variance as `rotation_scale * fitness_score / (inliers * characteristic_range_m^2)`, both clamped to `[*_floor, *_cap]`. Sanity-checked on MBES-SLAM `beach_pond` (model produces a 1-sample 0.25 m² for the init fan and floor-clamped values for subsequent fans, confirming the wiring; per-platform chi-square calibration against ground-truth error is future work).
 - AQUALOC harbor sequence 07 starter profile (`aqua_imu_loc/config/aqualoc.yaml`) and bring-up doc (`datasets/aqualoc_demo.md`) ship; the bag download + ROS 2 conversion + topic discovery flow is fully documented. End-to-end accuracy on this bag is not yet validated (still-window-free start means the static-bias initializer cannot observe sensor biases).
 - Top-level launch starts IMU, sonar, and fusion nodes.
 - Replay launch supports `ros2 bag play`, topic remapping, `use_sim_time`, and subsystem toggles.
@@ -79,7 +80,12 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
   is missing is sonar-residual feedback into the IMU bias states.
 - `aqua_fusion` end-to-end run on a real public bag (it currently has unit + runtime tests but no public-data benchmark).
 - ESKF backend with error-state IMU propagation and bias handling.
-- Validated sonar covariance estimation.
+- Per-platform chi-square calibration of the sonar covariance scales against
+  ground-truth pose error. The fitness/inliers model and the parameter knobs
+  ship today; what is missing is the offline tuning loop that records
+  `(estimate, covariance, GT)` triples and adjusts `position_scale`,
+  `rotation_scale`, and the floors so ~95% of per-step pose errors fall
+  within 2σ.
 - NDT scan matching backend.
 - DVL, visual odometry, and acoustic positioning inputs.
 - Tightly coupled sonar residual fusion.

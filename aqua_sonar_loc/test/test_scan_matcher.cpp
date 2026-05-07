@@ -518,6 +518,111 @@ TEST(IcpScanMatcher, ExternalPriorIsClearedAfterRejectedSummary)
   EXPECT_NEAR(next_result.odom_to_base.translation.x, 0.2, 0.03);
 }
 
+TEST(IcpScanMatcher, LegacyCovarianceIsHardcodedDiagonal)
+{
+  // With covariance estimation disabled the published covariance must be the
+  // legacy 0.25 m² / 0.10 rad² diagonal that downstream fusion consumers were
+  // tuned against. Any other path is a regression.
+  aqua_sonar_loc::IcpScanMatcher matcher;
+  aqua_sonar_loc::ScanMatcherConfig config;
+  config.backend = "icp";
+  config.max_correspondence_distance = 2.0;
+  config.max_iterations = 100;
+  config.transformation_epsilon = 1.0e-10;
+  config.covariance_enable_estimation = false;
+  matcher.configure(config);
+
+  const std::vector<std::array<float, 3>> reference_points = {{
+    {0.0F, 0.0F, 0.0F}, {0.8F, 0.1F, 0.2F}, {-0.4F, 1.1F, 0.3F},
+    {1.5F, -0.6F, 0.7F}, {-1.2F, -0.4F, 1.1F},
+  }};
+  const auto shifted = translated(reference_points, 0.2F, 0.0F, 0.0F);
+  ASSERT_TRUE(matcher.match(make_cloud(reference_points),
+                            accepted_summary(reference_points.size())).success);
+  const auto result = matcher.match(
+    make_cloud(shifted), accepted_summary(shifted.size()));
+  ASSERT_TRUE(result.success) << result.status;
+
+  EXPECT_DOUBLE_EQ(result.pose_covariance[0], 0.25);   // x
+  EXPECT_DOUBLE_EQ(result.pose_covariance[7], 0.25);   // y
+  EXPECT_DOUBLE_EQ(result.pose_covariance[14], 0.25);  // z
+  EXPECT_DOUBLE_EQ(result.pose_covariance[21], 0.10);  // roll
+  EXPECT_DOUBLE_EQ(result.pose_covariance[28], 0.10);  // pitch
+  EXPECT_DOUBLE_EQ(result.pose_covariance[35], 0.10);  // yaw
+}
+
+TEST(IcpScanMatcher, EstimatedCovarianceShrinksOnGoodFitAndRespectsFloor)
+{
+  // With estimation enabled the per-axis variance should equal the floor when
+  // fitness/inliers is small (good match), and stay at the floor not below.
+  aqua_sonar_loc::IcpScanMatcher matcher;
+  aqua_sonar_loc::ScanMatcherConfig config;
+  config.backend = "icp";
+  config.max_correspondence_distance = 2.0;
+  config.max_iterations = 100;
+  config.transformation_epsilon = 1.0e-10;
+  config.covariance_enable_estimation = true;
+  config.covariance_position_floor_m2 = 0.04;
+  config.covariance_rotation_floor_rad2 = 0.001;
+  config.covariance_position_cap_m2 = 9.0;
+  config.covariance_rotation_cap_rad2 = 1.0;
+  matcher.configure(config);
+
+  const std::vector<std::array<float, 3>> reference_points = {{
+    {0.0F, 0.0F, 0.0F}, {0.8F, 0.1F, 0.2F}, {-0.4F, 1.1F, 0.3F},
+    {1.5F, -0.6F, 0.7F}, {-1.2F, -0.4F, 1.1F}, {0.2F, 1.8F, -0.5F},
+    {1.9F, 1.2F, 0.4F}, {-0.9F, 0.7F, -0.8F}, {0.6F, -1.4F, 1.3F}, {1.1F, 0.4F, -1.0F},
+  }};
+  const auto shifted = translated(reference_points, 0.05F, 0.0F, 0.0F);
+  ASSERT_TRUE(matcher.match(make_cloud(reference_points),
+                            accepted_summary(reference_points.size())).success);
+  const auto result = matcher.match(
+    make_cloud(shifted), accepted_summary(shifted.size()));
+  ASSERT_TRUE(result.success) << result.status;
+
+  // Tiny shift = tiny fitness; the position variance should sit at the floor.
+  EXPECT_NEAR(result.pose_covariance[0], 0.04, 1.0e-9);
+  EXPECT_NEAR(result.pose_covariance[14], 0.04, 1.0e-9);
+  // Rotation variance should also sit at the floor for the same reason.
+  EXPECT_NEAR(result.pose_covariance[21], 0.001, 1.0e-9);
+  EXPECT_NEAR(result.pose_covariance[35], 0.001, 1.0e-9);
+}
+
+TEST(IcpScanMatcher, EstimatedCovarianceCapIsRespected)
+{
+  // Force a very low cap and confirm the estimate clamps to it on a noisy
+  // fitness score. We achieve a poor fit by giving GICP only a tiny
+  // overlap window and letting the residual blow up.
+  aqua_sonar_loc::IcpScanMatcher matcher;
+  aqua_sonar_loc::ScanMatcherConfig config;
+  config.backend = "icp";
+  config.max_correspondence_distance = 2.0;
+  config.max_iterations = 50;
+  config.transformation_epsilon = 1.0e-6;
+  config.covariance_enable_estimation = true;
+  config.covariance_position_scale = 1.0e6;        // hugely amplified
+  config.covariance_position_floor_m2 = 1.0e-9;    // effectively no floor
+  config.covariance_position_cap_m2 = 0.5;         // tight cap
+  config.covariance_rotation_scale = 1.0e6;
+  config.covariance_rotation_floor_rad2 = 1.0e-9;
+  config.covariance_rotation_cap_rad2 = 0.1;
+  matcher.configure(config);
+
+  const std::vector<std::array<float, 3>> reference_points = {{
+    {0.0F, 0.0F, 0.0F}, {0.8F, 0.1F, 0.2F}, {-0.4F, 1.1F, 0.3F},
+    {1.5F, -0.6F, 0.7F}, {-1.2F, -0.4F, 1.1F}, {0.2F, 1.8F, -0.5F},
+  }};
+  const auto shifted = translated(reference_points, 0.5F, 0.0F, 0.0F);
+  ASSERT_TRUE(matcher.match(make_cloud(reference_points),
+                            accepted_summary(reference_points.size())).success);
+  const auto result = matcher.match(
+    make_cloud(shifted), accepted_summary(shifted.size()));
+  ASSERT_TRUE(result.success) << result.status;
+
+  EXPECT_LE(result.pose_covariance[0], 0.5 + 1.0e-9);
+  EXPECT_LE(result.pose_covariance[35], 0.1 + 1.0e-9);
+}
+
 TEST(IcpScanMatcher, NegativeGateValuesAreDisabled)
 {
   aqua_sonar_loc::IcpScanMatcher matcher;

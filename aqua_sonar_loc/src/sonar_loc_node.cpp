@@ -87,6 +87,23 @@ private:
       submap_size_param > 0 ? static_cast<std::size_t>(submap_size_param) : std::size_t{1};
     scan_matcher_config.use_motion_prior =
       declare_parameter<bool>("scan_matching.use_motion_prior", false);
+
+    scan_matcher_config.covariance_enable_estimation = declare_parameter<bool>(
+      "scan_matching.covariance.enable_estimation", false);
+    scan_matcher_config.covariance_position_floor_m2 = declare_parameter<double>(
+      "scan_matching.covariance.position_floor_m2", 0.04);
+    scan_matcher_config.covariance_position_scale = declare_parameter<double>(
+      "scan_matching.covariance.position_scale", 1.0);
+    scan_matcher_config.covariance_position_cap_m2 = declare_parameter<double>(
+      "scan_matching.covariance.position_cap_m2", 25.0);
+    scan_matcher_config.covariance_rotation_floor_rad2 = declare_parameter<double>(
+      "scan_matching.covariance.rotation_floor_rad2", 0.001);
+    scan_matcher_config.covariance_rotation_scale = declare_parameter<double>(
+      "scan_matching.covariance.rotation_scale", 1.0);
+    scan_matcher_config.covariance_rotation_cap_rad2 = declare_parameter<double>(
+      "scan_matching.covariance.rotation_cap_rad2", 1.0);
+    scan_matcher_config.covariance_characteristic_range_m = declare_parameter<double>(
+      "scan_matching.covariance.characteristic_range_m", 10.0);
     scan_matcher_ = create_scan_matcher(scan_matcher_config.backend);
     if (!scan_matcher_) {
       RCLCPP_WARN(
@@ -292,19 +309,17 @@ private:
     odometry.pose.pose.position.z = match_result.odom_to_base.translation.z;
     odometry.pose.pose.orientation = match_result.odom_to_base.rotation;
 
-    for (auto & value : odometry.pose.covariance) {
-      value = 0.0;
+    // The match-result covariance carries either the estimated diagonal (when
+    // scan_matching.covariance.enable_estimation is true) or the legacy 0.25/0.10
+    // diagonal that downstream fusion consumers were tuned against. Either way
+    // it covers the full 6x6 pose block; copy it verbatim and zero the twist
+    // covariance since the scan matcher does not estimate body-frame velocity.
+    for (size_t i = 0; i < odometry.pose.covariance.size(); ++i) {
+      odometry.pose.covariance[i] = match_result.pose_covariance[i];
     }
     for (auto & value : odometry.twist.covariance) {
       value = 0.0;
     }
-
-    odometry.pose.covariance[0] = 0.25;
-    odometry.pose.covariance[7] = 0.25;
-    odometry.pose.covariance[14] = 0.25;
-    odometry.pose.covariance[21] = 0.10;
-    odometry.pose.covariance[28] = 0.10;
-    odometry.pose.covariance[35] = 0.10;
     return odometry;
   }
 

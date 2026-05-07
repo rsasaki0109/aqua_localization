@@ -35,6 +35,59 @@ PclPointCloud::Ptr convert_cloud(const sensor_msgs::msg::PointCloud2 & cloud)
   return converted;
 }
 
+// Legacy hard-coded diagonal covariance preserved for the
+// `covariance_enable_estimation=false` path so existing fusion configs keep
+// the same behaviour they had before the estimator landed.
+constexpr double kLegacyPositionVariance = 0.25;
+constexpr double kLegacyRotationVariance = 0.10;
+
+std::array<double, 36> legacy_diagonal_covariance()
+{
+  std::array<double, 36> cov{};
+  cov[0] = kLegacyPositionVariance;
+  cov[7] = kLegacyPositionVariance;
+  cov[14] = kLegacyPositionVariance;
+  cov[21] = kLegacyRotationVariance;
+  cov[28] = kLegacyRotationVariance;
+  cov[35] = kLegacyRotationVariance;
+  return cov;
+}
+
+// Estimate a 6x6 diagonal pose covariance from the post-registration
+// fitness_score (mean squared correspondence distance) and the inlier count.
+// Translation variance per axis scales as fitness/inliers (intuition: noise
+// per point divided by sqrt(N) sample averaging applied to each component;
+// taken element-wise so the per-axis variance is fitness/N times the scaling
+// factor). Rotation variance scales as fitness/(inliers * L^2) where L is the
+// characteristic correspondence stand-off (further-apart points pin rotation
+// more tightly). Floors/caps keep the estimate physically meaningful.
+std::array<double, 36> estimate_diagonal_covariance(
+  double fitness_score,
+  std::size_t inlier_count,
+  const ScanMatcherConfig & config)
+{
+  std::array<double, 36> cov{};
+  const double safe_n = std::max<double>(static_cast<double>(inlier_count), 1.0);
+  double position_variance =
+    config.covariance_position_scale * fitness_score / safe_n;
+  position_variance = std::max(position_variance, config.covariance_position_floor_m2);
+  position_variance = std::min(position_variance, config.covariance_position_cap_m2);
+
+  const double L = std::max(config.covariance_characteristic_range_m, 0.1);
+  double rotation_variance =
+    config.covariance_rotation_scale * fitness_score / (safe_n * L * L);
+  rotation_variance = std::max(rotation_variance, config.covariance_rotation_floor_rad2);
+  rotation_variance = std::min(rotation_variance, config.covariance_rotation_cap_rad2);
+
+  cov[0] = position_variance;
+  cov[7] = position_variance;
+  cov[14] = position_variance;
+  cov[21] = rotation_variance;
+  cov[28] = rotation_variance;
+  cov[35] = rotation_variance;
+  return cov;
+}
+
 geometry_msgs::msg::Transform accumulated_transform_msg(const Eigen::Matrix4f & accumulated)
 {
   geometry_msgs::msg::Transform transform;
@@ -84,6 +137,9 @@ ScanMatchResult run_pcl_registration(
 {
   ScanMatchResult result;
   result.odom_to_base.rotation.w = 1.0;
+  // Default to the legacy diagonal so even the early-return paths leave a
+  // sensible covariance for downstream consumers.
+  result.pose_covariance = legacy_diagonal_covariance();
 
   // Consume the external prior up front so every return path clears it. This way a
   // stale IMU-derived prior cannot leak into a later fan if the current fan is
@@ -191,6 +247,11 @@ ScanMatchResult run_pcl_registration(
   result.success = true;
   result.status = backend_label + " converged";
   result.odom_to_base = accumulated_transform_msg(accumulated_transform);
+  result.inlier_count = summary.in_range_points;
+  if (config.covariance_enable_estimation) {
+    result.pose_covariance =
+      estimate_diagonal_covariance(result.fitness_score, result.inlier_count, config);
+  }
   return result;
 }
 }  // namespace
@@ -211,6 +272,9 @@ ScanMatchResult NoopScanMatcher::match(
   result.fitness_score = 0.0;
   result.status = summary.accepted ? "noop identity transform" : summary.rejection_reason;
   result.odom_to_base.rotation.w = 1.0;
+  // The noop matcher does not produce a registration-quality signal, so emit
+  // the legacy diagonal regardless of covariance_enable_estimation.
+  result.pose_covariance = legacy_diagonal_covariance();
   return result;
 }
 
