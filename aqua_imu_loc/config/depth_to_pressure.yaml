@@ -1,0 +1,23 @@
+depth_to_pressure:
+  ros__parameters:
+    topics:
+      # Input depth in meters, positive downward. Type: std_msgs/msg/Float64.
+      depth: /depth
+      # Output absolute pressure in pascals. Type: sensor_msgs/msg/FluidPressure.
+      pressure: /pressure
+
+    # Frame assigned to the generated FluidPressure header.
+    frame_id: pressure_link
+
+    # Pressure model:
+    # pressure_pa = reference_pressure_pa + water_density_kg_m3 * gravity_mps2 * (depth + depth_offset_m)
+    reference_pressure_pa: 101325.0
+    # Seawater default. Use roughly 997.0 for fresh-water simulation/tanks.
+    water_density_kg_m3: 1025.0
+    gravity_mps2: 9.80665
+    # Additive depth correction before conversion. Positive means deeper.
+    depth_offset_m: 0.0
+    # Published FluidPressure variance in Pa^2. Set from simulator/sensor model if known.
+    pressure_variance_pa2: 0.0
+    # Reject clearly invalid negative depths while allowing small surface noise.
+    min_depth_m: -1.0

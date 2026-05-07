@@ -1,0 +1,94 @@
+aqua_imu_loc:
+  ros__parameters:
+    topics:
+      # NTNU underwater dataset (Ariel, BlueROV2-Heavy class) records IMU through
+      # MAVROS in base_link orientation. The Alphasense IMU is also available at
+      # /alphasense_driver_ros/imu (200 Hz) but is in the Alphasense frame.
+      imu: /mavros/imu/data
+      # Native sensor_msgs/msg/FluidPressure published by MAVROS. No scalar adapter needed.
+      pressure: /mavros/imu/static_pressure
+      current_velocity: ""
+      odometry: /aqua_imu_loc/odometry
+      status: /aqua_imu_loc/status
+
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+
+    publish:
+      tf: true
+      odometry: true
+
+    services:
+      reset: /aqua_imu_loc/reset
+
+    ukf:
+      alpha: 0.2
+      beta: 2.0
+      kappa: 0.0
+      # Inherits the BlueROV2 starter tuning since Ariel is a BlueROV2-Heavy variant.
+      initial_covariance_diagonal:
+        [0.50, 0.50, 0.20,
+         0.20, 0.20, 0.10,
+         0.05, 0.05, 0.20,
+         0.08, 0.08, 0.08,
+         0.02, 0.02, 0.02]
+      process_noise_diagonal:
+        [0.03, 0.03, 0.02,
+         0.35, 0.35, 0.15,
+         0.015, 0.015, 0.04,
+         0.0010, 0.0010, 0.0010,
+         0.0002, 0.0002, 0.0002]
+      max_prediction_dt: 0.05
+      min_prediction_dt: 0.0005
+
+    pressure:
+      use_first_pressure_as_reference: true
+      reference_pressure_pa: 101325.0
+      # Trondheim Fjord is brackish-to-marine; seawater default is a reasonable starter.
+      water_density_kg_m3: 1025.0
+      depth_variance: 0.02
+      depth_offset_m: 0.0
+
+    imu:
+      # AHRS yaw observation is left disabled on this sequence because tight yaw updates
+      # re-project body velocity and worsen horizontal APE. See docs/benchmarks/fjord_1_yaw_frame.md.
+      use_orientation_yaw: false
+      orientation_yaw_variance_rad2: 0.05
+      orientation_yaw_subsample: 5
+      # Use the AHRS yaw rate (numerical derivative of /mavros/imu/data orientation) as a soft
+      # measurement of the gyro_z bias state. This avoids position discontinuities while still
+      # letting the long-term mismatch between gyro and AHRS pull the bias state toward truth.
+      # On fjord_1 the z-only hook empirically out-performs the 3-axis hook because
+      # AHRS roll/pitch are accelerometer-anchored and noisy under dynamic motion, while
+      # AHRS yaw rate (mag-anchored) is reliable on average. Keep z-only here and leave
+      # the 3-axis variant disabled-but-available for tank/sim platforms.
+      use_ahrs_gyro_bias_z: true
+      ahrs_gyro_bias_z_variance_rad2_s2: 1.0e-2
+      ahrs_gyro_bias_z_subsample: 20
+      ahrs_gyro_bias_z_max_dt_s: 0.5
+      use_ahrs_gyro_bias_xyz: false
+      ahrs_gyro_bias_xyz_variance_rad2_s2:
+        x: 1.0e-2
+        y: 1.0e-2
+        z: 1.0e-2
+      ahrs_gyro_bias_xyz_subsample: 20
+      ahrs_gyro_bias_xyz_max_dt_s: 0.5
+
+    init:
+      static_bias:
+        # Ariel surface deployment off the support boat is short; 3 s of stillness is realistic.
+        enable: true
+        window_seconds: 3.0
+        gyro_motion_threshold_radps: 0.10
+        accel_motion_threshold_mps2: 0.50
+        minimum_samples: 50
+
+    dynamics:
+      gravity_mps2: 9.80665
+      enable_linear_drag: true
+      linear_drag_coeff: 0.08
+      enable_buoyancy: false
+      buoyancy_accel_z_mps2: 0.0
+      current_velocity_xyz: [0.0, 0.0, 0.0]

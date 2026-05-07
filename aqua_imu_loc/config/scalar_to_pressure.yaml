@@ -1,0 +1,42 @@
+scalar_to_pressure:
+  ros__parameters:
+    topics:
+      # Input scalar topic. Type is selected by input_type below.
+      scalar: /scalar_pressure
+      # Output absolute pressure in pascals. Type: sensor_msgs/msg/FluidPressure.
+      pressure: /pressure
+
+    # Frame assigned to the generated FluidPressure header.
+    frame_id: pressure_link
+
+    # Supported values:
+    #   float64: subscribe as std_msgs/msg/Float64
+    #   float32: subscribe as std_msgs/msg/Float32
+    input_type: float64
+
+    # Supported modes:
+    #   pressure_pa: scalar is already absolute pressure in pascals
+    #   depth_m: scalar is positive-down depth in meters
+    #   ntnu_barometer: depth = -((scalar - barometer_pressure_offset) / barometer_pressure_scale)
+    mode: pressure_pa
+
+    # Used by pressure_pa mode for simple dataset-specific unit/reference corrections.
+    pressure_offset_pa: 0.0
+
+    # Used by depth_m and ntnu_barometer modes:
+    # pressure_pa = reference_pressure_pa + water_density_kg_m3 * gravity_mps2 * (depth + depth_offset_m)
+    reference_pressure_pa: 101325.0
+    water_density_kg_m3: 1025.0
+    gravity_mps2: 9.80665
+    depth_offset_m: 0.0
+
+    # Reject converted depth outside this range before publishing FluidPressure.
+    min_depth_m: -1.0
+    max_depth_m: 10000.0
+
+    # Used only by ntnu_barometer mode. Fill these from the selected dataset sequence calibration.
+    barometer_pressure_offset: 0.0
+    barometer_pressure_scale: 1.0
+
+    # Published FluidPressure variance in Pa^2. Set from sensor model if known.
+    pressure_variance_pa2: 0.0

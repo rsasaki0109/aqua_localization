@@ -1,0 +1,31 @@
+aqua_fusion:
+  ros__parameters:
+    topics:
+      # Dead-reckoning odometry from aqua_imu_loc.
+      imu_odometry: /aqua_imu_loc/odometry
+      # Future sonar registration odometry from aqua_sonar_loc.
+      sonar_odometry: /aqua_sonar_loc/odometry
+      # Future fused output.
+      fused_odometry: /aqua_fusion/odometry
+      # Lightweight fusion policy diagnostics.
+      status: /aqua_fusion/status
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+    publish:
+      # Publish map->odom identity and odom->base_link from fused odometry.
+      # Keep false for standalone development if aqua_imu_loc is already publishing TF.
+      tf: false
+    fusion:
+      # Planned modes: loosely_coupled, tightly_coupled.
+      mode: loosely_coupled
+      # Weight applied to fresh sonar pose. 0.0 means pure IMU odometry; 1.0 means pure sonar pose.
+      sonar_pose_weight: 0.35
+      # Ignore sonar odometry older than this time difference relative to the IMU odometry stamp.
+      max_sonar_age_s: 1.0
+      # Use sonar orientation directly when a fresh sonar update is available.
+      use_sonar_orientation: false
+      # Keep sonar corrections conservative until registration covariance is validated.
+      sonar_position_variance_floor: 0.25
+      sonar_yaw_variance_floor: 0.05

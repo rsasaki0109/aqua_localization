@@ -1,0 +1,15 @@
+depth_to_pressure:
+  ros__parameters:
+    topics:
+      # Input depth in meters, positive downward. Type: std_msgs/msg/Float64.
+      depth: /rexrov/depth
+      # Output topic consumed by aqua_imu_loc/config/uuv_simulator.yaml.
+      pressure: /rexrov/pressure
+
+    frame_id: pressure_link
+    reference_pressure_pa: 101325.0
+    water_density_kg_m3: 1025.0
+    gravity_mps2: 9.80665
+    depth_offset_m: 0.0
+    pressure_variance_pa2: 0.0
+    min_depth_m: -1.0
