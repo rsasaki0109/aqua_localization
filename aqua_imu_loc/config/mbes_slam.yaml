@@ -1,0 +1,108 @@
+aqua_imu_loc:
+  ros__parameters:
+    topics:
+      # MBES-SLAM (POS group) bag publishes the Microstrain raw IMU at 100 Hz.
+      # The Madgwick-fused topic `/nav/processed/microstrain/imu/madgwick`
+      # carries the same accel/gyro plus an AHRS quaternion; we use the raw
+      # topic for the prediction step and rely on the AHRS hooks below for
+      # gyro-bias observations from the same Microstrain orientation channel
+      # (forwarded onto orientation fields via use_orientation_yaw etc.).
+      imu: /nav/processed/microstrain/imu/madgwick
+      # No pressure sensor on the surface vessel — disable the subscription and
+      # use the surface_assumption hook below to pin z at 0.
+      pressure: ""
+      current_velocity: ""
+      odometry: /aqua_imu_loc/odometry
+      status: /aqua_imu_loc/status
+
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+
+    publish:
+      tf: true
+      odometry: true
+
+    services:
+      reset: /aqua_imu_loc/reset
+
+    ukf:
+      alpha: 0.2
+      beta: 2.0
+      kappa: 0.0
+      # Surface-vessel motion is gentler than the BlueROV2 starter; tighter
+      # initial yaw and a tighter z covariance reflect the surface_assumption
+      # measurement that pins z at 0.
+      initial_covariance_diagonal:
+        [0.25, 0.25, 0.05,
+         0.20, 0.20, 0.05,
+         0.05, 0.05, 0.10,
+         0.05, 0.05, 0.05,
+         0.01, 0.01, 0.01]
+      process_noise_diagonal:
+        [0.02, 0.02, 0.005,
+         0.20, 0.20, 0.05,
+         0.01, 0.01, 0.02,
+         0.0005, 0.0005, 0.0005,
+         0.0001, 0.0001, 0.0001]
+      max_prediction_dt: 0.05
+      min_prediction_dt: 0.0005
+
+    pressure:
+      # Unused (topic disabled), but the parameters must still be declared for
+      # the node to start.
+      use_first_pressure_as_reference: true
+      reference_pressure_pa: 101325.0
+      water_density_kg_m3: 1000.0
+      depth_variance: 0.04
+      depth_offset_m: 0.0
+
+    imu:
+      # Microstrain Madgwick output is reliable on average; use the AHRS yaw
+      # rate to drag the gyro_z bias toward truth without injecting position
+      # discontinuities.
+      use_orientation_yaw: false
+      orientation_yaw_variance_rad2: 0.05
+      orientation_yaw_subsample: 5
+      use_ahrs_gyro_bias_z: true
+      ahrs_gyro_bias_z_variance_rad2_s2: 1.0e-2
+      ahrs_gyro_bias_z_subsample: 20
+      ahrs_gyro_bias_z_max_dt_s: 0.5
+      use_ahrs_gyro_bias_xyz: false
+      ahrs_gyro_bias_xyz_variance_rad2_s2:
+        x: 1.0e-2
+        y: 1.0e-2
+        z: 1.0e-2
+      ahrs_gyro_bias_xyz_subsample: 20
+      ahrs_gyro_bias_xyz_max_dt_s: 0.5
+
+      # Surface vessel: no pressure sensor, so emit a synthetic depth=0
+      # measurement every Nth IMU sample. At 100 Hz IMU and subsample=10 this
+      # is a 10 Hz pseudo-update with 4 cm^2 variance — loose enough that the
+      # estimator is dominated by accelerometer-derived motion when the boat
+      # genuinely heaves, but tight enough that vertical accel-bias drift does
+      # not run away.
+      surface_assumption:
+        enable: true
+        depth_variance: 0.04
+        subsample: 10
+
+    init:
+      static_bias:
+        # The bag starts with the boat already underway, so the static-bias
+        # initializer cannot find a still window. Disable it.
+        enable: false
+        window_seconds: 3.0
+        gyro_motion_threshold_radps: 0.10
+        accel_motion_threshold_mps2: 0.50
+        minimum_samples: 50
+
+    dynamics:
+      gravity_mps2: 9.80665
+      # Surface vessel; no submerged drag.
+      enable_linear_drag: false
+      linear_drag_coeff: 0.0
+      enable_buoyancy: false
+      buoyancy_accel_z_mps2: 0.0
+      current_velocity_xyz: [0.0, 0.0, 0.0]

@@ -35,9 +35,11 @@ public:
     imu_sub_ = create_subscription<sensor_msgs::msg::Imu>(
       imu_topic_, rclcpp::SensorDataQoS(),
       std::bind(&ImuLocNode::on_imu, this, std::placeholders::_1));
-    pressure_sub_ = create_subscription<sensor_msgs::msg::FluidPressure>(
-      pressure_topic_, rclcpp::SensorDataQoS(),
-      std::bind(&ImuLocNode::on_pressure, this, std::placeholders::_1));
+    if (!pressure_topic_.empty()) {
+      pressure_sub_ = create_subscription<sensor_msgs::msg::FluidPressure>(
+        pressure_topic_, rclcpp::SensorDataQoS(),
+        std::bind(&ImuLocNode::on_pressure, this, std::placeholders::_1));
+    }
     if (!current_velocity_topic_.empty()) {
       current_velocity_sub_ = create_subscription<geometry_msgs::msg::TwistStamped>(
         current_velocity_topic_, rclcpp::SystemDefaultsQoS(),
@@ -54,7 +56,8 @@ public:
     RCLCPP_INFO(
       get_logger(),
       "aqua_imu_loc started: imu=%s pressure=%s current_velocity=%s odom=%s reset=%s frames=%s->%s->%s",
-      imu_topic_.c_str(), pressure_topic_.c_str(),
+      imu_topic_.c_str(),
+      pressure_topic_.empty() ? "<disabled>" : pressure_topic_.c_str(),
       current_velocity_topic_.empty() ? "<disabled>" : current_velocity_topic_.c_str(), odometry_topic_.c_str(),
       reset_service_.c_str(), map_frame_.c_str(), odom_frame_.c_str(), base_frame_.c_str());
   }
@@ -163,6 +166,17 @@ private:
       1, declare_parameter<long>("imu.ahrs_gyro_bias_xyz_subsample", 20)));
     ahrs_gyro_bias_xyz_max_dt_s_ =
       declare_parameter<double>("imu.ahrs_gyro_bias_xyz_max_dt_s", 0.5);
+
+    // Surface-vessel pseudo-depth: when there is no pressure sensor (e.g. a
+    // surface boat with a multibeam sounder mounted from the hull) we can pin z
+    // at zero so accel-derived vertical drift does not blow up. This is
+    // equivalent to a synthetic depth-0 measurement at every Nth IMU step.
+    surface_assumption_enable_ =
+      declare_parameter<bool>("imu.surface_assumption.enable", false);
+    surface_assumption_variance_ =
+      declare_parameter<double>("imu.surface_assumption.depth_variance", 0.04);
+    surface_assumption_subsample_ = static_cast<size_t>(std::max<long>(
+      1, declare_parameter<long>("imu.surface_assumption.subsample", 10)));
   }
 
   std::vector<double> vector_parameter(
@@ -215,6 +229,7 @@ private:
     last_imu_stamp_valid_ = false;
     last_prediction_dt_ = 0.0;
     update_count_ = 0;
+    surface_assumption_sample_count_ = 0;
   }
 
   void on_imu(const sensor_msgs::msg::Imu::SharedPtr msg)
@@ -260,8 +275,22 @@ private:
     maybe_apply_orientation_yaw(*msg);
     maybe_apply_ahrs_gyro_bias_z(stamp, *msg);
     maybe_apply_ahrs_gyro_bias_xyz(stamp, *msg, sample);
+    maybe_apply_surface_assumption();
 
     publish(stamp);
+  }
+
+  void maybe_apply_surface_assumption()
+  {
+    if (!surface_assumption_enable_) {
+      return;
+    }
+    ++surface_assumption_sample_count_;
+    if (surface_assumption_sample_count_ < surface_assumption_subsample_) {
+      return;
+    }
+    surface_assumption_sample_count_ = 0;
+    filter_.update_depth(0.0, surface_assumption_variance_);
   }
 
   void maybe_apply_ahrs_gyro_bias_xyz(
@@ -639,6 +668,10 @@ private:
   std::size_t ahrs_gyro_bias_z_sample_count_{0};
   std::size_t ahrs_gyro_bias_xyz_subsample_{20};
   std::size_t ahrs_gyro_bias_xyz_sample_count_{0};
+  bool surface_assumption_enable_{false};
+  double surface_assumption_variance_{0.04};
+  std::size_t surface_assumption_subsample_{10};
+  std::size_t surface_assumption_sample_count_{0};
 
   rclcpp::Time last_imu_stamp_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;

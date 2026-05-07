@@ -24,6 +24,8 @@ This checklist tracks the first usable `aqua_localization` milestone.
 - `aqua_sonar_loc` applies post-registration quality gates (`max_fitness_score`, `max_translation_step_m`, `max_rotation_step_rad`).
 - `aqua_sonar_loc` ships a submap front end (`scan_matching.submap_size > 1` with optional `use_motion_prior`).
 - `aqua_sonar_loc` accepts an external IMU/DVL motion prior on a `nav_msgs/Odometry` topic (`motion_prior.topic`) and uses the relative SE(3) between bracketing samples as the registration initial guess.
+- `aqua_imu_loc` supports IMU-only operation (`topics.pressure: ""`) with a configurable surface-vessel pseudo-depth hook (`imu.surface_assumption`) so a boat with no pressure sensor can dead-reckon without z drifting unbounded.
+- MBES-SLAM `beach_pond` IMU-only `aqua_imu_loc` profile (`aqua_imu_loc/config/mbes_slam.yaml`) feeds `/aqua_imu_loc/odometry` into `aqua_sonar_loc` (`aqua_sonar_loc/config/mbes_slam.yaml` `motion_prior.topic`); end-to-end replay confirms the registration initial guess flows through and the estimate moves out from origin (further accuracy tuning is tracked separately).
 - `aqua_imu_loc` exposes optional AHRS hooks (yaw observation, gyro_z bias from AHRS yaw rate, 3-axis gyro bias) and a static-bias initializer.
 - `aqua_fusion` loosely fuses IMU/depth odometry with fresh sonar odometry.
 - Top-level launch starts IMU, sonar, and fusion nodes.
@@ -64,8 +66,9 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
 
 ## Still Research/Next Milestones
 
-- Microstrain-IMU-only `aqua_imu_loc` profile for the MBES-SLAM bag (no pressure, depth=0)
-  so the new `motion_prior.topic` wiring can be exercised end-to-end on the public bag.
+- Tighten the IMU-only `aqua_imu_loc` MBES-SLAM tuning so the estimate matches the
+  bag's reference more closely (current end-to-end demo proves the wiring but the
+  estimate trails the GT trajectory by a large margin over an 8 s slice).
 - `aqua_fusion` end-to-end run on a real public bag (it currently has unit + runtime tests but no public-data benchmark).
 - ESKF backend with error-state IMU propagation and bias handling.
 - Validated sonar covariance estimation.
