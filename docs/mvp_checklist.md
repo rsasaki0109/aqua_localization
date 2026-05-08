@@ -51,6 +51,17 @@ This checklist tracks the first usable `aqua_localization` milestone.
   - MBES-SLAM `beach_pond` multibeam replay through `aqua_sonar_loc` GICP (see `datasets/mbes_slam_demo.md`).
 - Trajectory recording (`record_odometry.py`, `record_status.py`) and Umeyama-aligned APE comparison (`compare_trajectories.py`, `plot_trajectories.py`) ship in the metapackage.
 - NTNU `fjord_1` benchmark runner (`bench_fjord_1.sh`) appends results to `docs/benchmarks/fjord_1.md`.
+- All four public demos ship a headless [rerun.io](https://rerun.io) export
+  script (`rerun_export.py`, `rerun_export_mbes.py`, `rerun_export_ntnu.py`,
+  `rerun_export_aqualoc.py`) plus a screenshot under `docs/media/*_rerun.png`,
+  produced from results-included demo bags (recipe in
+  `docs/foxglove/README.md`). Replaces the "60–120 s screen recording"
+  Next Milestones item — every demo now has a self-contained `.rrd` that
+  is interactively scrubbable in the rerun viewer or web viewer, and the
+  static screenshots ship in the README without requiring a live RViz.
+- Lichtblick (Apache-2.0 fork of Foxglove Studio) layout JSON ships in
+  `docs/foxglove/aqua_tank_demo.json` plus a Playwright driver
+  (`scripts/lichtblick_screenshot.py`) for browser-only replay.
 - TF ownership is automatic in top-level launch:
   - fusion enabled: `aqua_fusion` owns TF
   - fusion disabled: `aqua_imu_loc` owns TF
@@ -99,4 +110,3 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
   remaining sensor-aiding gaps are visual and acoustic.)
 - Tightly coupled sonar residual fusion.
 - AQUALOC + additional MBES-SLAM/OpenSonarDatasets adapters.
-- Demo screen recording (60–120 s) replacing the static thumbnails.

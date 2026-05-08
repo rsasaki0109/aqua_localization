@@ -77,6 +77,22 @@ See [PLAN.md](PLAN.md) for the handover plan and public-demo next steps.
 
 ## Public-Data Demo
 
+Four public underwater datasets, four [rerun.io](https://rerun.io) renderings,
+no synthetic bags or simulation in the headline path:
+
+| Dataset | What it shows | Asset |
+|---------|---------------|-------|
+| Tank Dataset `short_test` | DVL fusion vs AprilTag GT, **0.43 m APE RMSE** on 15 s | [`tank_dataset_rerun.png`](docs/media/tank_dataset_rerun.png) |
+| MBES-SLAM `beach_pond` | Multibeam fans accumulated into a depth-colored bathymetric scan | [`mbes_slam_rerun.png`](docs/media/mbes_slam_rerun.png) |
+| NTNU `subset-fjord/fjord_1` | Dataset SLAM baseline through a 7 m fjord dive | [`ntnu_fjord_1_rerun.png`](docs/media/ntnu_fjord_1_rerun.png) |
+| AQUALOC `harbor_07` | LIRMM "Dumbo" ROV underwater camera + pressure depth track | [`aqualoc_harbor_07_rerun.png`](docs/media/aqualoc_harbor_07_rerun.png) |
+
+Each entry below has its own rerun export script under
+[`aqua_localization/scripts/rerun_export*.py`](aqua_localization/scripts) and
+its own `.rrd` recording recipe. The exports are reproducible from the
+recorded demo bag (see [`docs/foxglove/README.md`](docs/foxglove/README.md))
+without a manual RViz session.
+
 Tank Dataset `short_test` — IMU + pressure + DVL fusion vs AprilTag GT, rendered
 in [rerun.io](https://rerun.io) directly from the recorded demo bag. The 3D
 panel overlays GT (green) and `aqua_imu_loc` estimate (blue, Umeyama-aligned to
