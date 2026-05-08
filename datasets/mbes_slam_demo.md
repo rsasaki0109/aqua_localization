@@ -96,9 +96,41 @@ Roles for `aqua_sonar_loc`:
 It is installed automatically by `aqua_sonar_loc` (the whole `config/` directory is
 exported in `CMakeLists.txt`).
 
-## Three-node bring-up (IMU + sonar + fusion)
+## Tightly-coupled bring-up (IMU + sonar)
 
-For the full stack, also run `aqua_fusion` with the matching MBES profile. The
+The MBES-SLAM IMU profile pre-wires `topics.sonar_odometry` to
+`/aqua_sonar_loc/odometry` so that each accepted sonar registration is fed
+directly into the `aqua_imu_loc` UKF as a 3D position observation. The
+registration residual then closes the IMU bias loop through the existing
+position↔bias cross-covariance, which is what tightly-coupled fusion buys
+over the loose-coupling weighted average in `aqua_fusion`. Two-terminal
+bring-up:
+
+```bash
+# Terminal A: aqua_imu_loc with the MBES profile (subscribes to
+#             /aqua_sonar_loc/odometry as a measurement source).
+ros2 run aqua_imu_loc imu_loc_node --ros-args \
+  --params-file $(ros2 pkg prefix aqua_imu_loc)/share/aqua_imu_loc/config/mbes_slam.yaml \
+  -p use_sim_time:=true
+
+# Terminal B: aqua_sonar_loc.
+ros2 run aqua_sonar_loc sonar_loc_node --ros-args \
+  --params-file $(ros2 pkg prefix aqua_sonar_loc)/share/aqua_sonar_loc/config/mbes_slam.yaml \
+  -p use_sim_time:=true
+
+# Terminal C: bag.
+ros2 bag play aqua_localization/datasets/public/mbes_slam/beach_pond_ros2 \
+  --clock --start-offset 60 --playback-duration 120
+```
+
+`/aqua_imu_loc/odometry` is now the headline trajectory output, with
+sonar-residual feedback baked in. To disable the feedback (pure dead
+reckoning), launch with `-p topics.sonar_odometry:=""`.
+
+## Loose-coupling bring-up (legacy aqua_fusion)
+
+For a baseline comparison, the older loose-coupling fusion node still
+ships and can be run alongside the same IMU + sonar bring-up. The
 fusion node loosely combines the IMU pose and the sonar pose at each IMU
 update. Bring-up commands:
 

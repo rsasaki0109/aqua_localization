@@ -12,6 +12,13 @@ aqua_imu_loc:
       # use the surface_assumption hook below to pin z at 0.
       pressure: ""
       current_velocity: ""
+      # Tightly-coupled feedback path: subscribe to /aqua_sonar_loc/odometry
+      # and use its (x, y, z) + position covariance as a 3D measurement update
+      # on the UKF. Pair this with `aqua_sonar_loc/config/mbes_slam.yaml`
+      # which already publishes a fitness-derived covariance via
+      # scan_matching.covariance.enable_estimation. Leave empty to fall back
+      # to pure IMU dead reckoning.
+      sonar_odometry: /aqua_sonar_loc/odometry
       odometry: /aqua_imu_loc/odometry
       status: /aqua_imu_loc/status
 
@@ -91,6 +98,14 @@ aqua_imu_loc:
         enable: true
         depth_variance: 0.04
         subsample: 10
+
+      # Tightly-coupled sonar fusion knobs. The position variance floor
+      # protects the UKF against an over-confident sonar publishing a
+      # near-zero covariance; on this dataset the published sonar floor
+      # already sits at 0.10 m², so 0.04 m² is rarely binding.
+      sonar:
+        position_variance_floor: 0.04
+        max_age_s: 1.0
 
     init:
       static_bias:
