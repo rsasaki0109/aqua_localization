@@ -21,15 +21,36 @@ install required, no account needed for local-file playback.
 
 ## Recording a results-included bag
 
-Foxglove plays whatever is in the bag — by itself the source bag does not
-contain `aqua_localization` output topics. Record a "demo" bag that captures
-both the inputs and our pipeline output, so the resulting `.mcap` is
-self-contained and reproducible:
+Foxglove and rerun.io both play whatever is in the bag — by themselves the
+source public bags do not contain `aqua_localization` output topics. Record
+a "demo" bag that captures both the inputs and our pipeline outputs, so the
+resulting `.mcap` is self-contained and reproducible.
+
+One-shot recorder per dataset (each builds on the same pattern: estimator in
+the background, `ros2 bag record` writing to mcap, `ros2 bag play --clock`
+driving the source bag in the foreground):
+
+```bash
+ros2 run aqua_localization record_tank_demo.sh
+ros2 run aqua_localization record_mbes_demo.sh
+ros2 run aqua_localization record_ntnu_demo.sh
+ros2 run aqua_localization record_aqualoc_demo.sh
+```
+
+Each script honors environment overrides for source/output paths and replay
+duration — see the header comment of each `aqua_localization/scripts/record_*_demo.sh`
+file.
+
+The Tank demo bag contains ~27 k messages over ~15 s including 5 321
+`/aqua_imu_loc/odometry` samples; the MBES demo bag is ~50 MB across 60 s
+of multibeam fans plus our pipeline outputs; the NTNU bag is ~21 MB over
+90 s; AQUALOC clocks in around 400 MB because of the camera stream.
+
+If you prefer the manual three-terminal flow:
 
 ```bash
 # Source bag (input only).
 SRC=aqua_localization/datasets/public/tank_dataset/short_test_ros2
-
 # Output bag (input + estimate + TF).
 OUT=aqua_localization/datasets/public/tank_dataset/demo_with_estimate
 
@@ -51,10 +72,6 @@ ros2 bag play "$SRC" --clock
 ```
 
 After the source bag finishes, ctrl-C the recorder and estimator.
-
-The demo bag now contains 27 k messages over ~15 s, including the
-27 001-message Tank short_test sequence with 5 321 `/aqua_imu_loc/odometry`
-samples for the trajectory comparison.
 
 ## Loading the layout in Foxglove
 
