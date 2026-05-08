@@ -34,6 +34,7 @@ This checklist tracks the first usable `aqua_localization` milestone.
 - `aqua_imu_loc` accepts a tightly-coupled sonar position observation (`topics.sonar_odometry` + `imu.sonar.{position_variance_floor,max_age_s}`). The 3D position from `/aqua_sonar_loc/odometry` is fed as a measurement update on the UKF position state, and via the existing position↔bias cross-covariance the registration residual closes the IMU bias loop. MBES profile pre-wired (`aqua_imu_loc/config/mbes_slam.yaml`); sanity-checked end-to-end on the bag (loose-coupling drift of ±40 m in the previous fusion path drops to ~17 m now that sonar pulls the IMU state on every accepted fan instead of being weighted-averaged after the fact).
 - `aqua_imu_loc` accepts a DVL body-frame velocity observation (`topics.dvl_velocity` + `imu.dvl.{mount.rotation_rpy_rad,velocity_variance_floor,max_age_s}`). The TwistStamped sample is pre-rotated into base_link by the static mount rotation, then fed into the UKF as a body-frame velocity measurement (predicted = R(rpy)^T v_world, sigma-point cross-covariance properly couples back into both world-frame velocity and rotation states). Three new gtests cover identity-rotation pull, 90° yaw rotation correctness, and non-finite-input rejection. No public bag with DVL data is wired yet — the Tank Dataset (already on the dataset shortlist) is the natural next demo target.
 - AQUALOC harbor sequence 07 starter profile (`aqua_imu_loc/config/aqualoc.yaml`) and bring-up doc (`datasets/aqualoc_demo.md`) ship; the bag download + ROS 2 conversion + topic discovery flow is fully documented. End-to-end accuracy on this bag is not yet validated (still-window-free start means the static-bias initializer cannot observe sensor biases).
+- Tank Dataset (Xu et al., IJRR 2025) `short_test` sequence onboarded with starter profile (`aqua_imu_loc/config/tank_dataset.yaml`), bring-up doc (`datasets/tank_dataset_demo.md`), and a one-shot Python adapter (`scripts/convert_tank_dataset_bag.py`) that converts the source ROS 1 bag to ROS 2 mcap, decodes the custom `waterlinked_a50_ros_driver/DVL` message into `geometry_msgs/TwistStamped`, and synthesises a `sensor_msgs/FluidPressure` track from the source's `nav_msgs/Odometry` depth. End-to-end APE measured at 0.43 m RMSE / 5309 samples against the AprilTag GT track on the 15 s short_test sequence — this is the first public-data demo of the DVL body-frame velocity fusion path.
 - Top-level launch starts IMU, sonar, and fusion nodes.
 - Replay launch supports `ros2 bag play`, topic remapping, `use_sim_time`, and subsystem toggles.
 - Replay launch can optionally start the depth-to-pressure adapter.
@@ -94,9 +95,9 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
   within 2σ.
 - NDT scan matching backend.
 - Visual odometry and acoustic positioning inputs. (DVL body-frame velocity
-  fusion is implemented and unit-tested; what is missing is a public dataset
-  with DVL data wired through to confirm end-to-end behaviour. The Tank
-  Dataset entry in `docs/public_dataset_candidates.md` is the natural target.)
+  fusion is implemented, unit-tested, and validated end-to-end on the Tank
+  Dataset short_test sequence — see `datasets/tank_dataset_demo.md`. The
+  remaining sensor-aiding gaps are visual and acoustic.)
 - Tightly coupled sonar residual fusion.
 - AQUALOC + additional MBES-SLAM/OpenSonarDatasets adapters.
 - Demo screen recording (60–120 s) replacing the static thumbnails.
