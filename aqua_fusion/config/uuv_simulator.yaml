@@ -1,0 +1,27 @@
+aqua_fusion:
+  ros__parameters:
+    topics:
+      imu_odometry: /aqua_imu_loc/odometry
+      sonar_odometry: /aqua_sonar_loc/odometry
+      fused_odometry: /aqua_fusion/odometry
+      status: /aqua_fusion/status
+
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+
+    publish:
+      # Top-level launch sets this true when fusion is enabled.
+      tf: false
+
+    fusion:
+      mode: loosely_coupled
+      # Simulation sonar odometry is easier to inspect; use a slightly stronger correction than BlueROV2.
+      sonar_pose_weight: 0.40
+      # Simulator pipelines can publish sonar clouds slower than IMU.
+      max_sonar_age_s: 2.0
+      # Leave orientation on IMU until sonar orientation covariance is modeled.
+      use_sonar_orientation: false
+      sonar_position_variance_floor: 0.20
+      sonar_yaw_variance_floor: 0.05

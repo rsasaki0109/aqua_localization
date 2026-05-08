@@ -1,0 +1,59 @@
+aqua_sonar_loc:
+  ros__parameters:
+    topics:
+      # Input sonar point cloud from FLS, multibeam sonar, or simulation.
+      points: /sonar/points
+      # Accepted/preprocessed point cloud stream. Current skeleton republishes accepted clouds.
+      filtered_points: /aqua_sonar_loc/points_filtered
+      # Future scan-matching odometry output.
+      odometry: /aqua_sonar_loc/odometry
+      # Lightweight scan matching/preprocessing health diagnostics.
+      status: /aqua_sonar_loc/status
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+      sonar: sonar_link
+    scan_matching:
+      # Current backends: icp, gicp, noop. Planned backends: ndt.
+      # gicp uses pcl::GeneralizedIterativeClosestPoint and tends to be more accurate
+      # under noisy correspondences but needs at least k_correspondences (~20) points
+      # per scan to compute local covariances.
+      backend: icp
+      # Maximum correspondence distance in meters.
+      max_correspondence_distance: 1.0
+      # Maximum solver iterations per registration.
+      max_iterations: 50
+      # Minimum transformation delta for convergence.
+      transformation_epsilon: 0.000001
+      # Quality gates applied after each ICP run. Values <= 0 disable the gate.
+      # max_fitness_score: PCL ICP fitness (mean squared correspondence distance) above
+      # this threshold is rejected. Tune per environment; sonar point clouds are noisier
+      # than lidar so this is typically loose.
+      max_fitness_score: -1.0
+      # Reject per-step transforms whose translation magnitude exceeds this in meters.
+      # Catches ICP solutions that have jumped to a wrong correspondence basin.
+      max_translation_step_m: -1.0
+      # Reject per-step transforms whose rotation magnitude exceeds this in radians.
+      max_rotation_step_rad: -1.0
+      # Scan-to-submap front end. When > 1, the icp/gicp backends match the new fan
+      # against the concatenation of the last `submap_size` accepted fans (each kept
+      # in the most-recent fan's frame). Useful for multibeam where a single fan is
+      # geometrically degenerate. Value 1 keeps the original scan-to-scan behavior.
+      submap_size: 1
+      # Use the previous registration's transform as the initial guess for the next
+      # registration (constant-velocity motion prior). Strongly recommended when
+      # submap_size > 1 to avoid the zero-motion feedback loop on geometrically
+      # degenerate fans (each new fan starts at where the previous fan ended, not at
+      # identity, so the submap is forced to provide along-track structure).
+      use_motion_prior: false
+
+    preprocessing:
+      # Require x/y/z numeric fields before scan matching.
+      require_xyz: true
+      # Reject points outside max_range_m before registration.
+      enable_range_filter: true
+      # Conservative default for Forward-Looking Sonar and multibeam simulation.
+      max_range_m: 80.0
+      # Minimum finite in-range points required before publishing to the registration pipeline.
+      min_points: 20

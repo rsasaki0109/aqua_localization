@@ -1,0 +1,81 @@
+aqua_imu_loc:
+  ros__parameters:
+    topics:
+      # BlueROV2/ArduSub bags commonly expose IMU through MAVROS.
+      # Remap or edit this when using a different bridge, e.g. /imu/data.
+      imu: /mavros/imu/data
+      # Expected type: sensor_msgs/msg/FluidPressure in pascals.
+      # Bar30/pressure bridges often use /bar30/pressure or /pressure.
+      pressure: /bar30/pressure
+      # Optional geometry_msgs/TwistStamped water-current estimate in odom frame.
+      # Leave empty unless a simulator/current estimator publishes this.
+      current_velocity: ""
+      # Keep package output topics stable across vehicle profiles.
+      odometry: /aqua_imu_loc/odometry
+      status: /aqua_imu_loc/status
+
+    frames:
+      # Keep REP-105 frame names by default. Add static sensor extrinsics in robot_state_publisher.
+      map: map
+      odom: odom
+      base_link: base_link
+
+    publish:
+      # Top-level aqua_localization launch overrides this automatically when fusion is enabled.
+      tf: true
+      odometry: true
+
+    services:
+      reset: /aqua_imu_loc/reset
+
+    ukf:
+      # Conservative sigma point spread for early pool/tank tuning.
+      alpha: 0.2
+      beta: 2.0
+      kappa: 0.0
+      # State order:
+      # [x, y, z, vx, vy, vz, roll, pitch, yaw, accel_bias_xyz, gyro_bias_xyz]
+      # BlueROV2 pressure/depth is usually more reliable than horizontal dead reckoning,
+      # so z starts tighter than x/y while yaw remains loose without compass/DVL.
+      initial_covariance_diagonal:
+        [0.50, 0.50, 0.20,
+         0.20, 0.20, 0.10,
+         0.05, 0.05, 0.20,
+         0.08, 0.08, 0.08,
+         0.02, 0.02, 0.02]
+      # Continuous process noise diagonal for the same state order.
+      # Horizontal velocity is intentionally loose because pure IMU dead reckoning drifts quickly underwater.
+      process_noise_diagonal:
+        [0.03, 0.03, 0.02,
+         0.35, 0.35, 0.15,
+         0.015, 0.015, 0.04,
+         0.0010, 0.0010, 0.0010,
+         0.0002, 0.0002, 0.0002]
+      # Clamp abnormal intervals caused by bag seek, Wi-Fi latency, or bridge startup.
+      max_prediction_dt: 0.05
+      min_prediction_dt: 0.0005
+
+    pressure:
+      # For field bags, the first valid pressure sample is usually the safest zero-depth reference.
+      use_first_pressure_as_reference: true
+      # Used only when use_first_pressure_as_reference is false.
+      reference_pressure_pa: 101325.0
+      # Seawater default. Use roughly 997.0 for fresh-water tanks.
+      water_density_kg_m3: 1025.0
+      # Bar30-class sensors are typically stable enough for a tight depth update after calibration.
+      depth_variance: 0.02
+      # Positive means deeper. Use this for sensor mounting/calibration bias.
+      depth_offset_m: 0.0
+
+    dynamics:
+      gravity_mps2: 9.80665
+      # Simple relative-water drag is enabled by default for ROV-style motion.
+      enable_linear_drag: true
+      # Initial tune for a compact, drag-dominated vehicle. Increase if velocity should decay faster.
+      linear_drag_coeff: 0.08
+      # Set true only after ballast/buoyancy mismatch is measured.
+      enable_buoyancy: false
+      # Positive z is upward in odom frame.
+      buoyancy_accel_z_mps2: 0.0
+      # Static current estimate in odom frame [m/s]. Overwritten when topics.current_velocity is enabled.
+      current_velocity_xyz: [0.0, 0.0, 0.0]

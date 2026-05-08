@@ -1,0 +1,12 @@
+build/
+install/
+log/
+*.pyc
+__pycache__/
+.colcon/
+
+# Public-dataset downloads and ROS 2 conversions live here. The notes
+# (datasets/*.md) describe how to re-download; the data itself is too
+# large for version control.
+datasets/public/
+

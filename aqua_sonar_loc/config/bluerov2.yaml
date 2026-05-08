@@ -1,0 +1,38 @@
+aqua_sonar_loc:
+  ros__parameters:
+    topics:
+      # FLS/multibeam point cloud topic after vendor driver or simulator conversion.
+      # Common alternatives: /sonar/points, /fls/points, /multibeam/points.
+      points: /fls/points
+      # Accepted/preprocessed point cloud stream for inspection and bag debugging.
+      filtered_points: /aqua_sonar_loc/points_filtered
+      # Sonar scan-matching odometry output.
+      odometry: /aqua_sonar_loc/odometry
+      # Scan matching/preprocessing health diagnostics.
+      status: /aqua_sonar_loc/status
+
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+      # Match the sensor frame used by the BlueROV2 URDF/static TF.
+      sonar: sonar_link
+
+    scan_matching:
+      # Current production-MVP backend. Use noop for pipeline debugging.
+      backend: icp
+      # Shorter correspondence gate for close-range FLS data on a small ROV.
+      max_correspondence_distance: 0.75
+      # More iterations than the generic default to help sparse sonar clouds settle.
+      max_iterations: 80
+      transformation_epsilon: 0.000001
+
+    preprocessing:
+      # Require metric xyz fields. Raw polar sonar images must be converted upstream first.
+      require_xyz: true
+      # Reject far/invalid points before scan matching.
+      enable_range_filter: true
+      # BlueROV2 FLS usage is commonly close-range. Increase for multibeam surveys.
+      max_range_m: 30.0
+      # Keep this above tiny-noise clusters but below sparse FLS returns.
+      min_points: 12

@@ -1,0 +1,27 @@
+scalar_to_pressure:
+  ros__parameters:
+    topics:
+      # Replace with the barometer/scalar pressure topic found by inspect_bag_topics.py.
+      scalar: /barometer
+      # Match aqua_imu_loc topics.pressure or use replay.launch.py remapping.
+      pressure: /pressure
+
+    frame_id: pressure_link
+    input_type: float64
+
+    # NTNU dataset card documents depth as:
+    # depth = -((barometer_measurement - baro_pressure_offset_) / baro_pressure_scale)
+    mode: ntnu_barometer
+
+    reference_pressure_pa: 101325.0
+    water_density_kg_m3: 1025.0
+    gravity_mps2: 9.80665
+    depth_offset_m: 0.0
+    min_depth_m: -1.0
+    max_depth_m: 200.0
+
+    # Must be set from the chosen NTNU sequence calibration before recording a quantitative demo.
+    barometer_pressure_offset: 0.0
+    barometer_pressure_scale: 1.0
+
+    pressure_variance_pa2: 0.0

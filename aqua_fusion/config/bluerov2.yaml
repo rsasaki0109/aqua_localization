@@ -1,0 +1,30 @@
+aqua_fusion:
+  ros__parameters:
+    topics:
+      # Stable internal odometry topics from aqua_imu_loc and aqua_sonar_loc.
+      imu_odometry: /aqua_imu_loc/odometry
+      sonar_odometry: /aqua_sonar_loc/odometry
+      fused_odometry: /aqua_fusion/odometry
+      status: /aqua_fusion/status
+
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+
+    publish:
+      # Top-level launch sets this true when fusion is enabled.
+      # Keep false for standalone debugging if aqua_imu_loc is already publishing TF.
+      tf: false
+
+    fusion:
+      mode: loosely_coupled
+      # Conservative sonar correction. Increase only after scan matching covariance/quality is validated.
+      sonar_pose_weight: 0.25
+      # FLS/multibeam registration may run slower than IMU; tolerate moderate lag in bag replay.
+      max_sonar_age_s: 1.5
+      # Use IMU orientation until sonar orientation quality is explicitly validated.
+      use_sonar_orientation: false
+      # Keep fused covariance conservative for downstream controllers/visualization.
+      sonar_position_variance_floor: 0.35
+      sonar_yaw_variance_floor: 0.08

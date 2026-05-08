@@ -1,0 +1,32 @@
+aqua_sonar_loc:
+  ros__parameters:
+    topics:
+      # Starter point cloud topic for uuv_simulator sonar/multibeam conversions.
+      # Raw sonar images or ranges must be converted to metric PointCloud2 upstream.
+      points: /rexrov/sonar/points
+      filtered_points: /aqua_sonar_loc/points_filtered
+      odometry: /aqua_sonar_loc/odometry
+      status: /aqua_sonar_loc/status
+
+    frames:
+      map: map
+      odom: odom
+      base_link: base_link
+      sonar: sonar_link
+
+    scan_matching:
+      # ICP is useful for synthetic point clouds when scene overlap is good.
+      # Use noop when debugging the replay graph before tuning registration.
+      backend: icp
+      # Simulated multibeam clouds can move farther between frames than close-range FLS.
+      max_correspondence_distance: 1.5
+      max_iterations: 100
+      transformation_epsilon: 0.000001
+
+    preprocessing:
+      require_xyz: true
+      enable_range_filter: true
+      # Simulation sonar/multibeam scenes may cover larger ranges than BlueROV2 FLS profiles.
+      max_range_m: 100.0
+      # Synthetic clouds are often dense; keep this high enough to reject empty/noisy conversions.
+      min_points: 30
