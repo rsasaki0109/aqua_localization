@@ -105,9 +105,17 @@ For the older 2D matplotlib view of the same registration run:
 
 ![aqua_sonar_loc on MBES-SLAM beach_pond](docs/media/mbes_slam_beach_pond.gif)
 
-Per-trajectory breakdowns:
+NTNU `subset-fjord/fjord_1` — the dataset's own ground-truth trajectory
+through the fjord, rendered in rerun.io. The cyan path is the source SLAM
+baseline (~7 m diving over a ~20 m horizontal extent). The aqua_imu_loc
+estimate is logged but excluded from the default 3D view because the
+IMU-only dead-reckoning XY drifts hundreds of meters on this 312 s bag
+(no DVL/visual aiding); depth z(t) tracks the baseline closely thanks
+to the pressure-update loop, plotted in the right column.
 
-NTNU `subset-fjord/fjord_1` — IMU + pressure dead reckoning, Umeyama-aligned APE vs the dataset baseline:
+![aqua_imu_loc on NTNU fjord_1 (rerun.io)](docs/media/ntnu_fjord_1_rerun.png)
+
+Per-trajectory matplotlib breakdown:
 
 ![aqua_imu_loc on NTNU fjord_1](docs/media/public_demo_thumbnail.png)
 
