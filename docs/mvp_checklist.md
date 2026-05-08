@@ -98,12 +98,20 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
   observation loop, but an error-state formulation would be the principled
   way to handle attitude observations from `aqua_sonar_loc` and to add
   delayed-state smoothing once visual or DVL aiding lands.)
-- Per-platform chi-square calibration of the sonar covariance scales against
-  ground-truth pose error. The fitness/inliers model and the parameter knobs
-  ship today; what is missing is the offline tuning loop that records
-  `(estimate, covariance, GT)` triples and adjusts `position_scale`,
-  `rotation_scale`, and the floors so ~95% of per-step pose errors fall
-  within 2σ.
+- Per-platform chi-square calibration of the sonar covariance scales:
+  `aqua_localization/scripts/calibrate_sonar_covariance.py` is the offline
+  tuning loop, run on `(estimate, covariance, GT)` triples extracted from
+  a results-included demo bag. Reports observed Mahalanobis^2 distribution,
+  required scale factor to match chi-square 3-dof targets, and saturation
+  warnings when sigma is floor-/cap-bound. MBES-SLAM `beach_pond` calibrated
+  end-to-end against `/nav/processed/odometry`: with 22 accepted fans the
+  pre-calibration position_scale=1.0 produced d^2 mean=1834 vs the
+  chi-square-3 target of 3 (95th=9669 vs 7.8), so the profile now ships
+  position_floor=25 m^2 / scale=100 / cap=400 m^2 to make the published
+  uncertainty honest about the per-fan registration error on this
+  geometrically-degenerate dataset. Re-running with more samples per
+  platform (e.g. once an OpenSonarDatasets bag with more accepted fans is
+  wired) is the natural follow-up.
 - Visual odometry and acoustic positioning inputs. (DVL body-frame velocity
   fusion is implemented, unit-tested, and validated end-to-end on the Tank
   Dataset short_test sequence — see `datasets/tank_dataset_demo.md`. The
