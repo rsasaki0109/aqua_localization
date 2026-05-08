@@ -23,6 +23,8 @@ install(PROGRAMS
   scripts/make_synthetic_sonar_bag.py
   scripts/make_demo_gif.py
   scripts/convert_tank_dataset_bag.py
+  scripts/rerun_export.py
+  scripts/lichtblick_screenshot.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
