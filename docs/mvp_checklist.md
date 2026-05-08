@@ -66,9 +66,14 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
 
 ## Still Research/Next Milestones
 
-- Tighten the IMU-only `aqua_imu_loc` MBES-SLAM tuning so the estimate matches the
-  bag's reference more closely (current end-to-end demo proves the wiring but the
-  estimate trails the GT trajectory by a large margin over an 8 s slice).
+- Tightly-coupled IMU/sonar fusion so the trajectory output is no longer
+  IMU-dead-reckoning-only on bags without GPS/DVL aiding. Today the MBES-SLAM
+  IMU-only profile uses AHRS yaw + 3-axis gyro-bias hooks and a surface-vessel
+  pseudo-depth assumption, but the residual horizontal velocity error over an
+  8 s slice is still large and the visible estimate trail in the demo GIF does
+  not track the bag's reference. Wiring is correct end-to-end (the registration
+  initial guess flows through and accepted scans produce visible motion); what
+  is missing is sonar-residual feedback into the IMU bias states.
 - `aqua_fusion` end-to-end run on a real public bag (it currently has unit + runtime tests but no public-data benchmark).
 - ESKF backend with error-state IMU propagation and bias handling.
 - Validated sonar covariance estimation.
