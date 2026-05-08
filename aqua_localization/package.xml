@@ -12,6 +12,7 @@
   <exec_depend>aqua_imu_loc</exec_depend>
   <exec_depend>aqua_sonar_loc</exec_depend>
   <exec_depend>aqua_fusion</exec_depend>
+  <exec_depend>aqua_pose_graph</exec_depend>
   <exec_depend>aqua_msgs</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
