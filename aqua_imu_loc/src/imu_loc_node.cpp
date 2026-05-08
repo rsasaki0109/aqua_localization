@@ -138,6 +138,20 @@ private:
     static_bias_initializer_.enable(
       declare_parameter<bool>("init.static_bias.enable", true));
 
+    // Static IMU mounting rotation. Some bags carry the IMU mounted such that
+    // the body-Z axis is not the up axis (e.g. AQUALOC reads gravity on the
+    // body-Y axis). When set, accel and angular_velocity are pre-rotated by
+    // R_mount before being handed to the UKF, so the UKF's REP-145 assumption
+    // (body-Z up, accel ~ +g when stationary level) holds.
+    {
+      const auto rpy = vector_parameter(
+        "imu.mount.rotation_rpy_rad", {0.0, 0.0, 0.0}, 3);
+      const Eigen::AngleAxisd roll(rpy[0], Eigen::Vector3d::UnitX());
+      const Eigen::AngleAxisd pitch(rpy[1], Eigen::Vector3d::UnitY());
+      const Eigen::AngleAxisd yaw(rpy[2], Eigen::Vector3d::UnitZ());
+      imu_mount_rotation_ = (yaw * pitch * roll).toRotationMatrix();
+    }
+
     use_orientation_yaw_ = declare_parameter<bool>("imu.use_orientation_yaw", false);
     orientation_yaw_variance_rad2_ =
       declare_parameter<double>("imu.orientation_yaw_variance_rad2", 0.05);
@@ -256,9 +270,9 @@ private:
     }
 
     ImuSample sample;
-    sample.linear_acceleration = Eigen::Vector3d(
+    sample.linear_acceleration = imu_mount_rotation_ * Eigen::Vector3d(
       msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
-    sample.angular_velocity = Eigen::Vector3d(
+    sample.angular_velocity = imu_mount_rotation_ * Eigen::Vector3d(
       msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
 
     if (!imu_preprocessor_.sample_is_finite(sample)) {
@@ -672,6 +686,7 @@ private:
   double surface_assumption_variance_{0.04};
   std::size_t surface_assumption_subsample_{10};
   std::size_t surface_assumption_sample_count_{0};
+  Eigen::Matrix3d imu_mount_rotation_{Eigen::Matrix3d::Identity()};
 
   rclcpp::Time last_imu_stamp_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
