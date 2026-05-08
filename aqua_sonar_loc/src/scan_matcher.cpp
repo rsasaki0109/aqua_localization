@@ -79,10 +79,17 @@ ScanMatchResult run_pcl_registration(
   const CloudSummary & summary,
   std::deque<PclPointCloud::Ptr> & previous_clouds,
   Eigen::Matrix4f & accumulated_transform,
-  Eigen::Matrix4f & last_current_to_previous)
+  Eigen::Matrix4f & last_current_to_previous,
+  std::optional<Eigen::Matrix4f> & external_prior)
 {
   ScanMatchResult result;
   result.odom_to_base.rotation.w = 1.0;
+
+  // Consume the external prior up front so every return path clears it. This way a
+  // stale IMU-derived prior cannot leak into a later fan if the current fan is
+  // rejected by preprocessing or the cloud conversion fails.
+  std::optional<Eigen::Matrix4f> consumed_prior;
+  std::swap(consumed_prior, external_prior);
 
   if (!summary.accepted) {
     result.status = summary.rejection_reason;
@@ -120,7 +127,12 @@ ScanMatchResult run_pcl_registration(
   registration.setTransformationEpsilon(config.transformation_epsilon);
 
   PclPointCloud aligned;
-  if (config.use_motion_prior) {
+  // External prior wins over the constant-velocity (use_motion_prior) prior; the
+  // prior was already swapped out of the member optional so this match call
+  // consumes it exactly once.
+  if (consumed_prior.has_value()) {
+    registration.align(aligned, *consumed_prior);
+  } else if (config.use_motion_prior) {
     registration.align(aligned, last_current_to_previous);
   } else {
     registration.align(aligned);
@@ -214,6 +226,7 @@ void IcpScanMatcher::configure(const ScanMatcherConfig & config)
   previous_clouds_.clear();
   accumulated_transform_.setIdentity();
   last_current_to_previous_.setIdentity();
+  external_prior_.reset();
 }
 
 ScanMatchResult IcpScanMatcher::match(
@@ -223,12 +236,22 @@ ScanMatchResult IcpScanMatcher::match(
   pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
   return run_pcl_registration(
     icp, config_, "icp", cloud, summary,
-    previous_clouds_, accumulated_transform_, last_current_to_previous_);
+    previous_clouds_, accumulated_transform_, last_current_to_previous_, external_prior_);
 }
 
 std::string IcpScanMatcher::backend_name() const
 {
   return config_.backend;
+}
+
+void IcpScanMatcher::set_external_prior(const Eigen::Matrix4f & current_to_previous)
+{
+  external_prior_ = current_to_previous;
+}
+
+void IcpScanMatcher::clear_external_prior()
+{
+  external_prior_.reset();
 }
 
 void GicpScanMatcher::configure(const ScanMatcherConfig & config)
@@ -238,6 +261,7 @@ void GicpScanMatcher::configure(const ScanMatcherConfig & config)
   previous_clouds_.clear();
   accumulated_transform_.setIdentity();
   last_current_to_previous_.setIdentity();
+  external_prior_.reset();
 }
 
 ScanMatchResult GicpScanMatcher::match(
@@ -247,12 +271,22 @@ ScanMatchResult GicpScanMatcher::match(
   pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
   return run_pcl_registration(
     gicp, config_, "gicp", cloud, summary,
-    previous_clouds_, accumulated_transform_, last_current_to_previous_);
+    previous_clouds_, accumulated_transform_, last_current_to_previous_, external_prior_);
 }
 
 std::string GicpScanMatcher::backend_name() const
 {
   return config_.backend;
+}
+
+void GicpScanMatcher::set_external_prior(const Eigen::Matrix4f & current_to_previous)
+{
+  external_prior_ = current_to_previous;
+}
+
+void GicpScanMatcher::clear_external_prior()
+{
+  external_prior_.reset();
 }
 
 std::unique_ptr<ScanMatcher> create_scan_matcher(const std::string & backend)

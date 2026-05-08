@@ -44,6 +44,17 @@ aqua_sonar_loc:
       submap_size: 1
       use_motion_prior: false
 
+    motion_prior:
+      # Leave disabled by default: the public MBES-SLAM bag does not yet ship a
+      # published `aqua_imu_loc` odometry (the bag has a Microstrain IMU but no
+      # pressure, so a separate IMU-only `aqua_imu_loc` profile is required). Set
+      # this to e.g. `/aqua_imu_loc/odometry` once that profile lands and the IMU
+      # node is bringup-launched alongside this sonar node. With a usable prior you
+      # can also re-enable submap mode (`scan_matching.submap_size > 1`).
+      topic: ""
+      max_time_diff_s: 0.5
+      buffer_seconds: 10.0
+
     preprocessing:
       require_xyz: true
       enable_range_filter: true

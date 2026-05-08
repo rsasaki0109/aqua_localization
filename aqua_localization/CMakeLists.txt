@@ -21,6 +21,7 @@ install(PROGRAMS
   scripts/diagnose_yaw_frame.py
   scripts/plot_trajectories.py
   scripts/make_synthetic_sonar_bag.py
+  scripts/make_demo_gif.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
