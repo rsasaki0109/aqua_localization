@@ -60,6 +60,17 @@ struct ScanMatcherConfig
   double covariance_rotation_scale{1.0};
   double covariance_rotation_cap_rad2{1.0};
   double covariance_characteristic_range_m{10.0};
+
+  // NDT-specific knobs. Used only when backend=="ndt"; ignored otherwise.
+  // voxel_resolution_m sets the side length of the NDT voxel grid; the
+  // optimum is dataset-dependent (e.g. ~1 m for surface-vessel multibeam,
+  // ~0.2 m for tank/cluttered FLS scenes).
+  double ndt_voxel_resolution_m{1.0};
+  // step_size is the maximum optimization step (in meters) per Newton update.
+  double ndt_step_size_m{0.1};
+  // outlier_ratio is the fraction of correspondences treated as outliers in
+  // the NDT cost. Higher values are more robust at the cost of convergence.
+  double ndt_outlier_ratio{0.55};
 };
 
 struct ScanMatchResult
@@ -130,6 +141,27 @@ private:
 };
 
 class GicpScanMatcher final : public ScanMatcher
+{
+public:
+  void configure(const ScanMatcherConfig & config) override;
+  ScanMatchResult match(
+    const sensor_msgs::msg::PointCloud2 & cloud,
+    const CloudSummary & summary) override;
+  std::string backend_name() const override;
+  void set_external_prior(const Eigen::Matrix4f & current_to_previous) override;
+  void clear_external_prior() override;
+
+private:
+  using PointCloud = pcl::PointCloud<pcl::PointXYZ>;
+
+  ScanMatcherConfig config_;
+  std::deque<PointCloud::Ptr> previous_clouds_;
+  Eigen::Matrix4f accumulated_transform_{Eigen::Matrix4f::Identity()};
+  Eigen::Matrix4f last_current_to_previous_{Eigen::Matrix4f::Identity()};
+  std::optional<Eigen::Matrix4f> external_prior_;
+};
+
+class NdtScanMatcher final : public ScanMatcher
 {
 public:
   void configure(const ScanMatcherConfig & config) override;

@@ -9,6 +9,7 @@
 #include <pcl/filters/filter.h>
 #include <pcl/registration/gicp.h>
 #include <pcl/registration/icp.h>
+#include <pcl/registration/ndt.h>
 #include <pcl_conversions/pcl_conversions.h>
 
 namespace aqua_sonar_loc
@@ -353,6 +354,45 @@ void GicpScanMatcher::clear_external_prior()
   external_prior_.reset();
 }
 
+void NdtScanMatcher::configure(const ScanMatcherConfig & config)
+{
+  config_ = config;
+  config_.backend = "ndt";
+  previous_clouds_.clear();
+  accumulated_transform_.setIdentity();
+  last_current_to_previous_.setIdentity();
+  external_prior_.reset();
+}
+
+ScanMatchResult NdtScanMatcher::match(
+  const sensor_msgs::msg::PointCloud2 & cloud,
+  const CloudSummary & summary)
+{
+  pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt;
+  // NDT-specific knobs. These are no-ops on ICP/GICP so they live here only.
+  ndt.setResolution(static_cast<float>(config_.ndt_voxel_resolution_m));
+  ndt.setStepSize(config_.ndt_step_size_m);
+  ndt.setOulierRatio(config_.ndt_outlier_ratio);
+  return run_pcl_registration(
+    ndt, config_, "ndt", cloud, summary,
+    previous_clouds_, accumulated_transform_, last_current_to_previous_, external_prior_);
+}
+
+std::string NdtScanMatcher::backend_name() const
+{
+  return config_.backend;
+}
+
+void NdtScanMatcher::set_external_prior(const Eigen::Matrix4f & current_to_previous)
+{
+  external_prior_ = current_to_previous;
+}
+
+void NdtScanMatcher::clear_external_prior()
+{
+  external_prior_.reset();
+}
+
 std::unique_ptr<ScanMatcher> create_scan_matcher(const std::string & backend)
 {
   const auto normalized = lowercase(backend);
@@ -364,6 +404,9 @@ std::unique_ptr<ScanMatcher> create_scan_matcher(const std::string & backend)
   }
   if (normalized == "gicp") {
     return std::make_unique<GicpScanMatcher>();
+  }
+  if (normalized == "ndt") {
+    return std::make_unique<NdtScanMatcher>();
   }
   return nullptr;
 }

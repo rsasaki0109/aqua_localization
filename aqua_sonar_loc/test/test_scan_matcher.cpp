@@ -102,9 +102,20 @@ TEST(ScanMatcherFactory, CreatesGicpMatcher)
   EXPECT_EQ(matcher->backend_name(), "gicp");
 }
 
+TEST(ScanMatcherFactory, CreatesNdtMatcher)
+{
+  auto matcher = aqua_sonar_loc::create_scan_matcher("ndt");
+
+  ASSERT_NE(matcher, nullptr);
+  aqua_sonar_loc::ScanMatcherConfig config;
+  config.backend = "ndt";
+  matcher->configure(config);
+  EXPECT_EQ(matcher->backend_name(), "ndt");
+}
+
 TEST(ScanMatcherFactory, RejectsUnsupportedBackend)
 {
-  EXPECT_EQ(aqua_sonar_loc::create_scan_matcher("ndt"), nullptr);
+  EXPECT_EQ(aqua_sonar_loc::create_scan_matcher("nonexistent_backend"), nullptr);
 }
 
 TEST(NoopScanMatcher, ReturnsIdentityForAcceptedCloud)
@@ -287,6 +298,35 @@ std::vector<std::array<float, 3>> dense_reference_points()
   }
   return points;
 }
+
+// PCL's NDT needs ~5 points per voxel for the Gaussian to be well-defined.
+// Build a denser jittered cube so the NDT voxel grid has populated cells
+// regardless of the chosen voxel resolution within a sensible range.
+std::vector<std::array<float, 3>> dense_ndt_points()
+{
+  std::vector<std::array<float, 3>> points;
+  // Deterministic pseudo-random jitter so the test stays reproducible.
+  unsigned seed = 0x12345;
+  auto next = [&seed]() {
+    seed = seed * 1103515245U + 12345U;
+    return static_cast<float>((seed >> 16) & 0x7FFF) / 32767.0F - 0.5F;
+  };
+  for (int x = 0; x < 8; ++x) {
+    for (int y = 0; y < 8; ++y) {
+      for (int z = 0; z < 6; ++z) {
+        // 8 points per cell for redundancy.
+        for (int k = 0; k < 8; ++k) {
+          points.push_back({
+            static_cast<float>(x) * 0.5F + 0.1F * next(),
+            static_cast<float>(y) * 0.5F + 0.1F * next(),
+            static_cast<float>(z) * 0.5F + 0.1F * next(),
+          });
+        }
+      }
+    }
+  }
+  return points;
+}
 }  // namespace
 
 TEST(GicpScanMatcher, InitializesOnFirstAcceptedCloud)
@@ -430,6 +470,55 @@ TEST(IcpScanMatcher, SubmapZeroFallsBackToScanToScan)
     matcher.match(make_cloud(shifted), accepted_summary(shifted.size()));
   ASSERT_TRUE(shifted_result.success) << shifted_result.status;
   EXPECT_NEAR(shifted_result.odom_to_base.translation.x, 0.3, 0.03);
+}
+
+TEST(NdtScanMatcher, InitializesOnFirstAcceptedCloud)
+{
+  aqua_sonar_loc::NdtScanMatcher matcher;
+  aqua_sonar_loc::ScanMatcherConfig config;
+  config.backend = "ndt";
+  config.ndt_voxel_resolution_m = 0.5;
+  matcher.configure(config);
+
+  const auto reference_points = dense_ndt_points();
+  const auto cloud = make_cloud(reference_points);
+  const auto result = matcher.match(cloud, accepted_summary(reference_points.size()));
+
+  EXPECT_TRUE(result.success);
+  EXPECT_TRUE(result.converged);
+  EXPECT_EQ(result.status, "ndt initialized");
+  EXPECT_DOUBLE_EQ(result.odom_to_base.rotation.w, 1.0);
+}
+
+TEST(NdtScanMatcher, EstimatesTranslationBetweenAcceptedClouds)
+{
+  // NDT needs ~5 points per voxel for the Gaussian to be well-defined; use
+  // the denser jittered cube generator.
+  aqua_sonar_loc::NdtScanMatcher matcher;
+  aqua_sonar_loc::ScanMatcherConfig config;
+  config.backend = "ndt";
+  config.max_iterations = 100;
+  config.transformation_epsilon = 1.0e-8;
+  config.ndt_voxel_resolution_m = 0.5;
+  config.ndt_step_size_m = 0.1;
+  matcher.configure(config);
+
+  const auto reference_points = dense_ndt_points();
+  const auto shifted_points = translated(reference_points, 0.15F, -0.1F, 0.05F);
+
+  ASSERT_TRUE(
+    matcher.match(make_cloud(reference_points),
+                  accepted_summary(reference_points.size())).success);
+  const auto shifted_result = matcher.match(
+    make_cloud(shifted_points), accepted_summary(shifted_points.size()));
+
+  ASSERT_TRUE(shifted_result.success) << shifted_result.status;
+  EXPECT_EQ(shifted_result.status, "ndt converged");
+  // NDT recovers translation up to ~0.1 m on this small grid; the bound is
+  // looser than ICP/GICP's because the Gaussian fits a coarser geometry.
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, 0.15, 0.10);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.y, -0.1, 0.10);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.z, 0.05, 0.10);
 }
 
 TEST(IcpScanMatcher, ExternalPriorIsConsumedOnce)
