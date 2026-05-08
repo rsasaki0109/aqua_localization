@@ -20,7 +20,7 @@ This checklist tracks the first usable `aqua_localization` milestone.
   - linear drag against relative water velocity
   - constant buoyancy acceleration correction
 - `aqua_sonar_loc` validates sonar `PointCloud2`, republishes accepted clouds, and publishes scan matching odometry.
-- `aqua_sonar_loc` supports `noop`, PCL ICP, and PCL GICP backends.
+- `aqua_sonar_loc` supports `noop`, PCL ICP, PCL GICP, and PCL NDT backends.
 - `aqua_sonar_loc` applies post-registration quality gates (`max_fitness_score`, `max_translation_step_m`, `max_rotation_step_rad`).
 - `aqua_sonar_loc` ships a submap front end (`scan_matching.submap_size > 1` with optional `use_motion_prior`).
 - `aqua_sonar_loc` accepts an external IMU/DVL motion prior on a `nav_msgs/Odometry` topic (`motion_prior.topic`) and uses the relative SE(3) between bracketing samples as the registration initial guess.
@@ -93,7 +93,6 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
   `(estimate, covariance, GT)` triples and adjusts `position_scale`,
   `rotation_scale`, and the floors so ~95% of per-step pose errors fall
   within 2σ.
-- NDT scan matching backend.
 - Visual odometry and acoustic positioning inputs. (DVL body-frame velocity
   fusion is implemented, unit-tested, and validated end-to-end on the Tank
   Dataset short_test sequence — see `datasets/tank_dataset_demo.md`. The

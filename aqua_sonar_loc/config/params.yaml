@@ -15,10 +15,13 @@ aqua_sonar_loc:
       base_link: base_link
       sonar: sonar_link
     scan_matching:
-      # Current backends: icp, gicp, noop. Planned backends: ndt.
+      # Current backends: icp, gicp, ndt, noop.
       # gicp uses pcl::GeneralizedIterativeClosestPoint and tends to be more accurate
       # under noisy correspondences but needs at least k_correspondences (~20) points
       # per scan to compute local covariances.
+      # ndt uses pcl::NormalDistributionsTransform and tends to be more robust to
+      # outliers + sparse overlap, at the cost of needing a sensible voxel
+      # resolution per dataset (see scan_matching.ndt.voxel_resolution_m below).
       backend: icp
       # Maximum correspondence distance in meters.
       max_correspondence_distance: 1.0
@@ -47,6 +50,20 @@ aqua_sonar_loc:
       # degenerate fans (each new fan starts at where the previous fan ended, not at
       # identity, so the submap is forced to provide along-track structure).
       use_motion_prior: false
+      # Knobs specific to the NDT backend (ignored for other backends).
+      ndt:
+        # Voxel grid resolution in meters. The NDT sweet spot depends on the
+        # density of the input cloud — too small and voxels are empty; too
+        # large and the Gaussian distribution underfits real structure.
+        # ~1 m suits surface-vessel multibeam (~100s of points / fan over
+        # 30 m fan width); drop to ~0.2 m for tank/cluttered FLS scenes.
+        voxel_resolution_m: 1.0
+        # Maximum optimisation step (m) per Newton update.
+        step_size_m: 0.1
+        # Fraction of correspondences treated as outliers in the cost.
+        # Higher = more robust, slower convergence. PCL default is 0.55.
+        outlier_ratio: 0.55
+
       covariance:
         # Estimate the per-fan published pose covariance from the registration's
         # fitness score and inlier count instead of using a hard-coded diagonal.

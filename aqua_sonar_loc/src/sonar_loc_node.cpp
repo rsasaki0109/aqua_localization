@@ -104,6 +104,13 @@ private:
       "scan_matching.covariance.rotation_cap_rad2", 1.0);
     scan_matcher_config.covariance_characteristic_range_m = declare_parameter<double>(
       "scan_matching.covariance.characteristic_range_m", 10.0);
+
+    scan_matcher_config.ndt_voxel_resolution_m = declare_parameter<double>(
+      "scan_matching.ndt.voxel_resolution_m", 1.0);
+    scan_matcher_config.ndt_step_size_m = declare_parameter<double>(
+      "scan_matching.ndt.step_size_m", 0.1);
+    scan_matcher_config.ndt_outlier_ratio = declare_parameter<double>(
+      "scan_matching.ndt.outlier_ratio", 0.55);
     scan_matcher_ = create_scan_matcher(scan_matcher_config.backend);
     if (!scan_matcher_) {
       RCLCPP_WARN(
