@@ -59,18 +59,21 @@ aqua_imu_loc:
       depth_offset_m: 0.0
 
     imu:
-      # Microstrain Madgwick AHRS is gravity-anchored (roll/pitch) and
-      # mag-anchored (yaw). On a surface vessel without static-bias init the
-      # UKF state would otherwise start at RPY=0 and slowly drift, so we
-      # observe AHRS yaw at 50 Hz and the full 3-axis gyro bias at 5 Hz.
-      use_orientation_yaw: true
-      orientation_yaw_variance_rad2: 0.02
-      orientation_yaw_subsample: 2
-      use_ahrs_gyro_bias_z: false
+      # Microstrain Madgwick AHRS is mag-anchored (yaw). Use only the yaw-rate
+      # gyro_z bias soft observation: more aggressive AHRS hooks (full yaw
+      # observation, 3-axis gyro bias) have empirically caused position drift
+      # to oscillate when surface_assumption is also active, presumably
+      # because the depth-pin and yaw-update both inject information into the
+      # accel-bias states through cross-covariance. Keep this profile lean
+      # until tightly-coupled fusion is in place.
+      use_orientation_yaw: false
+      orientation_yaw_variance_rad2: 0.05
+      orientation_yaw_subsample: 5
+      use_ahrs_gyro_bias_z: true
       ahrs_gyro_bias_z_variance_rad2_s2: 1.0e-2
       ahrs_gyro_bias_z_subsample: 20
       ahrs_gyro_bias_z_max_dt_s: 0.5
-      use_ahrs_gyro_bias_xyz: true
+      use_ahrs_gyro_bias_xyz: false
       ahrs_gyro_bias_xyz_variance_rad2_s2:
         x: 1.0e-2
         y: 1.0e-2

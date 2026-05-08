@@ -28,6 +28,7 @@ This checklist tracks the first usable `aqua_localization` milestone.
 - MBES-SLAM `beach_pond` IMU-only `aqua_imu_loc` profile (`aqua_imu_loc/config/mbes_slam.yaml`) feeds `/aqua_imu_loc/odometry` into `aqua_sonar_loc` (`aqua_sonar_loc/config/mbes_slam.yaml` `motion_prior.topic`); end-to-end replay confirms the registration initial guess flows through and the estimate moves out from origin (further accuracy tuning is tracked separately).
 - `aqua_imu_loc` exposes optional AHRS hooks (yaw observation, gyro_z bias from AHRS yaw rate, 3-axis gyro bias) and a static-bias initializer.
 - `aqua_fusion` loosely fuses IMU/depth odometry with fresh sonar odometry.
+- `aqua_fusion` MBES-SLAM `beach_pond` profile (`aqua_fusion/config/mbes_slam.yaml`) ships and is exercised end-to-end alongside IMU + sonar; the loose-coupling weighted average follows the IMU input on this geometrically degenerate dataset (the trajectory improvement requires both inputs to be reasonable, see Next Milestones for the tightly-coupled follow-up).
 - Top-level launch starts IMU, sonar, and fusion nodes.
 - Replay launch supports `ros2 bag play`, topic remapping, `use_sim_time`, and subsystem toggles.
 - Replay launch can optionally start the depth-to-pressure adapter.
