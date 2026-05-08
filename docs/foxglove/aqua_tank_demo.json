@@ -1,0 +1,106 @@
+{
+  "configById": {
+    "3D!main": {
+      "cameraState": {
+        "perspective": true,
+        "distance": 6,
+        "phi": 60,
+        "thetaOffset": 45,
+        "targetOffset": [0, 0, 0],
+        "target": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "base_link",
+      "scene": {
+        "enableStats": false,
+        "backgroundColor": "#15202B",
+        "labelScaleFactor": 1
+      },
+      "transforms": {
+        "frame:base_link": { "visible": true },
+        "frame:map":       { "visible": true },
+        "frame:odom":      { "visible": true }
+      },
+      "topics": {
+        "/aqua_imu_loc/odometry": {
+          "visible": true,
+          "axisScale": 1,
+          "covariance": { "color": "#80b3ffaa" },
+          "lineColor": "#3aa1ff",
+          "lineWidth": 0.05
+        },
+        "/apriltag_slam/GT": {
+          "visible": true,
+          "axisScale": 1,
+          "lineColor": "#27c89a",
+          "lineWidth": 0.05
+        },
+        "/dvl/twist": {
+          "visible": true,
+          "color": "#f5a623",
+          "scale": 0.5
+        }
+      },
+      "layers": {},
+      "publish": { "type": "point", "poseTopic": "/move_base_simple/goal" },
+      "imageMode": {}
+    },
+    "Plot!depth": {
+      "title": "depth (m)  —  pressure-derived vs apriltag GT",
+      "paths": [
+        { "value": "/aqua_imu_loc/odometry.pose.pose.position.z", "enabled": true, "label": "aqua_imu_loc z", "color": "#3aa1ff" },
+        { "value": "/apriltag_slam/GT.pose.pose.position.z",      "enabled": true, "label": "apriltag GT z", "color": "#27c89a" }
+      ],
+      "minYValue": null,
+      "maxYValue": null,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240
+    },
+    "Plot!dvl": {
+      "title": "DVL body-frame velocity (m/s)",
+      "paths": [
+        { "value": "/dvl/twist.twist.linear.x", "enabled": true, "label": "vx", "color": "#f5a623" },
+        { "value": "/dvl/twist.twist.linear.y", "enabled": true, "label": "vy", "color": "#e85d75" },
+        { "value": "/dvl/twist.twist.linear.z", "enabled": true, "label": "vz", "color": "#9b8cff" }
+      ],
+      "showLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240
+    },
+    "RawMessages!status": {
+      "topicPath": "/aqua_imu_loc/status",
+      "diffEnabled": false,
+      "diffMethod": "custom"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": { "speed": 1 },
+  "layout": {
+    "first": "3D!main",
+    "second": {
+      "first": {
+        "first": "Plot!depth",
+        "second": "Plot!dvl",
+        "direction": "column",
+        "splitPercentage": 50
+      },
+      "second": "RawMessages!status",
+      "direction": "column",
+      "splitPercentage": 70
+    },
+    "direction": "row",
+    "splitPercentage": 60
+  }
+}
