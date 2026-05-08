@@ -32,6 +32,7 @@ install(PROGRAMS
   scripts/record_mbes_demo.sh
   scripts/record_ntnu_demo.sh
   scripts/record_aqualoc_demo.sh
+  scripts/calibrate_sonar_covariance.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
