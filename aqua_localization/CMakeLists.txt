@@ -26,6 +26,7 @@ install(PROGRAMS
   scripts/rerun_export.py
   scripts/rerun_export_mbes.py
   scripts/rerun_export_ntnu.py
+  scripts/rerun_export_aqualoc.py
   scripts/lichtblick_screenshot.py
   DESTINATION lib/${PROJECT_NAME}
 )

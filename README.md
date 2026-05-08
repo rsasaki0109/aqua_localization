@@ -105,6 +105,19 @@ For the older 2D matplotlib view of the same registration run:
 
 ![aqua_sonar_loc on MBES-SLAM beach_pond](docs/media/mbes_slam_beach_pond.gif)
 
+AQUALOC `harbor_07` — underwater camera footage from the LIRMM "Dumbo" ROV
+threaded through `aqua_imu_loc` while a barometer-derived pressure update
+keeps depth bounded. The seafloor calibration board comes into view near
+the start of the dive; right-column plots show depth, pressure, and IMU
+acceleration over the 60 s replay. The IMU-only XY estimate runs away to
+km-scale drift on this bag (no DVL/visual aiding, no still warmup), so
+this dataset is wired in as the qualitative "look at the sensor stream"
+demo rather than a path-accuracy benchmark — see
+[`datasets/aqualoc_demo.md`](datasets/aqualoc_demo.md) for the bring-up
+notes and the documented accuracy gap.
+
+![aqua_localization on AQUALOC harbor_07 (rerun.io)](docs/media/aqualoc_harbor_07_rerun.png)
+
 NTNU `subset-fjord/fjord_1` — the dataset's own ground-truth trajectory
 through the fjord, rendered in rerun.io. The cyan path is the source SLAM
 baseline (~7 m diving over a ~20 m horizontal extent). The aqua_imu_loc
