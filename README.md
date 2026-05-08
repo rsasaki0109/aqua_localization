@@ -109,6 +109,20 @@ Recording targets and the maintained dataset shortlist live in
 [docs/public_demo_plan.md](docs/public_demo_plan.md) and
 [docs/public_dataset_candidates.md](docs/public_dataset_candidates.md).
 
+### Web replay (Foxglove Studio)
+
+For a browser-only view that does not require a local RViz, drop a
+results-included `.mcap` onto [Foxglove Studio](https://studio.foxglove.dev/)
+and import [`docs/foxglove/aqua_tank_demo.json`](docs/foxglove/aqua_tank_demo.json):
+3D trajectory follows `base_link`, GT (green) and `aqua_imu_loc` estimate
+(blue) are overlaid, and the right column plots depth and DVL body-frame
+velocity.
+
+See [`docs/foxglove/README.md`](docs/foxglove/README.md) for the recording
+recipe that produces the input bag (it captures both the source sensor
+streams and `aqua_imu_loc` output topics into a single self-contained
+`.mcap`).
+
 ## Architecture
 
 ### `aqua_imu_loc`
