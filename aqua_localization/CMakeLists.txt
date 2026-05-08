@@ -24,6 +24,7 @@ install(PROGRAMS
   scripts/make_demo_gif.py
   scripts/convert_tank_dataset_bag.py
   scripts/rerun_export.py
+  scripts/rerun_export_mbes.py
   scripts/lichtblick_screenshot.py
   DESTINATION lib/${PROJECT_NAME}
 )
