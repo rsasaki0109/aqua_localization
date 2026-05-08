@@ -1,6 +1,7 @@
 #ifndef AQUA_SONAR_LOC__SCAN_MATCHER_HPP_
 #define AQUA_SONAR_LOC__SCAN_MATCHER_HPP_
 
+#include <array>
 #include <cstddef>
 #include <deque>
 #include <memory>
@@ -43,6 +44,22 @@ struct ScanMatcherConfig
   // multibeam geometry. For pure scan-to-scan (submap_size == 1), the prior makes very
   // little difference because consecutive fans already overlap heavily.
   bool use_motion_prior{false};
+
+  // Covariance-estimation model. When enable_estimation is false the published
+  // ScanMatchResult.covariance is the legacy hard-coded diagonal (0.25 m², 0.10 rad²).
+  // When true, per-component variance scales as fitness_score / inlier_count, with
+  // a position floor and a position cap to keep the estimate physically meaningful.
+  // Rotation variance reuses the same fitness/inliers ratio scaled by 1/L² where L
+  // is `characteristic_range_m` (a typical correspondence stand-off distance for
+  // the sensor): a longer baseline gives tighter rotation observation.
+  bool covariance_enable_estimation{false};
+  double covariance_position_floor_m2{0.04};
+  double covariance_position_scale{1.0};
+  double covariance_position_cap_m2{25.0};
+  double covariance_rotation_floor_rad2{0.001};
+  double covariance_rotation_scale{1.0};
+  double covariance_rotation_cap_rad2{1.0};
+  double covariance_characteristic_range_m{10.0};
 };
 
 struct ScanMatchResult
@@ -52,6 +69,13 @@ struct ScanMatchResult
   double fitness_score{0.0};
   std::string status;
   geometry_msgs::msg::Transform odom_to_base;
+  // 6x6 pose covariance in row-major (x, y, z, roll, pitch, yaw) order.
+  // Populated even when success=false (with the legacy diagonal) so downstream
+  // status messages always have a defined value to inspect.
+  std::array<double, 36> pose_covariance{};
+  // Number of finite in-range points that participated in this match — useful
+  // for diagnostics and downstream covariance scaling.
+  std::size_t inlier_count{0};
 };
 
 class ScanMatcher

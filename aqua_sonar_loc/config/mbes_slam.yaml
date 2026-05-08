@@ -47,6 +47,23 @@ aqua_sonar_loc:
       # registration (planned next step). Re-enable when that wiring lands.
       submap_size: 1
       use_motion_prior: false
+      covariance:
+        # Replace the legacy 0.25 m² / 0.10 rad² hard-coded diagonal with a
+        # fitness/inliers-derived diagonal. The scales are intentionally
+        # conservative on this dataset because the post-registration fitness
+        # score on degenerate single-fan multibeam is not yet calibrated
+        # against ground-truth error — we simply trust the relative ordering:
+        # high-fitness fans get a larger published variance, so the loose-
+        # coupling fusion downweights them.
+        enable_estimation: true
+        position_floor_m2: 0.10
+        position_scale: 1.0
+        position_cap_m2: 16.0
+        rotation_floor_rad2: 0.005
+        rotation_scale: 1.0
+        rotation_cap_rad2: 0.5
+        # ~10 m sonar stand-off matches the bathymetric range gate.
+        characteristic_range_m: 10.0
 
     motion_prior:
       # Pair this sonar profile with `aqua_imu_loc/config/mbes_slam.yaml` (the

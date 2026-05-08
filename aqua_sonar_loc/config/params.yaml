@@ -47,6 +47,26 @@ aqua_sonar_loc:
       # degenerate fans (each new fan starts at where the previous fan ended, not at
       # identity, so the submap is forced to provide along-track structure).
       use_motion_prior: false
+      covariance:
+        # Estimate the per-fan published pose covariance from the registration's
+        # fitness score and inlier count instead of using a hard-coded diagonal.
+        # When false, the legacy 0.25 m² / 0.10 rad² diagonal is published so
+        # downstream fusion stays bit-compatible. When true, position variance
+        # scales as `position_scale * fitness_score / inliers` (clamped to
+        # [position_floor_m2, position_cap_m2]) and rotation variance scales as
+        # `rotation_scale * fitness_score / (inliers * characteristic_range_m^2)`
+        # (clamped similarly). Higher fitness → larger published variance →
+        # downstream fusion downweights the registration. Tune the scales per
+        # platform once a chi-square consistency check against ground-truth
+        # error is available.
+        enable_estimation: false
+        position_floor_m2: 0.04
+        position_scale: 1.0
+        position_cap_m2: 25.0
+        rotation_floor_rad2: 0.001
+        rotation_scale: 1.0
+        rotation_cap_rad2: 1.0
+        characteristic_range_m: 10.0
 
     motion_prior:
       # External motion prior that gets staged on the scan matcher as the registration
