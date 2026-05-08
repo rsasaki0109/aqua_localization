@@ -32,6 +32,7 @@ This checklist tracks the first usable `aqua_localization` milestone.
 - `aqua_imu_loc` supports a static IMU mounting rotation (`imu.mount.rotation_rpy_rad`) so bags whose IMU axes do not match REP-145 (e.g. AQUALOC harbor sequences read gravity on -Y) can be replayed with the correct gravity subtraction.
 - `aqua_sonar_loc` publishes a fitness/inliers-derived diagonal pose covariance when `scan_matching.covariance.enable_estimation` is true (default: legacy 0.25 m² / 0.10 rad² for backward compatibility). Position variance scales as `position_scale * fitness_score / inliers` and rotation variance as `rotation_scale * fitness_score / (inliers * characteristic_range_m^2)`, both clamped to `[*_floor, *_cap]`. Sanity-checked on MBES-SLAM `beach_pond` (model produces a 1-sample 0.25 m² for the init fan and floor-clamped values for subsequent fans, confirming the wiring; per-platform chi-square calibration against ground-truth error is future work).
 - `aqua_imu_loc` accepts a tightly-coupled sonar position observation (`topics.sonar_odometry` + `imu.sonar.{position_variance_floor,max_age_s}`). The 3D position from `/aqua_sonar_loc/odometry` is fed as a measurement update on the UKF position state, and via the existing position↔bias cross-covariance the registration residual closes the IMU bias loop. MBES profile pre-wired (`aqua_imu_loc/config/mbes_slam.yaml`); sanity-checked end-to-end on the bag (loose-coupling drift of ±40 m in the previous fusion path drops to ~17 m now that sonar pulls the IMU state on every accepted fan instead of being weighted-averaged after the fact).
+- `aqua_imu_loc` accepts a DVL body-frame velocity observation (`topics.dvl_velocity` + `imu.dvl.{mount.rotation_rpy_rad,velocity_variance_floor,max_age_s}`). The TwistStamped sample is pre-rotated into base_link by the static mount rotation, then fed into the UKF as a body-frame velocity measurement (predicted = R(rpy)^T v_world, sigma-point cross-covariance properly couples back into both world-frame velocity and rotation states). Three new gtests cover identity-rotation pull, 90° yaw rotation correctness, and non-finite-input rejection. No public bag with DVL data is wired yet — the Tank Dataset (already on the dataset shortlist) is the natural next demo target.
 - AQUALOC harbor sequence 07 starter profile (`aqua_imu_loc/config/aqualoc.yaml`) and bring-up doc (`datasets/aqualoc_demo.md`) ship; the bag download + ROS 2 conversion + topic discovery flow is fully documented. End-to-end accuracy on this bag is not yet validated (still-window-free start means the static-bias initializer cannot observe sensor biases).
 - Top-level launch starts IMU, sonar, and fusion nodes.
 - Replay launch supports `ros2 bag play`, topic remapping, `use_sim_time`, and subsystem toggles.
@@ -92,7 +93,10 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
   `rotation_scale`, and the floors so ~95% of per-step pose errors fall
   within 2σ.
 - NDT scan matching backend.
-- DVL, visual odometry, and acoustic positioning inputs.
+- Visual odometry and acoustic positioning inputs. (DVL body-frame velocity
+  fusion is implemented and unit-tested; what is missing is a public dataset
+  with DVL data wired through to confirm end-to-end behaviour. The Tank
+  Dataset entry in `docs/public_dataset_candidates.md` is the natural target.)
 - Tightly coupled sonar residual fusion.
 - AQUALOC + additional MBES-SLAM/OpenSonarDatasets adapters.
 - Demo screen recording (60–120 s) replacing the static thumbnails.

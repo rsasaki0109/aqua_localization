@@ -50,6 +50,11 @@ public:
         sonar_odometry_topic_, rclcpp::SensorDataQoS(),
         std::bind(&ImuLocNode::on_sonar_odometry, this, std::placeholders::_1));
     }
+    if (!dvl_velocity_topic_.empty()) {
+      dvl_sub_ = create_subscription<geometry_msgs::msg::TwistStamped>(
+        dvl_velocity_topic_, rclcpp::SensorDataQoS(),
+        std::bind(&ImuLocNode::on_dvl_velocity, this, std::placeholders::_1));
+    }
     odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(odometry_topic_, rclcpp::SystemDefaultsQoS());
     status_pub_ =
       create_publisher<aqua_msgs::msg::EstimatorStatus>(status_topic_, rclcpp::SystemDefaultsQoS());
@@ -60,11 +65,12 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "aqua_imu_loc started: imu=%s pressure=%s current_velocity=%s sonar=%s odom=%s reset=%s frames=%s->%s->%s",
+      "aqua_imu_loc started: imu=%s pressure=%s current_velocity=%s sonar=%s dvl=%s odom=%s reset=%s frames=%s->%s->%s",
       imu_topic_.c_str(),
       pressure_topic_.empty() ? "<disabled>" : pressure_topic_.c_str(),
       current_velocity_topic_.empty() ? "<disabled>" : current_velocity_topic_.c_str(),
       sonar_odometry_topic_.empty() ? "<disabled>" : sonar_odometry_topic_.c_str(),
+      dvl_velocity_topic_.empty() ? "<disabled>" : dvl_velocity_topic_.c_str(),
       odometry_topic_.c_str(),
       reset_service_.c_str(), map_frame_.c_str(), odom_frame_.c_str(), base_frame_.c_str());
   }
@@ -76,6 +82,7 @@ private:
     pressure_topic_ = declare_parameter<std::string>("topics.pressure", "/pressure");
     current_velocity_topic_ = declare_parameter<std::string>("topics.current_velocity", "");
     sonar_odometry_topic_ = declare_parameter<std::string>("topics.sonar_odometry", "");
+    dvl_velocity_topic_ = declare_parameter<std::string>("topics.dvl_velocity", "");
     odometry_topic_ = declare_parameter<std::string>("topics.odometry", "/aqua_imu_loc/odometry");
     status_topic_ = declare_parameter<std::string>("topics.status", "/aqua_imu_loc/status");
     reset_service_ = declare_parameter<std::string>("services.reset", "/aqua_imu_loc/reset");
@@ -209,6 +216,49 @@ private:
       declare_parameter<double>("imu.sonar.position_variance_floor", 0.04);
     sonar_max_age_s_ =
       declare_parameter<double>("imu.sonar.max_age_s", 1.0);
+
+    // DVL velocity observation knobs. mount.rotation_rpy_rad pre-rotates the
+    // raw DVL sample into base_link before the body-frame measurement update.
+    {
+      const auto rpy = vector_parameter(
+        "imu.dvl.mount.rotation_rpy_rad", {0.0, 0.0, 0.0}, 3);
+      const Eigen::AngleAxisd roll(rpy[0], Eigen::Vector3d::UnitX());
+      const Eigen::AngleAxisd pitch(rpy[1], Eigen::Vector3d::UnitY());
+      const Eigen::AngleAxisd yaw(rpy[2], Eigen::Vector3d::UnitZ());
+      dvl_mount_rotation_ = (yaw * pitch * roll).toRotationMatrix();
+    }
+    dvl_velocity_variance_floor_ =
+      declare_parameter<double>("imu.dvl.velocity_variance_floor", 0.01);
+    dvl_max_age_s_ =
+      declare_parameter<double>("imu.dvl.max_age_s", 0.5);
+  }
+
+  void on_dvl_velocity(const geometry_msgs::msg::TwistStamped::SharedPtr msg)
+  {
+    const Eigen::Vector3d v_raw(
+      msg->twist.linear.x, msg->twist.linear.y, msg->twist.linear.z);
+    if (!v_raw.allFinite()) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000, "Rejected non-finite DVL velocity.");
+      return;
+    }
+    if (last_imu_stamp_valid_) {
+      const rclcpp::Time stamp(msg->header.stamp);
+      const double age = (last_imu_stamp_ - stamp).seconds();
+      if (age > dvl_max_age_s_) {
+        RCLCPP_DEBUG(
+          get_logger(), "Skipping DVL velocity: %.3fs older than latest IMU sample", age);
+        return;
+      }
+    }
+    const Eigen::Vector3d v_body = dvl_mount_rotation_ * v_raw;
+    // Diagonal isotropic covariance — TwistStamped does not carry one, so we
+    // expose the floor as the published variance. Future work: use a
+    // Twist*WithCovariance*Stamped variant when the upstream driver provides
+    // per-axis variance.
+    const Eigen::Matrix3d cov = Eigen::Matrix3d::Identity() * dvl_velocity_variance_floor_;
+    filter_.update_body_velocity(v_body, cov);
+    ++update_count_;
   }
 
   void on_sonar_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -748,12 +798,17 @@ private:
   std::string sonar_odometry_topic_;
   double sonar_position_variance_floor_{0.04};
   double sonar_max_age_s_{1.0};
+  std::string dvl_velocity_topic_;
+  Eigen::Matrix3d dvl_mount_rotation_{Eigen::Matrix3d::Identity()};
+  double dvl_velocity_variance_floor_{0.01};
+  double dvl_max_age_s_{0.5};
 
   rclcpp::Time last_imu_stamp_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr current_velocity_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sonar_odom_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr dvl_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<aqua_msgs::msg::EstimatorStatus>::SharedPtr status_pub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_srv_;

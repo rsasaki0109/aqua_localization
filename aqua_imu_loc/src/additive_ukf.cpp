@@ -284,6 +284,55 @@ void AdditiveUkf::update_position(
   covariance_ = 0.5 * (covariance_ + covariance_.transpose());
 }
 
+void AdditiveUkf::update_body_velocity(
+  const Eigen::Vector3d & velocity_body, const Eigen::Matrix3d & covariance)
+{
+  if (!velocity_body.allFinite() || !covariance.allFinite()) {
+    return;
+  }
+  const auto sigma_points = make_sigma_points();
+
+  // Predicted body velocity per sigma point. v_body = R(rpy)^T * v_world.
+  std::vector<Eigen::Vector3d> predicted_per_sigma;
+  predicted_per_sigma.reserve(sigma_points.size());
+  Eigen::Vector3d predicted = Eigen::Vector3d::Zero();
+  for (size_t i = 0; i < sigma_points.size(); ++i) {
+    const Eigen::Vector3d v_world = sigma_points[i].segment<3>(3);
+    const Eigen::Vector3d rpy = sigma_points[i].segment<3>(6);
+    const Eigen::Matrix3d rotation = rotation_from_rpy(rpy);
+    const Eigen::Vector3d v_body = rotation.transpose() * v_world;
+    predicted_per_sigma.push_back(v_body);
+    predicted += mean_weights_[i] * v_body;
+  }
+
+  Eigen::Matrix3d innovation_covariance = covariance;
+  Eigen::Matrix<double, kStateDim, 3> cross_covariance =
+    Eigen::Matrix<double, kStateDim, 3>::Zero();
+  for (size_t i = 0; i < sigma_points.size(); ++i) {
+    const Eigen::Vector3d measurement_delta = predicted_per_sigma[i] - predicted;
+    StateVector state_delta = sigma_points[i] - state_;
+    state_delta.segment<3>(6) = normalize_angles(state_delta.segment<3>(6));
+
+    innovation_covariance +=
+      covariance_weights_[i] * measurement_delta * measurement_delta.transpose();
+    cross_covariance +=
+      covariance_weights_[i] * state_delta * measurement_delta.transpose();
+  }
+
+  Eigen::LLT<Eigen::Matrix3d> llt(innovation_covariance);
+  if (llt.info() != Eigen::Success) {
+    return;
+  }
+
+  const Eigen::Matrix<double, kStateDim, 3> kalman_gain =
+    cross_covariance * innovation_covariance.inverse();
+  const Eigen::Vector3d innovation = velocity_body - predicted;
+  state_ += kalman_gain * innovation;
+  state_.segment<3>(6) = normalize_angles(state_.segment<3>(6));
+  covariance_ -= kalman_gain * innovation_covariance * kalman_gain.transpose();
+  covariance_ = 0.5 * (covariance_ + covariance_.transpose());
+}
+
 void AdditiveUkf::update_depth(double depth_m, double variance)
 {
   const auto sigma_points = make_sigma_points();
