@@ -93,7 +93,6 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
   `(estimate, covariance, GT)` triples and adjusts `position_scale`,
   `rotation_scale`, and the floors so ~95% of per-step pose errors fall
   within 2σ.
-- NDT scan matching backend.
 - Visual odometry and acoustic positioning inputs. (DVL body-frame velocity
   fusion is implemented, unit-tested, and validated end-to-end on the Tank
   Dataset short_test sequence — see `datasets/tank_dataset_demo.md`. The
