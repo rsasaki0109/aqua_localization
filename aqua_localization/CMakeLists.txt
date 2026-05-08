@@ -28,6 +28,10 @@ install(PROGRAMS
   scripts/rerun_export_ntnu.py
   scripts/rerun_export_aqualoc.py
   scripts/lichtblick_screenshot.py
+  scripts/record_tank_demo.sh
+  scripts/record_mbes_demo.sh
+  scripts/record_ntnu_demo.sh
+  scripts/record_aqualoc_demo.sh
   DESTINATION lib/${PROJECT_NAME}
 )
 
