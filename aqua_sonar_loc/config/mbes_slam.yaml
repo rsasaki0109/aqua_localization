@@ -28,10 +28,14 @@ aqua_sonar_loc:
       transformation_epsilon: 0.000001
       # Loose fitness gate — multibeam point clouds at ~13 Hz contain a lot of
       # noise and drop-outs; we only want to catch outright divergence.
-      max_fitness_score: 1.5
-      # ~1 m/s surface vessel × 1/13 s ping period ≈ 0.08 m. 0.6 m is a safe upper
-      # bound on per-step motion that still rejects runaway ICP solutions.
-      max_translation_step_m: 0.6
+      # With an IMU motion prior the ICP solution tracks the prior more
+      # aggressively and the fitness scores rise, so this is loosened from the
+      # previous prior-disabled value of 1.5.
+      max_fitness_score: 5.0
+      # ~1 m/s surface vessel × 1/13 s ping period ≈ 0.08 m, but the IMU prior
+      # can momentarily over-shoot during transients; 1.5 m absorbs that without
+      # admitting outright runaway solutions.
+      max_translation_step_m: 1.5
       # Surface vessel yaw rate stays well under 1 rad/s; a 0.4 rad per-step gate
       # rejects bad correspondences without clipping legitimate turns.
       max_rotation_step_rad: 0.4
@@ -45,13 +49,15 @@ aqua_sonar_loc:
       use_motion_prior: false
 
     motion_prior:
-      # Leave disabled by default: the public MBES-SLAM bag does not yet ship a
-      # published `aqua_imu_loc` odometry (the bag has a Microstrain IMU but no
-      # pressure, so a separate IMU-only `aqua_imu_loc` profile is required). Set
-      # this to e.g. `/aqua_imu_loc/odometry` once that profile lands and the IMU
-      # node is bringup-launched alongside this sonar node. With a usable prior you
-      # can also re-enable submap mode (`scan_matching.submap_size > 1`).
-      topic: ""
+      # Pair this sonar profile with `aqua_imu_loc/config/mbes_slam.yaml` (the
+      # IMU-only profile that subscribes to /nav/processed/microstrain/imu/madgwick
+      # and emits surface-vessel z=0 pseudo-depth updates). When that node is
+      # running alongside this one, /aqua_imu_loc/odometry feeds the registration
+      # initial guess and the estimator can actually move on this geometrically
+      # degenerate single-fan dataset. If aqua_imu_loc is not running, the buffer
+      # stays empty and the matcher silently falls back to the identity prior —
+      # equivalent to the previous scan-to-scan behavior.
+      topic: /aqua_imu_loc/odometry
       max_time_diff_s: 0.5
       buffer_seconds: 10.0
 

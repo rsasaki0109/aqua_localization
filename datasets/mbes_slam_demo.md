@@ -96,6 +96,35 @@ Roles for `aqua_sonar_loc`:
 It is installed automatically by `aqua_sonar_loc` (the whole `config/` directory is
 exported in `CMakeLists.txt`).
 
+## IMU + sonar replay (with motion prior)
+
+The MBES-SLAM bag has a Microstrain IMU at 100 Hz but no pressure sensor. Run
+`aqua_imu_loc` with the IMU-only `mbes_slam.yaml` profile (which subscribes to
+`/nav/processed/microstrain/imu/madgwick`, disables the pressure subscription,
+and enables `imu.surface_assumption` to pin z = 0) alongside `aqua_sonar_loc`.
+The default `aqua_sonar_loc/config/mbes_slam.yaml` already wires
+`motion_prior.topic: /aqua_imu_loc/odometry`, so the registration starts from
+the IMU-derived initial guess rather than identity.
+
+```bash
+# Terminal A: aqua_imu_loc (IMU-only).
+ros2 run aqua_imu_loc imu_loc_node --ros-args \
+  --params-file $(ros2 pkg prefix aqua_imu_loc)/share/aqua_imu_loc/config/mbes_slam.yaml \
+  -p use_sim_time:=true
+
+# Terminal B: aqua_sonar_loc.
+ros2 run aqua_sonar_loc sonar_loc_node --ros-args \
+  --params-file $(ros2 pkg prefix aqua_sonar_loc)/share/aqua_sonar_loc/config/mbes_slam.yaml \
+  -p use_sim_time:=true
+
+# Terminal C: bag (jazzy uses --playback-duration).
+ros2 bag play aqua_localization/datasets/public/mbes_slam/beach_pond_ros2 \
+  --clock --start-offset 60 --playback-duration 120
+```
+
+When `aqua_imu_loc` is not running the sonar node silently falls back to the
+identity prior — equivalent to the previous scan-to-scan behavior.
+
 ## Replay command (sonar-only, GICP backend)
 
 The bag is long (≈ 158 min). For a quick demo, `ros2 bag play --duration` slices a window:
