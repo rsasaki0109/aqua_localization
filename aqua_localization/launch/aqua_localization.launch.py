@@ -31,6 +31,7 @@ def generate_launch_description():
     enable_imu_loc = LaunchConfiguration("enable_imu_loc")
     enable_sonar_loc = LaunchConfiguration("enable_sonar_loc")
     enable_fusion = LaunchConfiguration("enable_fusion")
+    enable_pose_graph = LaunchConfiguration("enable_pose_graph")
     enable_rviz = LaunchConfiguration("enable_rviz")
     current_velocity_topic = LaunchConfiguration("current_velocity_topic")
 
@@ -39,6 +40,7 @@ def generate_launch_description():
     scalar_to_pressure_params_file = LaunchConfiguration("scalar_to_pressure_params_file")
     sonar_params_file = LaunchConfiguration("sonar_params_file")
     fusion_params_file = LaunchConfiguration("fusion_params_file")
+    pose_graph_params_file = LaunchConfiguration("pose_graph_params_file")
     rviz_config_file = LaunchConfiguration("rviz_config_file")
     imu_tf_enabled = ParameterValue(
         PythonExpression(["'", enable_fusion, "' != 'true'"]),
@@ -72,6 +74,16 @@ def generate_launch_description():
                 "enable_fusion",
                 default_value="true",
                 description="Start the aqua_fusion loosely coupled fusion node.",
+            ),
+            DeclareLaunchArgument(
+                "enable_pose_graph",
+                default_value="false",
+                description=(
+                    "Start the aqua_pose_graph SE(3) keyframe backend. "
+                    "Off by default since it does not yet generate loop "
+                    "closure constraints — switch on to expose "
+                    "/aqua_pose_graph/path."
+                ),
             ),
             DeclareLaunchArgument(
                 "enable_rviz",
@@ -109,6 +121,11 @@ def generate_launch_description():
                 "fusion_params_file",
                 default_value=package_params("aqua_fusion"),
                 description="Parameter YAML for aqua_fusion.",
+            ),
+            DeclareLaunchArgument(
+                "pose_graph_params_file",
+                default_value=package_params("aqua_pose_graph"),
+                description="Parameter YAML for aqua_pose_graph.",
             ),
             DeclareLaunchArgument(
                 "rviz_config_file",
@@ -161,6 +178,14 @@ def generate_launch_description():
                     {"publish.tf": fusion_tf_enabled},
                 ],
                 condition=IfCondition(enable_fusion),
+            ),
+            Node(
+                package="aqua_pose_graph",
+                executable="pose_graph_node",
+                name="aqua_pose_graph",
+                output="screen",
+                parameters=[pose_graph_params_file],
+                condition=IfCondition(enable_pose_graph),
             ),
             Node(
                 package="rviz2",
