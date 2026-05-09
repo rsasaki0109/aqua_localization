@@ -1,597 +1,310 @@
-# aqua_localization Handover Plan
+# aqua_localization Plan and State of the Stack
 
-This document is a handover plan for continuing `aqua_localization` development after the current Codex session.
-It is written for another coding agent, especially Claude, to continue without re-discovering the whole repository.
+This document is the canonical "where we are, where we are going" for
+`aqua_localization`. It is rewritten each release; the previous handover-
+style plan that targeted the v0 MVP is preserved in git history (last seen
+at commit `f56bd01`, just before the v0.2 release).
 
-Current date context: 2026-05-07.
-
-## Non-Negotiable Workspace Rule
-
-All shell commands in this workspace must be prefixed with:
-
-```bash
-rtk
-```
-
-Examples:
-
-```bash
-rtk colcon build --symlink-install
-rtk colcon test --packages-select aqua_imu_loc --event-handlers console_direct+
-rtk rg -n "scalar_to_pressure" .
-```
-
-This comes from the workspace instruction file referenced by `AGENTS.md`.
+Current date: 2026-05-09.
+Latest release: [v0.2](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.2).
 
 ## Project Goal
 
-`aqua_localization` is a ROS 2 Humble/Jazzy underwater localization stack for AUV/ROV platforms.
+A ROS 2 localization stack for underwater robots, designed around two
+equally-important localization paths:
 
-The intended identity of the project:
+- high-rate dead reckoning from IMU and pressure / depth sensors,
+- sonar point cloud registration from forward-looking sonar (FLS) or
+  multibeam sonar.
 
-- not a thin wrapper around `robot_localization`
-- main IMU/depth estimator is self-implemented UKF now, with future ESKF
-- pressure/depth fusion is first-class and high priority
-- sonar scan matching is also first-class, not an afterthought
-- architecture must be ready for later DVL, visual odometry, acoustic positioning, and tighter sonar fusion
+The target robots are BlueROV2-class ROVs, custom AUVs, and simulator
+platforms such as `uuv_simulator`. ROS 2 Humble and Jazzy are the primary
+supported distributions. The headline path uses real public underwater
+datasets — no simulation or synthetic bag in the canonical demo flow.
 
-Target platforms:
+The project's identity:
 
-- BlueROV2-class vehicles
-- custom AUVs
-- `uuv_simulator`/rexrov-style simulation
-- public underwater datasets for demo and validation
+- not a thin wrapper around `robot_localization`,
+- the main IMU/depth estimator is a self-implemented additive UKF (an
+  ESKF backend is on the roadmap),
+- pressure/depth fusion is first-class and high priority,
+- sonar scan matching is also first-class, not an afterthought,
+- the architecture is ready for DVL, visual odometry, acoustic positioning,
+  and tighter sonar coupling.
 
-Primary near-term milestone:
+## Releases And What Each One Shipped
 
-Record a public-data localization demo video and link it from `README.md`.
+### [v0.1](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.1) — MVP snapshot
 
-## Current Repository State
+- ROS 2 ament_cmake packages: `aqua_msgs`, `aqua_imu_loc`,
+  `aqua_sonar_loc`, `aqua_fusion`, `aqua_localization` metapackage.
+- 15-state additive UKF in `aqua_imu_loc`: position / velocity / RPY /
+  accel-bias / gyro-bias.
+- Pressure / depth measurement update with seawater density conversion.
+- Tightly-coupled DVL body-frame velocity update and tightly-coupled
+  sonar 3D position update (registration → IMU bias loop via sigma-
+  point cross-covariance).
+- Optional AHRS hooks: yaw observation, gyro_z bias from AHRS yaw rate,
+  3-axis gyro bias.
+- Static-bias initializer with motion-detection abort.
+- IMU mount rotation (`imu.mount.rotation_rpy_rad`) for non-REP-145
+  sensor mounting.
+- Surface-vessel pseudo-depth hook for boats without pressure.
+- Configurable underwater dynamics: gravity, water-current, linear drag,
+  buoyancy.
+- `aqua_sonar_loc` with PCL ICP / GICP / NDT / `noop` backends, factory
+  dispatched. Quality gates (`max_fitness_score`,
+  `max_translation_step_m`, `max_rotation_step_rad`). Submap front end
+  (concatenates last K accepted fans) with constant-velocity prior or
+  external IMU/DVL motion prior.
+- Fitness/inliers-derived diagonal pose covariance (off by default for
+  backward compatibility, on with one flag).
+- `aqua_fusion` loose coupling of IMU/depth odometry with sonar
+  odometry, exercised end-to-end on MBES-SLAM `beach_pond`.
+- Web replay paths: rerun.io headless `.rrd` export with curated 3D +
+  plots blueprint, plus a Lichtblick (Apache-2.0 fork of Foxglove
+  Studio) layout JSON and Playwright headless driver.
+- 134 unit + runtime tests pass on the canonical packages.
 
-The repository is not committed yet. `git status --short` currently reports all project files as untracked:
+### [v0.2](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.2) — pose graph backend + sonar covariance calibration
 
-```text
-?? .gitignore
-?? README.md
-?? aqua_fusion/
-?? aqua_imu_loc/
-?? aqua_localization/
-?? aqua_msgs/
-?? aqua_sonar_loc/
-?? datasets/
-?? docs/
+- New `aqua_pose_graph` package: SE(3) keyframe graph on g2o.
+  Subscribes to upstream odometry, extracts keyframes when relative
+  motion exceeds configurable thresholds, connects them with `EdgeSE3`
+  constraints whose information matrix is read from the upstream
+  `pose.covariance`. Runs g2o Levenberg-Marquardt optimisation on
+  demand (`/aqua_pose_graph/optimize`) or every N keyframes. Publishes
+  the optimised trajectory as `nav_msgs/Path` on
+  `/aqua_pose_graph/path`. The `add_loop_constraint(...)` API is the
+  entry point for a future place-recognition / submap-matching front
+  end. 5 gtests pass.
+- Chi-square calibration of sonar pose covariance:
+  `aqua_localization/scripts/calibrate_sonar_covariance.py`. Reports
+  observed Mahalanobis^2 distribution, recommended `position_scale`
+  factor to match chi-square 3-dof targets (3.0 / 7.815 for mean /
+  95th percentile), and saturation warnings when sigma is floor- or
+  cap-bound. MBES-SLAM `beach_pond` calibrated end-to-end against
+  `/nav/processed/odometry`: pre-tune position_scale=1.0 produced d^2
+  mean=1834 vs target 3 (single-fan multibeam is geometrically
+  degenerate, real residuals ~10 m vs floor-clamped sigma 0.10 m^2).
+  Profile now ships `position_floor=25 m^2 / scale=100 / cap=400 m^2`.
+- `aqua_pose_graph` wired into the top-level launch (off by default).
+  Smoke-tested on Tank Dataset short_test: 361 keyframes, populated
+  `/aqua_pose_graph/path`.
+
+## Public-Data Demo Matrix
+
+Four public underwater datasets, four rerun.io renderings, four matching
+recorder + export scripts. Every entry is reproducible from a single
+command per dataset.
+
+| Dataset | What it shows | Recorder | rerun export |
+|---------|---------------|----------|--------------|
+| Tank Dataset `short_test` | DVL fusion vs AprilTag GT, **0.43 m APE RMSE** on 15 s | `record_tank_demo.sh` | `rerun_export.py` |
+| MBES-SLAM `beach_pond` | Multibeam fans accumulated into a depth-coloured bathymetric scan | `record_mbes_demo.sh` | `rerun_export_mbes.py` |
+| NTNU `subset-fjord/fjord_1` | Dataset SLAM baseline through a 7 m fjord dive | `record_ntnu_demo.sh` | `rerun_export_ntnu.py` |
+| AQUALOC `harbor_07` | LIRMM "Dumbo" ROV underwater camera + pressure depth track | `record_aqualoc_demo.sh` | `rerun_export_aqualoc.py` |
+
+Static screenshots are committed under `docs/media/*_rerun.png`.
+
+## Architecture
+
+```
+                +---------------------+
+                |   IMU + pressure    |
+                |   + DVL + AHRS      |
+                +----------+----------+
+                           |
+                           v
+                +----------+----------+
+                |    aqua_imu_loc     |  additive UKF, tightly-coupled DVL
+                |  (15-state UKF)     |  + sonar-position residual updates
+                +----------+----------+
+                           |
+                           |  /aqua_imu_loc/odometry (with covariance)
+                           v
+       +-------------------+-------------------+
+       |                   |                   |
+       v                   v                   v
++------+--------+   +------+-------+   +------+------------+
+|  aqua_fusion  |   | aqua_sonar_  |   |  aqua_pose_graph  |
+|  loose-coupl  |<--|     loc      |   |  (g2o SE(3) KF    |
+|  IMU + sonar  |   |  ICP/GICP/   |   |   graph, future   |
+|     fusion    |   |  NDT,        |   |   loop closure)   |
++---------------+   |  submap FE,  |   +------+------------+
+                    |  motion prior|          |
+                    +------+-------+          |
+                           |                  v
+                           |          /aqua_pose_graph/path
+                           v
+                  /aqua_sonar_loc/odometry
+                  (fitness/inliers covariance)
 ```
 
-Do not assume a clean git baseline. Do not reset or remove files. Work with the current tree.
+TF ownership is automatic in the top-level launch:
 
-## Package Layout
-
-```text
-aqua_localization/
-├── PLAN.md
-├── README.md
-├── aqua_localization/ # metapackage, top-level launch, replay tools, RViz config
-├── aqua_imu_loc/      # UKF IMU + pressure/depth localization and adapters
-├── aqua_sonar_loc/    # sonar cloud preprocessing and scan matching
-├── aqua_fusion/       # loosely coupled IMU/sonar odometry fusion
-├── aqua_msgs/         # custom status messages
-├── docs/              # architecture, MVP checklist, public demo plan
-└── datasets/          # replay and dataset notes
-```
-
-## Implemented MVP
-
-### `aqua_imu_loc`
-
-Implemented:
-
-- additive UKF backend in `src/additive_ukf.cpp`
-- IMU preprocessing in `src/imu_preprocessor.cpp`
-- pressure-to-depth converter in `src/pressure_depth_converter.cpp`
-- runtime node in `src/imu_loc_node.cpp`
-- `depth_to_pressure_node` for `std_msgs/msg/Float64` positive-down depth to `sensor_msgs/msg/FluidPressure`
-- `scalar_to_pressure_node` for public scalar pressure/depth/barometer topics
-- configs:
-  - `config/params.yaml`
-  - `config/bluerov2.yaml`
-  - `config/uuv_simulator.yaml`
-  - `config/depth_to_pressure.yaml`
-  - `config/depth_to_pressure_uuv_simulator.yaml`
-  - `config/scalar_to_pressure.yaml`
-  - `config/scalar_to_pressure_ntnu.yaml`
-- launch:
-  - `launch/imu_loc.launch.py`
-  - `launch/depth_to_pressure.launch.py`
-  - `launch/scalar_to_pressure.launch.py`
-
-Important behavior:
-
-- publishes odometry and estimator status
-- optionally publishes TF `map -> odom -> base_link`
-- reset service is available
-- pressure update constrains depth with positive-down depth mapped to negative ENU `z`
-- underwater dynamics hooks include gravity, current velocity, linear drag, and buoyancy acceleration correction
-
-Limitations:
-
-- current UKF does not estimate IMU bias as a full error-state inertial estimator would
-- orientation propagation is simple and should not be sold as production-grade inertial nav
-- covariance tuning is placeholder-level
-- no validated performance on public data yet
-
-### `scalar_to_pressure_node`
-
-This was added specifically for public datasets that do not publish `sensor_msgs/msg/FluidPressure`.
-
-File:
-
-- `aqua_imu_loc/src/scalar_to_pressure_node.cpp`
-
-Supported input types:
-
-- `std_msgs/msg/Float64`
-- `std_msgs/msg/Float32`
-
-Supported modes:
-
-- `pressure_pa`: scalar already represents absolute pressure in pascals
-- `depth_m`: scalar is positive-down depth in meters
-- `ntnu_barometer`: converts using:
-
-```text
-depth = -((barometer_measurement - barometer_pressure_offset) / barometer_pressure_scale)
-pressure_pa = reference_pressure_pa + rho * g * (depth + depth_offset_m)
-```
-
-NTNU config:
-
-- `aqua_imu_loc/config/scalar_to_pressure_ntnu.yaml`
-
-Important: the NTNU calibration values in the YAML are placeholders. The chosen sequence calibration must be filled before claiming quantitative performance.
-
-### `aqua_sonar_loc`
-
-Implemented:
-
-- `SonarCloudPreprocessor`
-- scan matcher interface
-- `noop` matcher
-- PCL ICP matcher
-- runtime node `sonar_loc_node`
-- filtered cloud output
-- odometry output
-- scan matching status output
-- BlueROV2 and `uuv_simulator` configs
-
-Limitations:
-
-- ICP is MVP-level
-- no GICP or NDT yet
-- no robust sonar covariance model yet
-- public sonar datasets may need conversion before they can be replayed as `sensor_msgs/msg/PointCloud2`
-
-### `aqua_fusion`
-
-Implemented:
-
-- loosely coupled fuser
-- fuses IMU/depth odometry with fresh sonar odometry
-- publishes fused odometry and fusion status
-- optionally owns TF in top-level launch
-
-Limitations:
-
-- not yet a tightly coupled estimator
-- no DVL/visual/acoustic inputs
-- covariance use is intentionally simple
-
-### `aqua_localization`
-
-Implemented:
-
-- top-level launch:
-  - `aqua_localization/launch/aqua_localization.launch.py`
-- replay launch:
-  - `aqua_localization/launch/replay.launch.py`
-- RViz demo config:
-  - `aqua_localization/rviz/demo.rviz`
-- bag inspection script:
-  - `aqua_localization/scripts/inspect_bag_topics.py`
-- pytest tests:
-  - `aqua_localization/test/test_inspect_bag_topics.py`
-
-`replay.launch.py` supports:
-
-- `ros2 bag play`
-- optional loop and playback rate
-- topic remapping
-- `use_sim_time`
-- optional depth-to-pressure adapter
-- optional scalar-to-pressure adapter
-- optional RViz
-- toggles for IMU, sonar, and fusion nodes
-
-`inspect_bag_topics.py` currently detects:
-
-- IMU
-- `sensor_msgs/msg/FluidPressure`
-- scalar barometer/pressure topics
-- scalar depth topics
-- sonar `PointCloud2`
-- optional current velocity
-
-It suggests a replay command. Tests cover:
-
-- NTNU-style `/barometer` topic enabling `scalar_to_pressure_node`
-- depth-only bag using `depth_to_pressure_node`
-- real `FluidPressure` taking priority over scalar adapter
+- `aqua_fusion` owns `map -> odom -> base_link` when fusion is enabled,
+- `aqua_imu_loc` owns it otherwise.
 
 ## Verified Commands
 
-The following commands were run successfully:
+```bash
+# Build everything.
+colcon build --symlink-install
+
+# Run unit + runtime tests.
+colcon test --packages-select \
+  aqua_imu_loc aqua_sonar_loc aqua_fusion aqua_pose_graph aqua_localization \
+  --event-handlers console_direct+
+
+# Source and launch (default: imu_loc + sonar_loc + fusion, pose graph off).
+source install/setup.bash
+ros2 launch aqua_localization aqua_localization.launch.py
+
+# Top-level launch with pose graph on.
+ros2 launch aqua_localization aqua_localization.launch.py \
+  enable_pose_graph:=true
+```
+
+## Recording And Visualising A Public-Data Demo
+
+Each dataset recorder produces a results-included `.mcap` that bundles
+the source sensor topics with `aqua_imu_loc` and (where applicable)
+`aqua_sonar_loc` outputs:
 
 ```bash
-rtk colcon build --symlink-install
-rtk colcon test --packages-select aqua_imu_loc --event-handlers console_direct+
-rtk colcon build --symlink-install --packages-select aqua_localization
-rtk colcon test --packages-select aqua_localization --event-handlers console_direct+
-rtk colcon test-result --verbose
+ros2 run aqua_localization record_tank_demo.sh
+ros2 run aqua_localization record_mbes_demo.sh
+ros2 run aqua_localization record_ntnu_demo.sh
+ros2 run aqua_localization record_aqualoc_demo.sh
 ```
 
-Latest observed aggregate result:
-
-```text
-Summary: 54 tests, 0 errors, 0 failures, 0 skipped
-```
-
-Also verified:
+Then export to a rerun.io recording and screenshot:
 
 ```bash
-rtk bash -lc 'source install/setup.bash && ros2 launch aqua_localization replay.launch.py --show-args'
-rtk bash -lc 'source install/setup.bash && ros2 launch aqua_localization aqua_localization.launch.py --show-args'
-rtk python3 -m py_compile aqua_localization/scripts/inspect_bag_topics.py
+ros2 run aqua_localization rerun_export.py \
+  --bag aqua_localization/datasets/public/tank_dataset/demo_with_estimate \
+  --out /tmp/tank.rrd
+rerun --screenshot-to /tmp/tank.png --window-size 1920x1080 /tmp/tank.rrd
 ```
 
-Short launch verification for scalar adapter:
+The Lichtblick path (committable layout JSON,
+`docs/foxglove/aqua_tank_demo.json`) is parallel:
 
 ```bash
-rtk bash -lc 'source install/setup.bash && timeout 5s ros2 launch aqua_localization aqua_localization.launch.py enable_scalar_to_pressure:=true scalar_to_pressure_params_file:=$(ros2 pkg prefix aqua_imu_loc)/share/aqua_imu_loc/config/scalar_to_pressure_ntnu.yaml enable_sonar_loc:=false enable_fusion:=false'
+ros2 run aqua_localization lichtblick_screenshot.py \
+  --bag aqua_localization/datasets/public/tank_dataset/demo_with_estimate \
+  --layout docs/foxglove/aqua_tank_demo.json \
+  --out docs/media/tank_dataset_lichtblick.png
 ```
 
-Observed nodes:
-
-- `scalar_to_pressure_node`
-- `imu_loc_node`
-
-## Public Demo Target
-
-Goal:
-
-Record a 60-120 second public demo video and embed it in `README.md`.
-
-README placeholder already exists:
-
-```markdown
-[![aqua_localization public dataset demo](docs/media/public_demo_thumbnail.png)](https://youtu.be/REPLACE_WITH_DEMO_VIDEO_ID)
-```
-
-Demo acceptance criteria:
-
-- use public dataset or public simulator bag
-- reproducible command in `README.md` or `datasets/README.md`
-- RViz view from `aqua_localization/rviz/demo.rviz`
-- visible `map -> odom -> base_link`
-- visible `/aqua_imu_loc/odometry`
-- if fusion/sonar available, visible `/aqua_fusion/odometry` and filtered sonar cloud
-- status topics visible or inspected
-- honest note distinguishing dead reckoning, scan matching, and fusion
-
-Current honest status:
-
-- buildable and runnable MVP
-- public bag replay pipeline is prepared
-- not yet validated on real public data
-- video-level demo should target reproducible bringup/localization visualization first, not benchmark-quality accuracy
-
-## Public Dataset Candidates
-
-Main docs:
-
-- `docs/public_dataset_candidates.md`
-- `docs/public_demo_plan.md`
-- `datasets/README.md`
-
-Recommended first target:
-
-- NTNU underwater dataset
-- URL: https://huggingface.co/datasets/ntnu-arl/underwater-datasets
-- reason: public hosting, documented ROS bags, BlueROV2-like platform, IMU and barometer/depth data
-
-Backup IMU + pressure target:
-
-- AQUALOC
-- URL: http://www.lirmm.fr/aqualoc/
-- paper page: https://huggingface.co/papers/1910.14532
-- reason: visual-inertial-pressure underwater localization data, ROS bags/raw data reported
-
-Sonar track:
-
-- OpenSonarDatasets
-- URL: https://github.com/remaro-network/OpenSonarDatasets
-- reason: list of sonar datasets, but likely needs conversion before ICP can run
-
-Future benchmark target:
-
-- Tank Dataset
-- URL: https://journals.sagepub.com/doi/full/10.1177/02783649251364904
-- reason: IMU/depth/DVL/GT useful for later DVL and benchmarking
-
-## Immediate Next Plan For Claude
-
-### Step 1: Do Not Refactor First
-
-Start with the demo pipeline. Do not begin with ESKF, GICP, NDT, or a large architecture refactor.
-
-The user wants visible progress toward a public localization demo video.
-
-### Step 2: Download One Small Public Dataset Segment
-
-Preferred:
-
-- NTNU dataset, one short Marine Cybernetics Lab trajectory if possible
-
-Suggested flow:
-
-```bash
-rtk mkdir -p datasets/public/ntnu
-```
-
-Then use the dataset instructions from the NTNU Hugging Face card.
-
-Important:
-
-- the dataset may be large
-- do not download the whole dataset unless necessary
-- choose one short bag/sequence
-- keep downloaded data out of git unless there is already an explicit data policy
-
-If using Python/Hugging Face tooling, prefer a local cache or explicit destination under `datasets/public/ntnu`.
-
-### Step 3: Inspect The Bag
-
-After a bag is available:
-
-```bash
-rtk bash -lc 'source install/setup.bash && ros2 run aqua_localization inspect_bag_topics.py /path/to/bag'
-```
-
-Save the output somewhere useful, likely:
-
-- `datasets/README.md`
-- or a new dataset-specific note such as `datasets/ntnu_demo.md`
-
-Expected outcomes:
-
-- if `sensor_msgs/msg/FluidPressure` exists, use it directly
-- if scalar barometer exists, use `scalar_to_pressure_node`
-- if scalar depth exists, use `depth_to_pressure_node` or `scalar_to_pressure_node mode:=depth_m`
-- if no pressure/depth exists, run IMU-only only as a debugging step, not as the target demo
-
-### Step 4: Fill NTNU Scalar Calibration
-
-If the bag has an NTNU-style barometer scalar:
-
-1. Find the selected sequence calibration values.
-2. Copy or create a dataset-specific YAML from:
-
-```text
-aqua_imu_loc/config/scalar_to_pressure_ntnu.yaml
-```
-
-Do not overwrite the generic starter YAML with sequence-specific values unless that is clearly wanted.
-
-Preferred new file:
-
-```text
-aqua_imu_loc/config/scalar_to_pressure_ntnu_<sequence_name>.yaml
-```
-
-Then make sure it is installed automatically because the whole `config/` directory is installed.
-
-### Step 5: Replay IMU + Depth First
-
-First demo should disable sonar and fusion until the IMU/depth path is visibly stable.
-
-Command shape:
-
-```bash
-rtk bash -lc 'source install/setup.bash && ros2 launch aqua_localization replay.launch.py \
-  start_bag:=true \
-  bag_path:=/path/to/ntnu_bag \
-  enable_scalar_to_pressure:=true \
-  bag_scalar_pressure_topic:=/barometer \
-  scalar_to_pressure_params_file:=$(ros2 pkg prefix aqua_imu_loc)/share/aqua_imu_loc/config/scalar_to_pressure_ntnu.yaml \
-  enable_sonar_loc:=false \
-  enable_fusion:=false \
-  enable_rviz:=true'
-```
-
-Adjust topic names from `inspect_bag_topics.py`.
-
-### Step 6: Verify Runtime Signals
-
-In separate terminals or by log inspection, confirm:
-
-```bash
-rtk bash -lc 'source install/setup.bash && ros2 topic list'
-rtk bash -lc 'source install/setup.bash && ros2 topic echo /aqua_imu_loc/status --once'
-rtk bash -lc 'source install/setup.bash && ros2 topic echo /aqua_imu_loc/odometry --once'
-rtk bash -lc 'source install/setup.bash && ros2 run tf2_ros tf2_echo map odom'
-rtk bash -lc 'source install/setup.bash && ros2 run tf2_ros tf2_echo odom base_link'
-```
-
-Expected:
-
-- status topic reports accepted IMU and pressure/depth updates
-- odometry is published
-- TF exists
-- depth update should keep vertical drift bounded compared with IMU-only
-
-### Step 7: Make Demo RViz Usable
-
-Current RViz config exists:
-
-```text
-aqua_localization/rviz/demo.rviz
-```
-
-If public data uses different frames or topics, update RViz conservatively.
-
-Do not create a marketing page. The first screen should be the actual localization visualization.
-
-For a clean video, show:
-
-- Grid
-- TF
-- `/aqua_imu_loc/odometry`
-- `/aqua_fusion/odometry` only if fusion is enabled and meaningful
-- sonar filtered point cloud only if sonar data is valid
-
-### Step 8: Record A Short Demo
-
-Create:
-
-```text
-docs/media/public_demo_thumbnail.png
-```
-
-When the video is uploaded, replace in `README.md`:
-
-```text
-https://youtu.be/REPLACE_WITH_DEMO_VIDEO_ID
-```
-
-Also add the exact replay command used.
-
-### Step 9: Commit-Ready Cleanup
-
-Before presenting final work:
-
-```bash
-rtk colcon build --symlink-install
-rtk colcon test --event-handlers console_direct+
-rtk colcon test-result --verbose
-rtk git status --short
-```
-
-If full tests are too slow, at minimum:
-
-```bash
-rtk colcon test --packages-select aqua_imu_loc aqua_localization --event-handlers console_direct+
-rtk colcon test-result --verbose
-```
-
-## Known Risks
-
-### Public Dataset Download Size
-
-NTNU may be large. Avoid broad downloads. Pick one sequence.
-
-### NTNU Calibration
-
-`scalar_to_pressure_ntnu.yaml` has placeholder calibration values. A demo can show bringup with placeholders only if clearly labeled, but it should not claim quantitative accuracy.
-
-### Time Stamps In Adapter Nodes
-
-Current adapter nodes publish `FluidPressure` with `now()` because scalar messages have no header.
-For rosbag replay with `use_sim_time`, this should be acceptable for bringup, but it is not ideal for high-quality time alignment.
-
-Potential improvement:
-
-- support `Header`-bearing scalar custom messages if dataset provides them
-- or add a small bag conversion script that writes proper `FluidPressure` messages with original timestamps
-
-### IMU-Only Drift
-
-Do not oversell horizontal localization from pure IMU. Underwater dead reckoning without DVL/acoustic/visual aid will drift. The first demo should emphasize:
-
-- depth constraint from pressure/barometer
-- estimator status
-- reproducible ROS 2 replay
-- TF and odometry pipeline
-
-### Sonar Data Format
-
-Many public sonar datasets are images or raw sonar returns, not metric `PointCloud2`.
-Do not assume `aqua_sonar_loc` can run on a sonar dataset without conversion.
-
-### TF Ownership
-
-Top-level launch switches TF ownership:
-
-- fusion enabled: `aqua_fusion` owns TF
-- fusion disabled: `aqua_imu_loc` owns TF
-
-If TF duplicates appear, inspect `publish.tf` parameters.
-
-## Recommended Next Code Improvements
-
-Only after the first public replay works:
-
-1. Add a bag conversion utility for scalar barometer/depth to `FluidPressure` with preserved timestamps.
-2. Add dataset-specific docs for the exact public sequence.
-3. Add a launch preset for the chosen public sequence.
-4. Add an RViz config specifically for public demo if needed.
-5. Add optional CSV export of odometry/status for quick plotting.
-6. Improve UKF state with accelerometer/gyro bias terms or start the ESKF backend.
-7. Add sonar registration quality gating and covariance estimation.
-8. Add GICP/NDT backends.
-9. Add DVL input and benchmark against datasets with DVL/GT.
-
-## Suggested Files To Read First
-
-Read these before editing:
-
-```text
-README.md
-docs/architecture.md
-docs/mvp_checklist.md
-docs/public_demo_plan.md
-docs/public_dataset_candidates.md
-datasets/README.md
-aqua_localization/launch/replay.launch.py
-aqua_localization/scripts/inspect_bag_topics.py
-aqua_imu_loc/src/imu_loc_node.cpp
-aqua_imu_loc/src/scalar_to_pressure_node.cpp
-aqua_imu_loc/config/scalar_to_pressure_ntnu.yaml
-```
-
-## Suggested First Claude Task
-
-Continue with this exact task:
-
-> Download or prepare one small NTNU public dataset sequence, run `inspect_bag_topics.py`, create a dataset-specific replay note and scalar barometer calibration YAML if needed, then verify that `aqua_imu_loc` publishes odometry/status/TF in RViz with sonar and fusion disabled.
-
-Expected output from that task:
-
-- dataset path and sequence name
-- detected topics table
-- exact replay command
-- any new config YAML
-- whether odometry/status/TF were observed
-- whether the result is ready for a short README demo video
-
-## Definition Of Done For The Public Demo MVP
-
-The public demo MVP is done when:
-
-- one public dataset sequence is named and documented
-- replay command is reproducible from a clean shell after `source install/setup.bash`
-- RViz starts with useful displays
-- `/aqua_imu_loc/status` shows accepted IMU and pressure/depth updates
-- `/aqua_imu_loc/odometry` publishes during replay
-- TF `map -> odom -> base_link` exists
-- README includes the final command and video link or local recording plan
-- tests pass after any code changes
-
-This is the correct short-term target. Full localization accuracy benchmarking is a later milestone.
+## Honest Limitations As Of v0.2
+
+- IMU-only dead reckoning drifts roughly an order of magnitude on bags
+  without DVL/visual aiding. NTNU `fjord_1` and AQUALOC `harbor_07`
+  exhibit hundreds-of-meters XY drift; depth `z(t)` tracks well thanks
+  to the pressure-update loop.
+- Single-fan multibeam registration is geometrically degenerate.
+  Tightly-coupled sonar feedback narrows MBES-SLAM `beach_pond` fusion
+  drift from ±40 m loose-coupling to ~17 m, but the per-fan residuals
+  are still ~10 m magnitude.
+- The pose graph backend is structurally complete but does not yet
+  generate loop closure constraints. Optimisation against odometry-only
+  initialisation is a no-op.
+- Per-platform sonar covariance calibration produced sensible numbers
+  on MBES with 22 accepted fans. More accepted fans (e.g. via an
+  OpenSonarDatasets bag with longer overlapping geometry) would tighten
+  the statistical estimate.
+- `aqua_fusion` has unit + runtime tests but no per-platform accuracy
+  benchmark history (separate from the bench_fjord_1 harness which is
+  IMU-only).
+
+## v0.3+ Roadmap
+
+The headline next milestone is **loop closure detection**. The pose
+graph backend is in place; what remains is the front end that proposes
+loop closure constraints from sensor data.
+
+Two natural directions, can be developed in parallel:
+
+1. **Bathymetric submap-vs-submap loop closure (MBES path).** Persist
+   accumulated multibeam sub-maps at each keyframe, search for
+   spatially-near keyframes when a new one is added, run a sub-map vs
+   sub-map ICP/GICP registration, and inject the relative SE(3) and
+   information matrix as a loop constraint into `aqua_pose_graph`.
+   First target dataset is MBES-SLAM `beach_pond` (textured lakebed).
+2. **Visual loop closure (AQUALOC path).** OpenCV ORB features + a
+   bag-of-words descriptor (DBoW2 or a lighter-weight equivalent) per
+   keyframe. On each new keyframe, query the descriptor index for
+   matches above a similarity threshold, compute essential matrix +
+   triangulated scale (depth from pressure or DVL), and inject the
+   constraint. First target dataset is AQUALOC `harbor_07` (clear
+   harbor water, dense seafloor texture).
+
+Other roadmap items:
+
+- ESKF backend with error-state IMU propagation. The current additive
+  UKF works but an error-state formulation is the principled way to
+  handle attitude observations from sonar and to add delayed-state
+  smoothing once visual or DVL aiding lands.
+- `aqua_fusion` per-platform benchmark runner (matching the existing
+  `bench_fjord_1.sh` pattern).
+- Magnetometer-based yaw observation (NTNU and AQUALOC both publish
+  raw magnetometers but we currently only use the AHRS yaw-rate hook).
+- Acoustic positioning inputs (USBL / SBL) — currently no public
+  dataset shipping these is on our shortlist, but the UKF measurement
+  framework is ready.
+- Additional dataset adapters: OpenSonarDatasets, a second AQUALOC
+  sequence, possibly UDualCam-Bottom or marine BlueROV2 logs.
+
+## Suggested First Tasks For The Next Iteration
+
+In priority order:
+
+1. **Bathymetric submap-vs-submap loop closure on MBES.** Bridge the
+   submap front end already inside `aqua_sonar_loc` (registration only
+   uses K most-recent fans) with a longer-horizon submap store keyed
+   by pose-graph keyframe id. Add a `LoopClosureDetector` class that
+   periodically searches for spatially-near keyframes and runs ICP
+   between their submaps, then calls
+   `aqua_pose_graph::PoseGraph::add_loop_constraint`.
+2. **rerun visualisation of `/aqua_pose_graph/path`.** Extend each
+   `rerun_export*.py` with an optional `--pose-graph-bag` argument
+   that overlays the optimised path on top of the existing odometry
+   path, colour-coded.
+3. **`aqua_fusion` benchmark runner** matching the
+   `bench_fjord_1.sh` pattern, plus a `docs/benchmarks/` table per
+   public dataset.
+4. **Visual loop closure on AQUALOC** (probably depends on adopting a
+   DBoW-like descriptor library — evaluate before committing).
+5. **ESKF backend** as a separate node behind a `localization.backend`
+   parameter so additive UKF and error-state run in parallel during
+   the transition.
+
+## Files To Read First
+
+If you are picking this project up cold, in this order:
+
+- `README.md` — top-level positioning, package list, public-data demo
+  matrix, web replay paths.
+- `docs/mvp_checklist.md` — the canonical "Done" / "Next Milestones"
+  list, kept in sync with each PR.
+- `docs/foxglove/README.md` — the recording-and-replay workflow that
+  underpins every demo asset.
+- `aqua_pose_graph/include/aqua_pose_graph/pose_graph.hpp` and the
+  matching `src/pose_graph.cpp` — short, self-contained, the cleanest
+  example of what shipping into this repo looks like.
+- `aqua_imu_loc/src/additive_ukf.cpp` — the largest single source file,
+  the place where DVL / sonar / pressure measurement updates live.
+
+## Workspace Note
+
+The repository sits at
+`/media/sasaki/aiueo/ai_coding_ws/aqua_loc_ws/aqua_localization`. The
+colcon workspace root is one directory up. Standard ROS 2 Jazzy
+sourcing applies; no project-specific shell wrappers are required for
+this iteration.
+
+PR workflow is mandatory — direct pushes to `main` are rejected by
+GitHub branch protection. Feature branches are squash-merged via
+`gh pr merge --squash --delete-branch`.
