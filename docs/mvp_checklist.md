@@ -62,6 +62,14 @@ This checklist tracks the first usable `aqua_localization` milestone.
 - Lichtblick (Apache-2.0 fork of Foxglove Studio) layout JSON ships in
   `docs/foxglove/aqua_tank_demo.json` plus a Playwright driver
   (`scripts/lichtblick_screenshot.py`) for browser-only replay.
+- `aqua_pose_graph` package: SE(3) pose graph backend on g2o. Subscribes
+  to upstream odometry (default `/aqua_imu_loc/odometry`), extracts
+  keyframes once translation/rotation thresholds are exceeded, and
+  publishes the optimised keyframe trajectory as `nav_msgs/Path` on
+  `/aqua_pose_graph/path`. `add_loop_constraint(...)` is the entry
+  point for a future place-recognition/submap-matching front end. 5
+  gtests cover seeding, threshold triggering, optimise-on-chain,
+  loop-constraint pull-in, and reset.
 - TF ownership is automatic in top-level launch:
   - fusion enabled: `aqua_fusion` owns TF
   - fusion disabled: `aqua_imu_loc` owns TF
@@ -118,3 +126,10 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
   remaining sensor-aiding gaps are visual and acoustic.)
 - Tightly coupled sonar residual fusion.
 - AQUALOC + additional MBES-SLAM/OpenSonarDatasets adapters.
+- Loop closure detection on top of `aqua_pose_graph`: the SE(3) keyframe
+  graph + g2o optimiser ship today (5 unit tests cover seeding, threshold
+  triggering, no-op chain optimisation, loop-constraint pull-in, and reset)
+  but the place-recognition / submap-matching front end that *generates*
+  loop closure constraints is still TODO. Bathymetric submap-vs-submap
+  matching for the MBES path and visual loop closure for AQUALOC are the
+  two natural follow-ups.

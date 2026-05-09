@@ -15,6 +15,7 @@ aqua_localization/
 ├── aqua_imu_loc/      # Main IMU + pressure localization package
 ├── aqua_sonar_loc/    # Sonar point cloud preprocessing and scan matching
 ├── aqua_fusion/       # Loosely/tightly coupled IMU + sonar fusion
+├── aqua_pose_graph/   # SE(3) pose graph backend (g2o) for keyframe-based smoothing + future loop closure
 ├── aqua_msgs/         # Project-specific messages, services, and actions
 ├── docs/              # Design notes and dataset documentation
 └── datasets/          # Dataset adapters, download notes, and examples
@@ -194,6 +195,10 @@ Sonar localization package. Inputs are `sensor_msgs/msg/PointCloud2` from FLS, m
 ### `aqua_fusion`
 
 Fusion package for combining IMU/depth odometry and sonar registration. The current implementation is a loosely coupled odometry fuser that blends fresh sonar position into IMU odometry. Tightly coupled sonar residual integration is reserved for a later stage.
+
+### `aqua_pose_graph`
+
+SE(3) pose graph backend built on g2o. Subscribes to an upstream odometry topic (typically `/aqua_imu_loc/odometry` or `/aqua_fusion/odometry`), extracts keyframes when motion exceeds configurable translation/rotation thresholds, and connects them with `EdgeSE3` constraints whose information matrix is read from the upstream `pose.covariance` block. Optimisation runs automatically every N keyframes (configurable, off by default with N=20) or on demand via the `/aqua_pose_graph/optimize` service. Without external constraints the graph is a chain and optimisation is a no-op; once `add_loop_constraint(...)` is wired to a place-recognition / submap-matching front end the same backend closes accumulated drift. Publishes the optimised keyframe trajectory as `nav_msgs/msg/Path` on `/aqua_pose_graph/path`.
 
 ### `aqua_msgs`
 

@@ -1,0 +1,35 @@
+aqua_pose_graph:
+  ros__parameters:
+    topics:
+      # Input odometry. Typically `/aqua_imu_loc/odometry` for the dead-reckoning
+      # path or `/aqua_fusion/odometry` once that node is the canonical front end.
+      odometry: /aqua_imu_loc/odometry
+      # Optimised keyframe trajectory output (nav_msgs/Path).
+      path: /aqua_pose_graph/path
+      # Diagnostic count of keyframes currently in the graph (std_msgs/UInt32).
+      keyframe_count: /aqua_pose_graph/keyframe_count
+
+    frames:
+      # Frame for the published path. This node does not publish TF.
+      map: map
+
+    keyframe:
+      # Add a new keyframe whenever the upstream odometry has moved at least
+      # this far in translation OR rotation since the last keyframe. Smaller
+      # spacings produce a denser graph and slower optimisation.
+      translation_m: 0.5
+      rotation_rad: 0.1745329  # 10 degrees
+
+    edges:
+      # Information matrix diagonal used when the upstream odometry message
+      # does not carry a finite covariance. Larger means tighter constraint.
+      default_translation_information: 100.0      # 1 / (0.1 m)^2
+      default_rotation_information: 1000.0        # 1 / (0.0316 rad)^2
+
+    optimization:
+      # g2o iterations per optimize() call.
+      iterations: 20
+      # Trigger optimize() automatically once this many keyframes have been
+      # added since the last optimisation. 0 disables automatic optimisation
+      # (callers must trigger via the `/aqua_pose_graph/optimize` service).
+      optimize_every_n_keyframes: 20
