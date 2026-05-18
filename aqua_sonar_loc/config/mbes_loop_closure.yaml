@@ -5,6 +5,7 @@ mbes_loop_closure:
       keyframe: /aqua_pose_graph/keyframe
       loop_constraint: /aqua_pose_graph/loop_constraint
       status: /mbes_loop_closure/status
+      markers: /mbes_loop_closure/markers
 
     frames:
       map: map

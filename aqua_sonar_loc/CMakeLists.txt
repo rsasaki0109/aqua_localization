@@ -18,6 +18,7 @@ find_package(PCL REQUIRED COMPONENTS common filters registration)
 find_package(pcl_conversions REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 add_library(sonar_cloud_preprocessor src/sonar_cloud_preprocessor.cpp)
 target_compile_features(sonar_cloud_preprocessor PUBLIC cxx_std_17)
@@ -53,6 +54,7 @@ ament_target_dependencies(
   pcl_conversions
   rclcpp
   sensor_msgs
+  visualization_msgs
 )
 
 install(TARGETS sonar_cloud_preprocessor scan_matcher
@@ -107,6 +109,7 @@ if(BUILD_TESTING)
     pcl_conversions
     rclcpp
     sensor_msgs
+    visualization_msgs
   )
 endif()
 
