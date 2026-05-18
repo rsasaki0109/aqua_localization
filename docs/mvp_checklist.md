@@ -66,10 +66,11 @@ This checklist tracks the first usable `aqua_localization` milestone.
   to upstream odometry (default `/aqua_imu_loc/odometry`), extracts
   keyframes once translation/rotation thresholds are exceeded, and
   publishes the optimised keyframe trajectory as `nav_msgs/Path` on
-  `/aqua_pose_graph/path`. `add_loop_constraint(...)` is the entry
-  point for a future place-recognition/submap-matching front end. 5
-  gtests cover seeding, threshold triggering, optimise-on-chain,
-  loop-constraint pull-in, and reset.
+  `/aqua_pose_graph/path`. External loop constraints arrive on
+  `/aqua_pose_graph/loop_constraint`, and MBES loop-closure diagnostics
+  are visible in rerun.io via pose-graph path, accepted loop-edge, and
+  status plots. 5 gtests cover seeding, threshold triggering,
+  optimise-on-chain, loop-constraint pull-in, and reset.
 - TF ownership is automatic in top-level launch:
   - fusion enabled: `aqua_fusion` owns TF
   - fusion disabled: `aqua_imu_loc` owns TF

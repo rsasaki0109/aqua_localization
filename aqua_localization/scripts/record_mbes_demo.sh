@@ -2,8 +2,9 @@
 # MBES-SLAM beach_pond demo bag recorder.
 #
 # Records a results-included `.mcap` that bundles the source multibeam fans,
-# IMU, reference odometry, and `aqua_imu_loc` + `aqua_sonar_loc` outputs,
-# ready for rerun.io / Lichtblick replay.
+# IMU, reference odometry, `aqua_imu_loc` + `aqua_sonar_loc` outputs, and the
+# optional pose-graph / MBES loop-closure diagnostics ready for rerun.io /
+# Lichtblick replay.
 #
 # Usage:
 #   ./record_mbes_demo.sh
@@ -16,6 +17,8 @@ MBES_SRC="${MBES_SRC:-$WORKSPACE/aqua_localization/datasets/public/mbes_slam/bea
 MBES_OUT="${MBES_OUT:-$WORKSPACE/aqua_localization/datasets/public/mbes_slam/demo_with_estimate}"
 IMU_PROFILE="${IMU_PROFILE:-$WORKSPACE/install/aqua_imu_loc/share/aqua_imu_loc/config/mbes_slam.yaml}"
 SONAR_PROFILE="${SONAR_PROFILE:-$WORKSPACE/install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_slam.yaml}"
+POSE_GRAPH_PROFILE="${POSE_GRAPH_PROFILE:-$WORKSPACE/install/aqua_pose_graph/share/aqua_pose_graph/config/params.yaml}"
+MBES_LOOP_PROFILE="${MBES_LOOP_PROFILE:-$WORKSPACE/install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml}"
 MBES_DURATION="${MBES_DURATION:-60}"
 
 cd "$WORKSPACE"
@@ -38,6 +41,18 @@ ros2 run aqua_sonar_loc sonar_loc_node --ros-args \
   > /tmp/aqua_record_mbes_sonar.log 2>&1 &
 SON_PID=$!
 
+ros2 run aqua_pose_graph pose_graph_node --ros-args \
+  --params-file "$POSE_GRAPH_PROFILE" \
+  -p use_sim_time:=true \
+  > /tmp/aqua_record_mbes_pose_graph.log 2>&1 &
+PG_PID=$!
+
+ros2 run aqua_sonar_loc mbes_loop_closure_node --ros-args \
+  --params-file "$MBES_LOOP_PROFILE" \
+  -p use_sim_time:=true \
+  > /tmp/aqua_record_mbes_loop_closure.log 2>&1 &
+LOOP_PID=$!
+
 sleep 3
 
 ros2 bag record -s mcap -o "$MBES_OUT" \
@@ -46,6 +61,11 @@ ros2 bag record -s mcap -o "$MBES_OUT" \
            /aqua_imu_loc/odometry /aqua_imu_loc/status \
            /aqua_sonar_loc/odometry /aqua_sonar_loc/status \
            /aqua_sonar_loc/points_filtered \
+           /aqua_pose_graph/path /aqua_pose_graph/keyframe \
+           /aqua_pose_graph/keyframe_count \
+           /aqua_pose_graph/loop_constraint \
+           /aqua_pose_graph/loop_constraint_count \
+           /mbes_loop_closure/status \
            /tf /tf_static \
   > /tmp/aqua_record_mbes_bag.log 2>&1 &
 REC_PID=$!
@@ -57,9 +77,9 @@ ros2 bag play "$MBES_SRC" --clock --playback-duration "$MBES_DURATION" \
 
 sleep 3
 
-kill -INT "$REC_PID" "$IMU_PID" "$SON_PID" 2>/dev/null || true
+kill -INT "$REC_PID" "$IMU_PID" "$SON_PID" "$PG_PID" "$LOOP_PID" 2>/dev/null || true
 sleep 4
-kill -TERM "$REC_PID" "$IMU_PID" "$SON_PID" 2>/dev/null || true
+kill -TERM "$REC_PID" "$IMU_PID" "$SON_PID" "$PG_PID" "$LOOP_PID" 2>/dev/null || true
 sleep 1
 
 ls -la "$MBES_OUT"

@@ -48,6 +48,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_plot_trajectories test/test_plot_trajectories.py)
   ament_add_pytest_test(test_record_status_format test/test_record_status_format.py)
   ament_add_pytest_test(test_make_synthetic_sonar_bag test/test_make_synthetic_sonar_bag.py)
+  ament_add_pytest_test(test_rerun_export_mbes_helpers test/test_rerun_export_mbes_helpers.py)
 endif()
 
 ament_package()
