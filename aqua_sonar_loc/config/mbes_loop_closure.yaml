@@ -4,6 +4,7 @@ mbes_loop_closure:
       points: /aqua_sonar_loc/points_filtered
       keyframe: /aqua_pose_graph/keyframe
       loop_constraint: /aqua_pose_graph/loop_constraint
+      status: /mbes_loop_closure/status
 
     frames:
       map: map

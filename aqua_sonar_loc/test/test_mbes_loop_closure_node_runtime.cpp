@@ -1,4 +1,5 @@
 #include <array>
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <memory>
@@ -8,6 +9,7 @@
 
 #include <gtest/gtest.h>
 
+#include "aqua_msgs/msg/loop_closure_status.hpp"
 #include "aqua_msgs/msg/pose_graph_keyframe.hpp"
 #include "aqua_msgs/msg/pose_graph_loop_constraint.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -126,12 +128,14 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
   constexpr auto kPointsTopic = "/mbes_loop_runtime_test/points";
   constexpr auto kKeyframeTopic = "/mbes_loop_runtime_test/keyframe";
   constexpr auto kLoopTopic = "/mbes_loop_runtime_test/loop_constraint";
+  constexpr auto kStatusTopic = "/mbes_loop_runtime_test/status";
 
   rclcpp::NodeOptions options;
   options.parameter_overrides({
     rclcpp::Parameter("topics.points", std::string(kPointsTopic)),
     rclcpp::Parameter("topics.keyframe", std::string(kKeyframeTopic)),
     rclcpp::Parameter("topics.loop_constraint", std::string(kLoopTopic)),
+    rclcpp::Parameter("topics.status", std::string(kStatusTopic)),
     rclcpp::Parameter("submaps.min_points", 5),
     rclcpp::Parameter("submaps.max_points", 1000),
     rclcpp::Parameter("submaps.voxel_leaf_m", 0.0),
@@ -154,6 +158,7 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
   auto test_node = std::make_shared<rclcpp::Node>("mbes_loop_runtime_test");
 
   std::vector<aqua_msgs::msg::PoseGraphLoopConstraint> loop_messages;
+  std::vector<aqua_msgs::msg::LoopClosureStatus> status_messages;
   auto keyframe_pub = test_node->create_publisher<aqua_msgs::msg::PoseGraphKeyframe>(
     kKeyframeTopic, rclcpp::QoS(10).transient_local());
   auto points_pub =
@@ -162,6 +167,11 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
     kLoopTopic, 10,
     [&loop_messages](const aqua_msgs::msg::PoseGraphLoopConstraint::SharedPtr msg) {
       loop_messages.push_back(*msg);
+    });
+  auto status_sub = test_node->create_subscription<aqua_msgs::msg::LoopClosureStatus>(
+    kStatusTopic, 10,
+    [&status_messages](const aqua_msgs::msg::LoopClosureStatus::SharedPtr msg) {
+      status_messages.push_back(*msg);
     });
 
   rclcpp::executors::SingleThreadedExecutor executor;
@@ -197,6 +207,19 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
   EXPECT_NEAR(loop.relative_pose.orientation.w, 1.0, 1e-3);
   EXPECT_NEAR(loop.information[0], 1.0 / (1.5 * 1.5), 1e-9);
   EXPECT_NEAR(loop.information[35], 1.0 / (0.25 * 0.25), 1e-9);
+
+  ASSERT_FALSE(status_messages.empty());
+  const auto accepted_status = std::find_if(
+    status_messages.begin(), status_messages.end(),
+    [](const aqua_msgs::msg::LoopClosureStatus & msg) {return msg.accepted;});
+  ASSERT_NE(accepted_status, status_messages.end());
+  EXPECT_EQ(accepted_status->current_id, 1U);
+  EXPECT_EQ(accepted_status->candidate_id, 0U);
+  EXPECT_TRUE(accepted_status->converged);
+  EXPECT_NEAR(accepted_status->fitness_score, 0.0, 1e-4);
+  EXPECT_NEAR(accepted_status->correction_translation_m, 0.0, 1e-3);
+  EXPECT_NEAR(accepted_status->correction_rotation_rad, 0.0, 1e-3);
+  EXPECT_EQ(accepted_status->status, "accepted");
 }
 
 }  // namespace

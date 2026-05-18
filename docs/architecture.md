@@ -190,6 +190,12 @@ keyframe, search older submaps after a temporal/spatial exclusion window,
 run submap-vs-submap GICP/NDT, and publish only geometrically consistent
 relative transforms as loop constraints.
 
+`aqua_sonar_loc/mbes_loop_closure_node` also publishes
+`aqua_msgs/msg/LoopClosureStatus` on `/mbes_loop_closure/status`. The status
+stream reports each tested candidate's convergence, fitness, correction
+magnitude, acceptance flag, and rejection reason, which makes real-bag tuning
+observable without enabling debug logs.
+
 ## Fusion Path
 
 `aqua_fusion` currently implements a loosely coupled odometry fuser:

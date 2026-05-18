@@ -17,6 +17,9 @@ front end so the next implementation can stay small and measurable.
   front end. It accumulates short submaps between pose-graph keyframes,
   searches older odometry-near submaps, registers them with ICP/GICP/NDT, and
   publishes accepted constraints to `/aqua_pose_graph/loop_constraint`.
+- The same node publishes `aqua_msgs/LoopClosureStatus` on
+  `/mbes_loop_closure/status` for each tested candidate, including rejection
+  reason, convergence, fitness score, and correction magnitude.
 - `aqua_localization/scripts/pose_graph_loop_demo.py` publishes a synthetic
   odometry chain plus one loop constraint for smoke-testing the graph input.
 
@@ -32,7 +35,9 @@ front end so the next implementation can stay small and measurable.
    consistency.
 7. Publish `aqua_msgs/PoseGraphLoopConstraint` with a conservative
    information matrix.
-8. Re-export the rerun.io demo with before/after pose-graph paths and loop
+8. Publish `aqua_msgs/LoopClosureStatus` so tuning can distinguish "no
+   candidates" from rejected or accepted registration results.
+9. Re-export the rerun.io demo with before/after pose-graph paths and loop
    edges.
 
 ## Smoke Demo
@@ -96,3 +101,15 @@ Tune in this order:
    `gates.max_correction_rotation_rad` until false positives are rejected.
 4. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
    optimized path changes against the MBES-SLAM reference odometry.
+
+Useful live checks while tuning:
+
+```bash
+ros2 topic echo /mbes_loop_closure/status
+ros2 topic echo /aqua_pose_graph/loop_constraint_count
+```
+
+`LoopClosureStatus.candidate_id` is `UINT32_MAX` when a keyframe has no
+eligible historical submap. Rejections report the specific gate that failed,
+so overly strict candidate, fitness, or correction thresholds are visible
+without reading debug logs.
