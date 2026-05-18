@@ -39,6 +39,8 @@ def generate_launch_description():
     enable_imu_loc = LaunchConfiguration("enable_imu_loc")
     enable_sonar_loc = LaunchConfiguration("enable_sonar_loc")
     enable_fusion = LaunchConfiguration("enable_fusion")
+    enable_pose_graph = LaunchConfiguration("enable_pose_graph")
+    enable_mbes_loop_closure = LaunchConfiguration("enable_mbes_loop_closure")
     enable_rviz = LaunchConfiguration("enable_rviz")
     start_bag = LaunchConfiguration("start_bag")
     loop_bag = LaunchConfiguration("loop_bag")
@@ -62,6 +64,8 @@ def generate_launch_description():
     scalar_to_pressure_params_file = LaunchConfiguration("scalar_to_pressure_params_file")
     sonar_params_file = LaunchConfiguration("sonar_params_file")
     fusion_params_file = LaunchConfiguration("fusion_params_file")
+    pose_graph_params_file = LaunchConfiguration("pose_graph_params_file")
+    mbes_loop_closure_params_file = LaunchConfiguration("mbes_loop_closure_params_file")
     rviz_config_file = LaunchConfiguration("rviz_config_file")
 
     common_node_parameters = [{"use_sim_time": ParameterValue(use_sim_time, value_type=bool)}]
@@ -197,6 +201,19 @@ def generate_launch_description():
                 description="Start the aqua_fusion loosely coupled fusion node.",
             ),
             DeclareLaunchArgument(
+                "enable_pose_graph",
+                default_value="false",
+                description="Start the aqua_pose_graph SE(3) keyframe backend.",
+            ),
+            DeclareLaunchArgument(
+                "enable_mbes_loop_closure",
+                default_value="false",
+                description=(
+                    "Start the experimental MBES submap loop-closure front end. "
+                    "Requires enable_pose_graph:=true and an MBES-style PointCloud2 stream."
+                ),
+            ),
+            DeclareLaunchArgument(
                 "enable_rviz",
                 default_value="false",
                 description="Start RViz with the aqua_localization demo display config.",
@@ -225,6 +242,16 @@ def generate_launch_description():
                 "fusion_params_file",
                 default_value=package_params("aqua_fusion"),
                 description="Parameter YAML for aqua_fusion.",
+            ),
+            DeclareLaunchArgument(
+                "pose_graph_params_file",
+                default_value=package_params("aqua_pose_graph"),
+                description="Parameter YAML for aqua_pose_graph.",
+            ),
+            DeclareLaunchArgument(
+                "mbes_loop_closure_params_file",
+                default_value=package_config("aqua_sonar_loc", "mbes_loop_closure.yaml"),
+                description="Parameter YAML for the MBES loop-closure front end.",
             ),
             DeclareLaunchArgument(
                 "rviz_config_file",
@@ -283,6 +310,22 @@ def generate_launch_description():
                     *common_node_parameters,
                 ],
                 condition=IfCondition(enable_fusion),
+            ),
+            Node(
+                package="aqua_pose_graph",
+                executable="pose_graph_node",
+                name="aqua_pose_graph",
+                output="screen",
+                parameters=[pose_graph_params_file, *common_node_parameters],
+                condition=IfCondition(enable_pose_graph),
+            ),
+            Node(
+                package="aqua_sonar_loc",
+                executable="mbes_loop_closure_node",
+                name="mbes_loop_closure",
+                output="screen",
+                parameters=[mbes_loop_closure_params_file, *common_node_parameters],
+                condition=IfCondition(enable_mbes_loop_closure),
             ),
             Node(
                 package="rviz2",

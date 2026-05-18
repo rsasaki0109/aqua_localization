@@ -42,13 +42,26 @@ target_compile_features(sonar_loc_node PUBLIC cxx_std_17)
 target_link_libraries(sonar_loc_node sonar_cloud_preprocessor scan_matcher)
 ament_target_dependencies(sonar_loc_node aqua_msgs nav_msgs rclcpp sensor_msgs)
 
+add_executable(mbes_loop_closure_node src/mbes_loop_closure_node.cpp)
+target_compile_features(mbes_loop_closure_node PUBLIC cxx_std_17)
+target_include_directories(mbes_loop_closure_node PUBLIC ${PCL_INCLUDE_DIRS})
+target_link_libraries(mbes_loop_closure_node ${PCL_LIBRARIES})
+ament_target_dependencies(
+  mbes_loop_closure_node
+  aqua_msgs
+  geometry_msgs
+  pcl_conversions
+  rclcpp
+  sensor_msgs
+)
+
 install(TARGETS sonar_cloud_preprocessor scan_matcher
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
 )
 
-install(TARGETS sonar_loc_node
+install(TARGETS sonar_loc_node mbes_loop_closure_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -77,6 +90,21 @@ if(BUILD_TESTING)
     test_sonar_loc_node_runtime
     aqua_msgs
     nav_msgs
+    rclcpp
+    sensor_msgs
+  )
+
+  ament_add_gtest(
+    test_mbes_loop_closure_node_runtime
+    test/test_mbes_loop_closure_node_runtime.cpp
+  )
+  target_link_libraries(test_mbes_loop_closure_node_runtime ${PCL_LIBRARIES})
+  target_include_directories(test_mbes_loop_closure_node_runtime PUBLIC ${PCL_INCLUDE_DIRS})
+  ament_target_dependencies(
+    test_mbes_loop_closure_node_runtime
+    aqua_msgs
+    geometry_msgs
+    pcl_conversions
     rclcpp
     sensor_msgs
   )

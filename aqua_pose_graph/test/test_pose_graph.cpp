@@ -136,6 +136,26 @@ TEST(PoseGraph, LoopConstraintBendsTrajectory)
   EXPECT_LT((kf4.translation() - kf0.translation()).norm(), 1.0);
 }
 
+TEST(PoseGraph, RejectsLoopConstraintWithUnknownKeyframe)
+{
+  PoseGraphConfig cfg;
+  cfg.keyframe_translation_m = 1.0;
+  cfg.keyframe_rotation_rad = M_PI;
+  PoseGraph graph(cfg);
+
+  graph.add_odometry_sample(
+    0.0, translation(0.0, 0.0, 0.0),
+    Eigen::Matrix<double, 6, 6>::Identity());
+
+  LoopConstraint loop;
+  loop.from_id = 0;
+  loop.to_id = 99;
+  loop.relative_pose = Eigen::Isometry3d::Identity();
+  loop.information = tight_information();
+  EXPECT_FALSE(graph.add_loop_constraint(loop));
+  EXPECT_EQ(graph.loop_constraint_count(), 0u);
+}
+
 TEST(PoseGraph, ResetClearsState)
 {
   PoseGraphConfig cfg;
