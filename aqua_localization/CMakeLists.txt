@@ -34,6 +34,7 @@ install(PROGRAMS
   scripts/record_aqualoc_demo.sh
   scripts/calibrate_sonar_covariance.py
   scripts/pose_graph_loop_demo.py
+  scripts/pose_graph_loop_smoke.sh
   DESTINATION lib/${PROJECT_NAME}
 )
 
