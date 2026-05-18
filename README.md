@@ -1,19 +1,35 @@
 # aqua_localization
 
-ROS 2 underwater localization stack — additive UKF (IMU + pressure + DVL +
-sonar) + g2o SE(3) pose graph, validated end-to-end on four public AUV/ROV
-bags. Targets BlueROV2-class ROVs, custom AUVs, and `uuv_simulator`.
-ROS 2 Humble and Jazzy are the supported distributions.
+[![ROS 2 Humble](https://img.shields.io/badge/ROS%202-Humble-blue)](https://docs.ros.org/en/humble/)
+[![ROS 2 Jazzy](https://img.shields.io/badge/ROS%202-Jazzy-blue)](https://docs.ros.org/en/jazzy/)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-green.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/rsasaki0109/aqua_localization)](https://github.com/rsasaki0109/aqua_localization/releases)
+
+ROS 2 underwater localization for real AUV/ROV data: a 15-state additive
+UKF for IMU + pressure + DVL + sonar updates, sonar point-cloud registration
+with PCL ICP/GICP/NDT, and a g2o SE(3) pose graph backend.
+
+![MBES-SLAM beach_pond multibeam sonar replay in rerun.io](docs/media/mbes_slam_beach_pond.gif)
+
+The headline path is intentionally public-data first: four underwater
+datasets, four [rerun.io](https://rerun.io) renderings, no synthetic bag
+or simulator-only demo in the main story. Targets BlueROV2-class ROVs,
+custom AUVs, and `uuv_simulator`. ROS 2 Humble and Jazzy are supported.
 
 Latest release: **[v0.2](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.2)**.
 
-## Public-Data Demo
+## Why It Exists
 
-Four public underwater datasets, four [rerun.io](https://rerun.io)
-renderings, no synthetic bags or simulation in the headline path. Each
-entry has a one-shot recorder + rerun export script — the screenshots
-below regenerate from the recorded demo bag without any manual RViz
-session.
+Underwater localization usually needs more than a generic planar robot
+stack: pressure/depth is a first-class measurement, DVL velocity arrives
+in the vehicle frame, sonar geometry can be degenerate, and public
+benchmarks often use ROS bags with dataset-specific topics. This repository
+keeps those underwater-specific paths explicit and testable.
+
+## Public-Data Results
+
+Each row has a one-shot recorder and rerun export script. The screenshots
+regenerate from the recorded demo bag without a manual RViz session.
 
 | Dataset | What it shows | rerun screenshot |
 |---------|---------------|------------------|
@@ -22,8 +38,10 @@ session.
 | **NTNU `subset-fjord/fjord_1`** | Dataset SLAM baseline through a 7 m fjord dive | [`ntnu_fjord_1_rerun.png`](docs/media/ntnu_fjord_1_rerun.png) |
 | **AQUALOC `harbor_07`** | LIRMM "Dumbo" ROV underwater camera + pressure depth track | [`aqualoc_harbor_07_rerun.png`](docs/media/aqualoc_harbor_07_rerun.png) |
 
-![aqua_localization on Tank Dataset short_test (rerun.io)](docs/media/tank_dataset_rerun.png)
-![aqua_localization on MBES-SLAM beach_pond (rerun.io)](docs/media/mbes_slam_rerun.png)
+<p>
+  <img src="docs/media/tank_dataset_rerun.png" alt="aqua_localization on Tank Dataset short_test in rerun.io" width="49%">
+  <img src="docs/media/mbes_slam_rerun.png" alt="aqua_localization on MBES-SLAM beach_pond in rerun.io" width="49%">
+</p>
 
 ## Packages
 
@@ -41,27 +59,37 @@ Detailed architecture per package: [`docs/architecture.md`](docs/architecture.md
 ## Quick Start
 
 ```bash
-# Clone into a colcon workspace, build, source.
+# Clone into a colcon workspace, install dependencies, build, and source.
 git clone https://github.com/rsasaki0109/aqua_localization.git
 cd aqua_localization && rosdep install --from-paths . --ignore-src -r -y
 cd ..
 colcon build --symlink-install
 source install/setup.bash
 
-# Run the full stack with default parameters.
+# Launch the full stack with default parameters.
 ros2 launch aqua_localization aqua_localization.launch.py
+```
 
-# Or run a public-data demo end-to-end (the recorder script handles the
-# estimator, bag recorder, and bag player; the rerun export then writes
-# a self-contained .rrd ready for the rerun viewer).
+## Try a Public Demo
+
+The smallest validated path is the Tank Dataset `short_test` sequence:
+about 15 seconds of real underwater motion with IMU, pressure-derived
+depth, DVL, and AprilTag ground truth.
+
+```bash
+# After following datasets/tank_dataset_demo.md to download and convert
+# short_test.bag, record the estimator outputs into a self-contained demo bag.
 ros2 run aqua_localization record_tank_demo.sh
+
+# Export to rerun.io for a browser-friendly 3D + plots replay.
 ros2 run aqua_localization rerun_export.py \
   --bag aqua_localization/datasets/public/tank_dataset/demo_with_estimate \
   --out /tmp/tank.rrd
 rerun /tmp/tank.rrd
 ```
 
-Per-dataset bring-up notes (download size, conversion, calibration):
+Per-dataset bring-up notes include download size, conversion steps,
+dataset-specific calibration, and replay commands:
 
 - [`datasets/tank_dataset_demo.md`](datasets/tank_dataset_demo.md)
 - [`datasets/mbes_slam_demo.md`](datasets/mbes_slam_demo.md)
@@ -96,6 +124,7 @@ also on the list.
 Plan and state of the stack: [`PLAN.md`](PLAN.md).
 Verified-feature checklist: [`docs/mvp_checklist.md`](docs/mvp_checklist.md).
 Per-platform benchmarks: [`docs/benchmarks/`](docs/benchmarks).
+Public launch checklist: [`docs/public_launch_checklist.md`](docs/public_launch_checklist.md).
 
 ## Honest Limitations
 
@@ -121,7 +150,13 @@ colcon test --packages-select \
 
 134 + 5 unit / runtime tests on v0.2 (zero failures).
 
+## Contributing
+
+Bug reports, dataset bring-up notes, benchmark results, and focused pull
+requests are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for the expected build/test commands and issue templates.
+
 ## License
 
-Apache-2.0. See individual `package.xml` files for per-package
-maintainer info.
+Apache-2.0. See [`LICENSE`](LICENSE) and individual `package.xml` files
+for per-package maintainer info.
