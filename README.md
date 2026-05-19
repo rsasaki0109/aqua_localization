@@ -32,7 +32,18 @@ custom AUVs, and `uuv_simulator`. ROS 2 Humble and Jazzy are supported.
 
 Latest release: **[v0.2](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.2)**.
 
-## Ocean Signals at a Glance
+## Start Here
+
+| Goal | Where to go |
+|------|-------------|
+| See real underwater outputs | [Public-data results](#public-data-results) |
+| Build and launch the stack | [Run it](#run-it) |
+| Try pose-graph loop closure without a bag | [Loop-closure smoke test](#loop-closure-smoke-test) |
+| Tune MBES loop closure on a real bag | [Experimental MBES loop closure](#experimental-mbes-loop-closure) |
+| Understand package ownership | [Stack map](#stack-map) |
+| Check known limits before using it | [Project status](#project-status) |
+
+## What It Does
 
 | Signal | Why it matters underwater |
 |--------|---------------------------|
@@ -41,8 +52,6 @@ Latest release: **[v0.2](https://github.com/rsasaki0109/aqua_localization/releas
 | **Multibeam sonar** | Turns acoustic fans into bathymetric structure for registration. |
 | **Pose graph edges** | Keeps long seafloor replays inspectable through keyframes and loop constraints. |
 | **rerun / RViz views** | Shows trajectories, sonar clouds, loop candidates, and tuning diagnostics. |
-
-## Why It Exists
 
 Underwater localization usually needs more than a generic planar robot
 stack: pressure/depth is a first-class measurement, DVL velocity arrives
@@ -70,20 +79,9 @@ instead of hand-captured screenshots.
   <img src="docs/media/aqualoc_harbor_07_rerun.png" alt="aqua_localization on AQUALOC harbor_07 in rerun.io" width="49%">
 </p>
 
-## Packages
+## Run It
 
-| Package | Role |
-|---------|------|
-| [`aqua_imu_loc`](aqua_imu_loc) | 15-state additive UKF (IMU + pressure + DVL + sonar position) |
-| [`aqua_sonar_loc`](aqua_sonar_loc) | PointCloud2 preprocessing + PCL ICP / GICP / NDT registration with submap front end |
-| [`aqua_fusion`](aqua_fusion) | Loose-coupling fusion of IMU/depth and sonar odometry |
-| [`aqua_pose_graph`](aqua_pose_graph) | g2o SE(3) keyframe graph with external loop-constraint input |
-| [`aqua_msgs`](aqua_msgs) | Diagnostic and fusion-input message types |
-| [`aqua_localization`](aqua_localization) | Metapackage + top-level launches |
-
-Detailed architecture per package: [`docs/architecture.md`](docs/architecture.md).
-
-## Quick Start
+### Build
 
 ```bash
 # Clone into a colcon workspace, install dependencies, build, and source.
@@ -97,7 +95,7 @@ source install/setup.bash
 ros2 launch aqua_localization aqua_localization.launch.py
 ```
 
-## Try a Public Demo
+### Public Demo
 
 The smallest validated path is the Tank Dataset `short_test` sequence:
 about 15 seconds of real underwater motion with IMU, pressure-derived
@@ -123,7 +121,7 @@ dataset-specific calibration, and replay commands:
 - [`datasets/ntnu_demo.md`](datasets/ntnu_demo.md)
 - [`datasets/aqualoc_demo.md`](datasets/aqualoc_demo.md)
 
-## Try Loop Closure Locally
+### Loop-Closure Smoke Test
 
 No bag is needed for the pose-graph loop-closure smoke path. This starts the
 g2o backend, publishes a tiny odometry chain plus one loop constraint, and
@@ -136,6 +134,19 @@ ros2 run aqua_localization pose_graph_loop_smoke.sh
 The same lower-level publisher is available as
 `ros2 run aqua_localization pose_graph_loop_demo.py` when you want to launch
 `aqua_pose_graph` yourself and inspect `/aqua_pose_graph/path`.
+
+## Stack Map
+
+| Package | Role |
+|---------|------|
+| [`aqua_imu_loc`](aqua_imu_loc) | 15-state additive UKF for IMU, pressure, DVL, and sonar position updates |
+| [`aqua_sonar_loc`](aqua_sonar_loc) | PointCloud2 preprocessing and PCL ICP/GICP/NDT registration with a submap front end |
+| [`aqua_fusion`](aqua_fusion) | Loose-coupling fusion of IMU/depth and sonar odometry |
+| [`aqua_pose_graph`](aqua_pose_graph) | g2o SE(3) keyframe graph with external loop-constraint input |
+| [`aqua_msgs`](aqua_msgs) | Diagnostic and fusion-input message types |
+| [`aqua_localization`](aqua_localization) | Metapackage, top-level launches, dataset scripts, and replay exports |
+
+Detailed architecture per package: [`docs/architecture.md`](docs/architecture.md).
 
 ## Experimental MBES Loop Closure
 
@@ -163,7 +174,7 @@ ros2 launch aqua_localization replay.launch.py \
 This front end is not yet production-tuned; the next reliability step is
 real-bag status export, threshold sweeps, and false-positive analysis.
 
-## Web Replay
+## Visualization Exports
 
 Two browser-friendly paths run on the same self-contained demo bag:
 
@@ -180,7 +191,9 @@ Two browser-friendly paths run on the same self-contained demo bag:
 
 Bag-recording recipe: [`docs/foxglove/README.md`](docs/foxglove/README.md).
 
-## Roadmap
+## Project Status
+
+### Roadmap
 
 The headline next milestone is **reliable real-data loop closure**. The
 pose-graph backend and an experimental MBES front end are in place; the
@@ -194,7 +207,7 @@ Per-platform benchmarks: [`docs/benchmarks/`](docs/benchmarks).
 Public launch checklist: [`docs/public_launch_checklist.md`](docs/public_launch_checklist.md).
 MBES loop closure plan: [`docs/mbes_loop_closure.md`](docs/mbes_loop_closure.md).
 
-## Honest Limitations
+### Honest Limitations
 
 - IMU-only dead reckoning drifts roughly an order of magnitude on bags
   without DVL/visual aiding (NTNU `fjord_1`, AQUALOC `harbor_07` show
