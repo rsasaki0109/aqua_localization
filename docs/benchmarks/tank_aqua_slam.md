@@ -153,6 +153,30 @@ same APE implementation.
 | Tank Dataset | Structure_Easy | AQUA-SLAM | TBD | TBD | TBD | TBD | TBD | TBD | TBD | record AQUA-SLAM output topic to TUM |
 | Tank Dataset | Structure_Easy | aqua_localization | TBD | TBD | TBD | TBD | TBD | TBD | TBD | run closest available input mode |
 
+## Gap Report
+
+Use `benchmark_gap_report.py` to turn the table above into an explicit "how far
+from winning" readout:
+
+```bash
+ros2 run aqua_localization benchmark_gap_report.py \
+  docs/benchmarks/tank_aqua_slam.md \
+  --target-system aqua_visual_frontend \
+  --baseline-system AQUA-SLAM
+```
+
+Current output for the experimental visual frontend:
+
+| Dataset | Sequence | Alignment | Target RMSE m | Baseline RMSE m | Gap x | Improvement to tie | Target samples | Baseline samples |
+|---------|----------|-----------|--------------:|----------------:|------:|-------------------:|---------------:|-----------------:|
+| Tank Dataset | short_test | SE(3) | 0.0947 | 0.0194 | 4.88 | 79.5% | 200 | 234 |
+
+Read this as an engineering target, not as a paper result: the current visual
+frontend needs roughly an 80% SE(3) RMSE reduction on the matched `short_test`
+window to tie AQUA-SLAM. The most useful next benchmark rows are held-out Tank
+sequences with one sequence used only for visual scale/extrinsic calibration and
+another sequence used only for validation.
+
 ## Generate Rows
 
 Use the same reference TUM for both systems:
