@@ -134,6 +134,35 @@ problems from true visual drift. It also writes
 short visual/reference segment lengths and direction buckets to expose
 frame-convention or extrinsic-dependent motion bias.
 
+Descriptor-distance sweeps are handled by `run_tank_visual_matching_sweep.py`.
+The runner assigns a unique odometry topic to every case so repeated bag replays
+cannot contaminate the recorder with stale visual-odometry publishers.
+
+```bash
+ros2 run aqua_localization run_tank_visual_matching_sweep.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_matching_sweep_real_unique \
+  --sequence short_test \
+  --translation-scale 0.169623465 \
+  --baseline-rmse-m 0.0194 \
+  --pairs 64:64,80:80,96:96,112:112,disabled:disabled
+```
+
+Latest `short_test` sweep result, recorded on 2026-05-20:
+
+| Stereo dist | Temporal dist | RMSE m | Gap to AQUA-SLAM | Matched s | Accepted | Median PnP inliers | Median temporal matches |
+|-------------|---------------|-------:|-----------------:|----------:|---------:|-------------------:|------------------------:|
+| 64 | 64 | 0.1699 | 8.76x | 14.95 | 100.0% | 195.0 | 219.0 |
+| 80 | 80 | 0.1859 | 9.58x | 14.95 | 100.0% | 207.0 | 239.0 |
+| 96 | 96 | 0.1864 | 9.61x | 14.95 | 100.0% | 208.0 | 241.0 |
+| 112 | 112 | 0.1864 | 9.61x | 14.95 | 100.0% | 208.0 | 241.0 |
+| disabled | disabled | 0.1864 | 9.61x | 14.95 | 100.0% | 208.0 | 241.0 |
+
+This says descriptor filtering alone is not the win condition. The next useful
+accuracy work is camera-to-base/extrinsic calibration and visual-inertial-DVL
+coupling, not another small threshold-only sweep.
+
 The public Tank Dataset page currently exposes `short_test` as sample data and
 requires the download form for the full sequence set, so this table keeps
 Structure_Easy and Medium rows as targets until those bags are available.

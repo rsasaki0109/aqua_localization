@@ -76,6 +76,8 @@ def test_benchmark_command_contains_thresholds(tmp_path):
     assert "64.0" in command
     assert "--max-temporal-descriptor-distance" in command
     assert "80.0" in command
+    assert "--odom-topic" in command
+    assert "/aqua_visual_frontend/stereo_64__temporal_80/odometry" in command
     assert "--no-sim-time" not in command
 
 

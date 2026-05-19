@@ -9,6 +9,7 @@ recording and only evaluates an existing TUM trajectory.
 
 import argparse
 from dataclasses import dataclass
+import os
 import shlex
 import signal
 import subprocess
@@ -86,6 +87,7 @@ def build_visual_command(args) -> list[str]:
         ros_param("matching.max_temporal_descriptor_distance", args.max_temporal_descriptor_distance)
     )
     command.extend(ros_param("tracking.translation_scale", args.translation_scale))
+    command.extend(ros_param("topics.odometry", args.odom_topic))
     if args.status_csv:
         command.extend(ros_param("diagnostics.status_csv_path", args.status_csv))
     return command
@@ -122,18 +124,36 @@ def write_replay_script(path: Path, commands: list[list[str]]):
     path.chmod(0o755)
 
 
+def start_process(command: list[str]) -> subprocess.Popen:
+    return subprocess.Popen(command, start_new_session=True)
+
+
+def send_process_signal(process: subprocess.Popen, sig: signal.Signals):
+    try:
+        process_group = os.getpgid(process.pid)
+    except ProcessLookupError:
+        return
+    if process_group != os.getpgrp():
+        try:
+            os.killpg(process_group, sig)
+            return
+        except ProcessLookupError:
+            return
+    process.send_signal(sig)
+
+
 def terminate_process(process: subprocess.Popen, timeout_s: float):
     if process.poll() is not None:
         return
-    process.send_signal(signal.SIGINT)
+    send_process_signal(process, signal.SIGINT)
     try:
         process.wait(timeout=timeout_s)
     except subprocess.TimeoutExpired:
-        process.terminate()
+        send_process_signal(process, signal.SIGTERM)
         try:
             process.wait(timeout=timeout_s)
         except subprocess.TimeoutExpired:
-            process.kill()
+            send_process_signal(process, signal.SIGKILL)
             process.wait(timeout=timeout_s)
 
 
@@ -145,9 +165,9 @@ def run_recording(args, paths: BenchmarkPaths):
     ]
     write_replay_script(paths.replay_script, commands)
 
-    visual = subprocess.Popen(commands[0])
+    visual = start_process(commands[0])
     time.sleep(args.startup_delay)
-    recorder = subprocess.Popen(commands[1])
+    recorder = start_process(commands[1])
     time.sleep(args.startup_delay)
     try:
         subprocess.run(commands[2], check=True)
