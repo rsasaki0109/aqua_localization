@@ -108,7 +108,9 @@ Tune in this order:
    plausible revisits are tested.
 3. `gates.max_fitness_score`, `gates.max_correction_translation_m`, and
    `gates.max_correction_rotation_rad` until false positives are rejected.
-4. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
+4. `loop.min_repeat_keyframe_gap` to suppress near-duplicate accepted loops
+   while preserving distinct revisits.
+5. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
    optimized path changes against the MBES-SLAM reference odometry.
 
 Export the loop-status stream after a replay to make tuning measurable:
@@ -133,8 +135,9 @@ ros2 topic echo /aqua_pose_graph/loop_constraint_count
 
 `LoopClosureStatus.candidate_id` is `UINT32_MAX` when a keyframe has no
 eligible historical submap. Rejections report the specific gate that failed,
-so overly strict candidate, fitness, or correction thresholds are visible
-without reading debug logs.
+or `duplicate loop suppressed` when accepted-loop cooldown blocks a near-repeat,
+so overly strict candidate, fitness, correction, or repeat thresholds are
+visible without reading debug logs.
 
 In RViz, use the dedicated tuning config:
 
