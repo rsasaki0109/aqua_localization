@@ -15,6 +15,9 @@ datasets and baseline comparisons.
 - [`oss_comparison.md`](oss_comparison.md): protocol for comparing
   `aqua_localization` against existing open-source localization and SLAM tools
   without overstating results.
+- [`aqua_slam_comparison.md`](aqua_slam_comparison.md): focused comparison
+  plan for SenseRoboticsLab/AQUA-SLAM, the closest current underwater SLAM
+  baseline.
 
 The comparison plan is intentionally conservative. It separates sensor-fusion,
 visual/LiDAR SLAM, underwater simulation, and MBES replay work so each baseline

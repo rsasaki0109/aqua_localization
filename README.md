@@ -209,6 +209,7 @@ Plan and state of the stack: [`PLAN.md`](PLAN.md).
 Verified-feature checklist: [`docs/mvp_checklist.md`](docs/mvp_checklist.md).
 Per-platform benchmarks: [`docs/benchmarks/`](docs/benchmarks).
 OSS comparison plan: [`docs/benchmarks/oss_comparison.md`](docs/benchmarks/oss_comparison.md).
+AQUA-SLAM comparison plan: [`docs/benchmarks/aqua_slam_comparison.md`](docs/benchmarks/aqua_slam_comparison.md).
 Public launch checklist: [`docs/public_launch_checklist.md`](docs/public_launch_checklist.md).
 MBES loop closure plan: [`docs/mbes_loop_closure.md`](docs/mbes_loop_closure.md).
 
