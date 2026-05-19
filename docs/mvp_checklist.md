@@ -127,10 +127,8 @@ ros2 launch aqua_localization replay.launch.py start_bag:=true bag_path:=/path/t
   remaining sensor-aiding gaps are visual and acoustic.)
 - Tightly coupled sonar residual fusion.
 - AQUALOC + additional MBES-SLAM/OpenSonarDatasets adapters.
-- Loop closure detection on top of `aqua_pose_graph`: the SE(3) keyframe
-  graph + g2o optimiser ship today (5 unit tests cover seeding, threshold
-  triggering, no-op chain optimisation, loop-constraint pull-in, and reset)
-  but the place-recognition / submap-matching front end that *generates*
-  loop closure constraints is still TODO. Bathymetric submap-vs-submap
-  matching for the MBES path and visual loop closure for AQUALOC are the
-  two natural follow-ups.
+- Loop closure reliability on top of `aqua_pose_graph`: the SE(3) keyframe
+  graph, external loop-constraint input, and experimental MBES
+  submap-vs-submap front end now ship. Real-bag threshold tuning,
+  false-positive analysis, stronger candidate selection, and visual loop
+  closure for AQUALOC are the natural follow-ups.

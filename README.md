@@ -7,7 +7,8 @@
 
 ROS 2 underwater localization for real AUV/ROV data: a 15-state additive
 UKF for IMU + pressure + DVL + sonar updates, sonar point-cloud registration
-with PCL ICP/GICP/NDT, and a g2o SE(3) pose graph backend.
+with PCL ICP/GICP/NDT, a g2o SE(3) pose graph backend, and an experimental
+MBES submap loop-closure front end.
 
 ![MBES-SLAM beach_pond multibeam sonar replay in rerun.io](docs/media/mbes_slam_beach_pond.gif)
 
@@ -50,7 +51,7 @@ regenerate from the recorded demo bag without a manual RViz session.
 | [`aqua_imu_loc`](aqua_imu_loc) | 15-state additive UKF (IMU + pressure + DVL + sonar position) |
 | [`aqua_sonar_loc`](aqua_sonar_loc) | PointCloud2 preprocessing + PCL ICP / GICP / NDT registration with submap front end |
 | [`aqua_fusion`](aqua_fusion) | Loose-coupling fusion of IMU/depth and sonar odometry |
-| [`aqua_pose_graph`](aqua_pose_graph) | g2o SE(3) keyframe graph (loop closure detection is the v0.3 milestone) |
+| [`aqua_pose_graph`](aqua_pose_graph) | g2o SE(3) keyframe graph with external loop-constraint input |
 | [`aqua_msgs`](aqua_msgs) | Diagnostic and fusion-input message types |
 | [`aqua_localization`](aqua_localization) | Metapackage + top-level launches |
 
@@ -110,6 +111,32 @@ The same lower-level publisher is available as
 `ros2 run aqua_localization pose_graph_loop_demo.py` when you want to launch
 `aqua_pose_graph` yourself and inspect `/aqua_pose_graph/path`.
 
+## Experimental MBES Loop Closure
+
+The MBES path now includes an experimental submap-vs-submap loop-closure
+front end. It accumulates bathymetric submaps between pose-graph keyframes,
+tests odometry-near historical candidates with ICP/GICP/NDT, publishes
+accepted constraints to `/aqua_pose_graph/loop_constraint`, and exposes
+tuning diagnostics on `/mbes_loop_closure/status` plus RViz markers on
+`/mbes_loop_closure/markers`.
+
+Use the dedicated RViz view while tuning real bags:
+
+```bash
+ros2 launch aqua_localization replay.launch.py \
+  start_bag:=true \
+  bag_path:=aqua_localization/datasets/public/mbes_slam/beach_pond_ros2 \
+  bag_sonar_points_topic:=/norbit/detections \
+  use_sim_time:=true \
+  enable_pose_graph:=true \
+  enable_mbes_loop_closure:=true \
+  enable_rviz:=true \
+  rviz_config_file:=$(ros2 pkg prefix aqua_localization)/share/aqua_localization/rviz/mbes_loop_closure.rviz
+```
+
+This front end is not yet production-tuned; the next reliability step is
+real-bag status export, threshold sweeps, and false-positive analysis.
+
 ## Web Replay
 
 Two browser-friendly paths run on the same self-contained demo bag:
@@ -129,11 +156,11 @@ Bag-recording recipe: [`docs/foxglove/README.md`](docs/foxglove/README.md).
 
 ## Roadmap
 
-The headline v0.3 milestone is **loop closure detection** on top of
-`aqua_pose_graph`. Bathymetric submap-vs-submap matching for the MBES
-path and visual loop closure for AQUALOC are the two natural front
-ends. ESKF backend, magnetometer fusion, and acoustic positioning are
-also on the list.
+The headline next milestone is **reliable real-data loop closure**. The
+pose-graph backend and an experimental MBES front end are in place; the
+remaining work is threshold tuning, candidate reliability, information
+matrix calibration, and eventually visual loop closure for AQUALOC. ESKF
+backend, magnetometer fusion, and acoustic positioning are also on the list.
 
 Plan and state of the stack: [`PLAN.md`](PLAN.md).
 Verified-feature checklist: [`docs/mvp_checklist.md`](docs/mvp_checklist.md).
@@ -150,8 +177,9 @@ MBES loop closure plan: [`docs/mbes_loop_closure.md`](docs/mbes_loop_closure.md)
 - Single-fan multibeam registration is geometrically degenerate.
   Tightly-coupled sonar feedback narrows MBES-SLAM `beach_pond` fusion
   drift from ±40 m to ~17 m, but per-fan residuals are still ~10 m
-  magnitude. The pose graph backend ships, but loop closure detection
-  (the front end that *generates* loop constraints) is the v0.3 work.
+  magnitude. The pose graph backend and experimental MBES loop-closure
+  front end ship, but the loop-closure thresholds and information matrix
+  are not yet calibrated on a full real-bag tuning run.
 - `aqua_fusion` has unit + runtime tests but no per-platform benchmark
   history yet.
 
@@ -163,7 +191,9 @@ colcon test --packages-select \
   --event-handlers console_direct+
 ```
 
-134 + 5 unit / runtime tests on v0.2 (zero failures).
+Run `colcon test-result --verbose` after testing for the current count; the
+latest local validation before this README refresh reported 92 tests with
+zero failures.
 
 ## Contributing
 

@@ -61,10 +61,12 @@ The project's identity:
   backward compatibility, on with one flag).
 - `aqua_fusion` loose coupling of IMU/depth odometry with sonar
   odometry, exercised end-to-end on MBES-SLAM `beach_pond`.
+- `aqua_pose_graph` SE(3) keyframe backend with external loop-constraint
+  input, plus an experimental MBES submap-vs-submap loop-closure front end.
 - Web replay paths: rerun.io headless `.rrd` export with curated 3D +
   plots blueprint, plus a Lichtblick (Apache-2.0 fork of Foxglove
   Studio) layout JSON and Playwright headless driver.
-- 134 unit + runtime tests pass on the canonical packages.
+- 92 unit + runtime test results were passing in the latest local validation.
 
 ### [v0.2](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.2) — pose graph backend + sonar covariance calibration
 
@@ -75,9 +77,9 @@ The project's identity:
   `pose.covariance`. Runs g2o Levenberg-Marquardt optimisation on
   demand (`/aqua_pose_graph/optimize`) or every N keyframes. Publishes
   the optimised trajectory as `nav_msgs/Path` on
-  `/aqua_pose_graph/path`. The `add_loop_constraint(...)` API is the
-  entry point for a future place-recognition / submap-matching front
-  end. 5 gtests pass.
+  `/aqua_pose_graph/path`. External front ends can inject loop constraints
+  through `/aqua_pose_graph/loop_constraint`; the MBES package now ships an
+  experimental submap-matching front end. 5 gtests pass.
 - Chi-square calibration of sonar pose covariance:
   `aqua_localization/scripts/calibrate_sonar_covariance.py`. Reports
   observed Mahalanobis^2 distribution, recommended `position_scale`
@@ -129,8 +131,8 @@ Static screenshots are committed under `docs/media/*_rerun.png`.
 +------+--------+   +------+-------+   +------+------------+
 |  aqua_fusion  |   | aqua_sonar_  |   |  aqua_pose_graph  |
 |  loose-coupl  |<--|     loc      |   |  (g2o SE(3) KF    |
-|  IMU + sonar  |   |  ICP/GICP/   |   |   graph, future   |
-|     fusion    |   |  NDT,        |   |   loop closure)   |
+|  IMU + sonar  |   |  ICP/GICP/   |   |   graph + loop    |
+|     fusion    |   |  NDT,        |   |   constraints)    |
 +---------------+   |  submap FE,  |   +------+------------+
                     |  motion prior|          |
                     +------+-------+          |
@@ -208,9 +210,10 @@ ros2 run aqua_localization lichtblick_screenshot.py \
   Tightly-coupled sonar feedback narrows MBES-SLAM `beach_pond` fusion
   drift from ±40 m loose-coupling to ~17 m, but the per-fan residuals
   are still ~10 m magnitude.
-- The pose graph backend is structurally complete but does not yet
-  generate loop closure constraints. Optimisation against odometry-only
-  initialisation is a no-op.
+- The pose graph backend and experimental MBES loop-closure front end now
+  generate and consume loop constraints, but the MBES thresholds,
+  candidate reliability, and information matrix still need a full real-bag
+  tuning pass.
 - Per-platform sonar covariance calibration produced sensible numbers
   on MBES with 22 accepted fans. More accepted fans (e.g. via an
   OpenSonarDatasets bag with longer overlapping geometry) would tighten
@@ -221,18 +224,19 @@ ros2 run aqua_localization lichtblick_screenshot.py \
 
 ## v0.3+ Roadmap
 
-The headline next milestone is **loop closure detection**. The pose
-graph backend is in place; what remains is the front end that proposes
-loop closure constraints from sensor data.
+The headline next milestone is **reliable real-data loop closure**. The
+pose graph backend and experimental MBES front end are in place; what
+remains is measurement evidence, stronger candidate selection, and
+calibrated constraints.
 
 Two natural directions, can be developed in parallel:
 
-1. **Bathymetric submap-vs-submap loop closure (MBES path).** Persist
-   accumulated multibeam sub-maps at each keyframe, search for
-   spatially-near keyframes when a new one is added, run a sub-map vs
-   sub-map ICP/GICP registration, and inject the relative SE(3) and
-   information matrix as a loop constraint into `aqua_pose_graph`.
-   First target dataset is MBES-SLAM `beach_pond` (textured lakebed).
+1. **Bathymetric submap-vs-submap loop closure (MBES path).** The first
+   front end persists accumulated multibeam submaps at pose-graph
+   keyframes, searches older odometry-near candidates, runs ICP/GICP/NDT,
+   and injects accepted constraints into `aqua_pose_graph`. Next work is
+   real-bag threshold sweeps, false-positive analysis, descriptor-based
+   candidate filtering, and information-matrix calibration.
 2. **Visual loop closure (AQUALOC path).** OpenCV ORB features + a
    bag-of-words descriptor (DBoW2 or a lighter-weight equivalent) per
    keyframe. On each new keyframe, query the descriptor index for
@@ -261,17 +265,15 @@ Other roadmap items:
 
 In priority order:
 
-1. **Bathymetric submap-vs-submap loop closure on MBES.** Bridge the
-   submap front end already inside `aqua_sonar_loc` (registration only
-   uses K most-recent fans) with a longer-horizon submap store keyed
-   by pose-graph keyframe id. Add a `LoopClosureDetector` class that
-   periodically searches for spatially-near keyframes and runs ICP
-   between their submaps, then calls
-   `aqua_pose_graph::PoseGraph::add_loop_constraint`.
-2. **rerun visualisation of `/aqua_pose_graph/path`.** Extend each
-   `rerun_export*.py` with an optional `--pose-graph-bag` argument
-   that overlays the optimised path on top of the existing odometry
-   path, colour-coded.
+1. **RViz + status-driven MBES loop-closure tuning.** Use
+   `rviz/mbes_loop_closure.rviz`, `/mbes_loop_closure/status`, and
+   `/mbes_loop_closure/markers` on MBES-SLAM `beach_pond`; export
+   accepted/rejected/no-candidate counts and correction distributions to
+   drive threshold choices instead of tuning by eye alone.
+2. **Loop-closure frontend refactor.** Split `mbes_loop_closure_node.cpp`
+   into submap management, candidate selection, registration, gate
+   evaluation, status/marker publishing, and constraint publishing before
+   adding descriptor or robust-constraint logic.
 3. **`aqua_fusion` benchmark runner** matching the
    `bench_fjord_1.sh` pattern, plus a `docs/benchmarks/` table per
    public dataset.
