@@ -123,10 +123,25 @@ eligible historical submap. Rejections report the specific gate that failed,
 so overly strict candidate, fitness, or correction thresholds are visible
 without reading debug logs.
 
-In RViz, add a `MarkerArray` display for `/mbes_loop_closure/markers`.
-Accepted loop candidates are green and thicker; rejected candidates are red
-and thinner. This makes it easy to see whether tuning is producing plausible
-geometric edges before trusting them as pose-graph constraints.
+In RViz, use the dedicated tuning config:
+
+```bash
+ros2 launch aqua_localization replay.launch.py \
+  start_bag:=true \
+  bag_path:=aqua_localization/datasets/public/mbes_slam/beach_pond_ros2 \
+  bag_sonar_points_topic:=/norbit/detections \
+  use_sim_time:=true \
+  enable_pose_graph:=true \
+  enable_mbes_loop_closure:=true \
+  enable_rviz:=true \
+  rviz_config_file:=$(ros2 pkg prefix aqua_localization)/share/aqua_localization/rviz/mbes_loop_closure.rviz
+```
+
+The config shows `/aqua_sonar_loc/points_filtered`,
+`/aqua_pose_graph/path`, and `/mbes_loop_closure/markers`. Accepted loop
+candidates are green and thicker; rejected candidates are red and thinner.
+This makes it easy to see whether tuning is producing plausible geometric
+edges before trusting them as pose-graph constraints.
 
 `aqua_localization/scripts/rerun_export_mbes.py` understands the optional
 pose-graph outputs when they are present in the results-included bag:
