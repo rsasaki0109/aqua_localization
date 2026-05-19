@@ -36,6 +36,7 @@ install(PROGRAMS
   scripts/record_ntnu_demo.sh
   scripts/record_aqualoc_demo.sh
   scripts/calibrate_sonar_covariance.py
+  scripts/calibrate_visual_scale.py
   scripts/export_mbes_loop_status.py
   scripts/pose_graph_loop_demo.py
   scripts/pose_graph_loop_smoke.sh
@@ -52,6 +53,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_ros1_odometry_csv_to_tum test/test_ros1_odometry_csv_to_tum.py)
   ament_add_pytest_test(test_convert_tank_dataset_bag test/test_convert_tank_dataset_bag.py)
   ament_add_pytest_test(test_stereo_visual_odometry test/test_stereo_visual_odometry.py)
+  ament_add_pytest_test(test_calibrate_visual_scale test/test_calibrate_visual_scale.py)
   ament_add_pytest_test(test_convert_scalar_pressure_bag test/test_convert_scalar_pressure_bag.py)
   ament_add_pytest_test(test_diagnose_yaw_frame test/test_diagnose_yaw_frame.py)
   ament_add_pytest_test(test_plot_trajectories test/test_plot_trajectories.py)
