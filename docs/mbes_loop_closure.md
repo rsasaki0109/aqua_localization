@@ -136,6 +136,31 @@ turning the gate on. The descriptor sweep report evaluates percentile-derived
 threshold grids and reports how many tested candidates would pass each
 combination.
 
+### Reading the Descriptor Sweep
+
+See [the descriptor sweep example](examples/mbes_loop_descriptor_sweep.md) for
+the report shape and a worked interpretation flow. Treat the sweep as a
+candidate budget tool: each row answers how many historical submaps would reach
+registration if those descriptor thresholds were enabled. The strictest row is
+not automatically best, because registration and correction gates still need
+enough plausible candidates to verify.
+
+Use one row as an initial descriptor config:
+
+```yaml
+descriptor:
+  enabled: true
+  max_centroid_distance_m: <Centroid <= m>
+  max_extent_ratio: <Extent <= ratio>
+  min_point_count_ratio: <Point count >= ratio>
+```
+
+After replaying with those values, export the status stream again and compare
+`descriptor gate rejected` counts, registration failures, accepted markers in
+RViz, and optimized path changes. Descriptor thresholds should reduce wasted or
+implausible registration attempts; they should not be treated as calibrated
+defaults until they have been checked on the target bag.
+
 Useful live checks while tuning:
 
 ```bash
