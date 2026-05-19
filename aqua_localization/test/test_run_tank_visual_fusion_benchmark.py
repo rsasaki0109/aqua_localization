@@ -27,6 +27,7 @@ def test_default_paths_use_sequence_stem(tmp_path):
 
     assert paths.fused_tum == tmp_path / "short_test_visual_visual_fused.tum"
     assert paths.visual_status_csv == tmp_path / "short_test_visual_visual_status.csv"
+    assert paths.visual_coverage_report == tmp_path / "short_test_visual_visual_coverage.md"
     assert paths.benchmark_row == tmp_path / "short_test_visual_visual_fusion_benchmark.md"
     assert paths.replay_script == tmp_path / "short_test_visual_visual_fusion_replay.sh"
     assert paths.visual_log == tmp_path / "short_test_visual_visual_frontend.log"
@@ -80,6 +81,43 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
     assert bag == ["ros2", "bag", "play", "/tmp/tank_bag", "--clock"]
 
 
+def test_visual_coverage_counts_status_rows_and_formats_note(tmp_path):
+    module = load_module()
+    status_csv = tmp_path / "visual_status.csv"
+    status_csv.write_text(
+        "timestamp,frame_index,accepted,status\n"
+        "1.0,0,1,accepted\n"
+        "2.0,1,1,accepted\n"
+        "3.0,2,0,pnp failed\n",
+        encoding="utf-8",
+    )
+
+    assert module.count_visual_status_rows(status_csv) == 3
+
+    coverage = module.VisualCoverage(processed_frames=3, expected_frames=4, min_coverage=0.8)
+
+    assert coverage.ratio == 0.75
+    assert coverage.below_gate
+    assert module.format_visual_coverage_note(coverage) == (
+        "visual coverage=3/4 (75.0%), below 80.0% gate"
+    )
+    report = module.format_visual_coverage_report(coverage, status_csv)
+    assert "coverage: 3/4 (75.0%)" in report
+    assert "WARNING" in report
+
+
+def test_visual_coverage_without_expected_frames_reports_processed_only(tmp_path):
+    module = load_module()
+    coverage = module.VisualCoverage(processed_frames=273, expected_frames=None, min_coverage=0.98)
+
+    assert coverage.ratio is None
+    assert not coverage.below_gate
+    assert module.format_visual_coverage_note(coverage) == "visual frames=273"
+    assert "expected visual frames" not in module.format_visual_coverage_report(
+        coverage, tmp_path / "status.csv"
+    )
+
+
 def test_rejects_non_positive_visual_variance():
     module = load_module()
 
@@ -94,5 +132,23 @@ def test_rejects_non_positive_visual_variance():
         ])
     except ValueError as exc:
         assert "visual-position-variance-floor" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_rejects_invalid_visual_coverage_gate():
+    module = load_module()
+
+    try:
+        module.main([
+            "--bag",
+            "/tmp/tank_bag",
+            "--reference",
+            "/tmp/ref.tum",
+            "--min-visual-coverage",
+            "1.5",
+        ])
+    except ValueError as exc:
+        assert "min-visual-coverage" in str(exc)
     else:
         raise AssertionError("expected ValueError")

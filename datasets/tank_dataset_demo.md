@@ -290,9 +290,10 @@ With the same-sequence visual scale fit, the diagnostic camera-to-base lever arm
 `base_from_camera=(-0.25,-0.45,0)` m, and
 `imu.visual.position_variance_floor:=0.01`, the fused IMU + pressure + DVL +
 visual run reaches 0.323 m SE(3) APE RMSE when replayed at 0.25x so the Python
-visual frontend processes all 300 stereo pairs. This is an engineering
-diagnostic: the next validation step is out-of-sequence scale and extrinsic
-calibration.
+visual frontend processes all 300 stereo pairs. The fusion benchmark runner can
+now record this as `visual coverage=300/300` and emits a warning report when a
+run drops below the configured coverage gate. This is an engineering diagnostic:
+the next validation step is out-of-sequence scale and extrinsic calibration.
 
 ## Verification topics
 

@@ -13,6 +13,7 @@ The script then evaluates the fused trajectory against the AprilTag reference.
 from __future__ import annotations
 
 import argparse
+import csv
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -33,6 +34,7 @@ DEFAULT_IMU_PARAMS = Path("install/aqua_imu_loc/share/aqua_imu_loc/config/tank_d
 class FusionBenchmarkPaths:
     fused_tum: Path
     visual_status_csv: Path
+    visual_coverage_report: Path
     benchmark_row: Path
     replay_script: Path
     visual_log: Path
@@ -46,6 +48,7 @@ def default_paths(out_dir: Path, sequence: str) -> FusionBenchmarkPaths:
     return FusionBenchmarkPaths(
         fused_tum=out_dir / f"{stem}_visual_fused.tum",
         visual_status_csv=out_dir / f"{stem}_visual_status.csv",
+        visual_coverage_report=out_dir / f"{stem}_visual_coverage.md",
         benchmark_row=out_dir / f"{stem}_visual_fusion_benchmark.md",
         replay_script=out_dir / f"{stem}_visual_fusion_replay.sh",
         visual_log=out_dir / f"{stem}_visual_frontend.log",
@@ -53,6 +56,81 @@ def default_paths(out_dir: Path, sequence: str) -> FusionBenchmarkPaths:
         record_log=out_dir / f"{stem}_record_odometry.log",
         bag_play_log=out_dir / f"{stem}_bag_play.log",
     )
+
+
+@dataclass(frozen=True)
+class VisualCoverage:
+    processed_frames: int
+    expected_frames: int | None
+    min_coverage: float
+
+    @property
+    def ratio(self) -> float | None:
+        if self.expected_frames is None:
+            return None
+        if self.expected_frames <= 0:
+            return None
+        return self.processed_frames / self.expected_frames
+
+    @property
+    def below_gate(self) -> bool:
+        ratio = self.ratio
+        return ratio is not None and ratio < self.min_coverage
+
+
+def count_visual_status_rows(path: Path) -> int:
+    if not path.exists():
+        return 0
+    with path.open(newline="", encoding="utf-8") as fp:
+        return sum(1 for _row in csv.DictReader(fp))
+
+
+def summarize_visual_coverage(args, paths: FusionBenchmarkPaths) -> VisualCoverage:
+    expected = args.expected_visual_frames if args.expected_visual_frames > 0 else None
+    return VisualCoverage(
+        processed_frames=count_visual_status_rows(paths.visual_status_csv),
+        expected_frames=expected,
+        min_coverage=args.min_visual_coverage,
+    )
+
+
+def format_visual_coverage_note(coverage: VisualCoverage) -> str:
+    if coverage.expected_frames is None:
+        return f"visual frames={coverage.processed_frames}"
+    ratio = coverage.ratio
+    percent = 0.0 if ratio is None else ratio * 100.0
+    note = (
+        f"visual coverage={coverage.processed_frames}/{coverage.expected_frames} "
+        f"({percent:.1f}%)"
+    )
+    if coverage.below_gate:
+        note += f", below {coverage.min_coverage * 100.0:.1f}% gate"
+    return note
+
+
+def format_visual_coverage_report(coverage: VisualCoverage, status_csv: Path) -> str:
+    lines = [
+        "# Visual Frame Coverage",
+        "",
+        f"- status csv: `{status_csv}`",
+        f"- processed visual frames: {coverage.processed_frames}",
+    ]
+    if coverage.expected_frames is not None:
+        percent = 0.0 if coverage.ratio is None else coverage.ratio * 100.0
+        lines.extend([
+            f"- expected visual frames: {coverage.expected_frames}",
+            f"- coverage: {coverage.processed_frames}/{coverage.expected_frames} ({percent:.1f}%)",
+            f"- coverage gate: {coverage.min_coverage * 100.0:.1f}%",
+        ])
+        if coverage.below_gate:
+            lines.extend([
+                "",
+                (
+                    "WARNING: visual frame coverage is below the configured gate; "
+                    "treat this benchmark run as throughput-limited."
+                ),
+            ])
+    return "\n".join(lines) + "\n"
 
 
 def build_visual_command(args, paths: FusionBenchmarkPaths) -> list[str]:
@@ -137,14 +215,15 @@ def run_recording(args, paths: FusionBenchmarkPaths):
             run_tank_visual_benchmark.terminate_process(visual, args.stop_timeout)
 
 
-def make_benchmark_row(args, paths: FusionBenchmarkPaths) -> str:
+def make_benchmark_row(args, paths: FusionBenchmarkPaths, coverage: VisualCoverage) -> str:
     compare_module = trajectory_benchmark_row.load_compare_module()
     stats, _ = compare_module.compare(args.reference, paths.fused_tum, with_scale=False, no_align=False)
     note = (
         f"visual position update; tracking.translation_scale={args.translation_scale:.9f}; "
         f"base_from_camera=({args.base_from_camera_x_m:g},{args.base_from_camera_y_m:g},"
         f"{args.base_from_camera_z_m:g}) m; "
-        f"visual variance floor={args.visual_position_variance_floor:g}"
+        f"visual variance floor={args.visual_position_variance_floor:g}; "
+        f"{format_visual_coverage_note(coverage)}"
     )
     row_args = SimpleNamespace(
         dataset=args.dataset,
@@ -159,15 +238,29 @@ def make_benchmark_row(args, paths: FusionBenchmarkPaths) -> str:
 
 
 def evaluate(args, paths: FusionBenchmarkPaths) -> str:
-    row = make_benchmark_row(args, paths)
+    coverage = summarize_visual_coverage(args, paths)
+    paths.visual_coverage_report.write_text(
+        format_visual_coverage_report(coverage, paths.visual_status_csv), encoding="utf-8"
+    )
+    row = make_benchmark_row(args, paths, coverage)
     paths.benchmark_row.write_text(row + "\n", encoding="utf-8")
-    return "\n".join([
+    lines = [
         f"fused estimate: {paths.fused_tum}",
         f"visual status csv: {paths.visual_status_csv}",
+        f"visual coverage report: {paths.visual_coverage_report}",
         f"benchmark row: {paths.benchmark_row}",
         "",
         row,
-    ])
+    ]
+    if coverage.below_gate:
+        lines.extend([
+            "",
+            (
+                "WARNING: visual frame coverage is below the configured gate; "
+                "this run is throughput-limited."
+            ),
+        ])
+    return "\n".join(lines)
 
 
 def parse_args(argv):
@@ -199,6 +292,18 @@ def parse_args(argv):
     parser.add_argument("--max-stereo-descriptor-distance", type=float, default=96.0)
     parser.add_argument("--max-temporal-descriptor-distance", type=float, default=96.0)
     parser.add_argument("--play-rate", type=float, default=1.0)
+    parser.add_argument(
+        "--expected-visual-frames",
+        type=int,
+        default=0,
+        help="Expected stereo frames for coverage reporting. Use 0 to report processed frames only.",
+    )
+    parser.add_argument(
+        "--min-visual-coverage",
+        type=float,
+        default=0.98,
+        help="Warn when processed/expected visual frames falls below this ratio.",
+    )
     parser.add_argument("--startup-delay", type=float, default=1.0)
     parser.add_argument("--post-play-delay", type=float, default=2.0)
     parser.add_argument("--stop-timeout", type=float, default=5.0)
@@ -215,6 +320,10 @@ def main(argv=None) -> int:
         raise ValueError("--visual-position-variance-floor must be positive")
     if args.play_rate <= 0.0:
         raise ValueError("--play-rate must be positive")
+    if args.expected_visual_frames < 0:
+        raise ValueError("--expected-visual-frames must be non-negative")
+    if not 0.0 < args.min_visual_coverage <= 1.0:
+        raise ValueError("--min-visual-coverage must be in (0, 1]")
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     paths = default_paths(args.out_dir, args.sequence)
