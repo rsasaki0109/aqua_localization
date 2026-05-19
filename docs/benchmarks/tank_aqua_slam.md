@@ -55,9 +55,26 @@ the Tank Dataset IMU + pressure + DVL profile:
 This is a fair current-stack result for the lighter ROS 2 localization mode,
 but it is not sensor-equivalent to AQUA-SLAM's stereo + IMU + DVL frontend.
 AQUA-SLAM is the accuracy target on this visual-DVL-IMU sequence; the immediate
-`aqua_localization` win path is either adding a visual frontend for Tank or
-moving the claim to ROS 2 reproducibility, permissive licensing, and MBES/sonar
-datasets where this repository has stronger tooling.
+`aqua_localization` win path is either validating and fusing the experimental
+`stereo_visual_odometry.py` frontend on Tank or moving the claim to ROS 2
+reproducibility, permissive licensing, and MBES/sonar datasets where this
+repository has stronger tooling.
+
+## Experimental Visual Frontend Measurement
+
+Recorded on 2026-05-20 with the new `stereo_visual_odometry.py` frontend on the
+camera-included `short_test` conversion:
+
+| Dataset | Sequence | System | Inputs | Alignment | Samples | Matched s | Mean m | Median m | RMSE m | Max m | Note |
+|---------|----------|--------|--------|-----------|--------:|----------:|-------:|---------:|-------:|------:|------|
+| Tank Dataset | `short_test` | `aqua_visual_frontend` | stereo only | SE(3) | 200 | 11.35 | 1.2667 | 1.2280 | 1.3649 | 2.2035 | nominal stereo scale |
+| Tank Dataset | `short_test` | `aqua_visual_frontend` | stereo only | Sim(3) | 200 | 11.35 | 0.0826 | 0.0786 | 0.0958 | 0.2458 | scale diagnostic, not paper-safe |
+| Tank Dataset | `short_test` | `aqua_visual_frontend` | stereo only | SE(3) | 200 | 11.25 | 0.0815 | 0.0792 | 0.0947 | 0.2416 | `tracking.translation_scale=0.169623`, same-sequence scale fit |
+
+The frontend is already better than the IMU + pressure + DVL row once metric
+scale is calibrated, but it still does not beat AQUA-SLAM's 0.0194 m RMSE and
+does not yet fuse IMU or DVL. The next serious step is out-of-sequence scale
+calibration and fusion into `aqua_imu_loc` as an external position observation.
 
 ## Head-to-Head Table
 
@@ -68,6 +85,7 @@ same APE implementation.
 |---------|----------|--------|-----------|--------:|----------:|-------:|---------:|-------:|------:|------|
 | Tank Dataset | short_test | AQUA-SLAM | SE(3) | 234 | 11.65 | 0.0173 | 0.0165 | 0.0194 | 0.0579 | AQUA-SLAM Docker, short_test, /AQUA_SLAM/orb_odom |
 | Tank Dataset | short_test | aqua_localization | SE(3) | 5399 | 14.94 | 0.3796 | 0.4014 | 0.4291 | 0.7652 | ROS 2 Humble, IMU+pressure+DVL, same AprilTag GT export |
+| Tank Dataset | short_test | aqua_visual_frontend | SE(3) | 200 | 11.25 | 0.0815 | 0.0792 | 0.0947 | 0.2416 | stereo ORB+PnP, same-sequence scale fit |
 | Tank Dataset | Structure_Easy | AQUA-SLAM | TBD | TBD | TBD | TBD | TBD | TBD | TBD | record AQUA-SLAM output topic to TUM |
 | Tank Dataset | Structure_Easy | aqua_localization | TBD | TBD | TBD | TBD | TBD | TBD | TBD | run closest available input mode |
 

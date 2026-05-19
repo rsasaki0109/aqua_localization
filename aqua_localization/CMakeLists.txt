@@ -25,6 +25,7 @@ install(PROGRAMS
   scripts/make_synthetic_sonar_bag.py
   scripts/make_demo_gif.py
   scripts/convert_tank_dataset_bag.py
+  scripts/stereo_visual_odometry.py
   scripts/rerun_export.py
   scripts/rerun_export_mbes.py
   scripts/rerun_export_ntnu.py
@@ -50,6 +51,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_trajectory_benchmark_row test/test_trajectory_benchmark_row.py)
   ament_add_pytest_test(test_ros1_odometry_csv_to_tum test/test_ros1_odometry_csv_to_tum.py)
   ament_add_pytest_test(test_convert_tank_dataset_bag test/test_convert_tank_dataset_bag.py)
+  ament_add_pytest_test(test_stereo_visual_odometry test/test_stereo_visual_odometry.py)
   ament_add_pytest_test(test_convert_scalar_pressure_bag test/test_convert_scalar_pressure_bag.py)
   ament_add_pytest_test(test_diagnose_yaw_frame test/test_diagnose_yaw_frame.py)
   ament_add_pytest_test(test_plot_trajectories test/test_plot_trajectories.py)
