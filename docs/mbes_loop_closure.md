@@ -122,7 +122,8 @@ Export the loop-status stream after a replay to make tuning measurable:
 ros2 run aqua_localization export_mbes_loop_status.py \
   --bag aqua_localization/datasets/public/mbes_slam/demo_with_estimate \
   --out /tmp/mbes_loop_status.csv \
-  --summary-out /tmp/mbes_loop_status.md
+  --summary-out /tmp/mbes_loop_status.md \
+  --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md
 ```
 
 The CSV preserves every `/mbes_loop_closure/status` sample. The markdown
@@ -131,7 +132,9 @@ reasons, fitness quantiles, correction translation/rotation quantiles, and
 descriptor centroid-distance, extent-ratio, and point-count-ratio quantiles.
 Descriptor fields are still exported when descriptor thresholds are disabled,
 so replay summaries can be used to choose initial threshold values before
-turning the gate on.
+turning the gate on. The descriptor sweep report evaluates percentile-derived
+threshold grids and reports how many tested candidates would pass each
+combination.
 
 Useful live checks while tuning:
 
