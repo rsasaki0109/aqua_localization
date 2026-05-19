@@ -96,6 +96,20 @@ dataset-specific calibration, and replay commands:
 - [`datasets/ntnu_demo.md`](datasets/ntnu_demo.md)
 - [`datasets/aqualoc_demo.md`](datasets/aqualoc_demo.md)
 
+## Try Loop Closure Locally
+
+No bag is needed for the pose-graph loop-closure smoke path. This starts the
+g2o backend, publishes a tiny odometry chain plus one loop constraint, and
+checks that the graph accepted both the keyframes and the loop edge:
+
+```bash
+ros2 run aqua_localization pose_graph_loop_smoke.sh
+```
+
+The same lower-level publisher is available as
+`ros2 run aqua_localization pose_graph_loop_demo.py` when you want to launch
+`aqua_pose_graph` yourself and inspect `/aqua_pose_graph/path`.
+
 ## Web Replay
 
 Two browser-friendly paths run on the same self-contained demo bag:
