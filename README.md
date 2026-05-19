@@ -1,23 +1,46 @@
-# aqua_localization
+<h1 align="center">aqua_localization</h1>
 
-[![ROS 2 Humble](https://img.shields.io/badge/ROS%202-Humble-blue)](https://docs.ros.org/en/humble/)
-[![ROS 2 Jazzy](https://img.shields.io/badge/ROS%202-Jazzy-blue)](https://docs.ros.org/en/jazzy/)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-green.svg)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/rsasaki0109/aqua_localization)](https://github.com/rsasaki0109/aqua_localization/releases)
+<p align="center">
+  <b>ROS 2 underwater localization for real AUV/ROV data.</b><br>
+  Fuse IMU, pressure, DVL, sonar registration, and pose-graph loop closure
+  into a stack built around public ocean datasets.
+</p>
 
-ROS 2 underwater localization for real AUV/ROV data: a 15-state additive
-UKF for IMU + pressure + DVL + sonar updates, sonar point-cloud registration
-with PCL ICP/GICP/NDT, a g2o SE(3) pose graph backend, and an experimental
-MBES submap loop-closure front end.
+<p align="center">
+  <a href="https://docs.ros.org/en/humble/"><img src="https://img.shields.io/badge/ROS%202-Humble-blue" alt="ROS 2 Humble"></a>
+  <a href="https://docs.ros.org/en/jazzy/"><img src="https://img.shields.io/badge/ROS%202-Jazzy-blue" alt="ROS 2 Jazzy"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-green.svg" alt="License: Apache-2.0"></a>
+  <a href="https://github.com/rsasaki0109/aqua_localization/releases"><img src="https://img.shields.io/github/v/release/rsasaki0109/aqua_localization" alt="Latest release"></a>
+</p>
 
-![MBES-SLAM beach_pond multibeam sonar replay in rerun.io](docs/media/mbes_slam_beach_pond.gif)
+<p align="center">
+  <img src="docs/media/mbes_slam_beach_pond.gif" alt="MBES-SLAM beach_pond multibeam sonar replay in rerun.io" width="86%">
+</p>
 
-The headline path is intentionally public-data first: four underwater
-datasets, four [rerun.io](https://rerun.io) renderings, no synthetic bag
-or simulator-only demo in the main story. Targets BlueROV2-class ROVs,
+This repository is shaped around the parts that make ocean localization hard:
+GNSS disappears at the surface boundary, pressure becomes a primary depth
+measurement, DVL arrives in the vehicle frame, and sonar returns can be sparse
+or geometrically ambiguous. The stack combines a 15-state additive UKF,
+pressure-depth updates, DVL velocity updates, PCL-based sonar registration, a
+g2o SE(3) pose graph backend, and an experimental MBES submap loop-closure
+front end.
+
+The main story is intentionally public-data first: four underwater datasets,
+four [rerun.io](https://rerun.io) renderings, no synthetic bag or
+simulator-only demo as the headline result. Targets BlueROV2-class ROVs,
 custom AUVs, and `uuv_simulator`. ROS 2 Humble and Jazzy are supported.
 
 Latest release: **[v0.2](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.2)**.
+
+## Ocean Signals at a Glance
+
+| Signal | Why it matters underwater |
+|--------|---------------------------|
+| **Pressure depth** | Keeps the vertical axis observable below the surface. |
+| **DVL velocity** | Provides vehicle-frame motion constraints for AUV/ROV dead reckoning. |
+| **Multibeam sonar** | Turns acoustic fans into bathymetric structure for registration. |
+| **Pose graph edges** | Keeps long seafloor replays inspectable through keyframes and loop constraints. |
+| **rerun / RViz views** | Shows trajectories, sonar clouds, loop candidates, and tuning diagnostics. |
 
 ## Why It Exists
 
@@ -29,8 +52,9 @@ keeps those underwater-specific paths explicit and testable.
 
 ## Public-Data Results
 
-Each row has a one-shot recorder and rerun export script. The screenshots
-regenerate from the recorded demo bag without a manual RViz session.
+Each row has a one-shot recorder and rerun export script. The images below are
+generated from recorded demo bags, so the README is tied to replayable data
+instead of hand-captured screenshots.
 
 | Dataset | What it shows | rerun screenshot |
 |---------|---------------|------------------|
@@ -42,6 +66,8 @@ regenerate from the recorded demo bag without a manual RViz session.
 <p>
   <img src="docs/media/tank_dataset_rerun.png" alt="aqua_localization on Tank Dataset short_test in rerun.io" width="49%">
   <img src="docs/media/mbes_slam_rerun.png" alt="aqua_localization on MBES-SLAM beach_pond in rerun.io" width="49%">
+  <img src="docs/media/ntnu_fjord_1_rerun.png" alt="aqua_localization on NTNU fjord_1 in rerun.io" width="49%">
+  <img src="docs/media/aqualoc_harbor_07_rerun.png" alt="aqua_localization on AQUALOC harbor_07 in rerun.io" width="49%">
 </p>
 
 ## Packages
