@@ -1,6 +1,7 @@
 #include <array>
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -239,6 +240,9 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
   EXPECT_NEAR(accepted_status->fitness_score, 0.0, 1e-4);
   EXPECT_NEAR(accepted_status->correction_translation_m, 0.0, 1e-3);
   EXPECT_NEAR(accepted_status->correction_rotation_rad, 0.0, 1e-3);
+  EXPECT_NEAR(accepted_status->descriptor_centroid_distance_m, 0.0, 1e-6);
+  EXPECT_NEAR(accepted_status->descriptor_extent_ratio, 1.0, 1e-6);
+  EXPECT_NEAR(accepted_status->descriptor_point_count_ratio, 1.0, 1e-6);
   EXPECT_EQ(accepted_status->status, "accepted");
 
   ASSERT_FALSE(marker_messages.empty());
@@ -345,6 +349,15 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesDescriptorGateRejection)
       });
   }));
 
+  const auto rejected_status = std::find_if(
+    status_messages.begin(), status_messages.end(),
+    [](const aqua_msgs::msg::LoopClosureStatus & msg) {
+      return msg.status == "descriptor gate rejected";
+    });
+  ASSERT_NE(rejected_status, status_messages.end());
+  EXPECT_GT(rejected_status->descriptor_centroid_distance_m, 0.5);
+  EXPECT_TRUE(std::isfinite(rejected_status->descriptor_extent_ratio));
+  EXPECT_TRUE(std::isfinite(rejected_status->descriptor_point_count_ratio));
   EXPECT_TRUE(loop_messages.empty());
 }
 
