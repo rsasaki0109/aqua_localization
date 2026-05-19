@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="430" viewBox="0 0 1280 430" role="img" aria-labelledby="title desc">
+  <title id="title">aqua_localization underwater localization pipeline</title>
+  <desc id="desc">Pipeline from underwater sensors through filtering, sonar registration, pose graph loop closure, and visualization.</desc>
+  <defs>
+    <linearGradient id="sea" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#083344"/>
+      <stop offset="46%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#0c4a6e"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#164e63"/>
+      <stop offset="55%" stop-color="#115e59"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#082f49" flood-opacity="0.28"/>
+    </filter>
+    <style>
+      .label { font: 700 28px Inter, Segoe UI, Arial, sans-serif; fill: #ecfeff; }
+      .sub { font: 500 18px Inter, Segoe UI, Arial, sans-serif; fill: #bae6fd; }
+      .tiny { font: 600 14px Inter, Segoe UI, Arial, sans-serif; fill: #cffafe; letter-spacing: 0.6px; }
+      .card { fill: #082f49; fill-opacity: 0.66; stroke: #bae6fd; stroke-opacity: 0.42; stroke-width: 1.5; }
+      .accent { fill: #67e8f9; }
+      .lime { fill: #bef264; }
+      .amber { fill: #fbbf24; }
+      .line { stroke: #a7f3d0; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+      .dash { stroke: #bae6fd; stroke-width: 2.5; stroke-dasharray: 7 10; stroke-linecap: round; fill: none; opacity: 0.78; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="430" fill="url(#sea)"/>
+  <path d="M0 90 C95 55 175 120 270 82 C365 45 445 110 540 78 C645 40 730 120 835 80 C940 42 1035 108 1125 82 C1190 64 1235 66 1280 78 L1280 0 L0 0 Z" fill="#e0f2fe" opacity="0.12"/>
+  <path d="M0 352 C120 320 225 374 350 344 C485 312 565 366 690 342 C835 312 930 368 1065 340 C1160 320 1224 336 1280 326 L1280 430 L0 430 Z" fill="url(#floor)" opacity="0.92"/>
+  <path d="M52 376 C150 345 220 383 326 360 C430 337 508 370 612 352 C744 328 846 374 984 346 C1084 326 1182 344 1242 334" class="dash"/>
+
+  <text x="56" y="62" class="tiny">REAL UNDERWATER BAGS</text>
+  <text x="56" y="103" class="label">Sensor fusion, sonar registration, and loop closure for AUV/ROV replay</text>
+
+  <g filter="url(#shadow)">
+    <rect x="58" y="158" width="210" height="122" rx="18" class="card"/>
+    <text x="82" y="201" class="label">Sensors</text>
+    <text x="82" y="234" class="sub">IMU + pressure</text>
+    <text x="82" y="260" class="sub">DVL + MBES</text>
+    <circle cx="232" cy="198" r="16" class="accent"/>
+    <path d="M220 235 C230 218 246 218 256 235" class="line"/>
+
+    <rect x="338" y="158" width="210" height="122" rx="18" class="card"/>
+    <text x="362" y="201" class="label">UKF</text>
+    <text x="362" y="234" class="sub">15-state filter</text>
+    <text x="362" y="260" class="sub">depth + velocity</text>
+    <path d="M505 198 L520 214 L492 244" class="line"/>
+
+    <rect x="618" y="158" width="210" height="122" rx="18" class="card"/>
+    <text x="642" y="201" class="label">Sonar</text>
+    <text x="642" y="234" class="sub">ICP / GICP / NDT</text>
+    <text x="642" y="260" class="sub">submap matching</text>
+    <path d="M780 200 C760 225 760 245 785 262" class="line"/>
+
+    <rect x="898" y="158" width="210" height="122" rx="18" class="card"/>
+    <text x="922" y="201" class="label">Pose Graph</text>
+    <text x="922" y="234" class="sub">g2o SE(3)</text>
+    <text x="922" y="260" class="sub">loop constraints</text>
+    <circle cx="1052" cy="206" r="9" class="lime"/>
+    <circle cx="1068" cy="247" r="9" class="lime"/>
+    <path d="M1052 206 L1068 247 L1024 238 Z" class="line"/>
+  </g>
+
+  <path d="M279 219 L325 219" class="line"/>
+  <path d="M559 219 L605 219" class="line"/>
+  <path d="M839 219 L885 219" class="line"/>
+
+  <g>
+    <path d="M1162 176 C1187 176 1208 197 1208 222 C1208 247 1187 268 1162 268 C1137 268 1116 247 1116 222 C1116 197 1137 176 1162 176 Z" fill="#082f49" fill-opacity="0.66" stroke="#bae6fd" stroke-opacity="0.42" stroke-width="1.5"/>
+    <text x="1162" y="213" text-anchor="middle" class="tiny">RVIZ</text>
+    <text x="1162" y="239" text-anchor="middle" class="tiny">RERUN</text>
+    <path d="M1119 222 L1140 222" class="line"/>
+  </g>
+
+  <text x="58" y="330" class="sub">Replay public datasets, inspect trajectories, tune loop candidates, and keep limitations explicit.</text>
+  <g opacity="0.9">
+    <circle cx="96" cy="374" r="5" class="amber"/>
+    <circle cx="164" cy="358" r="4" class="accent"/>
+    <circle cx="248" cy="374" r="6" class="lime"/>
+    <circle cx="742" cy="366" r="5" class="amber"/>
+    <circle cx="1108" cy="358" r="5" class="accent"/>
+  </g>
+</svg>
