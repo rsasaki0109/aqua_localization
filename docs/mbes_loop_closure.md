@@ -61,6 +61,12 @@ Expected behavior:
 - `/aqua_pose_graph/path` updates after the loop constraint is inserted and
   optimized.
 
+The same smoke path can be run as a single command:
+
+```bash
+ros2 run aqua_localization pose_graph_loop_smoke.sh
+```
+
 ## First Real-Data Target
 
 Use MBES-SLAM `beach_pond` because the repository already has:
