@@ -8,6 +8,11 @@ aqua_pose_graph:
       path: /aqua_pose_graph/path
       # Diagnostic count of keyframes currently in the graph (std_msgs/UInt32).
       keyframe_count: /aqua_pose_graph/keyframe_count
+      # External loop closure / front-end constraint input
+      # (aqua_msgs/PoseGraphLoopConstraint).
+      loop_constraint: /aqua_pose_graph/loop_constraint
+      # Diagnostic count of accepted loop constraints (std_msgs/UInt32).
+      loop_constraint_count: /aqua_pose_graph/loop_constraint_count
 
     frames:
       # Frame for the published path. This node does not publish TF.

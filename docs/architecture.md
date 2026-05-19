@@ -29,6 +29,22 @@ aqua_fusion
   /aqua_fusion/status          aqua_msgs/msg/FusionStatus     output
 ```
 
+The optional pose-graph backend adds a keyframe trajectory and an explicit
+loop-closure input:
+
+```text
+aqua_pose_graph
+  /aqua_imu_loc/odometry or
+  /aqua_fusion/odometry          nav_msgs/msg/Odometry                  input
+  /aqua_pose_graph/loop_constraint
+                                 aqua_msgs/msg/PoseGraphLoopConstraint input
+  /aqua_pose_graph/path          nav_msgs/msg/Path                      output
+  /aqua_pose_graph/keyframe_count
+                                 std_msgs/msg/UInt32                   output
+  /aqua_pose_graph/loop_constraint_count
+                                 std_msgs/msg/UInt32                   output
+```
+
 The full stack can be launched with:
 
 ```bash
@@ -146,6 +162,28 @@ Planned scan matching backends:
 - GICP
 - NDT
 - feature-based matching for structured sonar returns
+
+## Pose Graph And Loop Closure Path
+
+`aqua_pose_graph` maintains a g2o `VertexSE3` keyframe graph from upstream
+odometry. Consecutive keyframes are connected with odometry edges, and
+external front ends can now inject loop closures by publishing
+`aqua_msgs/msg/PoseGraphLoopConstraint` to
+`/aqua_pose_graph/loop_constraint`.
+
+The loop-constraint message carries:
+
+- `from_id`, `to_id`: existing pose-graph keyframe IDs,
+- `relative_pose`: the measured transform from `from_id` to `to_id`,
+- `information`: row-major 6x6 information matrix for
+  `[x, y, z, roll, pitch, yaw]`,
+- `optimize_after_insert`: whether to run g2o immediately after insertion.
+
+This keeps the graph backend independent of the loop-detection front end.
+For MBES data, the intended front end is: persist a bathymetric submap per
+keyframe, search older submaps after a temporal/spatial exclusion window,
+run submap-vs-submap GICP/NDT, and publish only geometrically consistent
+relative transforms as loop constraints.
 
 ## Fusion Path
 

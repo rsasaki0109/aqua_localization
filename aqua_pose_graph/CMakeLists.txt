@@ -11,6 +11,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(aqua_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -49,6 +50,7 @@ add_executable(pose_graph_node
 )
 target_link_libraries(pose_graph_node aqua_pose_graph_lib)
 ament_target_dependencies(pose_graph_node
+  aqua_msgs
   rclcpp
   nav_msgs
   geometry_msgs

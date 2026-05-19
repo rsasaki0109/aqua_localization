@@ -80,8 +80,8 @@ def generate_launch_description():
                 default_value="false",
                 description=(
                     "Start the aqua_pose_graph SE(3) keyframe backend. "
-                    "Off by default since it does not yet generate loop "
-                    "closure constraints — switch on to expose "
+                    "Off by default; external front ends can inject loop "
+                    "closures on /aqua_pose_graph/loop_constraint and use "
                     "/aqua_pose_graph/path."
                 ),
             ),
