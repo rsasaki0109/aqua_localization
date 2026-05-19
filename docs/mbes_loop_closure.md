@@ -20,6 +20,9 @@ front end so the next implementation can stay small and measurable.
 - The same node publishes `aqua_msgs/LoopClosureStatus` on
   `/mbes_loop_closure/status` for each tested candidate, including rejection
   reason, convergence, fitness score, and correction magnitude.
+- Candidate loop edges are also published as `visualization_msgs/MarkerArray`
+  on `/mbes_loop_closure/markers`, with accepted edges drawn brighter than
+  rejected edges for RViz tuning sessions.
 - `aqua_localization/scripts/pose_graph_loop_demo.py` publishes a synthetic
   odometry chain plus one loop constraint for smoke-testing the graph input.
 
@@ -113,6 +116,11 @@ ros2 topic echo /aqua_pose_graph/loop_constraint_count
 eligible historical submap. Rejections report the specific gate that failed,
 so overly strict candidate, fitness, or correction thresholds are visible
 without reading debug logs.
+
+In RViz, add a `MarkerArray` display for `/mbes_loop_closure/markers`.
+Accepted loop candidates are green and thicker; rejected candidates are red
+and thinner. This makes it easy to see whether tuning is producing plausible
+geometric edges before trusting them as pose-graph constraints.
 
 `aqua_localization/scripts/rerun_export_mbes.py` understands the optional
 pose-graph outputs when they are present in the results-included bag:
