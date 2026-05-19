@@ -106,11 +106,14 @@ Tune in this order:
    enough but not too slow.
 2. `candidates.max_distance_m` and `candidates.min_keyframe_separation` until
    plausible revisits are tested.
-3. `gates.max_fitness_score`, `gates.max_correction_translation_m`, and
+3. `descriptor.max_centroid_distance_m`, `descriptor.max_extent_ratio`, and
+   `descriptor.min_point_count_ratio` after collecting descriptor distributions
+   from a replay. Leave these disabled until real-bag ranges are understood.
+4. `gates.max_fitness_score`, `gates.max_correction_translation_m`, and
    `gates.max_correction_rotation_rad` until false positives are rejected.
-4. `loop.min_repeat_keyframe_gap` to suppress near-duplicate accepted loops
+5. `loop.min_repeat_keyframe_gap` to suppress near-duplicate accepted loops
    while preserving distinct revisits.
-5. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
+6. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
    optimized path changes against the MBES-SLAM reference odometry.
 
 Export the loop-status stream after a replay to make tuning measurable:
@@ -135,9 +138,10 @@ ros2 topic echo /aqua_pose_graph/loop_constraint_count
 
 `LoopClosureStatus.candidate_id` is `UINT32_MAX` when a keyframe has no
 eligible historical submap. Rejections report the specific gate that failed,
-or `duplicate loop suppressed` when accepted-loop cooldown blocks a near-repeat,
-so overly strict candidate, fitness, correction, or repeat thresholds are
-visible without reading debug logs.
+`descriptor gate rejected` when the pre-registration shape check rejects a
+candidate, or `duplicate loop suppressed` when accepted-loop cooldown blocks a
+near-repeat. This makes overly strict candidate, descriptor, fitness,
+correction, or repeat thresholds visible without reading debug logs.
 
 In RViz, use the dedicated tuning config:
 

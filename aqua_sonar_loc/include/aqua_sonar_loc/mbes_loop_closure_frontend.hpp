@@ -22,12 +22,21 @@ namespace aqua_sonar_loc
 
 using PointCloud = pcl::PointCloud<pcl::PointXYZ>;
 
+struct SubmapDescriptor
+{
+  bool valid{false};
+  std::size_t point_count{0};
+  Eigen::Vector3d centroid{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d extent{Eigen::Vector3d::Zero()};
+};
+
 struct Submap
 {
   std::uint32_t id{0};
   rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
   Eigen::Isometry3d pose{Eigen::Isometry3d::Identity()};
   PointCloud::Ptr cloud{std::make_shared<PointCloud>()};
+  SubmapDescriptor descriptor;
 };
 
 struct MatchResult
@@ -96,6 +105,13 @@ struct GateOptions
   double max_correction_rotation_rad{0.5};
 };
 
+struct DescriptorGateOptions
+{
+  double max_centroid_distance_m{0.0};
+  double max_extent_ratio{0.0};
+  double min_point_count_ratio{0.0};
+};
+
 struct LoopSuppressionOptions
 {
   int min_repeat_keyframe_gap{0};
@@ -111,6 +127,7 @@ Eigen::Isometry3d pose_to_isometry(const geometry_msgs::msg::Pose & msg);
 geometry_msgs::msg::Pose isometry_to_pose(const Eigen::Isometry3d & pose);
 PointCloud::Ptr convert_cloud(const sensor_msgs::msg::PointCloud2 & msg);
 PointCloud::Ptr downsample(const PointCloud & cloud, double voxel_leaf_m);
+SubmapDescriptor describe_cloud(const PointCloud & cloud);
 std::array<double, 36> diagonal_information(
   double translation_sigma_m,
   double rotation_sigma_rad);
@@ -159,6 +176,17 @@ public:
 
 private:
   RegistrationOptions options_;
+};
+
+class DescriptorGateEvaluator
+{
+public:
+  explicit DescriptorGateEvaluator(DescriptorGateOptions options);
+
+  GateResult evaluate(const Submap & candidate, const Submap & current) const;
+
+private:
+  DescriptorGateOptions options_;
 };
 
 class LoopGateEvaluator

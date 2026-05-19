@@ -24,6 +24,20 @@ std::uint32_t id_distance(std::uint32_t a, std::uint32_t b)
   return a > b ? a - b : b - a;
 }
 
+double ratio_or_infinity(double a, double b)
+{
+  constexpr double kEpsilon = 1.0e-9;
+  const double lo = std::min(std::abs(a), std::abs(b));
+  const double hi = std::max(std::abs(a), std::abs(b));
+  if (hi < kEpsilon) {
+    return 1.0;
+  }
+  if (lo < kEpsilon) {
+    return std::numeric_limits<double>::infinity();
+  }
+  return hi / lo;
+}
+
 template<typename RegistrationT>
 MatchResult run_registration(
   RegistrationT & registration,
@@ -113,6 +127,36 @@ PointCloud::Ptr downsample(const PointCloud & cloud, double voxel_leaf_m)
   return out;
 }
 
+SubmapDescriptor describe_cloud(const PointCloud & cloud)
+{
+  SubmapDescriptor descriptor;
+  descriptor.point_count = cloud.size();
+  if (cloud.empty()) {
+    return descriptor;
+  }
+
+  Eigen::Vector3d min_point(
+    std::numeric_limits<double>::infinity(),
+    std::numeric_limits<double>::infinity(),
+    std::numeric_limits<double>::infinity());
+  Eigen::Vector3d max_point(
+    -std::numeric_limits<double>::infinity(),
+    -std::numeric_limits<double>::infinity(),
+    -std::numeric_limits<double>::infinity());
+  Eigen::Vector3d sum = Eigen::Vector3d::Zero();
+  for (const auto & point : cloud) {
+    const Eigen::Vector3d p(point.x, point.y, point.z);
+    min_point = min_point.cwiseMin(p);
+    max_point = max_point.cwiseMax(p);
+    sum += p;
+  }
+
+  descriptor.valid = true;
+  descriptor.centroid = sum / static_cast<double>(cloud.size());
+  descriptor.extent = max_point - min_point;
+  return descriptor;
+}
+
 std::array<double, 36> diagonal_information(
   double translation_sigma_m,
   double rotation_sigma_rad)
@@ -191,6 +235,8 @@ FinalizeSubmapResult SubmapManager::finalize_current()
   }
 
   result.status = FinalizeSubmapStatus::Ready;
+  result.submap.descriptor = describe_cloud(*result.submap.cloud);
+  current_submap_.descriptor = result.submap.descriptor;
   return result;
 }
 
@@ -263,6 +309,60 @@ MatchResult RegistrationPipeline::match(
   pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
   return run_registration(
     gicp, candidate.cloud, current.cloud, current_to_candidate_guess, options_);
+}
+
+DescriptorGateEvaluator::DescriptorGateEvaluator(DescriptorGateOptions options)
+: options_(std::move(options))
+{
+}
+
+GateResult DescriptorGateEvaluator::evaluate(const Submap & candidate, const Submap & current) const
+{
+  GateResult gate;
+  if (!candidate.descriptor.valid || !current.descriptor.valid) {
+    gate.accepted = true;
+    gate.status = "descriptor gate skipped";
+    return gate;
+  }
+
+  if (options_.min_point_count_ratio > 0.0) {
+    const auto min_points =
+      std::min(candidate.descriptor.point_count, current.descriptor.point_count);
+    const auto max_points =
+      std::max(candidate.descriptor.point_count, current.descriptor.point_count);
+    const double count_ratio =
+      static_cast<double>(min_points) / static_cast<double>(max_points);
+    if (count_ratio < options_.min_point_count_ratio) {
+      gate.status = "descriptor gate rejected";
+      return gate;
+    }
+  }
+
+  if (options_.max_centroid_distance_m > 0.0) {
+    const double centroid_distance =
+      (candidate.descriptor.centroid - current.descriptor.centroid).norm();
+    if (centroid_distance > options_.max_centroid_distance_m) {
+      gate.status = "descriptor gate rejected";
+      return gate;
+    }
+  }
+
+  if (options_.max_extent_ratio > 0.0) {
+    const Eigen::Vector3d candidate_extent = candidate.descriptor.extent;
+    const Eigen::Vector3d current_extent = current.descriptor.extent;
+    const double extent_ratio = std::max({
+      ratio_or_infinity(candidate_extent.x(), current_extent.x()),
+      ratio_or_infinity(candidate_extent.y(), current_extent.y()),
+      ratio_or_infinity(candidate_extent.z(), current_extent.z())});
+    if (extent_ratio > options_.max_extent_ratio) {
+      gate.status = "descriptor gate rejected";
+      return gate;
+    }
+  }
+
+  gate.accepted = true;
+  gate.status = "descriptor gate accepted";
+  return gate;
 }
 
 LoopGateEvaluator::LoopGateEvaluator(GateOptions options)

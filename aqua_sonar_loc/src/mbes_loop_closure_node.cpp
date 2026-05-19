@@ -111,6 +111,13 @@ private:
     gate_options_.max_correction_rotation_rad =
       declare_parameter<double>("gates.max_correction_rotation_rad", 0.5);
 
+    descriptor_options_.max_centroid_distance_m =
+      declare_parameter<double>("descriptor.max_centroid_distance_m", 0.0);
+    descriptor_options_.max_extent_ratio =
+      declare_parameter<double>("descriptor.max_extent_ratio", 0.0);
+    descriptor_options_.min_point_count_ratio =
+      declare_parameter<double>("descriptor.min_point_count_ratio", 0.0);
+
     loop_translation_sigma_m_ =
       declare_parameter<double>("loop.translation_sigma_m", 2.0);
     loop_rotation_sigma_rad_ =
@@ -170,6 +177,7 @@ private:
   {
     int tested = 0;
     const LoopCandidateSelector selector(candidate_options_);
+    const DescriptorGateEvaluator descriptor_gate(descriptor_options_);
     const RegistrationPipeline registration(registration_options_);
     const LoopGateEvaluator gate_evaluator(gate_options_);
 
@@ -183,6 +191,19 @@ private:
         candidate.pose.inverse() * current.pose;
       const Eigen::Isometry3d current_to_candidate_guess =
         candidate_to_current_guess.inverse();
+      const GateResult descriptor_result = descriptor_gate.evaluate(candidate, current);
+      if (!descriptor_result.accepted) {
+        MatchResult result;
+        result.fitness = std::numeric_limits<double>::quiet_NaN();
+        result.status = descriptor_result.status;
+        publish_status(candidate, current, result, descriptor_result);
+        publish_candidate_marker(candidate, current, descriptor_result);
+        RCLCPP_DEBUG(
+          get_logger(), "rejected loop candidate %u -> %u: %s",
+          candidate.id, current.id, descriptor_result.status.c_str());
+        continue;
+      }
+
       MatchResult result =
         registration.match(candidate, current, current_to_candidate_guess);
       GateResult gate = gate_evaluator.evaluate(candidate_to_current_guess, result);
@@ -303,6 +324,7 @@ private:
   CandidateSelectionOptions candidate_options_;
   RegistrationOptions registration_options_;
   GateOptions gate_options_;
+  DescriptorGateOptions descriptor_options_;
   LoopSuppressionOptions loop_suppression_options_;
 
   double loop_translation_sigma_m_{2.0};
