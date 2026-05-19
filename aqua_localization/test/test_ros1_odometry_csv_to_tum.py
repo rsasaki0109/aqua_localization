@@ -57,6 +57,25 @@ def test_convert_csv_with_split_stamp_and_short_headers(tmp_path):
     assert rows == [[10.25, 4.0, 5.0, 6.0, 0.0, 0.0, 0.7071, 0.7071]]
 
 
+def test_convert_ros1_header_stamp_nanoseconds(tmp_path):
+    module = load_module()
+    csv_path = tmp_path / "odom.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "%time,field.header.stamp,field.pose.pose.position.x,field.pose.pose.position.y,field.pose.pose.position.z,field.pose.pose.orientation.x,field.pose.pose.orientation.y,field.pose.pose.orientation.z,field.pose.pose.orientation.w",
+                "1652274614085839987,1652274614085839987,0.0,1.0,2.0,0.0,0.0,0.0,1.0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    rows = module.convert_rows(csv_path)
+
+    assert rows == [[1652274614.085839987, 0.0, 1.0, 2.0, 0.0, 0.0, 0.0, 1.0]]
+
+
 def test_cli_writes_tum_file(tmp_path):
     csv_path = tmp_path / "odom.csv"
     out_path = tmp_path / "odom.tum"
