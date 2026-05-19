@@ -192,10 +192,12 @@ and fusion path are wired.
 The frontend also publishes JSON diagnostics on `/aqua_visual_frontend/status`.
 The status stream and optional CSV include per-frame `left_features`,
 `right_features`, `stereo_matches`, `stereo_points`, `temporal_matches`,
-`pnp_inliers`, `inlier_ratio`, `step_translation_m`, and the accept/reject
-reason. Use this before tuning thresholds: low stereo points means image/stereo
-triangulation is the bottleneck, while low PnP inliers means temporal tracking
-or outlier rejection is the bottleneck.
+`pnp_inliers`, `inlier_ratio`, `step_translation_m`, disparity statistics,
+depth statistics, and the accept/reject reason. Use this before tuning
+thresholds: low stereo points means image/stereo triangulation is the bottleneck,
+low disparity or a long depth tail means metric scale is sensitive to pixel
+noise, while low PnP inliers means temporal tracking or outlier rejection is the
+bottleneck.
 
 Summarize the CSV after a run:
 

@@ -63,6 +63,7 @@ class VisualFrame:
     points3d: np.ndarray
     keypoints_xy: np.ndarray
     descriptors: np.ndarray
+    disparities_px: np.ndarray
     left_features: int = 0
     right_features: int = 0
     stereo_matches: int = 0
@@ -88,6 +89,12 @@ class VisualFrontendStatus:
     right_features: int
     stereo_matches: int
     stereo_points: int
+    disparity_min_px: float
+    disparity_median_px: float
+    disparity_p95_px: float
+    depth_min_m: float
+    depth_median_m: float
+    depth_p95_m: float
     temporal_matches: int
     pnp_inliers: int
     inlier_ratio: float
@@ -105,6 +112,12 @@ STATUS_CSV_FIELDS = [
     "right_features",
     "stereo_matches",
     "stereo_points",
+    "disparity_min_px",
+    "disparity_median_px",
+    "disparity_p95_px",
+    "depth_min_m",
+    "depth_median_m",
+    "depth_p95_m",
     "temporal_matches",
     "pnp_inliers",
     "inlier_ratio",
@@ -140,6 +153,7 @@ def triangulate_stereo_features(
             empty_points3d(),
             empty_keypoints(),
             empty_descriptors(),
+            empty_disparities(),
             left_features=left_count,
             right_features=right_count,
         )
@@ -148,6 +162,7 @@ def triangulate_stereo_features(
     points = []
     keypoints = []
     descriptors = []
+    disparities = []
     for match in matches:
         left_pt = left_keypoints[match.queryIdx].pt
         right_pt = right_keypoints[match.trainIdx].pt
@@ -164,6 +179,7 @@ def triangulate_stereo_features(
         points.append((x, y, z))
         keypoints.append(left_pt)
         descriptors.append(left_desc[match.queryIdx])
+        disparities.append(disparity)
 
     if not points:
         return VisualFrame(
@@ -171,6 +187,7 @@ def triangulate_stereo_features(
             empty_points3d(),
             empty_keypoints(),
             empty_descriptors(),
+            empty_disparities(),
             left_features=left_count,
             right_features=right_count,
             stereo_matches=len(matches),
@@ -180,6 +197,7 @@ def triangulate_stereo_features(
         np.asarray(points, dtype=np.float32),
         np.asarray(keypoints, dtype=np.float32),
         np.asarray(descriptors, dtype=np.uint8),
+        np.asarray(disparities, dtype=np.float32),
         left_features=left_count,
         right_features=right_count,
         stereo_matches=len(matches),
@@ -302,6 +320,10 @@ def empty_descriptors() -> np.ndarray:
     return np.empty((0, 32), dtype=np.uint8)
 
 
+def empty_disparities() -> np.ndarray:
+    return np.empty((0,), dtype=np.float32)
+
+
 def failed_motion(reason: str, matches: int = 0, inliers: int = 0) -> MotionEstimate:
     return MotionEstimate(
         False,
@@ -311,6 +333,14 @@ def failed_motion(reason: str, matches: int = 0, inliers: int = 0) -> MotionEsti
         matches,
         reason,
     )
+
+
+def finite_percentile(values: np.ndarray, q: float) -> float:
+    finite = np.asarray(values, dtype=np.float64)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return math.nan
+    return float(np.percentile(finite, q))
 
 
 def make_status(
@@ -323,6 +353,7 @@ def make_status(
 ) -> VisualFrontendStatus:
     inlier_ratio = estimate.inliers / max(1, estimate.matches)
     step_translation_m = float(np.linalg.norm(estimate.translation_prev_to_curr))
+    depths = frame.points3d[:, 2] if frame.points3d.size else np.asarray([], dtype=np.float32)
     return VisualFrontendStatus(
         stamp_s=stamp_s,
         frame_index=frame_index,
@@ -332,6 +363,12 @@ def make_status(
         right_features=frame.right_features,
         stereo_matches=frame.stereo_matches,
         stereo_points=int(frame.points3d.shape[0]),
+        disparity_min_px=finite_percentile(frame.disparities_px, 0.0),
+        disparity_median_px=finite_percentile(frame.disparities_px, 50.0),
+        disparity_p95_px=finite_percentile(frame.disparities_px, 95.0),
+        depth_min_m=finite_percentile(depths, 0.0),
+        depth_median_m=finite_percentile(depths, 50.0),
+        depth_p95_m=finite_percentile(depths, 95.0),
         temporal_matches=estimate.matches,
         pnp_inliers=estimate.inliers,
         inlier_ratio=float(inlier_ratio),
@@ -351,6 +388,12 @@ def status_to_dict(status: VisualFrontendStatus) -> dict:
         "right_features": status.right_features,
         "stereo_matches": status.stereo_matches,
         "stereo_points": status.stereo_points,
+        "disparity_min_px": status.disparity_min_px,
+        "disparity_median_px": status.disparity_median_px,
+        "disparity_p95_px": status.disparity_p95_px,
+        "depth_min_m": status.depth_min_m,
+        "depth_median_m": status.depth_median_m,
+        "depth_p95_m": status.depth_p95_m,
         "temporal_matches": status.temporal_matches,
         "pnp_inliers": status.pnp_inliers,
         "inlier_ratio": status.inlier_ratio,
@@ -374,6 +417,16 @@ def write_status_csv_row(fp, status: VisualFrontendStatus):
     row["timestamp"] = f"{status.stamp_s:.9f}"
     row["inlier_ratio"] = f"{status.inlier_ratio:.9f}"
     row["step_translation_m"] = f"{status.step_translation_m:.9f}"
+    for field in (
+        "disparity_min_px",
+        "disparity_median_px",
+        "disparity_p95_px",
+        "depth_min_m",
+        "depth_median_m",
+        "depth_p95_m",
+    ):
+        value = row[field]
+        row[field] = f"{value:.9f}" if math.isfinite(float(value)) else ""
     row["accepted"] = int(status.accepted)
     writer = csv.DictWriter(fp, fieldnames=STATUS_CSV_FIELDS)
     writer.writerow(row)
