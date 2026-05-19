@@ -89,3 +89,71 @@ def test_cli_writes_report(tmp_path):
     )
 
     assert "Benchmark Gap Report" in out.read_text(encoding="utf-8")
+
+
+def test_gate_failures_report_threshold_misses():
+    module = load_module()
+    rows = module.parse_markdown_benchmark_rows(sample_markdown())
+    gaps = module.compute_gaps(rows, "aqua_visual_frontend", "AQUA-SLAM")
+
+    failures = module.gate_failures(
+        gaps,
+        max_gap_x=4.0,
+        max_improvement_to_tie_percent=70.0,
+    )
+
+    assert len(failures) == 2
+    assert "gap" in failures[0]
+    assert "improvement-to-tie" in failures[1]
+
+
+def test_cli_gap_gate_passes(tmp_path):
+    src = tmp_path / "benchmarks.md"
+    src.write_text(sample_markdown(), encoding="utf-8")
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            str(src),
+            "--target-system",
+            "aqua_visual_frontend",
+            "--baseline-system",
+            "AQUA-SLAM",
+            "--max-gap-x",
+            "5.0",
+            "--max-improvement-to-tie-percent",
+            "80.0",
+        ],
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode == 0
+    assert "4.88" in proc.stdout
+    assert proc.stderr == ""
+
+
+def test_cli_gap_gate_fails(tmp_path):
+    src = tmp_path / "benchmarks.md"
+    src.write_text(sample_markdown(), encoding="utf-8")
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            str(src),
+            "--target-system",
+            "aqua_visual_frontend",
+            "--baseline-system",
+            "AQUA-SLAM",
+            "--max-gap-x",
+            "4.0",
+        ],
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode == 2
+    assert "benchmark gap gate failed" in proc.stderr
+    assert "exceeds --max-gap-x" in proc.stderr

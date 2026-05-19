@@ -177,6 +177,21 @@ window to tie AQUA-SLAM. The most useful next benchmark rows are held-out Tank
 sequences with one sequence used only for visual scale/extrinsic calibration and
 another sequence used only for validation.
 
+The same command can act as a regression gate. This passes for the current
+experimental visual frontend:
+
+```bash
+ros2 run aqua_localization benchmark_gap_report.py \
+  docs/benchmarks/tank_aqua_slam.md \
+  --target-system aqua_visual_frontend \
+  --baseline-system AQUA-SLAM \
+  --max-gap-x 5.0 \
+  --max-improvement-to-tie-percent 80.0
+```
+
+Tighten those numbers after each real accuracy improvement. For example,
+`--max-gap-x 4.0` intentionally fails today because the current gap is `4.88x`.
+
 ## Generate Rows
 
 Use the same reference TUM for both systems:
