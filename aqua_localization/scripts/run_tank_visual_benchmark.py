@@ -19,6 +19,7 @@ from types import SimpleNamespace
 
 import calibrate_visual_scale
 import analyze_visual_drift
+import analyze_visual_motion_segments
 import summarize_visual_frontend_status
 import trajectory_benchmark_row
 
@@ -37,6 +38,7 @@ class BenchmarkPaths:
     status_csv: Path
     status_summary: Path
     drift_report: Path
+    motion_segments_report: Path
     scale_report: Path
     benchmark_row: Path
     replay_script: Path
@@ -53,6 +55,7 @@ def default_paths(out_dir: Path, sequence: str) -> BenchmarkPaths:
         status_csv=out_dir / f"{stem}_visual_frontend_status.csv",
         status_summary=out_dir / f"{stem}_visual_frontend_status.md",
         drift_report=out_dir / f"{stem}_visual_drift.md",
+        motion_segments_report=out_dir / f"{stem}_visual_motion_segments.md",
         scale_report=out_dir / f"{stem}_visual_scale_report.txt",
         benchmark_row=out_dir / f"{stem}_visual_benchmark.md",
         replay_script=out_dir / f"{stem}_visual_replay.sh",
@@ -182,6 +185,14 @@ def evaluate(args, estimate_tum: Path, paths: BenchmarkPaths) -> str:
         min_samples=args.drift_min_samples,
     ))
     paths.drift_report.write_text(drift_report, encoding="utf-8")
+    motion_segments_report = analyze_visual_motion_segments.run_analysis(SimpleNamespace(
+        reference=args.reference,
+        estimate=estimate_tum,
+        segment_s=args.segment_s,
+        stride_s=args.segment_stride_s,
+        min_reference_motion_m=args.segment_min_reference_motion_m,
+    ))
+    paths.motion_segments_report.write_text(motion_segments_report, encoding="utf-8")
     status_summary_lines = []
     if args.status_csv is not None and args.status_csv.exists():
         status_summary = summarize_visual_frontend_status.format_summary_markdown(
@@ -199,6 +210,7 @@ def evaluate(args, estimate_tum: Path, paths: BenchmarkPaths) -> str:
         f"scale report: {paths.scale_report}",
         f"benchmark row: {paths.benchmark_row}",
         f"drift report: {paths.drift_report}",
+        f"motion segments report: {paths.motion_segments_report}",
         *status_summary_lines,
         "",
         report,
@@ -229,6 +241,9 @@ def parse_args(argv):
     parser.add_argument("--drift-window-s", type=float, default=3.0)
     parser.add_argument("--drift-stride-s", type=float, default=1.0)
     parser.add_argument("--drift-min-samples", type=int, default=20)
+    parser.add_argument("--segment-s", type=float, default=1.0)
+    parser.add_argument("--segment-stride-s", type=float, default=0.5)
+    parser.add_argument("--segment-min-reference-motion-m", type=float, default=0.01)
     parser.add_argument("--camera-fx", type=float, default=DEFAULT_FX)
     parser.add_argument("--camera-fy", type=float, default=DEFAULT_FY)
     parser.add_argument("--camera-cx", type=float, default=DEFAULT_CX)

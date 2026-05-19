@@ -129,7 +129,10 @@ It also emits `*_visual_frontend_status.md` via
 short tuning report next to the trajectory metrics. The same run writes
 `*_visual_drift.md` with sliding-window SE(3), Sim(3), and scale estimates from
 `analyze_visual_drift.py`; use that report to separate fixed-scale calibration
-problems from true visual drift.
+problems from true visual drift. It also writes
+`*_visual_motion_segments.md` from `analyze_visual_motion_segments.py`, comparing
+short visual/reference segment lengths and direction buckets to expose
+frame-convention or extrinsic-dependent motion bias.
 
 The public Tank Dataset page currently exposes `short_test` as sample data and
 requires the download form for the full sequence set, so this table keeps

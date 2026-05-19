@@ -173,9 +173,9 @@ ros2 run aqua_localization run_tank_visual_benchmark.py \
 
 In bag replay mode, the runner writes the recorded visual TUM file, a
 `calibrate_visual_scale.py` report, a visual-frontend status CSV, a Markdown
-benchmark row, and a replay shell script containing the exact ROS commands it
-used. If you already have a visual TUM estimate, skip ROS replay and evaluate it
-directly:
+benchmark row, drift and motion-segment reports, and a replay shell script
+containing the exact ROS commands it used. If you already have a visual TUM
+estimate, skip ROS replay and evaluate it directly:
 
 ```bash
 ros2 run aqua_localization run_tank_visual_benchmark.py \
@@ -225,6 +225,23 @@ scale. If window scales are stable but Sim(3) error still grows, tune drift and
 geometry. If window scales vary, tune stereo scale or calibration first. The
 benchmark runner writes this drift report automatically next to the scale report
 and benchmark row.
+
+Analyze short relative motion segments directly:
+
+```bash
+ros2 run aqua_localization analyze_visual_motion_segments.py \
+  /tmp/tank_short_test_gt.tum \
+  /tmp/tank_short_test_visual_frontend.tum \
+  --segment-s 1.0 \
+  --stride-s 0.5 \
+  --out /tmp/tank_short_test_visual_motion_segments.md
+```
+
+This report compares each segment's visual path length against the reference
+path length. Direction buckets help spot camera-frame or extrinsic-dependent
+bias, while speed and segment-length statistics expose short-baseline PnP noise.
+The benchmark runner writes this report automatically as
+`*_visual_motion_segments.md`.
 
 On `short_test`, the first camera-only run processed 272 stereo pairs and
 accepted 271 visual odometry steps. With the nominal stereo scale it produced
