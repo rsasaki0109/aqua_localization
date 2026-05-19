@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert a Tank Dataset ROS 1 bag (Xu et al. 2025, IJRR) to a ROS 2 mcap.
+"""Convert a Tank Dataset ROS 1 bag (Xu et al. 2025, IJRR) to a ROS 2 bag.
 
 The original bag carries `/dvl/data` as the custom
 `waterlinked_a50_ros_driver/DVL` message, which `rosbags-convert` cannot
@@ -13,7 +13,7 @@ preserve without the upstream package installed. This script:
    (`geometry_msgs/TwistStamped`) — the topic + type that
    `aqua_imu_loc` already accepts via `topics.dvl_velocity`.
 4. Passes every other topic through unchanged.
-5. Writes a single ROS 2 mcap bag at the destination path.
+5. Writes a single ROS 2 bag at the destination path.
 
 By default the camera topics are dropped because they are large and not used
 by `aqua_imu_loc`; pass `--include-cameras` to keep them.
@@ -25,7 +25,9 @@ Typical usage:
         --src aqua_localization/datasets/public/tank_dataset/short_test.bag \
         --dst aqua_localization/datasets/public/tank_dataset/short_test_ros2
 
-The destination is created if missing; the mcap file lives inside it.
+The destination is created if missing; by default the output uses sqlite3
+storage plus Humble-compatible metadata so `ros2 bag play` works on a minimal
+ROS 2 Humble install.
 """
 
 import argparse
@@ -51,12 +53,16 @@ PRESSURE_OUT_TYPE = "sensor_msgs/msg/FluidPressure"
 WATER_DENSITY_KGM3 = 1000.0
 GRAVITY_MPS2 = 9.80665
 ATMOSPHERIC_PA = 101325.0
+STORAGE_PLUGINS = {
+    "sqlite3": StoragePlugin.SQLITE3,
+    "mcap": StoragePlugin.MCAP,
+}
 
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(
         description=(
-            "Convert a Tank Dataset ROS 1 bag to a ROS 2 mcap, decoding the "
+            "Convert a Tank Dataset ROS 1 bag to a ROS 2 bag, decoding the "
             "WaterLinked DVL message into geometry_msgs/TwistStamped."
         )
     )
@@ -70,6 +76,18 @@ def parse_args(argv):
         "--dvl-frame", default="dvl_link",
         help="frame_id stamped on the emitted /dvl/twist messages.",
     )
+    parser.add_argument(
+        "--storage",
+        choices=sorted(STORAGE_PLUGINS),
+        default="sqlite3",
+        help="ROS 2 bag storage backend. sqlite3 is the most portable on ROS 2 Humble.",
+    )
+    parser.add_argument(
+        "--metadata-compat",
+        choices=("humble", "latest"),
+        default="humble",
+        help="Rewrite rosbags metadata for ROS 2 Humble compatibility by default.",
+    )
     return parser.parse_args(argv)
 
 
@@ -77,6 +95,22 @@ def topic_should_pass_through(topic: str, include_cameras: bool) -> bool:
     if not include_cameras and topic.startswith("/camera/"):
         return False
     return True
+
+
+def rewrite_metadata_for_humble(dst: Path) -> None:
+    metadata = dst / "metadata.yaml"
+    if not metadata.exists():
+        return
+    lines = []
+    for line in metadata.read_text(encoding="utf-8").splitlines():
+        if "type_description_hash:" in line:
+            continue
+        if "offered_qos_profiles: []" in line:
+            line = line.replace("offered_qos_profiles: []", 'offered_qos_profiles: ""')
+        if line.strip() == "version: 9":
+            line = line.replace("version: 9", "version: 5")
+        lines.append(line)
+    metadata.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main(argv=None) -> int:
@@ -99,7 +133,7 @@ def main(argv=None) -> int:
     with Ros1Reader(args.src) as reader, Ros2Writer(
         args.dst,
         version=Ros2Writer.VERSION_LATEST,
-        storage_plugin=StoragePlugin.MCAP,
+        storage_plugin=STORAGE_PLUGINS[args.storage],
     ) as writer:
         # Register every connection's message definition into both typestores
         # (the source typestore needs the custom DVL definition to deserialize
@@ -203,6 +237,9 @@ def main(argv=None) -> int:
                     timestamp,
                     ros2_typestore.serialize_cdr(fp_msg, PRESSURE_OUT_TYPE),
                 )
+
+    if args.metadata_compat == "humble":
+        rewrite_metadata_for_humble(args.dst)
 
     print(
         f"wrote {args.dst}: {converted} DVL→TwistStamped, "

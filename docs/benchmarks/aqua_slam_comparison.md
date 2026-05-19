@@ -63,13 +63,12 @@ The first measured head-to-head row is tracked in
 | Dataset | Sequence | System | Alignment | Samples | Matched s | RMSE m | Status |
 |---------|----------|--------|-----------|--------:|----------:|-------:|--------|
 | Tank Dataset | `short_test` | AQUA-SLAM | SE(3) | 234 | 11.65 | 0.0194 | measured |
-| Tank Dataset | `short_test` | `aqua_localization` | SE(3) | TBD | TBD | TBD | rerun needed under same command |
+| Tank Dataset | `short_test` | `aqua_localization` | SE(3) | 5399 | 14.94 | 0.4291 | measured, lighter sensor stack |
 
 This result makes AQUA-SLAM the accuracy target to beat on Tank visual-DVL-IMU
-sequences. The fair development path is to first reproduce the
-`aqua_localization` row with the same AprilTag GT export and comparison script,
-then improve the ROS 2 stack or scope the paper claim toward permissive ROS 2
-localization and MBES-specific replay strengths.
+sequences. The fair development path is to either add a visual frontend for a
+sensor-equivalent Tank comparison or scope the paper claim toward permissive
+ROS 2 localization and MBES-specific replay strengths.
 
 ## Fair Head-to-Head Tasks
 
