@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible build, launch, estimator, or replay problem.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: input
+    id: ros_distro
+    attributes:
+      label: ROS 2 distribution
+      placeholder: Humble or Jazzy
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: Ubuntu 22.04, Ubuntu 24.04, container image, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: Paste the exact command or launch file invocation.
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste the smallest useful log excerpt.
+      render: text
+  - type: textarea
+    id: dataset
+    attributes:
+      label: Dataset context
+      description: Bag path/source, topics, time window, and config files if applicable.
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior

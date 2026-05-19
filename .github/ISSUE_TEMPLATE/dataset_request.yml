@@ -1,0 +1,50 @@
+name: Public dataset request
+description: Suggest a public AUV/ROV dataset for bring-up or benchmarking.
+title: "[Dataset]: "
+labels: ["dataset"]
+body:
+  - type: input
+    id: dataset_name
+    attributes:
+      label: Dataset name
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source URL
+      placeholder: Project page, DOI, GitHub repository, or download link.
+    validations:
+      required: true
+  - type: textarea
+    id: license
+    attributes:
+      label: License and redistribution notes
+      description: Include the dataset license or usage terms if known.
+    validations:
+      required: true
+  - type: textarea
+    id: sensors
+    attributes:
+      label: Available sensors and topics
+      description: IMU, pressure/depth, DVL, sonar, camera, acoustic positioning, GT, and bag format.
+    validations:
+      required: true
+  - type: dropdown
+    id: localization_path
+    attributes:
+      label: Primary localization path
+      options:
+        - IMU + pressure/depth
+        - IMU + pressure/depth + DVL
+        - Sonar point-cloud registration
+        - Visual or visual-inertial
+        - Acoustic positioning
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Download size, conversion blockers, calibration files, expected benchmark, or prior papers.
