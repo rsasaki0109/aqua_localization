@@ -18,6 +18,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import calibrate_visual_scale
+import summarize_visual_frontend_status
 import trajectory_benchmark_row
 
 
@@ -33,6 +34,7 @@ DEFAULT_ODOM_TOPIC = "/aqua_visual_frontend/odometry"
 class BenchmarkPaths:
     estimate_tum: Path
     status_csv: Path
+    status_summary: Path
     scale_report: Path
     benchmark_row: Path
     replay_script: Path
@@ -47,6 +49,7 @@ def default_paths(out_dir: Path, sequence: str) -> BenchmarkPaths:
     return BenchmarkPaths(
         estimate_tum=out_dir / f"{stem}_visual_frontend.tum",
         status_csv=out_dir / f"{stem}_visual_frontend_status.csv",
+        status_summary=out_dir / f"{stem}_visual_frontend_status.md",
         scale_report=out_dir / f"{stem}_visual_scale_report.txt",
         benchmark_row=out_dir / f"{stem}_visual_benchmark.md",
         replay_script=out_dir / f"{stem}_visual_replay.sh",
@@ -168,10 +171,23 @@ def evaluate(args, estimate_tum: Path, paths: BenchmarkPaths) -> str:
     )
     row = make_benchmark_row(args, estimate_tum, note)
     paths.benchmark_row.write_text(row + "\n", encoding="utf-8")
+    status_summary_lines = []
+    if args.status_csv is not None and args.status_csv.exists():
+        status_summary = summarize_visual_frontend_status.format_summary_markdown(
+            summarize_visual_frontend_status.summarize(
+                summarize_visual_frontend_status.read_csv(args.status_csv)),
+            str(args.status_csv),
+        )
+        paths.status_summary.write_text(status_summary, encoding="utf-8")
+        status_summary_lines = [
+            f"status csv: {args.status_csv}",
+            f"status summary: {paths.status_summary}",
+        ]
     return "\n".join([
         f"estimate: {estimate_tum}",
         f"scale report: {paths.scale_report}",
         f"benchmark row: {paths.benchmark_row}",
+        *status_summary_lines,
         "",
         report,
         "",

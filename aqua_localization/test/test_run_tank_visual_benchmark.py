@@ -44,6 +44,7 @@ def test_default_paths_sanitize_sequence_name(tmp_path):
 
     assert paths.estimate_tum == tmp_path / "Tank_short_test_visual_frontend.tum"
     assert paths.status_csv == tmp_path / "Tank_short_test_visual_frontend_status.csv"
+    assert paths.status_summary == tmp_path / "Tank_short_test_visual_frontend_status.md"
     assert paths.scale_report == tmp_path / "Tank_short_test_visual_scale_report.txt"
     assert paths.benchmark_row == tmp_path / "Tank_short_test_visual_benchmark.md"
     assert paths.replay_script == tmp_path / "Tank_short_test_visual_replay.sh"
@@ -119,6 +120,36 @@ def test_evaluate_writes_scale_report_and_markdown_row(tmp_path):
     assert paths.benchmark_row.exists()
     assert "same-sequence Sim(3) scale diagnostic=0.250000000" in paths.benchmark_row.read_text(
         encoding="utf-8")
+
+
+def test_evaluate_writes_status_summary_when_csv_is_available(tmp_path):
+    module = load_module()
+    ref = tmp_path / "ref.tum"
+    est = tmp_path / "est.tum"
+    write_tum(ref, make_rows(scale=1.0))
+    write_tum(est, make_rows(scale=4.0))
+    status_csv = tmp_path / "visual_status.csv"
+    status_csv.write_text(
+        "timestamp,frame_index,accepted_count,rejected_count,left_features,right_features,"
+        "stereo_matches,stereo_points,temporal_matches,pnp_inliers,inlier_ratio,"
+        "step_translation_m,accepted,status\n"
+        "1.000000000,1,1,0,100,95,80,70,60,50,0.800000000,0.050000000,1,accepted\n",
+        encoding="utf-8",
+    )
+    args = module.parse_args([
+        "--estimate", str(est),
+        "--reference", str(ref),
+        "--out-dir", str(tmp_path),
+        "--sequence", "short_test",
+        "--status-csv", str(status_csv),
+    ])
+    paths = module.default_paths(tmp_path, args.sequence)
+
+    text = module.evaluate(args, est, paths)
+
+    assert f"status csv: {status_csv}" in text
+    assert paths.status_summary.exists()
+    assert "Visual Frontend Status Summary" in paths.status_summary.read_text(encoding="utf-8")
 
 
 def test_rejects_non_positive_scale():
