@@ -42,6 +42,13 @@ mbes_loop_closure:
       max_correction_translation_m: 5.0
       max_correction_rotation_rad: 0.5
 
+    descriptor:
+      # Experimental pre-registration shape gate. These are disabled by default
+      # until calibrated on real MBES bags; set positive values to enable.
+      max_centroid_distance_m: 0.0
+      max_extent_ratio: 0.0
+      min_point_count_ratio: 0.0
+
     loop:
       # Conservative information until calibrated on MBES-SLAM beach_pond.
       translation_sigma_m: 2.0
