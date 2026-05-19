@@ -142,6 +142,23 @@ On the current `short_test` run this reports
 for `short_test`; for a publishable result, calibrate on one sequence and report
 accuracy on a different held-out sequence.
 
+For held-out validation after you have access to additional Tank Dataset bags:
+
+```bash
+ros2 run aqua_localization validate_visual_scale.py \
+  --calibration-reference /tmp/tank_structure_easy_gt.tum \
+  --calibration-estimate /tmp/tank_structure_easy_visual.tum \
+  --validation-reference /tmp/tank_medium_gt.tum \
+  --validation-estimate /tmp/tank_medium_visual.tum \
+  --calibration-sequence Structure_Easy \
+  --validation-sequence Medium \
+  --markdown
+```
+
+The script prints the scale learned on the calibration pair and a Markdown row
+for the held-out validation pair. If the same path is reused for both, it emits
+a warning because that is only a diagnostic fit.
+
 The published pose is in a `visual_odom -> camera_left` frame. Treat it as an
 experimental visual frontend output until a calibrated camera-to-base extrinsic
 and fusion path are wired.
