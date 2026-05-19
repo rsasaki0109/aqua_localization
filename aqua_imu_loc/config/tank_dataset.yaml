@@ -11,6 +11,7 @@ aqua_imu_loc:
       pressure: /pressure
       current_velocity: ""
       sonar_odometry: ""
+      visual_odometry: ""
       dvl_velocity: /dvl/twist
       odometry: /aqua_imu_loc/odometry
       status: /aqua_imu_loc/status
@@ -79,6 +80,13 @@ aqua_imu_loc:
 
       # No sonar source on this dataset.
       sonar:
+        position_variance_floor: 0.04
+        max_age_s: 1.0
+      # Optional input from aqua_localization/stereo_visual_odometry.py.
+      # Leave disabled by default; enable with
+      # `-p topics.visual_odometry:=/aqua_visual_frontend/odometry` after
+      # validating visual scale/extrinsics for the target sequence.
+      visual:
         position_variance_floor: 0.04
         max_age_s: 1.0
 

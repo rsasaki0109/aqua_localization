@@ -140,6 +140,21 @@ shape is useful but the metric scale needs calibration. For diagnostics only,
 setting `tracking.translation_scale:=0.169623` gives 0.095 m SE(3) APE RMSE on
 this sequence; do not treat that same-sequence scale fit as a paper-safe result.
 
+The visual odometry can also be fed into `aqua_imu_loc` as a position update:
+
+```bash
+ros2 run aqua_imu_loc imu_loc_node --ros-args \
+  --params-file $(ros2 pkg prefix aqua_imu_loc)/share/aqua_imu_loc/config/tank_dataset.yaml \
+  -p use_sim_time:=true \
+  -p topics.visual_odometry:=/aqua_visual_frontend/odometry
+```
+
+With the same-sequence visual scale fit and a stronger visual covariance floor
+(`imu.visual.position_variance_floor:=0.0025`), the fused IMU + pressure + DVL
++ visual run reaches 0.373 m SE(3) APE RMSE. This is an engineering diagnostic:
+the next validation step is out-of-sequence scale calibration and a calibrated
+camera-to-base transform.
+
 ## Verification topics
 
 ```bash

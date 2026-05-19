@@ -50,6 +50,11 @@ public:
         sonar_odometry_topic_, rclcpp::SensorDataQoS(),
         std::bind(&ImuLocNode::on_sonar_odometry, this, std::placeholders::_1));
     }
+    if (!visual_odometry_topic_.empty()) {
+      visual_odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+        visual_odometry_topic_, rclcpp::SensorDataQoS(),
+        std::bind(&ImuLocNode::on_visual_odometry, this, std::placeholders::_1));
+    }
     if (!dvl_velocity_topic_.empty()) {
       dvl_sub_ = create_subscription<geometry_msgs::msg::TwistStamped>(
         dvl_velocity_topic_, rclcpp::SensorDataQoS(),
@@ -65,11 +70,12 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "aqua_imu_loc started: imu=%s pressure=%s current_velocity=%s sonar=%s dvl=%s odom=%s reset=%s frames=%s->%s->%s",
+      "aqua_imu_loc started: imu=%s pressure=%s current_velocity=%s sonar=%s visual=%s dvl=%s odom=%s reset=%s frames=%s->%s->%s",
       imu_topic_.c_str(),
       pressure_topic_.empty() ? "<disabled>" : pressure_topic_.c_str(),
       current_velocity_topic_.empty() ? "<disabled>" : current_velocity_topic_.c_str(),
       sonar_odometry_topic_.empty() ? "<disabled>" : sonar_odometry_topic_.c_str(),
+      visual_odometry_topic_.empty() ? "<disabled>" : visual_odometry_topic_.c_str(),
       dvl_velocity_topic_.empty() ? "<disabled>" : dvl_velocity_topic_.c_str(),
       odometry_topic_.c_str(),
       reset_service_.c_str(), map_frame_.c_str(), odom_frame_.c_str(), base_frame_.c_str());
@@ -82,6 +88,7 @@ private:
     pressure_topic_ = declare_parameter<std::string>("topics.pressure", "/pressure");
     current_velocity_topic_ = declare_parameter<std::string>("topics.current_velocity", "");
     sonar_odometry_topic_ = declare_parameter<std::string>("topics.sonar_odometry", "");
+    visual_odometry_topic_ = declare_parameter<std::string>("topics.visual_odometry", "");
     dvl_velocity_topic_ = declare_parameter<std::string>("topics.dvl_velocity", "");
     odometry_topic_ = declare_parameter<std::string>("topics.odometry", "/aqua_imu_loc/odometry");
     status_topic_ = declare_parameter<std::string>("topics.status", "/aqua_imu_loc/status");
@@ -217,6 +224,11 @@ private:
     sonar_max_age_s_ =
       declare_parameter<double>("imu.sonar.max_age_s", 1.0);
 
+    visual_position_variance_floor_ =
+      declare_parameter<double>("imu.visual.position_variance_floor", 0.04);
+    visual_max_age_s_ =
+      declare_parameter<double>("imu.visual.max_age_s", 1.0);
+
     // DVL velocity observation knobs. mount.rotation_rpy_rad pre-rotates the
     // raw DVL sample into base_link before the body-frame measurement update.
     {
@@ -263,39 +275,54 @@ private:
 
   void on_sonar_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
   {
+    apply_position_odometry(
+      *msg, "sonar", sonar_position_variance_floor_, sonar_max_age_s_);
+  }
+
+  void on_visual_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
+  {
+    apply_position_odometry(
+      *msg, "visual", visual_position_variance_floor_, visual_max_age_s_);
+  }
+
+  void apply_position_odometry(
+    const nav_msgs::msg::Odometry & msg, const char * source_name,
+    double position_variance_floor, double max_age_s)
+  {
     const Eigen::Vector3d position(
-      msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z);
+      msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z);
     if (!position.allFinite()) {
       RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 2000, "Rejected non-finite sonar position.");
+        get_logger(), *get_clock(), 2000, "Rejected non-finite %s position.", source_name);
       return;
     }
     // Reject stale samples relative to the latest IMU stamp; this keeps
-    // sonar-position observations from leaking across long bag pauses.
+    // external-position observations from leaking across long bag pauses.
     if (last_imu_stamp_valid_) {
-      const rclcpp::Time stamp(msg->header.stamp);
+      const rclcpp::Time stamp(msg.header.stamp);
       const double age = (last_imu_stamp_ - stamp).seconds();
-      if (age > sonar_max_age_s_) {
+      if (age > max_age_s) {
         RCLCPP_DEBUG(
-          get_logger(), "Skipping sonar pose: %.3fs older than latest IMU sample", age);
+          get_logger(), "Skipping %s pose: %.3fs older than latest IMU sample",
+          source_name, age);
         return;
       }
     }
     Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
     // Read the 3x3 position block from the 6x6 row-major pose covariance.
-    cov(0, 0) = msg->pose.covariance[0];
-    cov(0, 1) = msg->pose.covariance[1];
-    cov(0, 2) = msg->pose.covariance[2];
-    cov(1, 0) = msg->pose.covariance[6];
-    cov(1, 1) = msg->pose.covariance[7];
-    cov(1, 2) = msg->pose.covariance[8];
-    cov(2, 0) = msg->pose.covariance[12];
-    cov(2, 1) = msg->pose.covariance[13];
-    cov(2, 2) = msg->pose.covariance[14];
+    cov(0, 0) = msg.pose.covariance[0];
+    cov(0, 1) = msg.pose.covariance[1];
+    cov(0, 2) = msg.pose.covariance[2];
+    cov(1, 0) = msg.pose.covariance[6];
+    cov(1, 1) = msg.pose.covariance[7];
+    cov(1, 2) = msg.pose.covariance[8];
+    cov(2, 0) = msg.pose.covariance[12];
+    cov(2, 1) = msg.pose.covariance[13];
+    cov(2, 2) = msg.pose.covariance[14];
     // Ensure the diagonal stays at or above the configured floor so an
-    // overconfident sonar cannot collapse the UKF position uncertainty.
+    // overconfident external source cannot collapse the UKF position uncertainty.
     for (int i = 0; i < 3; ++i) {
-      cov(i, i) = std::max(cov(i, i), sonar_position_variance_floor_);
+      cov(i, i) = std::max(cov(i, i), position_variance_floor);
     }
     filter_.update_position(position, cov);
     ++update_count_;
@@ -798,6 +825,9 @@ private:
   std::string sonar_odometry_topic_;
   double sonar_position_variance_floor_{0.04};
   double sonar_max_age_s_{1.0};
+  std::string visual_odometry_topic_;
+  double visual_position_variance_floor_{0.04};
+  double visual_max_age_s_{1.0};
   std::string dvl_velocity_topic_;
   Eigen::Matrix3d dvl_mount_rotation_{Eigen::Matrix3d::Identity()};
   double dvl_velocity_variance_floor_{0.01};
@@ -808,6 +838,7 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr current_velocity_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sonar_odom_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr visual_odom_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr dvl_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<aqua_msgs::msg::EstimatorStatus>::SharedPtr status_pub_;
