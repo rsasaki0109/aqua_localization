@@ -163,6 +163,35 @@ This says descriptor filtering alone is not the win condition. The next useful
 accuracy work is camera-to-base/extrinsic calibration and visual-inertial-DVL
 coupling, not another small threshold-only sweep.
 
+Camera-to-base lever-arm hypotheses can be tested without replaying the bag by
+post-processing the visual TUM trajectory:
+
+```bash
+ros2 run aqua_localization sweep_visual_extrinsics.py \
+  --reference /tmp/tank_short_test_gt.tum \
+  --estimate /tmp/aqua_tank_visual_matching_sweep_real_unique/stereo_64__temporal_64/short_test_stereo_64__temporal_64_visual_frontend.tum \
+  --out-dir /tmp/aqua_tank_visual_extrinsic_sweep_fine \
+  --sequence short_test \
+  --x-m=-0.45,-0.35,-0.25,-0.15,-0.05 \
+  --y-m=-0.45,-0.35,-0.25,-0.15,-0.05 \
+  --z-m=0 \
+  --roll-deg=0 \
+  --pitch-deg=0 \
+  --yaw-deg=-10,0,10
+```
+
+Latest lever-arm readout on the best `64:64` visual trajectory:
+
+| x m | y m | z m | roll deg | pitch deg | yaw deg | RMSE m | Matched s | Samples |
+|----:|----:|----:|---------:|----------:|--------:|-------:|----------:|--------:|
+| 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.1699 | 14.95 | 273 |
+| -0.25 | -0.45 | 0.00 | 0.00 | 0.00 | 0.00 | 0.1417 | 14.95 | 273 |
+
+This is still a same-sequence diagnostic, not a paper-safe calibration. It does
+show that extrinsics are a real error source: the tested lever arm improves the
+visual frontend RMSE by about 16.6%, while the descriptor threshold sweep only
+changed the best run within roughly 0.02 m.
+
 The public Tank Dataset page currently exposes `short_test` as sample data and
 requires the download form for the full sequence set, so this table keeps
 Structure_Easy and Medium rows as targets until those bags are available.
