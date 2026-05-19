@@ -160,3 +160,69 @@ def test_format_summary_markdown_contains_key_sections():
     assert "| descriptor_centroid_distance_m |" in text
     assert "| descriptor_extent_ratio |" in text
     assert "| descriptor_point_count_ratio |" in text
+
+
+def test_descriptor_sweep_rows_count_threshold_passes():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 0.2, 0.01,
+            0.5, 1.0, 0.9, "accepted"),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, False, True, 2.0, 0.4, 0.02,
+            1.0, 1.5, 0.7, "descriptor gate rejected"),
+        module.LoopStatusSample(
+            3.0, "map", 3, 0, False, True, 2.5, 0.5, 0.03,
+            2.0, 3.0, 0.4, "descriptor gate rejected"),
+        module.LoopStatusSample(
+            4.0, "map", 4, module.NO_CANDIDATE_ID, False, False,
+            math.nan, math.nan, math.nan, math.nan, math.nan, math.nan,
+            "no candidate submaps"),
+    ]
+
+    rows = module.descriptor_sweep_rows(samples)
+
+    assert rows
+    assert all(row["total_count"] == 3 for row in rows)
+    assert any(
+        math.isclose(row["centroid_threshold"], 1.8) and
+        math.isclose(row["extent_threshold"], 3.0) and
+        math.isclose(row["point_ratio_threshold"], 0.4) and
+        row["pass_count"] == 2
+        for row in rows
+    )
+    assert any(0 < row["pass_count"] < row["total_count"] for row in rows)
+
+
+def test_descriptor_sweep_markdown_handles_missing_metrics():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 0.2, 0.01,
+            math.nan, math.nan, math.nan, "accepted")
+    ]
+
+    text = module.format_descriptor_sweep_markdown(
+        samples, "/mbes_loop_closure/status")
+
+    assert "# MBES Loop Closure Descriptor Threshold Sweep" in text
+    assert "No finite descriptor metrics" in text
+
+
+def test_descriptor_sweep_markdown_contains_threshold_table():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 0.2, 0.01,
+            0.5, 1.0, 0.9, "accepted"),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, False, True, 2.0, 0.4, 0.02,
+            1.0, 1.5, 0.7, "descriptor gate rejected"),
+    ]
+
+    text = module.format_descriptor_sweep_markdown(
+        samples, "/mbes_loop_closure/status")
+
+    assert "Descriptor samples: 2" in text
+    assert "| Centroid <= m |" in text
+    assert "Would pass" in text
