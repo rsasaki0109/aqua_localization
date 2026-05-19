@@ -38,6 +38,22 @@ target_include_directories(scan_matcher PUBLIC
 target_link_libraries(scan_matcher sonar_cloud_preprocessor ${PCL_LIBRARIES})
 ament_target_dependencies(scan_matcher geometry_msgs pcl_conversions sensor_msgs)
 
+add_library(mbes_loop_closure_frontend src/mbes_loop_closure_frontend.cpp)
+target_compile_features(mbes_loop_closure_frontend PUBLIC cxx_std_17)
+target_include_directories(mbes_loop_closure_frontend PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${PCL_INCLUDE_DIRS}
+)
+target_link_libraries(mbes_loop_closure_frontend ${PCL_LIBRARIES})
+ament_target_dependencies(
+  mbes_loop_closure_frontend
+  geometry_msgs
+  pcl_conversions
+  rclcpp
+  sensor_msgs
+)
+
 add_executable(sonar_loc_node src/sonar_loc_node.cpp)
 target_compile_features(sonar_loc_node PUBLIC cxx_std_17)
 target_link_libraries(sonar_loc_node sonar_cloud_preprocessor scan_matcher)
@@ -46,7 +62,7 @@ ament_target_dependencies(sonar_loc_node aqua_msgs nav_msgs rclcpp sensor_msgs)
 add_executable(mbes_loop_closure_node src/mbes_loop_closure_node.cpp)
 target_compile_features(mbes_loop_closure_node PUBLIC cxx_std_17)
 target_include_directories(mbes_loop_closure_node PUBLIC ${PCL_INCLUDE_DIRS})
-target_link_libraries(mbes_loop_closure_node ${PCL_LIBRARIES})
+target_link_libraries(mbes_loop_closure_node mbes_loop_closure_frontend ${PCL_LIBRARIES})
 ament_target_dependencies(
   mbes_loop_closure_node
   aqua_msgs
@@ -57,7 +73,7 @@ ament_target_dependencies(
   visualization_msgs
 )
 
-install(TARGETS sonar_cloud_preprocessor scan_matcher
+install(TARGETS sonar_cloud_preprocessor scan_matcher mbes_loop_closure_frontend
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -86,6 +102,9 @@ if(BUILD_TESTING)
   ament_add_gtest(test_scan_matcher test/test_scan_matcher.cpp)
   target_link_libraries(test_scan_matcher scan_matcher)
 
+  ament_add_gtest(test_mbes_loop_closure_frontend test/test_mbes_loop_closure_frontend.cpp)
+  target_link_libraries(test_mbes_loop_closure_frontend mbes_loop_closure_frontend)
+
   ament_add_gtest(test_sonar_loc_node_runtime test/test_sonar_loc_node_runtime.cpp)
   target_link_libraries(test_sonar_loc_node_runtime sonar_cloud_preprocessor scan_matcher)
   ament_target_dependencies(
@@ -100,7 +119,7 @@ if(BUILD_TESTING)
     test_mbes_loop_closure_node_runtime
     test/test_mbes_loop_closure_node_runtime.cpp
   )
-  target_link_libraries(test_mbes_loop_closure_node_runtime ${PCL_LIBRARIES})
+  target_link_libraries(test_mbes_loop_closure_node_runtime mbes_loop_closure_frontend ${PCL_LIBRARIES})
   target_include_directories(test_mbes_loop_closure_node_runtime PUBLIC ${PCL_INCLUDE_DIRS})
   ament_target_dependencies(
     test_mbes_loop_closure_node_runtime
