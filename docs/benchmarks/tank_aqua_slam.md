@@ -125,7 +125,10 @@ the reject reason. Use that CSV to decide whether the next tuning pass should
 focus on image features, stereo geometry, temporal matching, or PnP gates.
 It also emits `*_visual_frontend_status.md` via
 `summarize_visual_frontend_status.py`, so each visual benchmark run carries a
-short tuning report next to the trajectory metrics.
+short tuning report next to the trajectory metrics. The same run writes
+`*_visual_drift.md` with sliding-window SE(3), Sim(3), and scale estimates from
+`analyze_visual_drift.py`; use that report to separate fixed-scale calibration
+problems from true visual drift.
 
 The public Tank Dataset page currently exposes `short_test` as sample data and
 requires the download form for the full sequence set, so this table keeps

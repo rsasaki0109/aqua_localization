@@ -18,6 +18,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import calibrate_visual_scale
+import analyze_visual_drift
 import summarize_visual_frontend_status
 import trajectory_benchmark_row
 
@@ -35,6 +36,7 @@ class BenchmarkPaths:
     estimate_tum: Path
     status_csv: Path
     status_summary: Path
+    drift_report: Path
     scale_report: Path
     benchmark_row: Path
     replay_script: Path
@@ -50,6 +52,7 @@ def default_paths(out_dir: Path, sequence: str) -> BenchmarkPaths:
         estimate_tum=out_dir / f"{stem}_visual_frontend.tum",
         status_csv=out_dir / f"{stem}_visual_frontend_status.csv",
         status_summary=out_dir / f"{stem}_visual_frontend_status.md",
+        drift_report=out_dir / f"{stem}_visual_drift.md",
         scale_report=out_dir / f"{stem}_visual_scale_report.txt",
         benchmark_row=out_dir / f"{stem}_visual_benchmark.md",
         replay_script=out_dir / f"{stem}_visual_replay.sh",
@@ -171,6 +174,14 @@ def evaluate(args, estimate_tum: Path, paths: BenchmarkPaths) -> str:
     )
     row = make_benchmark_row(args, estimate_tum, note)
     paths.benchmark_row.write_text(row + "\n", encoding="utf-8")
+    drift_report = analyze_visual_drift.run_analysis(SimpleNamespace(
+        reference=args.reference,
+        estimate=estimate_tum,
+        window_s=args.drift_window_s,
+        stride_s=args.drift_stride_s,
+        min_samples=args.drift_min_samples,
+    ))
+    paths.drift_report.write_text(drift_report, encoding="utf-8")
     status_summary_lines = []
     if args.status_csv is not None and args.status_csv.exists():
         status_summary = summarize_visual_frontend_status.format_summary_markdown(
@@ -187,6 +198,7 @@ def evaluate(args, estimate_tum: Path, paths: BenchmarkPaths) -> str:
         f"estimate: {estimate_tum}",
         f"scale report: {paths.scale_report}",
         f"benchmark row: {paths.benchmark_row}",
+        f"drift report: {paths.drift_report}",
         *status_summary_lines,
         "",
         report,
@@ -214,6 +226,9 @@ def parse_args(argv):
         help="Optional visual frontend diagnostics CSV. Defaults under --out-dir when --bag is used.",
     )
     parser.add_argument("--translation-scale", type=float, default=1.0)
+    parser.add_argument("--drift-window-s", type=float, default=3.0)
+    parser.add_argument("--drift-stride-s", type=float, default=1.0)
+    parser.add_argument("--drift-min-samples", type=int, default=20)
     parser.add_argument("--camera-fx", type=float, default=DEFAULT_FX)
     parser.add_argument("--camera-fy", type=float, default=DEFAULT_FY)
     parser.add_argument("--camera-cx", type=float, default=DEFAULT_CX)

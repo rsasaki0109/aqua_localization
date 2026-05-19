@@ -207,6 +207,23 @@ ros2 run aqua_localization summarize_visual_frontend_status.py \
 
 The benchmark runner creates the same summary automatically in bag replay mode.
 
+Analyze visual scale stability and drift from the reference and visual TUM files:
+
+```bash
+ros2 run aqua_localization analyze_visual_drift.py \
+  /tmp/tank_short_test_gt.tum \
+  /tmp/tank_short_test_visual_frontend.tum \
+  --window-s 3.0 \
+  --stride-s 1.0 \
+  --out /tmp/tank_short_test_visual_drift.md
+```
+
+The report shows each sliding window's SE(3) RMSE, Sim(3) RMSE, and Sim(3)
+scale. If window scales are stable but Sim(3) error still grows, tune drift and
+geometry. If window scales vary, tune stereo scale or calibration first. The
+benchmark runner writes this drift report automatically next to the scale report
+and benchmark row.
+
 On `short_test`, the first camera-only run processed 272 stereo pairs and
 accepted 271 visual odometry steps. With the nominal stereo scale it produced
 1.36 m SE(3) APE RMSE against AprilTag GT over the published 11.35 s window.
