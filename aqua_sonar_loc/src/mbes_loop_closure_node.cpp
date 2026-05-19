@@ -21,6 +21,7 @@
 #include "aqua_msgs/msg/pose_graph_loop_constraint.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
 
 namespace aqua_sonar_loc
 {
@@ -184,12 +185,15 @@ public:
       loop_constraint_topic_, rclcpp::QoS(10));
     status_pub_ = create_publisher<aqua_msgs::msg::LoopClosureStatus>(
       status_topic_, rclcpp::QoS(10));
+    marker_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(
+      marker_topic_, rclcpp::QoS(10));
 
     RCLCPP_INFO(
       get_logger(),
-      "mbes_loop_closure started: points=%s keyframes=%s loops=%s status=%s backend=%s",
+      "mbes_loop_closure started: points=%s keyframes=%s loops=%s status=%s markers=%s backend=%s",
       points_topic_.c_str(), keyframe_topic_.c_str(),
-      loop_constraint_topic_.c_str(), status_topic_.c_str(), backend_.c_str());
+      loop_constraint_topic_.c_str(), status_topic_.c_str(), marker_topic_.c_str(),
+      backend_.c_str());
   }
 
 private:
@@ -203,6 +207,8 @@ private:
       "topics.loop_constraint", "/aqua_pose_graph/loop_constraint");
     status_topic_ = declare_parameter<std::string>(
       "topics.status", "/mbes_loop_closure/status");
+    marker_topic_ = declare_parameter<std::string>(
+      "topics.markers", "/mbes_loop_closure/markers");
     map_frame_ = declare_parameter<std::string>("frames.map", "map");
 
     max_submaps_ = declare_parameter<int>("submaps.max_submaps", 200);
@@ -316,6 +322,7 @@ private:
         match_submaps(candidate, current, current_to_candidate_guess);
       const GateResult gate = evaluate_gates(candidate_to_current_guess, result);
       publish_status(candidate, current, result, gate);
+      publish_candidate_marker(candidate, current, gate);
       if (!gate.accepted) {
         RCLCPP_DEBUG(
           get_logger(), "rejected loop candidate %u -> %u: %s fitness=%.4f",
@@ -455,6 +462,41 @@ private:
     status_pub_->publish(msg);
   }
 
+  geometry_msgs::msg::Point marker_point(const Eigen::Vector3d & p) const
+  {
+    geometry_msgs::msg::Point msg;
+    msg.x = p.x();
+    msg.y = p.y();
+    msg.z = p.z();
+    return msg;
+  }
+
+  void publish_candidate_marker(
+    const Submap & candidate,
+    const Submap & current,
+    const GateResult & gate)
+  {
+    visualization_msgs::msg::Marker marker;
+    marker.header.stamp = current.stamp;
+    marker.header.frame_id = map_frame_;
+    marker.ns = gate.accepted ? "mbes_loop_closure/accepted" : "mbes_loop_closure/rejected";
+    marker.id = static_cast<int>(marker_sequence_++);
+    marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.pose.orientation.w = 1.0;
+    marker.scale.x = gate.accepted ? 0.12 : 0.05;
+    marker.color.a = gate.accepted ? 1.0F : 0.55F;
+    marker.color.r = gate.accepted ? 0.10F : 1.0F;
+    marker.color.g = gate.accepted ? 0.95F : 0.20F;
+    marker.color.b = gate.accepted ? 0.30F : 0.10F;
+    marker.points.push_back(marker_point(candidate.pose.translation()));
+    marker.points.push_back(marker_point(current.pose.translation()));
+
+    visualization_msgs::msg::MarkerArray markers;
+    markers.markers.push_back(marker);
+    marker_pub_->publish(markers);
+  }
+
   void publish_no_candidate_status(const Submap & current)
   {
     aqua_msgs::msg::LoopClosureStatus msg;
@@ -475,6 +517,7 @@ private:
   std::string keyframe_topic_;
   std::string loop_constraint_topic_;
   std::string status_topic_;
+  std::string marker_topic_;
   std::string map_frame_;
 
   int max_submaps_{200};
@@ -501,6 +544,7 @@ private:
   double loop_translation_sigma_m_{2.0};
   double loop_rotation_sigma_rad_{0.35};
   bool optimize_after_insert_{true};
+  std::uint32_t marker_sequence_{0};
 
   Submap current_submap_;
   std::deque<Submap> submaps_;
@@ -509,6 +553,7 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr points_sub_;
   rclcpp::Publisher<aqua_msgs::msg::PoseGraphLoopConstraint>::SharedPtr loop_pub_;
   rclcpp::Publisher<aqua_msgs::msg::LoopClosureStatus>::SharedPtr status_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
 };
 
 }  // namespace aqua_sonar_loc

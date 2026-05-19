@@ -14,6 +14,7 @@
 #include "aqua_msgs/msg/pose_graph_loop_constraint.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
 
 #define AQUA_SONAR_LOC_DISABLE_MBES_LOOP_MAIN
 #include "../src/mbes_loop_closure_node.cpp"
@@ -129,6 +130,7 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
   constexpr auto kKeyframeTopic = "/mbes_loop_runtime_test/keyframe";
   constexpr auto kLoopTopic = "/mbes_loop_runtime_test/loop_constraint";
   constexpr auto kStatusTopic = "/mbes_loop_runtime_test/status";
+  constexpr auto kMarkerTopic = "/mbes_loop_runtime_test/markers";
 
   rclcpp::NodeOptions options;
   options.parameter_overrides({
@@ -136,6 +138,7 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
     rclcpp::Parameter("topics.keyframe", std::string(kKeyframeTopic)),
     rclcpp::Parameter("topics.loop_constraint", std::string(kLoopTopic)),
     rclcpp::Parameter("topics.status", std::string(kStatusTopic)),
+    rclcpp::Parameter("topics.markers", std::string(kMarkerTopic)),
     rclcpp::Parameter("submaps.min_points", 5),
     rclcpp::Parameter("submaps.max_points", 1000),
     rclcpp::Parameter("submaps.voxel_leaf_m", 0.0),
@@ -159,6 +162,7 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
 
   std::vector<aqua_msgs::msg::PoseGraphLoopConstraint> loop_messages;
   std::vector<aqua_msgs::msg::LoopClosureStatus> status_messages;
+  std::vector<visualization_msgs::msg::MarkerArray> marker_messages;
   auto keyframe_pub = test_node->create_publisher<aqua_msgs::msg::PoseGraphKeyframe>(
     kKeyframeTopic, rclcpp::QoS(10).transient_local());
   auto points_pub =
@@ -172,6 +176,11 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
     kStatusTopic, 10,
     [&status_messages](const aqua_msgs::msg::LoopClosureStatus::SharedPtr msg) {
       status_messages.push_back(*msg);
+    });
+  auto marker_sub = test_node->create_subscription<visualization_msgs::msg::MarkerArray>(
+    kMarkerTopic, 10,
+    [&marker_messages](const visualization_msgs::msg::MarkerArray::SharedPtr msg) {
+      marker_messages.push_back(*msg);
     });
 
   rclcpp::executors::SingleThreadedExecutor executor;
@@ -220,6 +229,19 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
   EXPECT_NEAR(accepted_status->correction_translation_m, 0.0, 1e-3);
   EXPECT_NEAR(accepted_status->correction_rotation_rad, 0.0, 1e-3);
   EXPECT_EQ(accepted_status->status, "accepted");
+
+  ASSERT_FALSE(marker_messages.empty());
+  const auto marker_array = std::find_if(
+    marker_messages.begin(), marker_messages.end(),
+    [](const visualization_msgs::msg::MarkerArray & msg) {return !msg.markers.empty();});
+  ASSERT_NE(marker_array, marker_messages.end());
+  const auto & marker = marker_array->markers.front();
+  EXPECT_EQ(marker.ns, "mbes_loop_closure/accepted");
+  EXPECT_EQ(marker.type, visualization_msgs::msg::Marker::LINE_STRIP);
+  ASSERT_EQ(marker.points.size(), 2U);
+  EXPECT_NEAR(marker.points[0].x, 0.0, 1e-9);
+  EXPECT_NEAR(marker.points[1].x, 0.0, 1e-9);
+  EXPECT_GT(marker.color.g, marker.color.r);
 }
 
 }  // namespace

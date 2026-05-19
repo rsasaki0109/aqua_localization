@@ -194,7 +194,9 @@ relative transforms as loop constraints.
 `aqua_msgs/msg/LoopClosureStatus` on `/mbes_loop_closure/status`. The status
 stream reports each tested candidate's convergence, fitness, correction
 magnitude, acceptance flag, and rejection reason, which makes real-bag tuning
-observable without enabling debug logs.
+observable without enabling debug logs. It also publishes
+`visualization_msgs/msg/MarkerArray` on `/mbes_loop_closure/markers` so RViz
+can show accepted and rejected candidate loop edges in the map frame.
 
 ## Fusion Path
 
