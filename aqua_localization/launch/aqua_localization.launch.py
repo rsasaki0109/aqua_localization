@@ -32,6 +32,7 @@ def generate_launch_description():
     enable_sonar_loc = LaunchConfiguration("enable_sonar_loc")
     enable_fusion = LaunchConfiguration("enable_fusion")
     enable_pose_graph = LaunchConfiguration("enable_pose_graph")
+    enable_mbes_loop_closure = LaunchConfiguration("enable_mbes_loop_closure")
     enable_rviz = LaunchConfiguration("enable_rviz")
     current_velocity_topic = LaunchConfiguration("current_velocity_topic")
 
@@ -41,6 +42,7 @@ def generate_launch_description():
     sonar_params_file = LaunchConfiguration("sonar_params_file")
     fusion_params_file = LaunchConfiguration("fusion_params_file")
     pose_graph_params_file = LaunchConfiguration("pose_graph_params_file")
+    mbes_loop_closure_params_file = LaunchConfiguration("mbes_loop_closure_params_file")
     rviz_config_file = LaunchConfiguration("rviz_config_file")
     imu_tf_enabled = ParameterValue(
         PythonExpression(["'", enable_fusion, "' != 'true'"]),
@@ -86,6 +88,14 @@ def generate_launch_description():
                 ),
             ),
             DeclareLaunchArgument(
+                "enable_mbes_loop_closure",
+                default_value="false",
+                description=(
+                    "Start the experimental MBES submap loop-closure front end. "
+                    "Requires enable_pose_graph:=true and an MBES-style point cloud."
+                ),
+            ),
+            DeclareLaunchArgument(
                 "enable_rviz",
                 default_value="false",
                 description="Start RViz with the aqua_localization demo display config.",
@@ -126,6 +136,11 @@ def generate_launch_description():
                 "pose_graph_params_file",
                 default_value=package_params("aqua_pose_graph"),
                 description="Parameter YAML for aqua_pose_graph.",
+            ),
+            DeclareLaunchArgument(
+                "mbes_loop_closure_params_file",
+                default_value=package_config("aqua_sonar_loc", "mbes_loop_closure.yaml"),
+                description="Parameter YAML for the MBES loop-closure front end.",
             ),
             DeclareLaunchArgument(
                 "rviz_config_file",
@@ -186,6 +201,14 @@ def generate_launch_description():
                 output="screen",
                 parameters=[pose_graph_params_file],
                 condition=IfCondition(enable_pose_graph),
+            ),
+            Node(
+                package="aqua_sonar_loc",
+                executable="mbes_loop_closure_node",
+                name="mbes_loop_closure",
+                output="screen",
+                parameters=[mbes_loop_closure_params_file],
+                condition=IfCondition(enable_mbes_loop_closure),
             ),
             Node(
                 package="rviz2",

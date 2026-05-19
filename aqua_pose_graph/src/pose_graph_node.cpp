@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include <aqua_msgs/msg/pose_graph_keyframe.hpp>
 #include <aqua_msgs/msg/pose_graph_loop_constraint.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
@@ -141,6 +142,8 @@ public:
       "topics.path", "/aqua_pose_graph/path");
     keyframe_count_topic_ = declare_parameter<std::string>(
       "topics.keyframe_count", "/aqua_pose_graph/keyframe_count");
+    keyframe_topic_ = declare_parameter<std::string>(
+      "topics.keyframe", "/aqua_pose_graph/keyframe");
     loop_constraint_topic_ = declare_parameter<std::string>(
       "topics.loop_constraint", "/aqua_pose_graph/loop_constraint");
     loop_constraint_count_topic_ = declare_parameter<std::string>(
@@ -163,6 +166,8 @@ public:
       path_topic_, rclcpp::QoS(10).transient_local());
     keyframe_count_pub_ = create_publisher<std_msgs::msg::UInt32>(
       keyframe_count_topic_, rclcpp::QoS(10).transient_local());
+    keyframe_pub_ = create_publisher<aqua_msgs::msg::PoseGraphKeyframe>(
+      keyframe_topic_, rclcpp::QoS(10).transient_local());
     loop_constraint_count_pub_ = create_publisher<std_msgs::msg::UInt32>(
       loop_constraint_count_topic_, rclcpp::QoS(10).transient_local());
 
@@ -210,6 +215,7 @@ private:
     const bool added = graph_->add_odometry_sample(t, pose, cov);
     if (added) {
       publish_keyframe_count();
+      publish_latest_keyframe();
       publish_path();
     }
   }
@@ -267,6 +273,30 @@ private:
     keyframe_count_pub_->publish(msg);
   }
 
+  void publish_latest_keyframe()
+  {
+    if (graph_->keyframes().empty()) {
+      return;
+    }
+    const auto & kf = graph_->keyframes().back();
+    aqua_msgs::msg::PoseGraphKeyframe msg;
+    msg.header.frame_id = map_frame_;
+    msg.header.stamp.sec = static_cast<int32_t>(std::floor(kf.stamp_seconds));
+    msg.header.stamp.nanosec = static_cast<uint32_t>(
+      (kf.stamp_seconds - std::floor(kf.stamp_seconds)) * 1e9);
+    msg.id = static_cast<uint32_t>(kf.id);
+    const Eigen::Vector3d t = kf.pose.translation();
+    const Eigen::Quaterniond q(kf.pose.linear());
+    msg.pose.position.x = t.x();
+    msg.pose.position.y = t.y();
+    msg.pose.position.z = t.z();
+    msg.pose.orientation.x = q.x();
+    msg.pose.orientation.y = q.y();
+    msg.pose.orientation.z = q.z();
+    msg.pose.orientation.w = q.w();
+    keyframe_pub_->publish(msg);
+  }
+
   void publish_loop_constraint_count()
   {
     std_msgs::msg::UInt32 msg;
@@ -292,12 +322,14 @@ private:
     loop_constraint_sub_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt32>::SharedPtr keyframe_count_pub_;
+  rclcpp::Publisher<aqua_msgs::msg::PoseGraphKeyframe>::SharedPtr keyframe_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt32>::SharedPtr loop_constraint_count_pub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr optimize_srv_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_srv_;
   std::string odom_topic_;
   std::string path_topic_;
   std::string keyframe_count_topic_;
+  std::string keyframe_topic_;
   std::string loop_constraint_topic_;
   std::string loop_constraint_count_topic_;
   std::string map_frame_;

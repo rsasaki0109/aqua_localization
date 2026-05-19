@@ -38,6 +38,7 @@ aqua_pose_graph
   /aqua_fusion/odometry          nav_msgs/msg/Odometry                  input
   /aqua_pose_graph/loop_constraint
                                  aqua_msgs/msg/PoseGraphLoopConstraint input
+  /aqua_pose_graph/keyframe      aqua_msgs/msg/PoseGraphKeyframe        output
   /aqua_pose_graph/path          nav_msgs/msg/Path                      output
   /aqua_pose_graph/keyframe_count
                                  std_msgs/msg/UInt32                   output
@@ -170,6 +171,10 @@ odometry. Consecutive keyframes are connected with odometry edges, and
 external front ends can now inject loop closures by publishing
 `aqua_msgs/msg/PoseGraphLoopConstraint` to
 `/aqua_pose_graph/loop_constraint`.
+
+Every accepted keyframe is also published as
+`aqua_msgs/msg/PoseGraphKeyframe` on `/aqua_pose_graph/keyframe` so loop
+front ends can build submaps using the graph's actual keyframe IDs.
 
 The loop-constraint message carries:
 

@@ -8,6 +8,8 @@ aqua_pose_graph:
       path: /aqua_pose_graph/path
       # Diagnostic count of keyframes currently in the graph (std_msgs/UInt32).
       keyframe_count: /aqua_pose_graph/keyframe_count
+      # Latest accepted keyframe with pose-graph ID (aqua_msgs/PoseGraphKeyframe).
+      keyframe: /aqua_pose_graph/keyframe
       # External loop closure / front-end constraint input
       # (aqua_msgs/PoseGraphLoopConstraint).
       loop_constraint: /aqua_pose_graph/loop_constraint
