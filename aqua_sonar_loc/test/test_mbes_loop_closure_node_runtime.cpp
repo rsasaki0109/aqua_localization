@@ -106,6 +106,17 @@ std::vector<std::array<float, 3>> asymmetric_points()
   }};
 }
 
+std::vector<std::array<float, 3>> translate_points(
+  const std::vector<std::array<float, 3>> & points,
+  float dx)
+{
+  auto translated = points;
+  for (auto & point : translated) {
+    point[0] += dx;
+  }
+  return translated;
+}
+
 class MbesLoopClosureNodeRuntimeTest : public ::testing::Test
 {
 protected:
@@ -256,6 +267,85 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
   }));
 
   EXPECT_EQ(loop_messages.size(), loop_count_after_first_accept);
+}
+
+TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesDescriptorGateRejection)
+{
+  constexpr auto kPointsTopic = "/mbes_loop_descriptor_test/points";
+  constexpr auto kKeyframeTopic = "/mbes_loop_descriptor_test/keyframe";
+  constexpr auto kLoopTopic = "/mbes_loop_descriptor_test/loop_constraint";
+  constexpr auto kStatusTopic = "/mbes_loop_descriptor_test/status";
+  constexpr auto kMarkerTopic = "/mbes_loop_descriptor_test/markers";
+
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({
+    rclcpp::Parameter("topics.points", std::string(kPointsTopic)),
+    rclcpp::Parameter("topics.keyframe", std::string(kKeyframeTopic)),
+    rclcpp::Parameter("topics.loop_constraint", std::string(kLoopTopic)),
+    rclcpp::Parameter("topics.status", std::string(kStatusTopic)),
+    rclcpp::Parameter("topics.markers", std::string(kMarkerTopic)),
+    rclcpp::Parameter("submaps.min_points", 5),
+    rclcpp::Parameter("submaps.max_points", 1000),
+    rclcpp::Parameter("submaps.voxel_leaf_m", 0.0),
+    rclcpp::Parameter("candidates.min_keyframe_separation", 0),
+    rclcpp::Parameter("candidates.max_distance_m", 10.0),
+    rclcpp::Parameter("candidates.max_per_keyframe", 1),
+    rclcpp::Parameter("descriptor.max_centroid_distance_m", 0.5),
+    rclcpp::Parameter("descriptor.max_extent_ratio", 10.0),
+    rclcpp::Parameter("descriptor.min_point_count_ratio", 0.5),
+    rclcpp::Parameter("registration.backend", std::string("icp")),
+  });
+
+  auto loop_node = std::make_shared<aqua_sonar_loc::MbesLoopClosureNode>(options);
+  auto test_node = std::make_shared<rclcpp::Node>("mbes_loop_descriptor_test");
+
+  std::vector<aqua_msgs::msg::PoseGraphLoopConstraint> loop_messages;
+  std::vector<aqua_msgs::msg::LoopClosureStatus> status_messages;
+  auto keyframe_pub = test_node->create_publisher<aqua_msgs::msg::PoseGraphKeyframe>(
+    kKeyframeTopic, rclcpp::QoS(10).transient_local());
+  auto points_pub = test_node->create_publisher<sensor_msgs::msg::PointCloud2>(
+    kPointsTopic, rclcpp::SensorDataQoS());
+  auto loop_sub = test_node->create_subscription<aqua_msgs::msg::PoseGraphLoopConstraint>(
+    kLoopTopic, 10,
+    [&loop_messages](const aqua_msgs::msg::PoseGraphLoopConstraint::SharedPtr msg) {
+      loop_messages.push_back(*msg);
+    });
+  auto status_sub = test_node->create_subscription<aqua_msgs::msg::LoopClosureStatus>(
+    kStatusTopic, 10,
+    [&status_messages](const aqua_msgs::msg::LoopClosureStatus::SharedPtr msg) {
+      status_messages.push_back(*msg);
+    });
+
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(loop_node);
+  executor.add_node(test_node);
+
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    return keyframe_pub->get_subscription_count() > 0 &&
+           points_pub->get_subscription_count() > 0;
+  }));
+
+  const auto points = asymmetric_points();
+  keyframe_pub->publish(make_keyframe(test_node->now(), 0, 0.0));
+  ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));
+  points_pub->publish(make_cloud(test_node->now(), points));
+  ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));
+
+  keyframe_pub->publish(make_keyframe(test_node->now(), 1, 0.0));
+  ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));
+  points_pub->publish(make_cloud(test_node->now(), translate_points(points, 10.0F)));
+  ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));
+
+  keyframe_pub->publish(make_keyframe(test_node->now(), 2, 0.0));
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    return std::any_of(
+      status_messages.begin(), status_messages.end(),
+      [](const aqua_msgs::msg::LoopClosureStatus & msg) {
+        return msg.status == "descriptor gate rejected";
+      });
+  }));
+
+  EXPECT_TRUE(loop_messages.empty());
 }
 
 }  // namespace
