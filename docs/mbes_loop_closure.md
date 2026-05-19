@@ -127,7 +127,11 @@ ros2 run aqua_localization export_mbes_loop_status.py \
 
 The CSV preserves every `/mbes_loop_closure/status` sample. The markdown
 summary reports accepted, rejected, and no-candidate counts, rejection
-reasons, fitness quantiles, and correction translation/rotation quantiles.
+reasons, fitness quantiles, correction translation/rotation quantiles, and
+descriptor centroid-distance, extent-ratio, and point-count-ratio quantiles.
+Descriptor fields are still exported when descriptor thresholds are disabled,
+so replay summaries can be used to choose initial threshold values before
+turning the gate on.
 
 Useful live checks while tuning:
 
