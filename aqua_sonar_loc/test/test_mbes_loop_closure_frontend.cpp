@@ -28,6 +28,16 @@ aqua_sonar_loc::PointCloud make_cloud(int points)
   return cloud;
 }
 
+aqua_sonar_loc::Submap make_described_submap(
+  std::uint32_t id,
+  const aqua_sonar_loc::PointCloud & cloud)
+{
+  auto submap = make_submap(id, 0.0);
+  *submap.cloud = cloud;
+  submap.descriptor = aqua_sonar_loc::describe_cloud(*submap.cloud);
+  return submap;
+}
+
 }  // namespace
 
 TEST(MbesLoopClosureFrontendTest, CandidateSelectorFiltersAndRanksByDistance)
@@ -75,6 +85,71 @@ TEST(MbesLoopClosureFrontendTest, GateEvaluatorKeepsExistingAcceptanceRules)
   const auto rejected_gate = evaluator.evaluate(Eigen::Isometry3d::Identity(), rejected);
   EXPECT_FALSE(rejected_gate.accepted);
   EXPECT_EQ(rejected_gate.status, "translation correction exceeds gate");
+}
+
+TEST(MbesLoopClosureFrontendTest, DescribeCloudComputesCentroidExtentAndPointCount)
+{
+  aqua_sonar_loc::PointCloud cloud;
+  cloud.push_back(pcl::PointXYZ(-1.0F, 0.0F, 2.0F));
+  cloud.push_back(pcl::PointXYZ(3.0F, 2.0F, -1.0F));
+  cloud.push_back(pcl::PointXYZ(1.0F, 4.0F, 5.0F));
+
+  const auto descriptor = aqua_sonar_loc::describe_cloud(cloud);
+
+  EXPECT_TRUE(descriptor.valid);
+  EXPECT_EQ(descriptor.point_count, 3U);
+  EXPECT_NEAR(descriptor.centroid.x(), 1.0, 1e-9);
+  EXPECT_NEAR(descriptor.centroid.y(), 2.0, 1e-9);
+  EXPECT_NEAR(descriptor.centroid.z(), 2.0, 1e-9);
+  EXPECT_NEAR(descriptor.extent.x(), 4.0, 1e-9);
+  EXPECT_NEAR(descriptor.extent.y(), 4.0, 1e-9);
+  EXPECT_NEAR(descriptor.extent.z(), 6.0, 1e-9);
+}
+
+TEST(MbesLoopClosureFrontendTest, DescriptorGateRejectsMismatchedSubmapShapes)
+{
+  aqua_sonar_loc::DescriptorGateOptions options;
+  options.max_centroid_distance_m = 1.0;
+  options.max_extent_ratio = 2.0;
+  options.min_point_count_ratio = 0.5;
+  aqua_sonar_loc::DescriptorGateEvaluator evaluator(options);
+
+  auto candidate = make_described_submap(1, make_cloud(10));
+  auto current = make_described_submap(2, make_cloud(10));
+
+  auto gate = evaluator.evaluate(candidate, current);
+  EXPECT_TRUE(gate.accepted);
+
+  current.descriptor.centroid.x() = 3.0;
+  gate = evaluator.evaluate(candidate, current);
+  EXPECT_FALSE(gate.accepted);
+  EXPECT_EQ(gate.status, "descriptor gate rejected");
+
+  current = make_described_submap(2, make_cloud(3));
+  gate = evaluator.evaluate(candidate, current);
+  EXPECT_FALSE(gate.accepted);
+  EXPECT_EQ(gate.status, "descriptor gate rejected");
+
+  current = candidate;
+  current.descriptor.extent.x() = 30.0;
+  gate = evaluator.evaluate(candidate, current);
+  EXPECT_FALSE(gate.accepted);
+  EXPECT_EQ(gate.status, "descriptor gate rejected");
+}
+
+TEST(MbesLoopClosureFrontendTest, DescriptorGateCanBeDisabled)
+{
+  aqua_sonar_loc::DescriptorGateEvaluator evaluator(aqua_sonar_loc::DescriptorGateOptions{});
+
+  auto candidate = make_described_submap(1, make_cloud(10));
+  auto current = make_described_submap(2, make_cloud(1));
+  current.descriptor.centroid.x() = 100.0;
+  current.descriptor.extent.x() = 100.0;
+
+  const auto gate = evaluator.evaluate(candidate, current);
+
+  EXPECT_TRUE(gate.accepted);
+  EXPECT_EQ(gate.status, "descriptor gate accepted");
 }
 
 TEST(MbesLoopClosureFrontendTest, SubmapManagerCapsPointsAndHistory)
