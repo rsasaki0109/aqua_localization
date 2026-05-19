@@ -163,6 +163,12 @@ def benchmark_command(args, case: SweepCase, sequence: str, out_dir: Path) -> li
         str(case.stereo_distance),
         "--max-temporal-descriptor-distance",
         str(case.temporal_distance),
+        "--orb-n-features",
+        str(getattr(args, "orb_n_features", 1000)),
+        "--orb-fast-threshold",
+        str(getattr(args, "orb_fast_threshold", 12)),
+        "--opencv-threads",
+        str(getattr(args, "opencv_threads", 0)),
         "--play-rate",
         str(args.play_rate),
         "--startup-delay",
@@ -408,6 +414,9 @@ def parse_args(argv):
         help="Comma-separated stereo:temporal pairs. Overrides --*-distances.",
     )
     parser.add_argument("--matrix", action="store_true", help="Run full Cartesian threshold matrix.")
+    parser.add_argument("--orb-n-features", type=int, default=1000)
+    parser.add_argument("--orb-fast-threshold", type=int, default=12)
+    parser.add_argument("--opencv-threads", type=int, default=0)
     parser.add_argument("--play-rate", type=float, default=1.0)
     parser.add_argument("--startup-delay", type=float, default=1.0)
     parser.add_argument("--stop-timeout", type=float, default=5.0)
@@ -422,6 +431,12 @@ def main(argv=None):
     args = parse_args(argv if argv is not None else sys.argv[1:])
     if args.translation_scale <= 0.0:
         raise ValueError("--translation-scale must be positive")
+    if args.orb_n_features <= 0:
+        raise ValueError("--orb-n-features must be positive")
+    if args.orb_fast_threshold < 0:
+        raise ValueError("--orb-fast-threshold must be non-negative")
+    if args.opencv_threads < 0:
+        raise ValueError("--opencv-threads must be non-negative")
     if math.isfinite(args.baseline_rmse_m) and args.baseline_rmse_m <= 0.0:
         raise ValueError("--baseline-rmse-m must be positive")
     if args.play_rate <= 0.0:

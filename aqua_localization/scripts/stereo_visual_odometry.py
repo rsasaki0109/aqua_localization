@@ -18,6 +18,7 @@ import csv
 import json
 import math
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
@@ -122,6 +123,10 @@ class VisualFrontendStatus:
     pnp_inliers: int
     inlier_ratio: float
     step_translation_m: float
+    decode_time_ms: float
+    stereo_time_ms: float
+    tracking_time_ms: float
+    total_time_ms: float
     accepted: bool
     status: str
 
@@ -145,9 +150,21 @@ STATUS_CSV_FIELDS = [
     "pnp_inliers",
     "inlier_ratio",
     "step_translation_m",
+    "decode_time_ms",
+    "stereo_time_ms",
+    "tracking_time_ms",
+    "total_time_ms",
     "accepted",
     "status",
 ]
+
+
+@dataclass(frozen=True)
+class ProcessingTimes:
+    decode_time_ms: float = 0.0
+    stereo_time_ms: float = 0.0
+    tracking_time_ms: float = 0.0
+    total_time_ms: float = 0.0
 
 
 def decode_compressed_image(data: bytes) -> np.ndarray:
@@ -393,6 +410,30 @@ def empty_disparities() -> np.ndarray:
     return np.empty((0,), dtype=np.float32)
 
 
+def make_warmup_image(width: int = 640, height: int = 512) -> np.ndarray:
+    image = np.zeros((height, width), dtype=np.uint8)
+    for y in range(0, height, 32):
+        color = 80 if (y // 32) % 2 == 0 else 180
+        image[y:y + 16, :] = color
+    for x in range(0, width, 32):
+        image[:, x:x + 16] = np.maximum(image[:, x:x + 16], 120)
+    cv2.circle(image, (width // 3, height // 3), 70, 220, 3)
+    cv2.rectangle(image, (width // 2, height // 2), (width - 80, height - 60), 200, 2)
+    return image
+
+
+def warm_up_feature_pipeline(orb: cv2.ORB, matcher: cv2.BFMatcher, iterations: int = 3) -> float:
+    left = make_warmup_image()
+    right = np.roll(left, shift=-4, axis=1)
+    start = time.perf_counter()
+    for _ in range(max(1, iterations)):
+        left_keypoints, left_desc = orb.detectAndCompute(left, None)
+        right_keypoints, right_desc = orb.detectAndCompute(right, None)
+        if left_desc is not None and right_desc is not None and left_keypoints and right_keypoints:
+            matcher.match(left_desc, right_desc)
+    return (time.perf_counter() - start) * 1000.0
+
+
 def failed_motion(reason: str, matches: int = 0, inliers: int = 0) -> MotionEstimate:
     return MotionEstimate(
         False,
@@ -419,6 +460,7 @@ def make_status(
     rejected_count: int,
     frame: VisualFrame,
     estimate: MotionEstimate,
+    processing_times: ProcessingTimes = ProcessingTimes(),
 ) -> VisualFrontendStatus:
     inlier_ratio = estimate.inliers / max(1, estimate.matches)
     step_translation_m = float(np.linalg.norm(estimate.translation_prev_to_curr))
@@ -442,6 +484,10 @@ def make_status(
         pnp_inliers=estimate.inliers,
         inlier_ratio=float(inlier_ratio),
         step_translation_m=step_translation_m,
+        decode_time_ms=processing_times.decode_time_ms,
+        stereo_time_ms=processing_times.stereo_time_ms,
+        tracking_time_ms=processing_times.tracking_time_ms,
+        total_time_ms=processing_times.total_time_ms,
         accepted=estimate.success,
         status=estimate.reason if estimate.reason else "accepted",
     )
@@ -467,6 +513,10 @@ def status_to_dict(status: VisualFrontendStatus) -> dict:
         "pnp_inliers": status.pnp_inliers,
         "inlier_ratio": status.inlier_ratio,
         "step_translation_m": status.step_translation_m,
+        "decode_time_ms": status.decode_time_ms,
+        "stereo_time_ms": status.stereo_time_ms,
+        "tracking_time_ms": status.tracking_time_ms,
+        "total_time_ms": status.total_time_ms,
         "accepted": status.accepted,
         "status": status.status,
     }
@@ -486,6 +536,13 @@ def write_status_csv_row(fp, status: VisualFrontendStatus):
     row["timestamp"] = f"{status.stamp_s:.9f}"
     row["inlier_ratio"] = f"{status.inlier_ratio:.9f}"
     row["step_translation_m"] = f"{status.step_translation_m:.9f}"
+    for field in (
+        "decode_time_ms",
+        "stereo_time_ms",
+        "tracking_time_ms",
+        "total_time_ms",
+    ):
+        row[field] = f"{float(row[field]):.3f}"
     for field in (
         "disparity_min_px",
         "disparity_median_px",
@@ -608,9 +665,16 @@ def run_ros_node(argv=None) -> int:
 
             nfeatures = int(self.declare_parameter("orb.n_features", 1000).value)
             fast_threshold = int(self.declare_parameter("orb.fast_threshold", 12).value)
+            opencv_threads = int(self.declare_parameter("opencv.threads", 0).value)
+            if opencv_threads > 0:
+                cv2.setNumThreads(opencv_threads)
             self.orb = cv2.ORB_create(nfeatures=nfeatures, fastThreshold=fast_threshold)
             self.stereo_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
             self.temporal_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+            warmup_enabled = bool(self.declare_parameter("diagnostics.warmup", True).value)
+            warmup_time_ms = 0.0
+            if warmup_enabled:
+                warmup_time_ms = warm_up_feature_pipeline(self.orb, self.stereo_matcher)
 
             qos = QoSProfile(depth=20)
             qos.reliability = ReliabilityPolicy.BEST_EFFORT
@@ -639,7 +703,9 @@ def run_ros_node(argv=None) -> int:
             self.rejected = 0
             self.get_logger().info(
                 f"stereo visual odometry started: left={self.left_topic} right={self.right_topic} "
-                f"odom={self.odom_topic} status={self.status_topic} child={self.child_frame_id}"
+                f"odom={self.odom_topic} status={self.status_topic} child={self.child_frame_id} "
+                f"orb_n_features={nfeatures} orb_fast_threshold={fast_threshold} "
+                f"opencv_threads={cv2.getNumThreads()} warmup_ms={warmup_time_ms:.1f}"
             )
 
         def on_left(self, msg):
@@ -669,20 +735,32 @@ def run_ros_node(argv=None) -> int:
             self.process_pair(left_msg, right_msg)
 
         def process_pair(self, left_msg, right_msg):
+            total_start = time.perf_counter()
             try:
+                decode_start = time.perf_counter()
                 left = decode_compressed_image(bytes(left_msg.data))
                 right = decode_compressed_image(bytes(right_msg.data))
+                decode_time_ms = (time.perf_counter() - decode_start) * 1000.0
             except ValueError as exc:
                 self.get_logger().warn(str(exc))
                 return
 
+            stereo_start = time.perf_counter()
             frame = triangulate_stereo_features(
                 left, right, self.camera, self.config, self.orb, self.stereo_matcher
             )
+            stereo_time_ms = (time.perf_counter() - stereo_start) * 1000.0
             frame.stamp_s = stamp_to_seconds(left_msg.header.stamp)
             self.frames += 1
 
             if self.previous_frame is None:
+                total_time_ms = (time.perf_counter() - total_start) * 1000.0
+                processing_times = ProcessingTimes(
+                    decode_time_ms=decode_time_ms,
+                    stereo_time_ms=stereo_time_ms,
+                    tracking_time_ms=0.0,
+                    total_time_ms=total_time_ms,
+                )
                 self.previous_frame = frame
                 self.publish_odometry(left_msg.header.stamp, 0, 0)
                 init_estimate = MotionEstimate(
@@ -693,12 +771,14 @@ def run_ros_node(argv=None) -> int:
                     0,
                     "initialized",
                 )
-                self.publish_status(frame, init_estimate)
+                self.publish_status(frame, init_estimate, processing_times)
                 return
 
+            tracking_start = time.perf_counter()
             estimate = estimate_motion_pnp(
                 self.previous_frame, frame, self.camera, self.config, self.temporal_matcher
             )
+            tracking_time_ms = (time.perf_counter() - tracking_start) * 1000.0
             if estimate.success:
                 self.world_from_camera = update_world_pose(
                     self.world_from_camera,
@@ -715,7 +795,17 @@ def run_ros_node(argv=None) -> int:
                     f"visual odometry rejected frame {self.frames}: {estimate.reason}",
                     throttle_duration_sec=2.0,
                 )
-            self.publish_status(frame, estimate)
+            total_time_ms = (time.perf_counter() - total_start) * 1000.0
+            self.publish_status(
+                frame,
+                estimate,
+                ProcessingTimes(
+                    decode_time_ms=decode_time_ms,
+                    stereo_time_ms=stereo_time_ms,
+                    tracking_time_ms=tracking_time_ms,
+                    total_time_ms=total_time_ms,
+                ),
+            )
 
         def publish_odometry(self, stamp, inliers: int, matches: int):
             msg = Odometry()
@@ -744,7 +834,12 @@ def run_ros_node(argv=None) -> int:
                 msg.twist.covariance[1] = float(inliers)
             self.odom_pub.publish(msg)
 
-        def publish_status(self, frame: VisualFrame, estimate: MotionEstimate):
+        def publish_status(
+            self,
+            frame: VisualFrame,
+            estimate: MotionEstimate,
+            processing_times: ProcessingTimes,
+        ):
             status = make_status(
                 frame.stamp_s,
                 self.frames,
@@ -752,6 +847,7 @@ def run_ros_node(argv=None) -> int:
                 self.rejected,
                 frame,
                 estimate,
+                processing_times,
             )
             msg = String()
             msg.data = status_to_json(status)

@@ -289,11 +289,12 @@ ros2 run aqua_imu_loc imu_loc_node --ros-args \
 With the same-sequence visual scale fit, the diagnostic camera-to-base lever arm
 `base_from_camera=(-0.25,-0.45,0)` m, and
 `imu.visual.position_variance_floor:=0.01`, the fused IMU + pressure + DVL +
-visual run reaches 0.323 m SE(3) APE RMSE when replayed at 0.25x so the Python
-visual frontend processes all 300 stereo pairs. The fusion benchmark runner can
-now record this as `visual coverage=300/300` and emits a warning report when a
-run drops below the configured coverage gate. This is an engineering diagnostic:
-the next validation step is out-of-sequence scale and extrinsic calibration.
+visual run reaches 0.218 m SE(3) APE RMSE at 1.0x replay with
+`orb.n_features:=700`, `orb.fast_threshold:=16`, OpenCV threads set to 2, and
+`visual coverage=300/300`. The visual node warms up ORB before subscribing so
+the first-frame OpenCV initialization spike does not drop early bag frames. This
+is an engineering diagnostic: the next validation step is out-of-sequence scale
+and extrinsic calibration.
 
 ## Verification topics
 

@@ -65,6 +65,9 @@ def test_benchmark_command_contains_thresholds(tmp_path):
         base_from_camera_roll_rad=0.0,
         base_from_camera_pitch_rad=0.0,
         base_from_camera_yaw_rad=0.0,
+        orb_n_features=700,
+        orb_fast_threshold=16,
+        opencv_threads=2,
         play_rate=0.5,
         startup_delay=0.1,
         stop_timeout=1.0,
@@ -88,6 +91,12 @@ def test_benchmark_command_contains_thresholds(tmp_path):
     assert "-0.25" in command
     assert "--base-from-camera-y-m" in command
     assert "-0.45" in command
+    assert "--orb-n-features" in command
+    assert "700" in command
+    assert "--orb-fast-threshold" in command
+    assert "16" in command
+    assert "--opencv-threads" in command
+    assert "2" in command
     assert "--no-sim-time" not in command
 
 

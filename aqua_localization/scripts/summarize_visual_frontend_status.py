@@ -34,6 +34,10 @@ NUMERIC_FIELDS = [
     "pnp_inliers",
     "inlier_ratio",
     "step_translation_m",
+    "decode_time_ms",
+    "stereo_time_ms",
+    "tracking_time_ms",
+    "total_time_ms",
 ]
 
 
@@ -57,6 +61,10 @@ class VisualStatusSample:
     pnp_inliers: int
     inlier_ratio: float
     step_translation_m: float
+    decode_time_ms: float
+    stereo_time_ms: float
+    tracking_time_ms: float
+    total_time_ms: float
     accepted: bool
     status: str
 
@@ -99,6 +107,10 @@ def sample_from_row(row: dict[str, str]) -> VisualStatusSample:
         pnp_inliers=parse_int(row, "pnp_inliers"),
         inlier_ratio=parse_float(row, "inlier_ratio"),
         step_translation_m=parse_float(row, "step_translation_m"),
+        decode_time_ms=parse_float(row, "decode_time_ms"),
+        stereo_time_ms=parse_float(row, "stereo_time_ms"),
+        tracking_time_ms=parse_float(row, "tracking_time_ms"),
+        total_time_ms=parse_float(row, "total_time_ms"),
         accepted=parse_bool(row.get("accepted", "")),
         status=str(row.get("status", "")),
     )
@@ -233,6 +245,7 @@ def tuning_hints(summary: dict) -> list[str]:
     temporal_matches_median = float(numeric["temporal_matches"]["median"])
     inlier_ratio_median = float(numeric["inlier_ratio"]["median"])
     step_p95 = float(numeric["step_translation_m"]["p95"])
+    total_time_p95 = float(numeric["total_time_ms"]["p95"])
 
     if math.isfinite(stereo_points_median) and stereo_points_median < 80:
         hints.append("Low stereo point count: tune ORB/image preprocessing, masks, or stereo disparity gates.")
@@ -246,6 +259,8 @@ def tuning_hints(summary: dict) -> list[str]:
         hints.append("Low PnP inlier ratio: tighten outlier handling or revisit feature geometry.")
     if math.isfinite(step_p95) and step_p95 > 0.25:
         hints.append("Large step-translation tail: check scale, timestamps, motion gate, and camera extrinsics.")
+    if math.isfinite(total_time_p95) and total_time_p95 > 30.0:
+        hints.append("Visual processing is near or above 30 ms/frame; profile ORB, stereo matching, and PnP before 1.0x replay claims.")
 
     dominant = summary["dominant_rejection"]
     if dominant != "none" and max_counter_value(rejection_counts) > 0:
