@@ -7,10 +7,12 @@ What you get in the recording:
   - `world/reference`    — reference odometry path (green)
   - `world/imu_estimate` — `aqua_imu_loc` path (orange)
   - `world/sonar_estimate` — `aqua_sonar_loc` path (blue)
+  - `world/pose_graph` — optimised pose-graph path and accepted loop edges
   - `world/sonar_fans/<i>` — accumulated multibeam fans transformed into world
                               coordinates by the bag's reference pose at the
                               fan timestamp. Color-coded by depth.
   - `plots/sonar/fitness`, `plots/sonar/inliers` — registration diagnostics
+  - `plots/loop_closure/*` — MBES loop closure accept/reject diagnostics
   - `plots/depth/{reference,imu,sonar}` — z(t) traces
 
 Quick usage:
@@ -40,6 +42,8 @@ except ImportError as e:
 REF_COLOR = (39, 200, 154)      # #27c89a green
 IMU_COLOR = (245, 166, 35)      # #f5a623 orange
 SONAR_COLOR = (58, 161, 255)    # #3aa1ff blue
+POSE_GRAPH_COLOR = (247, 216, 80)  # #f7d850 yellow
+LOOP_COLOR = (255, 82, 119)        # #ff5277 pink
 
 
 def umeyama_se3(src: np.ndarray, dst: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -93,6 +97,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sonar-odom-topic", default="/aqua_sonar_loc/odometry")
     parser.add_argument("--sonar-status-topic", default="/aqua_sonar_loc/status")
     parser.add_argument("--points-topic", default="/aqua_sonar_loc/points_filtered")
+    parser.add_argument("--pose-graph-path-topic", default="/aqua_pose_graph/path")
+    parser.add_argument("--loop-constraint-topic", default="/aqua_pose_graph/loop_constraint")
+    parser.add_argument("--loop-status-topic", default="/mbes_loop_closure/status")
     parser.add_argument("--application-id", default="aqua_localization MBES-SLAM beach_pond")
     parser.add_argument("--fan-stride", type=int, default=4,
                         help="Log every Nth fan to keep the .rrd small (default: 4)")
@@ -109,6 +116,40 @@ def odometry_position(msg) -> np.ndarray:
 def odometry_quat(msg) -> tuple[float, float, float, float]:
     q = msg.pose.pose.orientation
     return q.x, q.y, q.z, q.w
+
+
+def stamp_seconds(stamp) -> float:
+    return float(stamp.sec) + float(stamp.nanosec) * 1e-9
+
+
+def path_samples(msg, fallback_time: float) -> list[tuple[float, np.ndarray]]:
+    samples: list[tuple[float, np.ndarray]] = []
+    for pose_stamped in msg.poses:
+        p = pose_stamped.pose.position
+        t = stamp_seconds(pose_stamped.header.stamp)
+        if t <= 0.0:
+            t = fallback_time
+        samples.append((t, np.array([p.x, p.y, p.z], dtype=np.float64)))
+    return samples
+
+
+def loop_edge_segments(
+    pose_graph_world: np.ndarray,
+    loop_constraints: list[tuple[float, int, int]],
+) -> list[np.ndarray]:
+    segments = []
+    seen_edges: set[tuple[int, int]] = set()
+    for _t, from_id, to_id in loop_constraints:
+        edge = (from_id, to_id)
+        if edge in seen_edges:
+            continue
+        seen_edges.add(edge)
+        if from_id < 0 or to_id < 0:
+            continue
+        if from_id >= len(pose_graph_world) or to_id >= len(pose_graph_world):
+            continue
+        segments.append(np.asarray([pose_graph_world[from_id], pose_graph_world[to_id]]))
+    return segments
 
 
 def decode_pointcloud2(msg) -> np.ndarray:
@@ -189,6 +230,10 @@ def main() -> int:
                     name="aqua_sonar_loc inliers",
                     contents="/plots/sonar/inliers",
                 ),
+                rrb.TimeSeriesView(
+                    name="MBES loop closure status",
+                    contents="/plots/loop_closure/**",
+                ),
             ),
             column_shares=[3, 1],
         ),
@@ -208,10 +253,14 @@ def main() -> int:
     fans_buf: list[tuple[float, np.ndarray]] = []
     fitness_buf: list[tuple[float, float]] = []
     inliers_buf: list[tuple[float, int]] = []
+    pose_graph_paths: list[tuple[float, list[tuple[float, np.ndarray]]]] = []
+    loop_constraints: list[tuple[float, int, int]] = []
+    loop_status: list[tuple[float, bool, bool, float, float, float, int, int, str]] = []
 
     targets = {
         args.reference_topic, args.imu_topic, args.sonar_odom_topic,
-        args.sonar_status_topic, args.points_topic,
+        args.sonar_status_topic, args.points_topic, args.pose_graph_path_topic,
+        args.loop_constraint_topic, args.loop_status_topic,
     }
 
     with AnyReader([bag_dir]) as reader:
@@ -248,10 +297,30 @@ def main() -> int:
                         idx = np.linspace(0, pts.shape[0] - 1, args.max_fan_points).astype(int)
                         pts = pts[idx]
                     fans_buf.append((t, pts))
+            elif connection.topic == args.pose_graph_path_topic:
+                samples = path_samples(msg, t)
+                if samples:
+                    pose_graph_paths.append((t, samples))
+            elif connection.topic == args.loop_constraint_topic:
+                try:
+                    loop_constraints.append((t, int(msg.from_id), int(msg.to_id)))
+                except AttributeError:
+                    pass
+            elif connection.topic == args.loop_status_topic:
+                try:
+                    loop_status.append((
+                        t, bool(msg.accepted), bool(msg.converged),
+                        float(msg.fitness_score), float(msg.correction_translation_m),
+                        float(msg.correction_rotation_rad), int(msg.current_id),
+                        int(msg.candidate_id), str(msg.status)))
+                except AttributeError:
+                    pass
 
     print(
         f"buffered: ref={len(ref_buf)} imu={len(imu_buf)} sonar={len(sonar_buf)}"
         f" fans={len(fans_buf)} status={len(fitness_buf)}"
+        f" pose_graph_paths={len(pose_graph_paths)} loops={len(loop_constraints)}"
+        f" loop_status={len(loop_status)}"
     )
     if not ref_buf:
         sys.stderr.write("no reference odometry; cannot transform fans into world\n")
@@ -273,21 +342,26 @@ def main() -> int:
     # their own first-IMU-pose origin which is geographically arbitrary versus
     # the reference's UTM frame, so without alignment they can drift hundreds
     # of meters off-screen.
-    def _align(buf, label):
-        if not buf:
-            return np.eye(3), np.zeros(3)
-        est_t = np.array([t for t, _ in buf])
-        est_xyz = np.array([p for _, p in buf])
+    def _fit_alignment(est_t, est_xyz, label, min_samples=10, fallback=None):
+        if est_t.size == 0:
+            return fallback if fallback is not None else (np.eye(3), np.zeros(3))
         ref_at = interp_xyz(est_t, ref_t, ref_xyz_raw)
         valid = ~np.isnan(ref_at).any(axis=1)
-        if valid.sum() < 10:
+        if valid.sum() < min_samples:
             print(f"  {label}: too few overlapping samples ({int(valid.sum())}), skipping align")
-            return np.eye(3), np.zeros(3)
+            return fallback if fallback is not None else (np.eye(3), np.zeros(3))
         R, t = umeyama_se3(est_xyz[valid], ref_at[valid])
         rmse = float(np.sqrt(np.mean(np.linalg.norm(
             (est_xyz[valid] @ R.T + t) - ref_at[valid], axis=1) ** 2)))
         print(f"  {label} aligned: RMSE={rmse:.3f} m on {int(valid.sum())} samples")
         return R, t
+
+    def _align(buf, label):
+        if not buf:
+            return np.eye(3), np.zeros(3)
+        est_t = np.array([t for t, _ in buf])
+        est_xyz = np.array([p for _, p in buf])
+        return _fit_alignment(est_t, est_xyz, label)
 
     print("Umeyama alignment vs reference:")
     R_imu, t_imu = _align(imu_buf, "imu")
@@ -309,6 +383,8 @@ def main() -> int:
         events.append((t, "fit", i))
     for i, (t, _) in enumerate(inliers_buf):
         events.append((t, "inl", i))
+    for i, (t, *_rest) in enumerate(loop_status):
+        events.append((t, "loop_status", i))
     events.sort(key=lambda x: x[0])
 
     ref_path: list[np.ndarray] = []
@@ -376,6 +452,18 @@ def main() -> int:
             rr.log("plots/sonar/fitness", rr.Scalars(float(fitness_buf[i][1])))
         elif kind == "inl":
             rr.log("plots/sonar/inliers", rr.Scalars(float(inliers_buf[i][1])))
+        elif kind == "loop_status":
+            (_t, accepted, _converged, fitness, correction_t, correction_r,
+             _current_id, _candidate_id, _status) = loop_status[i]
+            rr.log("plots/loop_closure/accepted", rr.Scalars(1.0 if accepted else 0.0))
+            if np.isfinite(fitness):
+                rr.log("plots/loop_closure/fitness", rr.Scalars(float(fitness)))
+            if np.isfinite(correction_t):
+                rr.log("plots/loop_closure/correction/translation_m",
+                       rr.Scalars(float(correction_t)))
+            if np.isfinite(correction_r):
+                rr.log("plots/loop_closure/correction/rotation_rad",
+                       rr.Scalars(float(correction_r)))
 
     # Log full trajectories as static (after the timeline scrub), so they show
     # at every time slider position without bloating the recording with N
@@ -399,6 +487,26 @@ def main() -> int:
                rr.LineStrips3D([np.asarray(sonar_path)],
                                colors=SONAR_COLOR, radii=0.4),
                static=True)
+
+    pose_graph_world: np.ndarray | None = None
+    if pose_graph_paths:
+        _, pose_graph_samples = max(pose_graph_paths, key=lambda item: len(item[1]))
+        pg_t = np.array([t for t, _ in pose_graph_samples])
+        pg_xyz = np.array([p for _, p in pose_graph_samples])
+        R_pg, t_pg = _fit_alignment(
+            pg_t, pg_xyz, "pose_graph", min_samples=3, fallback=(R_son, t_son))
+        pose_graph_world = (pg_xyz @ R_pg.T + t_pg) - origin_xyz
+        rr.log("world/pose_graph/path",
+               rr.LineStrips3D([pose_graph_world],
+                               colors=POSE_GRAPH_COLOR, radii=0.55),
+               static=True)
+
+    if pose_graph_world is not None and loop_constraints:
+        loop_segments = loop_edge_segments(pose_graph_world, loop_constraints)
+        if loop_segments:
+            rr.log("world/pose_graph/loop_edges",
+                   rr.LineStrips3D(loop_segments, colors=LOOP_COLOR, radii=0.8),
+                   static=True)
 
     print(f"logged {fans_logged // args.fan_stride} fans (stride={args.fan_stride})")
     print(f"wrote {args.out} ({args.out.stat().st_size / 1e6:.1f} MB)")

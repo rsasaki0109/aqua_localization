@@ -37,8 +37,8 @@ front end so the next implementation can stay small and measurable.
    information matrix.
 8. Publish `aqua_msgs/LoopClosureStatus` so tuning can distinguish "no
    candidates" from rejected or accepted registration results.
-9. Re-export the rerun.io demo with before/after pose-graph paths and loop
-   edges.
+9. Re-export the rerun.io demo with the pose-graph path, accepted loop edges,
+   and loop-closure status plots.
 
 ## Smoke Demo
 
@@ -113,3 +113,16 @@ ros2 topic echo /aqua_pose_graph/loop_constraint_count
 eligible historical submap. Rejections report the specific gate that failed,
 so overly strict candidate, fitness, or correction thresholds are visible
 without reading debug logs.
+
+`aqua_localization/scripts/rerun_export_mbes.py` understands the optional
+pose-graph outputs when they are present in the results-included bag:
+
+```bash
+./aqua_localization/scripts/rerun_export_mbes.py \
+  --bag aqua_localization/datasets/public/mbes_slam/demo_with_estimate \
+  --out docs/media/mbes_slam.rrd
+```
+
+The 3D view overlays `/aqua_pose_graph/path` and accepted
+`/aqua_pose_graph/loop_constraint` edges. The side plots include
+`/mbes_loop_closure/status` accepted, fitness, and correction traces.
