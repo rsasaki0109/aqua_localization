@@ -33,6 +33,36 @@ def test_update_world_pose_inverts_pnp_transform():
     np.testing.assert_allclose(world_from_curr[:3, 3], [-0.5, 0.0, 0.0])
 
 
+def test_world_from_base_pose_applies_base_from_camera_lever_arm():
+    module = load_module()
+    extrinsics = module.VisualExtrinsics(base_from_camera_x_m=1.0)
+    world_from_camera = np.eye(4)
+    world_from_camera[:3, 3] = [2.0, 0.0, 0.0]
+
+    world_from_base = module.world_from_base_pose(
+        world_from_camera,
+        module.base_from_camera_transform(extrinsics),
+        publish_base_pose=True,
+    )
+
+    np.testing.assert_allclose(world_from_base[:3, 3], [1.0, 0.0, 0.0])
+
+
+def test_world_from_base_pose_can_keep_camera_pose():
+    module = load_module()
+    extrinsics = module.VisualExtrinsics(base_from_camera_x_m=1.0)
+    world_from_camera = np.eye(4)
+    world_from_camera[:3, 3] = [2.0, 0.0, 0.0]
+
+    publish_pose = module.world_from_base_pose(
+        world_from_camera,
+        module.base_from_camera_transform(extrinsics),
+        publish_base_pose=False,
+    )
+
+    np.testing.assert_allclose(publish_pose[:3, 3], [2.0, 0.0, 0.0])
+
+
 def test_rotation_matrix_to_quaternion_identity():
     module = load_module()
 

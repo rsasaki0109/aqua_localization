@@ -187,6 +187,26 @@ Latest lever-arm readout on the best `64:64` visual trajectory:
 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.1699 | 14.95 | 273 |
 | -0.25 | -0.45 | 0.00 | 0.00 | 0.00 | 0.00 | 0.1417 | 14.95 | 273 |
 
+The same lever arm was then replayed through `stereo_visual_odometry.py` itself:
+
+```bash
+ros2 run aqua_localization run_tank_visual_benchmark.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_base_extrinsic_benchmark \
+  --sequence short_test_visual_base_extrinsic \
+  --translation-scale 0.169623465 \
+  --max-stereo-descriptor-distance 64 \
+  --max-temporal-descriptor-distance 64 \
+  --base-from-camera-x-m=-0.25 \
+  --base-from-camera-y-m=-0.45 \
+  --base-from-camera-z-m=0.0
+```
+
+That direct node run also produced 273 matched samples over 14.95 s with
+0.1417 m SE(3) RMSE. The visual odometry publisher switches its child frame to
+`base_link` when a non-zero `extrinsics.base_from_camera.*` parameter is set.
+
 This is still a same-sequence diagnostic, not a paper-safe calibration. It does
 show that extrinsics are a real error source: the tested lever arm improves the
 visual frontend RMSE by about 16.6%, while the descriptor threshold sweep only

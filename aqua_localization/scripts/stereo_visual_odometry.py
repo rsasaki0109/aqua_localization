@@ -59,6 +59,27 @@ class VisualFrontendConfig:
     rotation_variance_floor_rad2: float = 0.05
 
 
+@dataclass(frozen=True)
+class VisualExtrinsics:
+    base_from_camera_x_m: float = 0.0
+    base_from_camera_y_m: float = 0.0
+    base_from_camera_z_m: float = 0.0
+    base_from_camera_roll_rad: float = 0.0
+    base_from_camera_pitch_rad: float = 0.0
+    base_from_camera_yaw_rad: float = 0.0
+
+    def is_identity(self) -> bool:
+        values = (
+            self.base_from_camera_x_m,
+            self.base_from_camera_y_m,
+            self.base_from_camera_z_m,
+            self.base_from_camera_roll_rad,
+            self.base_from_camera_pitch_rad,
+            self.base_from_camera_yaw_rad,
+        )
+        return all(abs(value) < 1.0e-12 for value in values)
+
+
 @dataclass
 class VisualFrame:
     stamp_s: float
@@ -281,6 +302,44 @@ def update_world_pose(
     return world_from_previous @ prev_from_curr
 
 
+def rpy_to_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray:
+    cr = math.cos(roll)
+    sr = math.sin(roll)
+    cp = math.cos(pitch)
+    sp = math.sin(pitch)
+    cy = math.cos(yaw)
+    sy = math.sin(yaw)
+    rot_x = np.asarray([[1.0, 0.0, 0.0], [0.0, cr, -sr], [0.0, sr, cr]])
+    rot_y = np.asarray([[cp, 0.0, sp], [0.0, 1.0, 0.0], [-sp, 0.0, cp]])
+    rot_z = np.asarray([[cy, -sy, 0.0], [sy, cy, 0.0], [0.0, 0.0, 1.0]])
+    return rot_z @ rot_y @ rot_x
+
+
+def base_from_camera_transform(extrinsics: VisualExtrinsics) -> np.ndarray:
+    transform = np.eye(4, dtype=np.float64)
+    transform[:3, :3] = rpy_to_matrix(
+        extrinsics.base_from_camera_roll_rad,
+        extrinsics.base_from_camera_pitch_rad,
+        extrinsics.base_from_camera_yaw_rad,
+    )
+    transform[:3, 3] = [
+        extrinsics.base_from_camera_x_m,
+        extrinsics.base_from_camera_y_m,
+        extrinsics.base_from_camera_z_m,
+    ]
+    return transform
+
+
+def world_from_base_pose(
+    world_from_camera: np.ndarray,
+    base_from_camera: np.ndarray,
+    publish_base_pose: bool,
+) -> np.ndarray:
+    if not publish_base_pose:
+        return world_from_camera
+    return world_from_camera @ np.linalg.inv(base_from_camera)
+
+
 def rotation_matrix_to_quaternion(rotation: np.ndarray) -> tuple[float, float, float, float]:
     trace = float(np.trace(rotation))
     if trace > 0.0:
@@ -471,12 +530,38 @@ def run_ros_node(argv=None) -> int:
                 "topics.status", "/aqua_visual_frontend/status"
             ).value
             self.frame_id = self.declare_parameter("frames.odom", "visual_odom").value
-            self.child_frame_id = self.declare_parameter("frames.camera", "camera_left").value
+            self.camera_frame_id = self.declare_parameter("frames.camera", "camera_left").value
+            self.base_frame_id = self.declare_parameter("frames.base", "base_link").value
             self.sync_slop_s = float(self.declare_parameter("sync.slop_s", 0.02).value)
             self.buffer_size = int(self.declare_parameter("sync.buffer_size", 20).value)
             self.status_csv_path = str(
                 self.declare_parameter("diagnostics.status_csv_path", "").value
             )
+            self.extrinsics = VisualExtrinsics(
+                base_from_camera_x_m=float(
+                    self.declare_parameter("extrinsics.base_from_camera.x_m", 0.0).value
+                ),
+                base_from_camera_y_m=float(
+                    self.declare_parameter("extrinsics.base_from_camera.y_m", 0.0).value
+                ),
+                base_from_camera_z_m=float(
+                    self.declare_parameter("extrinsics.base_from_camera.z_m", 0.0).value
+                ),
+                base_from_camera_roll_rad=float(
+                    self.declare_parameter("extrinsics.base_from_camera.roll_rad", 0.0).value
+                ),
+                base_from_camera_pitch_rad=float(
+                    self.declare_parameter("extrinsics.base_from_camera.pitch_rad", 0.0).value
+                ),
+                base_from_camera_yaw_rad=float(
+                    self.declare_parameter("extrinsics.base_from_camera.yaw_rad", 0.0).value
+                ),
+            )
+            self.publish_base_pose = bool(
+                self.declare_parameter("extrinsics.publish_base_pose", False).value
+            ) or not self.extrinsics.is_identity()
+            self.child_frame_id = self.base_frame_id if self.publish_base_pose else self.camera_frame_id
+            self.base_from_camera = base_from_camera_transform(self.extrinsics)
 
             self.camera = StereoCamera(
                 fx=float(self.declare_parameter("camera.fx", 655.0).value),
@@ -554,7 +639,7 @@ def run_ros_node(argv=None) -> int:
             self.rejected = 0
             self.get_logger().info(
                 f"stereo visual odometry started: left={self.left_topic} right={self.right_topic} "
-                f"odom={self.odom_topic} status={self.status_topic}"
+                f"odom={self.odom_topic} status={self.status_topic} child={self.child_frame_id}"
             )
 
         def on_left(self, msg):
@@ -637,11 +722,16 @@ def run_ros_node(argv=None) -> int:
             msg.header.stamp = stamp
             msg.header.frame_id = self.frame_id
             msg.child_frame_id = self.child_frame_id
-            position = self.world_from_camera[:3, 3]
+            publish_pose = world_from_base_pose(
+                self.world_from_camera,
+                self.base_from_camera,
+                self.publish_base_pose,
+            )
+            position = publish_pose[:3, 3]
             msg.pose.pose.position.x = float(position[0])
             msg.pose.pose.position.y = float(position[1])
             msg.pose.pose.position.z = float(position[2])
-            qx, qy, qz, qw = rotation_matrix_to_quaternion(self.world_from_camera[:3, :3])
+            qx, qy, qz, qw = rotation_matrix_to_quaternion(publish_pose[:3, :3])
             msg.pose.pose.orientation.x = qx
             msg.pose.pose.orientation.y = qy
             msg.pose.pose.orientation.z = qz

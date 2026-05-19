@@ -62,6 +62,8 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
         "--max-stereo-descriptor-distance", "80",
         "--max-temporal-descriptor-distance", "72",
         "--odom-topic", "/visual_sweep/case_80/odometry",
+        "--base-from-camera-x-m", "-0.25",
+        "--base-from-camera-y-m", "-0.45",
         "--play-rate", "0.5",
     ])
     paths = module.default_paths(tmp_path, args.sequence)
@@ -75,6 +77,9 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
     assert "matching.max_temporal_descriptor_distance:=72.0" in visual_command
     assert "camera.bf:=78.89165891925023" in visual_command
     assert "topics.odometry:=/visual_sweep/case_80/odometry" in visual_command
+    assert "extrinsics.base_from_camera.x_m:=-0.25" in visual_command
+    assert "extrinsics.base_from_camera.y_m:=-0.45" in visual_command
+    assert "extrinsics.base_from_camera.z_m:=0.0" in visual_command
     assert "/visual_sweep/case_80/odometry" in record_command
     assert record_command[-2:] == ["--format", "tum"]
     assert str(paths.estimate_tum) in record_command

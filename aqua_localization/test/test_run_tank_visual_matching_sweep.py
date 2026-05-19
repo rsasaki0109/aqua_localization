@@ -59,6 +59,12 @@ def test_benchmark_command_contains_thresholds(tmp_path):
         dataset="Tank Dataset",
         system="aqua_visual_frontend",
         translation_scale=0.25,
+        base_from_camera_x_m=-0.25,
+        base_from_camera_y_m=-0.45,
+        base_from_camera_z_m=0.0,
+        base_from_camera_roll_rad=0.0,
+        base_from_camera_pitch_rad=0.0,
+        base_from_camera_yaw_rad=0.0,
         play_rate=0.5,
         startup_delay=0.1,
         stop_timeout=1.0,
@@ -78,6 +84,10 @@ def test_benchmark_command_contains_thresholds(tmp_path):
     assert "80.0" in command
     assert "--odom-topic" in command
     assert "/aqua_visual_frontend/stereo_64__temporal_80/odometry" in command
+    assert "--base-from-camera-x-m" in command
+    assert "-0.25" in command
+    assert "--base-from-camera-y-m" in command
+    assert "-0.45" in command
     assert "--no-sim-time" not in command
 
 

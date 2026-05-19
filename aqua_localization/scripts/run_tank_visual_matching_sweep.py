@@ -147,6 +147,18 @@ def benchmark_command(args, case: SweepCase, sequence: str, out_dir: Path) -> li
         case_odom_topic(case),
         "--translation-scale",
         str(args.translation_scale),
+        "--base-from-camera-x-m",
+        str(args.base_from_camera_x_m),
+        "--base-from-camera-y-m",
+        str(args.base_from_camera_y_m),
+        "--base-from-camera-z-m",
+        str(args.base_from_camera_z_m),
+        "--base-from-camera-roll-rad",
+        str(args.base_from_camera_roll_rad),
+        "--base-from-camera-pitch-rad",
+        str(args.base_from_camera_pitch_rad),
+        "--base-from-camera-yaw-rad",
+        str(args.base_from_camera_yaw_rad),
         "--max-stereo-descriptor-distance",
         str(case.stereo_distance),
         "--max-temporal-descriptor-distance",
@@ -376,6 +388,12 @@ def parse_args(argv):
     parser.add_argument("--sequence", default="short_test")
     parser.add_argument("--system", default="aqua_visual_frontend")
     parser.add_argument("--translation-scale", type=float, default=1.0)
+    parser.add_argument("--base-from-camera-x-m", type=float, default=0.0)
+    parser.add_argument("--base-from-camera-y-m", type=float, default=0.0)
+    parser.add_argument("--base-from-camera-z-m", type=float, default=0.0)
+    parser.add_argument("--base-from-camera-roll-rad", type=float, default=0.0)
+    parser.add_argument("--base-from-camera-pitch-rad", type=float, default=0.0)
+    parser.add_argument("--base-from-camera-yaw-rad", type=float, default=0.0)
     parser.add_argument(
         "--baseline-rmse-m",
         type=float,
