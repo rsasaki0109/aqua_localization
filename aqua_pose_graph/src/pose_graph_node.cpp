@@ -163,13 +163,13 @@ public:
         on_loop_constraint(*msg);
       });
     path_pub_ = create_publisher<nav_msgs::msg::Path>(
-      path_topic_, rclcpp::QoS(10).transient_local());
+      path_topic_, rclcpp::QoS(1).transient_local());
     keyframe_count_pub_ = create_publisher<std_msgs::msg::UInt32>(
-      keyframe_count_topic_, rclcpp::QoS(10).transient_local());
+      keyframe_count_topic_, rclcpp::QoS(1).transient_local());
     keyframe_pub_ = create_publisher<aqua_msgs::msg::PoseGraphKeyframe>(
-      keyframe_topic_, rclcpp::QoS(10).transient_local());
+      keyframe_topic_, rclcpp::QoS(1).transient_local());
     loop_constraint_count_pub_ = create_publisher<std_msgs::msg::UInt32>(
-      loop_constraint_count_topic_, rclcpp::QoS(10).transient_local());
+      loop_constraint_count_topic_, rclcpp::QoS(1).transient_local());
 
     optimize_srv_ = create_service<std_srvs::srv::Trigger>(
       "/aqua_pose_graph/optimize",

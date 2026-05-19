@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.8)
 project(aqua_pose_graph)
 
+if(POLICY CMP0072)
+  cmake_policy(SET CMP0072 NEW)
+endif()
+
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,14 +25,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(Eigen3 REQUIRED)
-
-# g2o is shipped via the libg2o-dev Ubuntu package; the headers live under
-# /usr/include/g2o, libraries under /usr/lib/x86_64-linux-gnu.
-find_package(PkgConfig QUIET)
-set(G2O_LIBS
-  g2o_core g2o_stuff g2o_solver_eigen
-  g2o_types_slam3d
-)
+find_package(g2o REQUIRED)
 
 add_library(aqua_pose_graph_lib
   src/pose_graph.cpp
@@ -39,7 +36,9 @@ target_include_directories(aqua_pose_graph_lib PUBLIC
 )
 target_link_libraries(aqua_pose_graph_lib
   Eigen3::Eigen
-  ${G2O_LIBS}
+  g2o::core
+  g2o::solver_eigen
+  g2o::types_slam3d
 )
 ament_target_dependencies(aqua_pose_graph_lib
   rclcpp
