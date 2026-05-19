@@ -24,6 +24,7 @@
   <exec_depend>ros2bag</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
 
   <test_depend>ament_cmake_pytest</test_depend>
 

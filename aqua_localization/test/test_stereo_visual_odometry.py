@@ -1,6 +1,8 @@
 """Pure helper tests for stereo_visual_odometry.py."""
 
 import importlib.util
+import io
+import json
 import sys
 from pathlib import Path
 
@@ -70,3 +72,63 @@ def test_failed_motion_keeps_requested_counts():
     assert not estimate.success
     assert estimate.matches == 7
     assert estimate.inliers == 3
+
+
+def test_make_status_reports_tracking_diagnostics():
+    module = load_module()
+    frame = module.VisualFrame(
+        stamp_s=12.5,
+        points3d=np.zeros((11, 3), dtype=np.float32),
+        keypoints_xy=np.zeros((11, 2), dtype=np.float32),
+        descriptors=np.zeros((11, 32), dtype=np.uint8),
+        left_features=40,
+        right_features=35,
+        stereo_matches=20,
+    )
+    estimate = module.MotionEstimate(
+        True,
+        np.eye(3),
+        np.array([0.3, 0.4, 0.0]),
+        inliers=8,
+        matches=16,
+    )
+
+    status = module.make_status(12.5, 3, 2, 1, frame, estimate)
+    payload = json.loads(module.status_to_json(status))
+
+    assert payload["left_features"] == 40
+    assert payload["stereo_points"] == 11
+    assert payload["temporal_matches"] == 16
+    assert payload["pnp_inliers"] == 8
+    assert payload["inlier_ratio"] == 0.5
+    assert payload["step_translation_m"] == 0.5
+    assert payload["status"] == "accepted"
+
+
+def test_status_csv_writer_emits_stable_columns():
+    module = load_module()
+    status = module.VisualFrontendStatus(
+        stamp_s=1.25,
+        frame_index=2,
+        accepted_count=1,
+        rejected_count=1,
+        left_features=10,
+        right_features=9,
+        stereo_matches=8,
+        stereo_points=7,
+        temporal_matches=6,
+        pnp_inliers=5,
+        inlier_ratio=0.75,
+        step_translation_m=0.125,
+        accepted=False,
+        status="too few pnp inliers",
+    )
+    fp = io.StringIO()
+
+    module.write_status_csv_header(fp)
+    module.write_status_csv_row(fp, status)
+
+    lines = fp.getvalue().splitlines()
+    assert lines[0].startswith("timestamp,frame_index,accepted_count")
+    assert "1.250000000,2,1,1,10,9,8,7,6,5,0.750000000,0.125000000,0" in lines[1]
+    assert lines[1].endswith(",too few pnp inliers")

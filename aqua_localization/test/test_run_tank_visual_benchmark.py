@@ -43,6 +43,7 @@ def test_default_paths_sanitize_sequence_name(tmp_path):
     paths = module.default_paths(tmp_path, "Tank short/test")
 
     assert paths.estimate_tum == tmp_path / "Tank_short_test_visual_frontend.tum"
+    assert paths.status_csv == tmp_path / "Tank_short_test_visual_frontend_status.csv"
     assert paths.scale_report == tmp_path / "Tank_short_test_visual_scale_report.txt"
     assert paths.benchmark_row == tmp_path / "Tank_short_test_visual_benchmark.md"
     assert paths.replay_script == tmp_path / "Tank_short_test_visual_replay.sh"
@@ -68,6 +69,20 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
     assert record_command[-2:] == ["--format", "tum"]
     assert str(paths.estimate_tum) in record_command
     assert bag_command == ["ros2", "bag", "play", "/tmp/tank_bag", "--clock", "--rate", "0.5"]
+
+
+def test_build_visual_command_can_enable_status_csv(tmp_path):
+    module = load_module()
+    status_csv = tmp_path / "visual_status.csv"
+    args = module.parse_args([
+        "--bag", "/tmp/tank_bag",
+        "--reference", "/tmp/ref.tum",
+        "--status-csv", str(status_csv),
+    ])
+
+    command = module.build_visual_command(args)
+
+    assert f"diagnostics.status_csv_path:={status_csv}" in command
 
 
 def test_write_replay_script_quotes_paths(tmp_path):

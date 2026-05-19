@@ -111,7 +111,8 @@ ros2 run aqua_localization stereo_visual_odometry.py --ros-args \
   -p camera.fy:=655.0 \
   -p camera.cx:=306.0 \
   -p camera.cy:=256.0 \
-  -p camera.bf:=78.89165891925023
+  -p camera.bf:=78.89165891925023 \
+  -p diagnostics.status_csv_path:=/tmp/tank_short_test_visual_status.csv
 
 # Terminal B: camera-included bag.
 ros2 bag play \
@@ -170,10 +171,11 @@ ros2 run aqua_localization run_tank_visual_benchmark.py \
   --sequence short_test
 ```
 
-The runner writes the recorded visual TUM file, a `calibrate_visual_scale.py`
-report, a Markdown benchmark row, and a replay shell script containing the exact
-ROS commands it used. If you already have a visual TUM estimate, skip ROS replay
-and evaluate it directly:
+In bag replay mode, the runner writes the recorded visual TUM file, a
+`calibrate_visual_scale.py` report, a visual-frontend status CSV, a Markdown
+benchmark row, and a replay shell script containing the exact ROS commands it
+used. If you already have a visual TUM estimate, skip ROS replay and evaluate it
+directly:
 
 ```bash
 ros2 run aqua_localization run_tank_visual_benchmark.py \
@@ -186,6 +188,14 @@ ros2 run aqua_localization run_tank_visual_benchmark.py \
 The published pose is in a `visual_odom -> camera_left` frame. Treat it as an
 experimental visual frontend output until a calibrated camera-to-base extrinsic
 and fusion path are wired.
+
+The frontend also publishes JSON diagnostics on `/aqua_visual_frontend/status`.
+The status stream and optional CSV include per-frame `left_features`,
+`right_features`, `stereo_matches`, `stereo_points`, `temporal_matches`,
+`pnp_inliers`, `inlier_ratio`, `step_translation_m`, and the accept/reject
+reason. Use this before tuning thresholds: low stereo points means image/stereo
+triangulation is the bottleneck, while low PnP inliers means temporal tracking
+or outlier rejection is the bottleneck.
 
 On `short_test`, the first camera-only run processed 272 stereo pairs and
 accepted 271 visual odometry steps. With the nominal stereo scale it produced
@@ -216,6 +226,7 @@ camera-to-base transform.
 ```bash
 ros2 topic hz /aqua_imu_loc/odometry           # ~333 Hz
 ros2 topic echo --once /aqua_imu_loc/status
+ros2 topic echo --once /aqua_visual_frontend/status
 ```
 
 ## Record trajectory for offline comparison
