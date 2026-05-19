@@ -33,6 +33,7 @@ install(PROGRAMS
   scripts/record_ntnu_demo.sh
   scripts/record_aqualoc_demo.sh
   scripts/calibrate_sonar_covariance.py
+  scripts/pose_graph_loop_demo.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

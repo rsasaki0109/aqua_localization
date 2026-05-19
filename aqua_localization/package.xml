@@ -14,8 +14,11 @@
   <exec_depend>aqua_fusion</exec_depend>
   <exec_depend>aqua_pose_graph</exec_depend>
   <exec_depend>aqua_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>rclpy</exec_depend>
   <exec_depend>ros2bag</exec_depend>
   <exec_depend>rviz2</exec_depend>
 
