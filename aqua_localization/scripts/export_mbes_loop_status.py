@@ -4,7 +4,7 @@
 The CSV output is intended for threshold tuning. It preserves every
 `aqua_msgs/LoopClosureStatus` sample and prints a compact markdown summary with
 accepted/rejected/no-candidate counts, rejection reasons, and registration
-fitness/correction quantiles.
+fitness/correction/descriptor quantiles.
 
 Example:
 
@@ -38,6 +38,9 @@ CSV_FIELDS = [
     "fitness_score",
     "correction_translation_m",
     "correction_rotation_rad",
+    "descriptor_centroid_distance_m",
+    "descriptor_extent_ratio",
+    "descriptor_point_count_ratio",
     "status",
 ]
 
@@ -53,11 +56,18 @@ class LoopStatusSample:
     fitness_score: float
     correction_translation_m: float
     correction_rotation_rad: float
+    descriptor_centroid_distance_m: float
+    descriptor_extent_ratio: float
+    descriptor_point_count_ratio: float
     status: str
 
 
 def stamp_to_seconds(stamp) -> float:
     return float(stamp.sec) + float(stamp.nanosec) * 1.0e-9
+
+
+def optional_float(msg, attr: str) -> float:
+    return float(getattr(msg, attr, math.nan))
 
 
 def sample_from_msg(msg, fallback_time: float) -> LoopStatusSample:
@@ -74,6 +84,13 @@ def sample_from_msg(msg, fallback_time: float) -> LoopStatusSample:
         fitness_score=float(msg.fitness_score),
         correction_translation_m=float(msg.correction_translation_m),
         correction_rotation_rad=float(msg.correction_rotation_rad),
+        descriptor_centroid_distance_m=optional_float(
+            msg, "descriptor_centroid_distance_m"
+        ),
+        descriptor_extent_ratio=optional_float(msg, "descriptor_extent_ratio"),
+        descriptor_point_count_ratio=optional_float(
+            msg, "descriptor_point_count_ratio"
+        ),
         status=str(msg.status),
     )
 
@@ -149,6 +166,15 @@ def summarize(samples: list[LoopStatusSample]) -> dict:
         "correction_rotation_rad": stats(
             finite_values(samples, "correction_rotation_rad")
         ),
+        "descriptor_centroid_distance_m": stats(
+            finite_values(samples, "descriptor_centroid_distance_m")
+        ),
+        "descriptor_extent_ratio": stats(
+            finite_values(samples, "descriptor_extent_ratio")
+        ),
+        "descriptor_point_count_ratio": stats(
+            finite_values(samples, "descriptor_point_count_ratio")
+        ),
     }
 
 
@@ -185,6 +211,15 @@ def format_summary_markdown(summary: dict, topic: str) -> str:
         format_stats("accepted fitness_score", summary["accepted_fitness"]),
         format_stats("correction_translation_m", summary["correction_translation_m"]),
         format_stats("correction_rotation_rad", summary["correction_rotation_rad"]),
+        format_stats(
+            "descriptor_centroid_distance_m",
+            summary["descriptor_centroid_distance_m"],
+        ),
+        format_stats("descriptor_extent_ratio", summary["descriptor_extent_ratio"]),
+        format_stats(
+            "descriptor_point_count_ratio",
+            summary["descriptor_point_count_ratio"],
+        ),
         "",
         "## Rejection Reasons",
         "",
@@ -220,6 +255,13 @@ def write_csv(path: Path, samples: list[LoopStatusSample]) -> None:
                 "fitness_score": f"{sample.fitness_score:.9f}",
                 "correction_translation_m": f"{sample.correction_translation_m:.9f}",
                 "correction_rotation_rad": f"{sample.correction_rotation_rad:.9f}",
+                "descriptor_centroid_distance_m": (
+                    f"{sample.descriptor_centroid_distance_m:.9f}"
+                ),
+                "descriptor_extent_ratio": f"{sample.descriptor_extent_ratio:.9f}",
+                "descriptor_point_count_ratio": (
+                    f"{sample.descriptor_point_count_ratio:.9f}"
+                ),
                 "status": sample.status,
             })
 

@@ -207,6 +207,10 @@ private:
       MatchResult result =
         registration.match(candidate, current, current_to_candidate_guess);
       GateResult gate = gate_evaluator.evaluate(candidate_to_current_guess, result);
+      gate.descriptor_centroid_distance_m =
+        descriptor_result.descriptor_centroid_distance_m;
+      gate.descriptor_extent_ratio = descriptor_result.descriptor_extent_ratio;
+      gate.descriptor_point_count_ratio = descriptor_result.descriptor_point_count_ratio;
       if (gate.accepted &&
         accepted_loop_tracker_.is_suppressed(candidate.id, current.id))
       {
@@ -267,6 +271,9 @@ private:
     msg.fitness_score = result.fitness;
     msg.correction_translation_m = gate.correction_translation_m;
     msg.correction_rotation_rad = gate.correction_rotation_rad;
+    msg.descriptor_centroid_distance_m = gate.descriptor_centroid_distance_m;
+    msg.descriptor_extent_ratio = gate.descriptor_extent_ratio;
+    msg.descriptor_point_count_ratio = gate.descriptor_point_count_ratio;
     msg.status = gate.status;
     status_pub_->publish(msg);
   }
@@ -309,6 +316,9 @@ private:
     msg.fitness_score = std::numeric_limits<double>::quiet_NaN();
     msg.correction_translation_m = std::numeric_limits<double>::quiet_NaN();
     msg.correction_rotation_rad = std::numeric_limits<double>::quiet_NaN();
+    msg.descriptor_centroid_distance_m = std::numeric_limits<double>::quiet_NaN();
+    msg.descriptor_extent_ratio = std::numeric_limits<double>::quiet_NaN();
+    msg.descriptor_point_count_ratio = std::numeric_limits<double>::quiet_NaN();
     msg.status = "no candidate submaps";
     status_pub_->publish(msg);
   }

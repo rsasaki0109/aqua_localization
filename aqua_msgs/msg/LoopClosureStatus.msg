@@ -11,4 +11,9 @@ float64 fitness_score
 float64 correction_translation_m
 float64 correction_rotation_rad
 
+# Pre-registration descriptor metrics. NaN means unavailable or not evaluated.
+float64 descriptor_centroid_distance_m
+float64 descriptor_extent_ratio
+float64 descriptor_point_count_ratio
+
 string status
