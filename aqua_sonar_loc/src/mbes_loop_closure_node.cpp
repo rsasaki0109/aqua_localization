@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@
 #include <pcl/registration/ndt.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+#include "aqua_msgs/msg/loop_closure_status.hpp"
 #include "aqua_msgs/msg/pose_graph_keyframe.hpp"
 #include "aqua_msgs/msg/pose_graph_loop_constraint.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -39,6 +41,14 @@ struct MatchResult
   bool converged{false};
   double fitness{0.0};
   Eigen::Isometry3d candidate_to_current{Eigen::Isometry3d::Identity()};
+  std::string status;
+};
+
+struct GateResult
+{
+  bool accepted{false};
+  double correction_translation_m{std::numeric_limits<double>::quiet_NaN()};
+  double correction_rotation_rad{std::numeric_limits<double>::quiet_NaN()};
   std::string status;
 };
 
@@ -172,12 +182,14 @@ public:
       });
     loop_pub_ = create_publisher<aqua_msgs::msg::PoseGraphLoopConstraint>(
       loop_constraint_topic_, rclcpp::QoS(10));
+    status_pub_ = create_publisher<aqua_msgs::msg::LoopClosureStatus>(
+      status_topic_, rclcpp::QoS(10));
 
     RCLCPP_INFO(
       get_logger(),
-      "mbes_loop_closure started: points=%s keyframes=%s loops=%s backend=%s",
+      "mbes_loop_closure started: points=%s keyframes=%s loops=%s status=%s backend=%s",
       points_topic_.c_str(), keyframe_topic_.c_str(),
-      loop_constraint_topic_.c_str(), backend_.c_str());
+      loop_constraint_topic_.c_str(), status_topic_.c_str(), backend_.c_str());
   }
 
 private:
@@ -189,6 +201,8 @@ private:
       "topics.keyframe", "/aqua_pose_graph/keyframe");
     loop_constraint_topic_ = declare_parameter<std::string>(
       "topics.loop_constraint", "/aqua_pose_graph/loop_constraint");
+    status_topic_ = declare_parameter<std::string>(
+      "topics.status", "/mbes_loop_closure/status");
     map_frame_ = declare_parameter<std::string>("frames.map", "map");
 
     max_submaps_ = declare_parameter<int>("submaps.max_submaps", 200);
@@ -300,15 +314,20 @@ private:
         candidate_to_current_guess.inverse();
       MatchResult result =
         match_submaps(candidate, current, current_to_candidate_guess);
-      if (!passes_gates(candidate_to_current_guess, result)) {
+      const GateResult gate = evaluate_gates(candidate_to_current_guess, result);
+      publish_status(candidate, current, result, gate);
+      if (!gate.accepted) {
         RCLCPP_DEBUG(
           get_logger(), "rejected loop candidate %u -> %u: %s fitness=%.4f",
-          candidate.id, current.id, result.status.c_str(), result.fitness);
+          candidate.id, current.id, gate.status.c_str(), result.fitness);
         continue;
       }
 
       publish_loop_constraint(candidate, current, result.candidate_to_current);
       return;
+    }
+    if (tested == 0) {
+      publish_no_candidate_status(current);
     }
   }
 
@@ -361,29 +380,39 @@ private:
       max_iterations_, max_correspondence_distance_m_, transformation_epsilon_);
   }
 
-  bool passes_gates(
+  GateResult evaluate_gates(
     const Eigen::Isometry3d & guess,
     const MatchResult & result) const
   {
+    GateResult gate;
     if (!result.success) {
-      return false;
-    }
-    if (max_fitness_score_ > 0.0 && result.fitness > max_fitness_score_) {
-      return false;
+      gate.status = result.status.empty() ? "registration failed" : result.status;
+      return gate;
     }
     const Eigen::Isometry3d correction = guess.inverse() * result.candidate_to_current;
-    if (max_correction_translation_m_ > 0.0 &&
-      correction.translation().norm() > max_correction_translation_m_)
-    {
-      return false;
-    }
+    gate.correction_translation_m = correction.translation().norm();
     const Eigen::AngleAxisd aa(correction.linear());
-    if (max_correction_rotation_rad_ > 0.0 &&
-      std::abs(aa.angle()) > max_correction_rotation_rad_)
-    {
-      return false;
+    gate.correction_rotation_rad = std::abs(aa.angle());
+
+    if (max_fitness_score_ > 0.0 && result.fitness > max_fitness_score_) {
+      gate.status = "fitness score exceeds gate";
+      return gate;
     }
-    return true;
+    if (max_correction_translation_m_ > 0.0 &&
+      gate.correction_translation_m > max_correction_translation_m_)
+    {
+      gate.status = "translation correction exceeds gate";
+      return gate;
+    }
+    if (max_correction_rotation_rad_ > 0.0 &&
+      gate.correction_rotation_rad > max_correction_rotation_rad_)
+    {
+      gate.status = "rotation correction exceeds gate";
+      return gate;
+    }
+    gate.accepted = true;
+    gate.status = "accepted";
+    return gate;
   }
 
   void publish_loop_constraint(
@@ -406,9 +435,46 @@ private:
       candidate.id, current.id);
   }
 
+  void publish_status(
+    const Submap & candidate,
+    const Submap & current,
+    const MatchResult & result,
+    const GateResult & gate)
+  {
+    aqua_msgs::msg::LoopClosureStatus msg;
+    msg.header.stamp = current.stamp;
+    msg.header.frame_id = map_frame_;
+    msg.current_id = current.id;
+    msg.candidate_id = candidate.id;
+    msg.accepted = gate.accepted;
+    msg.converged = result.converged;
+    msg.fitness_score = result.fitness;
+    msg.correction_translation_m = gate.correction_translation_m;
+    msg.correction_rotation_rad = gate.correction_rotation_rad;
+    msg.status = gate.status;
+    status_pub_->publish(msg);
+  }
+
+  void publish_no_candidate_status(const Submap & current)
+  {
+    aqua_msgs::msg::LoopClosureStatus msg;
+    msg.header.stamp = current.stamp;
+    msg.header.frame_id = map_frame_;
+    msg.current_id = current.id;
+    msg.candidate_id = std::numeric_limits<std::uint32_t>::max();
+    msg.accepted = false;
+    msg.converged = false;
+    msg.fitness_score = std::numeric_limits<double>::quiet_NaN();
+    msg.correction_translation_m = std::numeric_limits<double>::quiet_NaN();
+    msg.correction_rotation_rad = std::numeric_limits<double>::quiet_NaN();
+    msg.status = "no candidate submaps";
+    status_pub_->publish(msg);
+  }
+
   std::string points_topic_;
   std::string keyframe_topic_;
   std::string loop_constraint_topic_;
+  std::string status_topic_;
   std::string map_frame_;
 
   int max_submaps_{200};
@@ -442,6 +508,7 @@ private:
   rclcpp::Subscription<aqua_msgs::msg::PoseGraphKeyframe>::SharedPtr keyframe_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr points_sub_;
   rclcpp::Publisher<aqua_msgs::msg::PoseGraphLoopConstraint>::SharedPtr loop_pub_;
+  rclcpp::Publisher<aqua_msgs::msg::LoopClosureStatus>::SharedPtr status_pub_;
 };
 
 }  // namespace aqua_sonar_loc
