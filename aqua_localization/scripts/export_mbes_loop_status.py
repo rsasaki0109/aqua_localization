@@ -11,7 +11,8 @@ Example:
   ros2 run aqua_localization export_mbes_loop_status.py \\
     --bag aqua_localization/datasets/public/mbes_slam/demo_with_estimate \\
     --out /tmp/mbes_loop_status.csv \\
-    --summary-out /tmp/mbes_loop_status.md
+    --summary-out /tmp/mbes_loop_status.md \\
+    --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md
 """
 
 from __future__ import annotations
@@ -139,6 +140,17 @@ def stats(values: list[float]) -> dict[str, float | int]:
     }
 
 
+def unique_finite(values: Iterable[float]) -> list[float]:
+    unique = sorted({float(value) for value in values if math.isfinite(float(value))})
+    return unique
+
+
+def candidate_thresholds(values: list[float], quantiles: list[float]) -> list[float]:
+    if not values:
+        return []
+    return unique_finite(percentile(values, q) for q in quantiles)
+
+
 def is_no_candidate(sample: LoopStatusSample) -> bool:
     return sample.candidate_id == NO_CANDIDATE_ID or "no candidate" in sample.status.lower()
 
@@ -178,6 +190,60 @@ def summarize(samples: list[LoopStatusSample]) -> dict:
     }
 
 
+def descriptor_sweep_rows(samples: list[LoopStatusSample]) -> list[dict[str, float | int]]:
+    descriptor_samples = [
+        sample for sample in samples
+        if all(math.isfinite(value) for value in (
+            sample.descriptor_centroid_distance_m,
+            sample.descriptor_extent_ratio,
+            sample.descriptor_point_count_ratio,
+        ))
+    ]
+    if not descriptor_samples:
+        return []
+
+    centroid_thresholds = candidate_thresholds(
+        [sample.descriptor_centroid_distance_m for sample in descriptor_samples],
+        [0.5, 0.75, 0.9, 0.95],
+    )
+    extent_thresholds = candidate_thresholds(
+        [sample.descriptor_extent_ratio for sample in descriptor_samples],
+        [0.75, 0.9, 0.95, 1.0],
+    )
+    point_ratio_thresholds = candidate_thresholds(
+        [sample.descriptor_point_count_ratio for sample in descriptor_samples],
+        [0.0, 0.05, 0.1, 0.25],
+    )
+
+    rows = []
+    for centroid_threshold in centroid_thresholds:
+        for extent_threshold in extent_thresholds:
+            for point_ratio_threshold in point_ratio_thresholds:
+                pass_count = sum(
+                    1 for sample in descriptor_samples
+                    if sample.descriptor_centroid_distance_m <= centroid_threshold and
+                    sample.descriptor_extent_ratio <= extent_threshold and
+                    sample.descriptor_point_count_ratio >= point_ratio_threshold
+                )
+                rows.append({
+                    "centroid_threshold": centroid_threshold,
+                    "extent_threshold": extent_threshold,
+                    "point_ratio_threshold": point_ratio_threshold,
+                    "pass_count": pass_count,
+                    "total_count": len(descriptor_samples),
+                })
+    rows.sort(
+        key=lambda row: (
+            int(row["pass_count"]),
+            float(row["centroid_threshold"]),
+            float(row["extent_threshold"]),
+            -float(row["point_ratio_threshold"]),
+        ),
+        reverse=True,
+    )
+    return rows
+
+
 def format_float(value: float) -> str:
     if not math.isfinite(value):
         return "n/a"
@@ -190,6 +256,42 @@ def format_stats(label: str, summary: dict[str, float | int]) -> str:
         f"{format_float(float(summary['median']))} | {format_float(float(summary['p95']))} | "
         f"{format_float(float(summary['max']))} |"
     )
+
+
+def format_descriptor_sweep_markdown(samples: list[LoopStatusSample], topic: str) -> str:
+    rows = descriptor_sweep_rows(samples)
+    lines = [
+        "# MBES Loop Closure Descriptor Threshold Sweep",
+        "",
+        f"- Topic: `{topic}`",
+        f"- Samples: {len(samples)}",
+        "",
+    ]
+    if not rows:
+        lines.extend([
+            "No finite descriptor metrics were available for threshold sweep.",
+            "",
+        ])
+        return "\n".join(lines)
+
+    total_count = int(rows[0]["total_count"])
+    lines.extend([
+        f"- Descriptor samples: {total_count}",
+        "",
+        "| Centroid <= m | Extent <= ratio | Point count >= ratio | Would pass | Pass % |",
+        "|--------------:|----------------:|---------------------:|-----------:|-------:|",
+    ])
+    for row in rows:
+        pass_count = int(row["pass_count"])
+        pass_pct = 100.0 * pass_count / total_count if total_count else 0.0
+        lines.append(
+            f"| {format_float(float(row['centroid_threshold']))} | "
+            f"{format_float(float(row['extent_threshold']))} | "
+            f"{format_float(float(row['point_ratio_threshold']))} | "
+            f"{pass_count} | {pass_pct:.1f}% |"
+        )
+    lines.append("")
+    return "\n".join(lines)
 
 
 def format_summary_markdown(summary: dict, topic: str) -> str:
@@ -301,6 +403,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="LoopClosureStatus topic")
     parser.add_argument("--summary-out", type=Path,
                         help="Optional markdown summary output path")
+    parser.add_argument("--descriptor-sweep-out", type=Path,
+                        help="Optional descriptor threshold sweep markdown output path")
     return parser.parse_args(argv)
 
 
@@ -317,10 +421,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.summary_out:
         args.summary_out.parent.mkdir(parents=True, exist_ok=True)
         args.summary_out.write_text(summary_text, encoding="utf-8")
+    if args.descriptor_sweep_out:
+        args.descriptor_sweep_out.parent.mkdir(parents=True, exist_ok=True)
+        args.descriptor_sweep_out.write_text(
+            format_descriptor_sweep_markdown(samples, args.topic),
+            encoding="utf-8",
+        )
     print(summary_text)
     print(f"wrote {len(samples)} samples to {args.out}", file=sys.stderr)
     if args.summary_out:
         print(f"wrote summary to {args.summary_out}", file=sys.stderr)
+    if args.descriptor_sweep_out:
+        print(f"wrote descriptor sweep to {args.descriptor_sweep_out}", file=sys.stderr)
     return 0
 
 
