@@ -111,6 +111,19 @@ Tune in this order:
 4. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
    optimized path changes against the MBES-SLAM reference odometry.
 
+Export the loop-status stream after a replay to make tuning measurable:
+
+```bash
+ros2 run aqua_localization export_mbes_loop_status.py \
+  --bag aqua_localization/datasets/public/mbes_slam/demo_with_estimate \
+  --out /tmp/mbes_loop_status.csv \
+  --summary-out /tmp/mbes_loop_status.md
+```
+
+The CSV preserves every `/mbes_loop_closure/status` sample. The markdown
+summary reports accepted, rejected, and no-candidate counts, rejection
+reasons, fitness quantiles, and correction translation/rotation quantiles.
+
 Useful live checks while tuning:
 
 ```bash
