@@ -286,11 +286,13 @@ ros2 run aqua_imu_loc imu_loc_node --ros-args \
   -p topics.visual_odometry:=/aqua_visual_frontend/odometry
 ```
 
-With the same-sequence visual scale fit and a stronger visual covariance floor
-(`imu.visual.position_variance_floor:=0.0025`), the fused IMU + pressure + DVL
-+ visual run reaches 0.373 m SE(3) APE RMSE. This is an engineering diagnostic:
-the next validation step is out-of-sequence scale calibration and a calibrated
-camera-to-base transform.
+With the same-sequence visual scale fit, the diagnostic camera-to-base lever arm
+`base_from_camera=(-0.25,-0.45,0)` m, and
+`imu.visual.position_variance_floor:=0.01`, the fused IMU + pressure + DVL +
+visual run reaches 0.323 m SE(3) APE RMSE when replayed at 0.25x so the Python
+visual frontend processes all 300 stereo pairs. This is an engineering
+diagnostic: the next validation step is out-of-sequence scale and extrinsic
+calibration.
 
 ## Verification topics
 

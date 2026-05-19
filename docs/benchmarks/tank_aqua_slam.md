@@ -71,10 +71,11 @@ camera-included `short_test` conversion:
 | Tank Dataset | `short_test` | `aqua_visual_frontend` | stereo only | Sim(3) | 200 | 11.35 | 0.0826 | 0.0786 | 0.0958 | 0.2458 | scale diagnostic, not paper-safe |
 | Tank Dataset | `short_test` | `aqua_visual_frontend` | stereo only | SE(3) | 200 | 11.25 | 0.0815 | 0.0792 | 0.0947 | 0.2416 | `tracking.translation_scale=0.169623465`, same-sequence scale fit |
 | Tank Dataset | `short_test` | `aqua_localization+visual` | IMU + pressure + DVL + stereo | SE(3) | 5399 | 14.94 | 0.3384 | 0.2928 | 0.3726 | 0.7497 | visual position update, same-sequence scale fit, variance floor 0.0025 |
+| Tank Dataset | `short_test` | `aqua_localization+visual` | IMU + pressure + DVL + stereo | SE(3) | 5424 | 14.95 | 0.2579 | 0.2220 | 0.3228 | 1.2305 | visual position update, base-frame visual odometry, `base_from_camera=(-0.25,-0.45,0)` m, variance floor 0.01, replay rate 0.25 |
 
 The frontend is already better than the IMU + pressure + DVL row once metric
 scale is calibrated, but it still does not beat AQUA-SLAM's 0.0194 m RMSE and
-the fused result only improves the current stack from 0.4291 m to 0.3726 m.
+the fused result only improves the current stack from 0.4291 m to 0.3228 m.
 The next serious step is out-of-sequence scale calibration plus a calibrated
 camera-to-base transform before claiming a visual-inertial-DVL result.
 
@@ -212,6 +213,31 @@ show that extrinsics are a real error source: the tested lever arm improves the
 visual frontend RMSE by about 16.6%, while the descriptor threshold sweep only
 changed the best run within roughly 0.02 m.
 
+The same base-frame visual odometry can be fed into `aqua_imu_loc` with the
+reproducible fusion runner:
+
+```bash
+ros2 run aqua_localization run_tank_visual_fusion_benchmark.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_fusion_runner_rate025 \
+  --sequence short_test_visual_base_fusion \
+  --translation-scale 0.169623465 \
+  --max-stereo-descriptor-distance 64 \
+  --max-temporal-descriptor-distance 64 \
+  --base-from-camera-x-m -0.25 \
+  --base-from-camera-y-m -0.45 \
+  --base-from-camera-z-m 0.0 \
+  --visual-position-variance-floor 0.01 \
+  --play-rate 0.25
+```
+
+The slower replay rate gives the Python visual frontend enough headroom to
+process all 300 stereo pairs on `short_test`. This run produced 5424 fused
+samples over 14.95 s with 0.3228 m SE(3) RMSE. At 1.0x replay, the same runner
+processed only 273 visual frames on this machine and the fused RMSE regressed to
+about 0.42 m, so visual frame coverage is now a benchmark precondition.
+
 The public Tank Dataset page currently exposes `short_test` as sample data and
 requires the download form for the full sequence set, so this table keeps
 Structure_Easy and Medium rows as targets until those bags are available.
@@ -227,6 +253,7 @@ same APE implementation.
 | Tank Dataset | short_test | aqua_localization | SE(3) | 5399 | 14.94 | 0.3796 | 0.4014 | 0.4291 | 0.7652 | ROS 2 Humble, IMU+pressure+DVL, same AprilTag GT export |
 | Tank Dataset | short_test | aqua_visual_frontend | SE(3) | 200 | 11.25 | 0.0815 | 0.0792 | 0.0947 | 0.2416 | stereo ORB+PnP, same-sequence scale fit from calibrate_visual_scale.py |
 | Tank Dataset | short_test | aqua_localization+visual | SE(3) | 5399 | 14.94 | 0.3384 | 0.2928 | 0.3726 | 0.7497 | visual position update, same-sequence scale fit |
+| Tank Dataset | short_test | aqua_localization+visual | SE(3) | 5424 | 14.95 | 0.2579 | 0.2220 | 0.3228 | 1.2305 | base-frame visual odometry, same-sequence scale/extrinsic diagnostics, replay rate 0.25 |
 | Tank Dataset | Medium | aqua_visual_frontend | TBD | TBD | TBD | TBD | TBD | TBD | TBD | held-out validation after scale calibration on Structure_Easy |
 | Tank Dataset | Structure_Easy | AQUA-SLAM | TBD | TBD | TBD | TBD | TBD | TBD | TBD | record AQUA-SLAM output topic to TUM |
 | Tank Dataset | Structure_Easy | aqua_localization | TBD | TBD | TBD | TBD | TBD | TBD | TBD | run closest available input mode |
