@@ -72,5 +72,6 @@ Demo notes: https://github.com/rsasaki0109/aqua_localization/tree/main/datasets
   artifact paths still exist.
 - Include one concrete metric in the post. The current strongest number is
   Tank Dataset `short_test`: 0.43 m APE RMSE vs AprilTag ground truth.
-- Mention limitations clearly: the pose graph backend ships, but loop
-  closure detection is the next milestone.
+- Mention limitations clearly: the pose graph backend and experimental
+  MBES loop-closure front end ship, but real-bag loop-closure tuning and
+  false-positive analysis are still in progress.
