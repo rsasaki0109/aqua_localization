@@ -1,3 +1,4 @@
+#include <cmath>
 #include <deque>
 #include <memory>
 #include <vector>
@@ -150,6 +151,9 @@ TEST(MbesLoopClosureFrontendTest, DescriptorGateCanBeDisabled)
 
   EXPECT_TRUE(gate.accepted);
   EXPECT_EQ(gate.status, "descriptor gate accepted");
+  EXPECT_TRUE(std::isfinite(gate.descriptor_centroid_distance_m));
+  EXPECT_TRUE(std::isfinite(gate.descriptor_extent_ratio));
+  EXPECT_TRUE(std::isfinite(gate.descriptor_point_count_ratio));
 }
 
 TEST(MbesLoopClosureFrontendTest, SubmapManagerCapsPointsAndHistory)

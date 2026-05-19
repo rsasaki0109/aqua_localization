@@ -325,39 +325,42 @@ GateResult DescriptorGateEvaluator::evaluate(const Submap & candidate, const Sub
     return gate;
   }
 
-  if (options_.min_point_count_ratio > 0.0) {
-    const auto min_points =
-      std::min(candidate.descriptor.point_count, current.descriptor.point_count);
-    const auto max_points =
-      std::max(candidate.descriptor.point_count, current.descriptor.point_count);
-    const double count_ratio =
-      static_cast<double>(min_points) / static_cast<double>(max_points);
-    if (count_ratio < options_.min_point_count_ratio) {
-      gate.status = "descriptor gate rejected";
-      return gate;
-    }
+  const auto min_points =
+    std::min(candidate.descriptor.point_count, current.descriptor.point_count);
+  const auto max_points =
+    std::max(candidate.descriptor.point_count, current.descriptor.point_count);
+  gate.descriptor_point_count_ratio =
+    static_cast<double>(min_points) / static_cast<double>(max_points);
+
+  gate.descriptor_centroid_distance_m =
+    (candidate.descriptor.centroid - current.descriptor.centroid).norm();
+
+  const Eigen::Vector3d candidate_extent = candidate.descriptor.extent;
+  const Eigen::Vector3d current_extent = current.descriptor.extent;
+  gate.descriptor_extent_ratio = std::max({
+    ratio_or_infinity(candidate_extent.x(), current_extent.x()),
+    ratio_or_infinity(candidate_extent.y(), current_extent.y()),
+    ratio_or_infinity(candidate_extent.z(), current_extent.z())});
+
+  if (options_.min_point_count_ratio > 0.0 &&
+    gate.descriptor_point_count_ratio < options_.min_point_count_ratio)
+  {
+    gate.status = "descriptor gate rejected";
+    return gate;
   }
 
-  if (options_.max_centroid_distance_m > 0.0) {
-    const double centroid_distance =
-      (candidate.descriptor.centroid - current.descriptor.centroid).norm();
-    if (centroid_distance > options_.max_centroid_distance_m) {
-      gate.status = "descriptor gate rejected";
-      return gate;
-    }
+  if (options_.max_centroid_distance_m > 0.0 &&
+    gate.descriptor_centroid_distance_m > options_.max_centroid_distance_m)
+  {
+    gate.status = "descriptor gate rejected";
+    return gate;
   }
 
-  if (options_.max_extent_ratio > 0.0) {
-    const Eigen::Vector3d candidate_extent = candidate.descriptor.extent;
-    const Eigen::Vector3d current_extent = current.descriptor.extent;
-    const double extent_ratio = std::max({
-      ratio_or_infinity(candidate_extent.x(), current_extent.x()),
-      ratio_or_infinity(candidate_extent.y(), current_extent.y()),
-      ratio_or_infinity(candidate_extent.z(), current_extent.z())});
-    if (extent_ratio > options_.max_extent_ratio) {
-      gate.status = "descriptor gate rejected";
-      return gate;
-    }
+  if (options_.max_extent_ratio > 0.0 &&
+    gate.descriptor_extent_ratio > options_.max_extent_ratio)
+  {
+    gate.status = "descriptor gate rejected";
+    return gate;
   }
 
   gate.accepted = true;

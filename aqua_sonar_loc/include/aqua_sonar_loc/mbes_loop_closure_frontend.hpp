@@ -53,6 +53,9 @@ struct GateResult
   bool accepted{false};
   double correction_translation_m{std::numeric_limits<double>::quiet_NaN()};
   double correction_rotation_rad{std::numeric_limits<double>::quiet_NaN()};
+  double descriptor_centroid_distance_m{std::numeric_limits<double>::quiet_NaN()};
+  double descriptor_extent_ratio{std::numeric_limits<double>::quiet_NaN()};
+  double descriptor_point_count_ratio{std::numeric_limits<double>::quiet_NaN()};
   std::string status;
 };
 
