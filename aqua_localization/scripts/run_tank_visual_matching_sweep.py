@@ -210,38 +210,98 @@ def format_percent(value: float) -> str:
     return f"{100.0 * value:.1f}%"
 
 
+def gap_ratio(rmse_m: float, baseline_rmse_m: float) -> float:
+    if not math.isfinite(rmse_m) or not math.isfinite(baseline_rmse_m):
+        return math.nan
+    if baseline_rmse_m <= 0.0:
+        return math.inf
+    return rmse_m / baseline_rmse_m
+
+
+def improvement_to_tie_percent(rmse_m: float, baseline_rmse_m: float) -> float:
+    if not math.isfinite(rmse_m) or not math.isfinite(baseline_rmse_m):
+        return math.nan
+    if rmse_m <= 0.0:
+        return 0.0
+    return max(0.0, (1.0 - baseline_rmse_m / rmse_m) * 100.0)
+
+
+def has_baseline(args) -> bool:
+    return math.isfinite(float(getattr(args, "baseline_rmse_m", math.nan)))
+
+
 def format_markdown(results: list[SweepResult], args) -> str:
     valid = [result for result in results if math.isfinite(result.rmse_m)]
     best = min(valid, key=lambda result: result.rmse_m) if valid else None
+    include_baseline = has_baseline(args)
+    header = [
+        "Stereo dist",
+        "Temporal dist",
+        "Status",
+        "RMSE m",
+    ]
+    separator = [
+        "-------------",
+        "---------------",
+        "--------",
+        "-------:",
+    ]
+    if include_baseline:
+        header.extend(["Gap x", "Improvement to tie"])
+        separator.extend(["------:", "-------------------:"])
+    header.extend([
+        "Matched s",
+        "Accepted",
+        "Median PnP inliers",
+        "Median temporal matches",
+        "Output",
+    ])
+    separator.extend([
+        "----------:",
+        "---------:",
+        "-------------------:",
+        "------------------------:",
+        "--------",
+    ])
     lines = [
         "# Tank Visual Matching Sweep",
         "",
         f"Sequence: `{args.sequence}`",
         f"Reference: `{args.reference}`",
         f"Translation scale: `{args.translation_scale:g}`",
-        "",
-        "| Stereo dist | Temporal dist | Status | RMSE m | Matched s | Accepted | Median PnP inliers | Median temporal matches | Output |",
-        "|-------------|---------------|--------|-------:|----------:|---------:|-------------------:|------------------------:|--------|",
     ]
+    if include_baseline:
+        lines.append(f"Baseline RMSE: `{args.baseline_rmse_m:g}` m")
+    lines.extend([
+        "",
+        "| " + " | ".join(header) + " |",
+        "| " + " | ".join(separator) + " |",
+    ])
     for result in results:
         marker = "best" if best is not None and result is best else "ok"
         if result.returncode != 0:
             marker = f"failed ({result.returncode})"
+        cells = [
+            format_distance(result.case.stereo_distance),
+            format_distance(result.case.temporal_distance),
+            marker,
+            format_float(result.rmse_m),
+        ]
+        if include_baseline:
+            cells.extend([
+                format_float(gap_ratio(result.rmse_m, args.baseline_rmse_m), precision=2),
+                f"{format_float(improvement_to_tie_percent(result.rmse_m, args.baseline_rmse_m), precision=1)}%",
+            ])
+        cells.extend([
+            format_float(result.matched_seconds, precision=2),
+            format_percent(result.accepted_ratio),
+            format_float(result.median_pnp_inliers, precision=1),
+            format_float(result.median_temporal_matches, precision=1),
+            f"`{result.out_dir}`",
+        ])
         lines.append(
             "| "
-            + " | ".join(
-                [
-                    format_distance(result.case.stereo_distance),
-                    format_distance(result.case.temporal_distance),
-                    marker,
-                    format_float(result.rmse_m),
-                    format_float(result.matched_seconds, precision=2),
-                    format_percent(result.accepted_ratio),
-                    format_float(result.median_pnp_inliers, precision=1),
-                    format_float(result.median_temporal_matches, precision=1),
-                    f"`{result.out_dir}`",
-                ]
-            )
+            + " | ".join(cells)
             + " |"
         )
 
@@ -266,6 +326,17 @@ def format_markdown(results: list[SweepResult], args) -> str:
                 ),
             ]
         )
+        if include_baseline:
+            lines.extend(
+                [
+                    (
+                        f"Best gap to baseline: "
+                        f"`{format_float(gap_ratio(best.rmse_m, args.baseline_rmse_m), precision=2)}x`; "
+                        f"RMSE reduction still needed to tie: "
+                        f"`{format_float(improvement_to_tie_percent(best.rmse_m, args.baseline_rmse_m), precision=1)}%`."
+                    ),
+                ]
+            )
     return "\n".join(lines)
 
 
@@ -299,6 +370,12 @@ def parse_args(argv):
     parser.add_argument("--sequence", default="short_test")
     parser.add_argument("--system", default="aqua_visual_frontend")
     parser.add_argument("--translation-scale", type=float, default=1.0)
+    parser.add_argument(
+        "--baseline-rmse-m",
+        type=float,
+        default=math.nan,
+        help="Optional baseline RMSE for gap-to-baseline columns, e.g. AQUA-SLAM 0.0194.",
+    )
     parser.add_argument("--stereo-distances", default=DEFAULT_DISTANCE_SET)
     parser.add_argument("--temporal-distances", default=DEFAULT_DISTANCE_SET)
     parser.add_argument(
@@ -321,6 +398,8 @@ def main(argv=None):
     args = parse_args(argv if argv is not None else sys.argv[1:])
     if args.translation_scale <= 0.0:
         raise ValueError("--translation-scale must be positive")
+    if math.isfinite(args.baseline_rmse_m) and args.baseline_rmse_m <= 0.0:
+        raise ValueError("--baseline-rmse-m must be positive")
     if args.play_rate <= 0.0:
         raise ValueError("--play-rate must be positive")
 

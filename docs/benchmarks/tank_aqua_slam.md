@@ -202,11 +202,14 @@ ros2 run aqua_localization run_tank_visual_matching_sweep.py \
   --out-dir /tmp/aqua_tank_visual_matching_sweep \
   --sequence tank_sequence \
   --translation-scale <calibrated-scale> \
+  --baseline-rmse-m 0.0194 \
   --pairs 64:64,80:80,96:96,112:112,disabled:disabled
 ```
 
 Use the best held-out setting from `visual_matching_sweep.md` when generating
-the next `trajectory_benchmark_row.py` result.
+the next `trajectory_benchmark_row.py` result. The baseline RMSE column makes
+the sweep table directly show how far each setting is from the current
+AQUA-SLAM `short_test` anchor.
 
 ## Generate Rows
 
