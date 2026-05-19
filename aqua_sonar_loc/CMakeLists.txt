@@ -93,6 +93,21 @@ if(BUILD_TESTING)
     rclcpp
     sensor_msgs
   )
+
+  ament_add_gtest(
+    test_mbes_loop_closure_node_runtime
+    test/test_mbes_loop_closure_node_runtime.cpp
+  )
+  target_link_libraries(test_mbes_loop_closure_node_runtime ${PCL_LIBRARIES})
+  target_include_directories(test_mbes_loop_closure_node_runtime PUBLIC ${PCL_INCLUDE_DIRS})
+  ament_target_dependencies(
+    test_mbes_loop_closure_node_runtime
+    aqua_msgs
+    geometry_msgs
+    pcl_conversions
+    rclcpp
+    sensor_msgs
+  )
 endif()
 
 ament_package()

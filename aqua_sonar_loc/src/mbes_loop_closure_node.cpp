@@ -23,10 +23,27 @@
 namespace aqua_sonar_loc
 {
 
+using PointCloud = pcl::PointCloud<pcl::PointXYZ>;
+
+struct Submap
+{
+  std::uint32_t id{0};
+  rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
+  Eigen::Isometry3d pose{Eigen::Isometry3d::Identity()};
+  PointCloud::Ptr cloud{std::make_shared<PointCloud>()};
+};
+
+struct MatchResult
+{
+  bool success{false};
+  bool converged{false};
+  double fitness{0.0};
+  Eigen::Isometry3d candidate_to_current{Eigen::Isometry3d::Identity()};
+  std::string status;
+};
+
 namespace
 {
-
-using PointCloud = pcl::PointCloud<pcl::PointXYZ>;
 
 Eigen::Isometry3d pose_to_isometry(const geometry_msgs::msg::Pose & msg)
 {
@@ -99,23 +116,6 @@ std::array<double, 36> diagonal_information(
   return info;
 }
 
-struct Submap
-{
-  std::uint32_t id{0};
-  rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
-  Eigen::Isometry3d pose{Eigen::Isometry3d::Identity()};
-  PointCloud::Ptr cloud{std::make_shared<PointCloud>()};
-};
-
-struct MatchResult
-{
-  bool success{false};
-  bool converged{false};
-  double fitness{0.0};
-  Eigen::Isometry3d candidate_to_current{Eigen::Isometry3d::Identity()};
-  std::string status;
-};
-
 template<typename RegistrationT>
 MatchResult run_registration(
   RegistrationT & registration,
@@ -155,8 +155,8 @@ MatchResult run_registration(
 class MbesLoopClosureNode : public rclcpp::Node
 {
 public:
-  MbesLoopClosureNode()
-  : Node("mbes_loop_closure")
+  explicit MbesLoopClosureNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  : Node("mbes_loop_closure", options)
   {
     load_parameters();
 
@@ -446,6 +446,7 @@ private:
 
 }  // namespace aqua_sonar_loc
 
+#ifndef AQUA_SONAR_LOC_DISABLE_MBES_LOOP_MAIN
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
@@ -453,3 +454,4 @@ int main(int argc, char ** argv)
   rclcpp::shutdown();
   return 0;
 }
+#endif
