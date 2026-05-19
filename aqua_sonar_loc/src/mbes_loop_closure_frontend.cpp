@@ -19,6 +19,11 @@ namespace aqua_sonar_loc
 namespace
 {
 
+std::uint32_t id_distance(std::uint32_t a, std::uint32_t b)
+{
+  return a > b ? a - b : b - a;
+}
+
 template<typename RegistrationT>
 MatchResult run_registration(
   RegistrationT & registration,
@@ -298,6 +303,36 @@ GateResult LoopGateEvaluator::evaluate(
   gate.accepted = true;
   gate.status = "accepted";
   return gate;
+}
+
+AcceptedLoopTracker::AcceptedLoopTracker(LoopSuppressionOptions options)
+: options_(std::move(options))
+{
+}
+
+bool AcceptedLoopTracker::is_suppressed(std::uint32_t from_id, std::uint32_t to_id) const
+{
+  if (options_.min_repeat_keyframe_gap <= 0) {
+    return false;
+  }
+
+  const auto gap = static_cast<std::uint32_t>(options_.min_repeat_keyframe_gap);
+  return std::any_of(
+    accepted_loops_.begin(), accepted_loops_.end(),
+    [from_id, to_id, gap](const AcceptedLoop & loop) {
+      return id_distance(loop.from_id, from_id) <= gap &&
+             id_distance(loop.to_id, to_id) <= gap;
+    });
+}
+
+void AcceptedLoopTracker::record(std::uint32_t from_id, std::uint32_t to_id)
+{
+  accepted_loops_.push_back(AcceptedLoop{from_id, to_id});
+}
+
+const std::vector<AcceptedLoop> & AcceptedLoopTracker::accepted_loops() const
+{
+  return accepted_loops_;
 }
 
 }  // namespace aqua_sonar_loc

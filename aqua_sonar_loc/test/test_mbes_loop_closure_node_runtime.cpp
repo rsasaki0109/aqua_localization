@@ -165,8 +165,8 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
   std::vector<visualization_msgs::msg::MarkerArray> marker_messages;
   auto keyframe_pub = test_node->create_publisher<aqua_msgs::msg::PoseGraphKeyframe>(
     kKeyframeTopic, rclcpp::QoS(10).transient_local());
-  auto points_pub =
-    test_node->create_publisher<sensor_msgs::msg::PointCloud2>(kPointsTopic, rclcpp::SensorDataQoS());
+  auto points_pub = test_node->create_publisher<sensor_msgs::msg::PointCloud2>(
+    kPointsTopic, rclcpp::SensorDataQoS());
   auto loop_sub = test_node->create_subscription<aqua_msgs::msg::PoseGraphLoopConstraint>(
     kLoopTopic, 10,
     [&loop_messages](const aqua_msgs::msg::PoseGraphLoopConstraint::SharedPtr msg) {
@@ -242,6 +242,20 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
   EXPECT_NEAR(marker.points[0].x, 0.0, 1e-9);
   EXPECT_NEAR(marker.points[1].x, 0.0, 1e-9);
   EXPECT_GT(marker.color.g, marker.color.r);
+
+  const auto loop_count_after_first_accept = loop_messages.size();
+  points_pub->publish(make_cloud(test_node->now(), points));
+  ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));
+  keyframe_pub->publish(make_keyframe(test_node->now(), 3, 0.0));
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    return std::any_of(
+      status_messages.begin(), status_messages.end(),
+      [](const aqua_msgs::msg::LoopClosureStatus & msg) {
+        return msg.status == "duplicate loop suppressed";
+      });
+  }));
+
+  EXPECT_EQ(loop_messages.size(), loop_count_after_first_accept);
 }
 
 }  // namespace

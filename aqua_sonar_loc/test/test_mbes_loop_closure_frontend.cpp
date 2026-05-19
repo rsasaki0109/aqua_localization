@@ -103,3 +103,31 @@ TEST(MbesLoopClosureFrontendTest, SubmapManagerCapsPointsAndHistory)
   ASSERT_EQ(manager.submaps().size(), 1U);
   EXPECT_EQ(manager.submaps().front().id, 2U);
 }
+
+TEST(MbesLoopClosureFrontendTest, AcceptedLoopTrackerSuppressesNearbyAcceptedPairs)
+{
+  aqua_sonar_loc::LoopSuppressionOptions options;
+  options.min_repeat_keyframe_gap = 3;
+  aqua_sonar_loc::AcceptedLoopTracker tracker(options);
+
+  EXPECT_FALSE(tracker.is_suppressed(10, 30));
+  tracker.record(10, 30);
+
+  EXPECT_TRUE(tracker.is_suppressed(12, 32));
+  EXPECT_TRUE(tracker.is_suppressed(7, 27));
+  EXPECT_FALSE(tracker.is_suppressed(14, 32));
+  EXPECT_FALSE(tracker.is_suppressed(12, 34));
+  ASSERT_EQ(tracker.accepted_loops().size(), 1U);
+}
+
+TEST(MbesLoopClosureFrontendTest, AcceptedLoopTrackerCanBeDisabled)
+{
+  aqua_sonar_loc::LoopSuppressionOptions options;
+  options.min_repeat_keyframe_gap = 0;
+  aqua_sonar_loc::AcceptedLoopTracker tracker(options);
+
+  tracker.record(10, 30);
+
+  EXPECT_FALSE(tracker.is_suppressed(10, 30));
+  EXPECT_FALSE(tracker.is_suppressed(11, 31));
+}

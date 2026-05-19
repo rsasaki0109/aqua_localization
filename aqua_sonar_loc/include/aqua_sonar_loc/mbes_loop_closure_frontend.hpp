@@ -96,6 +96,17 @@ struct GateOptions
   double max_correction_rotation_rad{0.5};
 };
 
+struct LoopSuppressionOptions
+{
+  int min_repeat_keyframe_gap{0};
+};
+
+struct AcceptedLoop
+{
+  std::uint32_t from_id{0};
+  std::uint32_t to_id{0};
+};
+
 Eigen::Isometry3d pose_to_isometry(const geometry_msgs::msg::Pose & msg);
 geometry_msgs::msg::Pose isometry_to_pose(const Eigen::Isometry3d & pose);
 PointCloud::Ptr convert_cloud(const sensor_msgs::msg::PointCloud2 & msg);
@@ -161,6 +172,21 @@ public:
 
 private:
   GateOptions options_;
+};
+
+class AcceptedLoopTracker
+{
+public:
+  explicit AcceptedLoopTracker(LoopSuppressionOptions options);
+
+  bool is_suppressed(std::uint32_t from_id, std::uint32_t to_id) const;
+  void record(std::uint32_t from_id, std::uint32_t to_id);
+
+  const std::vector<AcceptedLoop> & accepted_loops() const;
+
+private:
+  LoopSuppressionOptions options_;
+  std::vector<AcceptedLoop> accepted_loops_;
 };
 
 }  // namespace aqua_sonar_loc
