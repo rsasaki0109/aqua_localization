@@ -159,6 +159,30 @@ The script prints the scale learned on the calibration pair and a Markdown row
 for the held-out validation pair. If the same path is reused for both, it emits
 a warning because that is only a diagnostic fit.
 
+To bundle the visual frontend replay, trajectory recording, scale diagnostic,
+and benchmark-row generation into one command:
+
+```bash
+ros2 run aqua_localization run_tank_visual_benchmark.py \
+  --bag aqua_localization/datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_short_test \
+  --sequence short_test
+```
+
+The runner writes the recorded visual TUM file, a `calibrate_visual_scale.py`
+report, a Markdown benchmark row, and a replay shell script containing the exact
+ROS commands it used. If you already have a visual TUM estimate, skip ROS replay
+and evaluate it directly:
+
+```bash
+ros2 run aqua_localization run_tank_visual_benchmark.py \
+  --estimate /tmp/tank_short_test_visual_frontend.tum \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_short_test \
+  --sequence short_test
+```
+
 The published pose is in a `visual_odom -> camera_left` frame. Treat it as an
 experimental visual frontend output until a calibrated camera-to-base extrinsic
 and fusion path are wired.
