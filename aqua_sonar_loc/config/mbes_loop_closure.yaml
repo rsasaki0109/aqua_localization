@@ -47,3 +47,6 @@ mbes_loop_closure:
       translation_sigma_m: 2.0
       rotation_sigma_rad: 0.35
       optimize_after_insert: true
+      # Suppress accepted loop constraints whose endpoints are both near an
+      # already accepted loop. Set <= 0 to disable.
+      min_repeat_keyframe_gap: 5

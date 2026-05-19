@@ -117,8 +117,11 @@ private:
       declare_parameter<double>("loop.rotation_sigma_rad", 0.35);
     optimize_after_insert_ =
       declare_parameter<bool>("loop.optimize_after_insert", true);
+    loop_suppression_options_.min_repeat_keyframe_gap =
+      declare_parameter<int>("loop.min_repeat_keyframe_gap", 5);
 
     submap_manager_ = SubmapManager(submap_options_);
+    accepted_loop_tracker_ = AcceptedLoopTracker(loop_suppression_options_);
   }
 
   void on_keyframe(const aqua_msgs::msg::PoseGraphKeyframe & msg)
@@ -182,7 +185,13 @@ private:
         candidate_to_current_guess.inverse();
       MatchResult result =
         registration.match(candidate, current, current_to_candidate_guess);
-      const GateResult gate = gate_evaluator.evaluate(candidate_to_current_guess, result);
+      GateResult gate = gate_evaluator.evaluate(candidate_to_current_guess, result);
+      if (gate.accepted &&
+        accepted_loop_tracker_.is_suppressed(candidate.id, current.id))
+      {
+        gate.accepted = false;
+        gate.status = "duplicate loop suppressed";
+      }
       publish_status(candidate, current, result, gate);
       publish_candidate_marker(candidate, current, gate);
       if (!gate.accepted) {
@@ -193,6 +202,7 @@ private:
       }
 
       publish_loop_constraint(candidate, current, result.candidate_to_current);
+      accepted_loop_tracker_.record(candidate.id, current.id);
       return;
     }
     if (tested == 0) {
@@ -293,6 +303,7 @@ private:
   CandidateSelectionOptions candidate_options_;
   RegistrationOptions registration_options_;
   GateOptions gate_options_;
+  LoopSuppressionOptions loop_suppression_options_;
 
   double loop_translation_sigma_m_{2.0};
   double loop_rotation_sigma_rad_{0.35};
@@ -300,6 +311,7 @@ private:
   std::uint32_t marker_sequence_{0};
 
   SubmapManager submap_manager_{submap_options_};
+  AcceptedLoopTracker accepted_loop_tracker_{loop_suppression_options_};
 
   rclcpp::Subscription<aqua_msgs::msg::PoseGraphKeyframe>::SharedPtr keyframe_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr points_sub_;
