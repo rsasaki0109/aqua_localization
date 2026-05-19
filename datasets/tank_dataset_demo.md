@@ -112,6 +112,8 @@ ros2 run aqua_localization stereo_visual_odometry.py --ros-args \
   -p camera.cx:=306.0 \
   -p camera.cy:=256.0 \
   -p camera.bf:=78.89165891925023 \
+  -p matching.max_stereo_descriptor_distance:=96.0 \
+  -p matching.max_temporal_descriptor_distance:=96.0 \
   -p diagnostics.status_csv_path:=/tmp/tank_short_test_visual_status.csv
 
 # Terminal B: camera-included bag.
@@ -198,6 +200,10 @@ thresholds: low stereo points means image/stereo triangulation is the bottleneck
 low disparity or a long depth tail means metric scale is sensitive to pixel
 noise, while low PnP inliers means temporal tracking or outlier rejection is the
 bottleneck.
+The `matching.max_stereo_descriptor_distance` and
+`matching.max_temporal_descriptor_distance` parameters reject weak ORB Hamming
+matches before triangulation and PnP; set either to `0.0` only for an ablation
+run that intentionally disables that descriptor-distance filter.
 
 Summarize the CSV after a run:
 
