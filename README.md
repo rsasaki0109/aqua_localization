@@ -32,6 +32,10 @@ custom AUVs, and `uuv_simulator`. ROS 2 Humble and Jazzy are supported.
 
 Latest release: **[v0.2](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.2)**.
 
+<p align="center">
+  <img src="docs/media/aqua_pipeline.svg" alt="aqua_localization pipeline from underwater sensors to filtering, sonar registration, pose graph loop closure, and visualization" width="92%">
+</p>
+
 ## Start Here
 
 | Goal | Where to go |
