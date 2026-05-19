@@ -192,6 +192,22 @@ ros2 run aqua_localization benchmark_gap_report.py \
 Tighten those numbers after each real accuracy improvement. For example,
 `--max-gap-x 4.0` intentionally fails today because the current gap is `4.88x`.
 
+Before updating the head-to-head table after a matching change, run the visual
+matching sweep so the selected ORB descriptor-distance gates are evidence-based:
+
+```bash
+ros2 run aqua_localization run_tank_visual_matching_sweep.py \
+  --bag /path/to/tank_sequence_ros2_with_cameras \
+  --reference /tmp/tank_sequence_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_matching_sweep \
+  --sequence tank_sequence \
+  --translation-scale <calibrated-scale> \
+  --pairs 64:64,80:80,96:96,112:112,disabled:disabled
+```
+
+Use the best held-out setting from `visual_matching_sweep.md` when generating
+the next `trajectory_benchmark_row.py` result.
+
 ## Generate Rows
 
 Use the same reference TUM for both systems:

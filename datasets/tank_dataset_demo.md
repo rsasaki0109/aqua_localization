@@ -205,6 +205,23 @@ The `matching.max_stereo_descriptor_distance` and
 matches before triangulation and PnP; set either to `0.0` only for an ablation
 run that intentionally disables that descriptor-distance filter.
 
+Sweep those thresholds with:
+
+```bash
+ros2 run aqua_localization run_tank_visual_matching_sweep.py \
+  --bag aqua_localization/datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_matching_sweep \
+  --sequence short_test \
+  --translation-scale 0.169623465 \
+  --pairs 64:64,80:80,96:96,112:112,disabled:disabled
+```
+
+The sweep writes `visual_matching_sweep.md` with RMSE, matched duration,
+acceptance rate, median PnP inliers, and median temporal matches for each
+setting. Use `--matrix` with `--stereo-distances` and `--temporal-distances` for
+a full Cartesian grid when runtime is acceptable.
+
 Summarize the CSV after a run:
 
 ```bash
