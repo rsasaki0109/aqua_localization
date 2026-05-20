@@ -31,6 +31,10 @@ such as `blue_gx5_StructureEasy.launch`, and notes that different sequences may
 need different extrinsic calibration files. It also documents a known issue:
 long sequences may randomly crash due to multithreading problems.
 
+Upstream source inspection shows the primary odometry output topic is
+`/AQUA_SLAM/orb_odom` (`nav_msgs/Odometry`), published from
+`src/RosHandling.cpp`.
+
 ## Direct Comparison
 
 | Axis | AQUA-SLAM | `aqua_localization` | Current read |
@@ -104,8 +108,7 @@ loop-closure diagnostics.
    Document the exact Docker, vocabulary download, Tank Dataset placement, and
    `rosbag play` commands from the AQUA-SLAM README.
 2. **Identify AQUA-SLAM output odometry topic.**
-   Run `rostopic list` inside its Docker workflow and record the published pose
-   topic used for APE export.
+   Use `/AQUA_SLAM/orb_odom` first. Confirm with `rostopic hz` during replay.
 3. **Write `record_aqua_slam_tank_baseline.md`.**
    Keep this as documentation first unless a reproducible ROS 1 container can
    be automated cleanly from this repository.
@@ -118,6 +121,28 @@ loop-closure diagnostics.
 6. **Generate a comparison table.**
    Start with [`tank_aqua_slam.md`](tank_aqua_slam.md), then include accuracy,
    runtime, setup steps, license, ROS generation, and failure modes.
+
+## AQUA-SLAM TUM Export
+
+Inside the AQUA-SLAM ROS 1 Docker container, after launching
+`blue_gx5_StructureEasy.launch` and starting `rosbag play`, record the odometry
+CSV:
+
+```bash
+rostopic echo -p /AQUA_SLAM/orb_odom > /tmp/aqua_slam_orb_odom.csv
+```
+
+Then convert that CSV with this repository's ROS 2-side helper:
+
+```bash
+ros2 run aqua_localization ros1_odometry_csv_to_tum.py \
+  --csv /tmp/aqua_slam_orb_odom.csv \
+  --out /tmp/tank_structure_easy_aqua_slam.tum \
+  --time-unit auto
+```
+
+The output can be passed directly to `compare_trajectories.py` or
+`trajectory_benchmark_row.py`.
 
 ## Decision: Where Can We Beat It?
 

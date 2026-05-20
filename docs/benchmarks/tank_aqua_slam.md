@@ -8,6 +8,10 @@ No AQUA-SLAM trajectory has been recorded into this repository yet. The first
 goal is to make both systems write TUM trajectories for the same sequence and
 then use the same comparison command.
 
+Upstream AQUA-SLAM publishes its main estimate on `/AQUA_SLAM/orb_odom`
+(`nav_msgs/Odometry`). Record that ROS 1 topic with `rostopic echo -p`, then
+convert it with `ros1_odometry_csv_to_tum.py`.
+
 ## Current Anchor Result
 
 `aqua_localization` already has a public Tank Dataset anchor on `short_test`
@@ -33,6 +37,17 @@ available for the same sequence.
 ## Generate Rows
 
 Use the same reference TUM for both systems:
+
+```bash
+# In the AQUA-SLAM ROS 1 Docker container while Structure_Easy.bag is playing.
+rostopic echo -p /AQUA_SLAM/orb_odom > /tmp/aqua_slam_orb_odom.csv
+
+# In this ROS 2 workspace after making the CSV visible on the host.
+ros2 run aqua_localization ros1_odometry_csv_to_tum.py \
+  --csv /tmp/aqua_slam_orb_odom.csv \
+  --out /tmp/tank_structure_easy_aqua_slam.tum \
+  --time-unit auto
+```
 
 ```bash
 ros2 run aqua_localization trajectory_benchmark_row.py \
