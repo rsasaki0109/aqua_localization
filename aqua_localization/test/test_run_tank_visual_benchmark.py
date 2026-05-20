@@ -46,6 +46,7 @@ def test_default_paths_sanitize_sequence_name(tmp_path):
     assert paths.status_csv == tmp_path / "Tank_short_test_visual_frontend_status.csv"
     assert paths.status_summary == tmp_path / "Tank_short_test_visual_frontend_status.md"
     assert paths.drift_report == tmp_path / "Tank_short_test_visual_drift.md"
+    assert paths.motion_segments_report == tmp_path / "Tank_short_test_visual_motion_segments.md"
     assert paths.scale_report == tmp_path / "Tank_short_test_visual_scale_report.txt"
     assert paths.benchmark_row == tmp_path / "Tank_short_test_visual_benchmark.md"
     assert paths.replay_script == tmp_path / "Tank_short_test_visual_replay.sh"
@@ -122,7 +123,10 @@ def test_evaluate_writes_scale_report_and_markdown_row(tmp_path):
     assert paths.scale_report.exists()
     assert paths.benchmark_row.exists()
     assert paths.drift_report.exists()
+    assert paths.motion_segments_report.exists()
     assert "Visual Drift Analysis" in paths.drift_report.read_text(encoding="utf-8")
+    assert "Visual Motion Segment Analysis" in paths.motion_segments_report.read_text(
+        encoding="utf-8")
     assert "same-sequence Sim(3) scale diagnostic=0.250000000" in paths.benchmark_row.read_text(
         encoding="utf-8")
 
