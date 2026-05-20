@@ -24,6 +24,7 @@ import time
 
 import run_tank_visual_benchmark
 import trajectory_benchmark_row
+import visual_calibration_profile
 
 
 DEFAULT_VISUAL_TOPIC = "/aqua_visual_frontend/fusion_visual/odometry"
@@ -313,6 +314,12 @@ def make_benchmark_row(args, paths: FusionBenchmarkPaths, coverage: VisualCovera
         f"replay rate={args.play_rate:g}; "
         f"{format_visual_coverage_note(coverage)}"
     )
+    if args.visual_calibration_profile:
+        label = visual_calibration_profile.profile_label(
+            args.visual_calibration_profile,
+            visual_calibration_profile.load_profile(args.visual_calibration_profile),
+        )
+        note += f"; calibration profile={label}"
     row_args = SimpleNamespace(
         dataset=args.dataset,
         sequence=args.sequence,
@@ -351,9 +358,15 @@ def evaluate(args, paths: FusionBenchmarkPaths) -> str:
     return "\n".join(lines)
 
 
-def parse_args(argv):
+def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run Tank visual-aided IMU/DVL fusion and write a benchmark row."
+    )
+    parser.add_argument(
+        "--visual-calibration-profile",
+        type=Path,
+        default=None,
+        help="YAML profile from visual_calibration_profile.py. CLI arguments override profile defaults.",
     )
     parser.add_argument("--bag", required=True, type=Path)
     parser.add_argument("--reference", required=True, type=Path)
@@ -400,6 +413,18 @@ def parse_args(argv):
     parser.add_argument("--stop-timeout", type=float, default=5.0)
     parser.add_argument("--no-sim-time", dest="use_sim_time", action="store_false")
     parser.set_defaults(use_sim_time=True)
+    return parser
+
+
+def parse_args(argv):
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--visual-calibration-profile", type=Path, default=None)
+    pre_args, _ = pre_parser.parse_known_args(argv)
+    parser = build_arg_parser()
+    if pre_args.visual_calibration_profile is not None:
+        parser.set_defaults(
+            **visual_calibration_profile.profile_arg_defaults(pre_args.visual_calibration_profile)
+        )
     return parser.parse_args(argv)
 
 

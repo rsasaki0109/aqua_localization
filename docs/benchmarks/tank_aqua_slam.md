@@ -106,6 +106,39 @@ ros2 run aqua_localization validate_visual_scale.py \
   --markdown
 ```
 
+The same calibrated values can be stored as a reusable YAML profile. Use one
+calibration sequence to write the profile, then pass that profile to the fusion
+benchmark on a held-out sequence:
+
+```bash
+ros2 run aqua_localization visual_calibration_profile.py \
+  --out /tmp/tank_structure_easy_visual_profile.yaml \
+  --name tank_structure_easy_visual \
+  --calibration-reference /tmp/tank_structure_easy_gt.tum \
+  --calibration-estimate /tmp/tank_structure_easy_visual.tum \
+  --calibration-sequence Structure_Easy \
+  --validation-sequence Medium \
+  --base-from-camera-x-m -0.25 \
+  --base-from-camera-y-m -0.45 \
+  --base-from-camera-z-m 0.0 \
+  --orb-n-features 700 \
+  --orb-fast-threshold 16 \
+  --opencv-threads 2 \
+  --visual-position-variance-floor 0.01
+
+ros2 run aqua_localization run_tank_visual_fusion_benchmark.py \
+  --visual-calibration-profile /tmp/tank_structure_easy_visual_profile.yaml \
+  --bag /tmp/tank_medium_ros2_visual \
+  --reference /tmp/tank_medium_gt.tum \
+  --out-dir /tmp/aqua_tank_medium_visual_fusion \
+  --sequence Medium \
+  --expected-visual-frames 300
+```
+
+CLI arguments passed to `run_tank_visual_fusion_benchmark.py` override profile
+defaults, so a profile can be reused while still sweeping replay rate or feature
+settings. Benchmark rows include the profile name in the note.
+
 For single-sequence visual frontend experiments, `run_tank_visual_benchmark.py`
 can replay a camera bag, record `/aqua_visual_frontend/odometry`, emit the scale
 diagnostic, and save a Markdown benchmark row:

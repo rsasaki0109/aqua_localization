@@ -162,6 +162,30 @@ The script prints the scale learned on the calibration pair and a Markdown row
 for the held-out validation pair. If the same path is reused for both, it emits
 a warning because that is only a diagnostic fit.
 
+Store the calibration as a reusable profile before running the fusion benchmark
+on the validation sequence:
+
+```bash
+ros2 run aqua_localization visual_calibration_profile.py \
+  --out /tmp/tank_structure_easy_visual_profile.yaml \
+  --name tank_structure_easy_visual \
+  --calibration-reference /tmp/tank_structure_easy_gt.tum \
+  --calibration-estimate /tmp/tank_structure_easy_visual.tum \
+  --calibration-sequence Structure_Easy \
+  --validation-sequence Medium \
+  --base-from-camera-x-m -0.25 \
+  --base-from-camera-y-m -0.45 \
+  --orb-n-features 700 \
+  --orb-fast-threshold 16 \
+  --opencv-threads 2 \
+  --visual-position-variance-floor 0.01
+```
+
+Then pass `--visual-calibration-profile /tmp/tank_structure_easy_visual_profile.yaml`
+to `run_tank_visual_fusion_benchmark.py`. This keeps scale, extrinsic,
+frontend-throughput settings, and fusion covariance in one file while leaving
+the evaluation bag and reference trajectory separate.
+
 To bundle the visual frontend replay, trajectory recording, scale diagnostic,
 and benchmark-row generation into one command:
 
