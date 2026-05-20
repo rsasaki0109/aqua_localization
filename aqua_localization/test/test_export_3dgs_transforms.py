@@ -194,6 +194,62 @@ def test_build_transforms_allows_missing_camera_info(tmp_path):
     assert "fl_x" not in payload
 
 
+def test_build_transforms_can_write_nerfstudio_format(tmp_path):
+    module = load_module()
+    manifest_path = tmp_path / "manifest.json"
+    pack = tmp_path / "pack"
+    make_manifest(manifest_path)
+    make_pack(pack)
+
+    payload = module.build_transforms(
+        manifest_path,
+        pack,
+        max_time_diff_s=0.000001,
+        output_format="nerfstudio",
+        reader=[
+            (900, odom_msg(990, xyz=(1.0, 2.0, 3.0))),
+            (1_900, odom_msg(2_000, xyz=(4.0, 5.0, 6.0))),
+        ],
+        camera_info_reader=[(480, camera_info_msg())],
+    )
+
+    assert payload["schema"] == module.NERFSTUDIO_SCHEMA
+    assert payload["format"] == "nerfstudio"
+    assert payload["fl_x"] == 520.0
+    assert payload["frames"][0]["file_path"] == "images/frame_000000.png"
+    assert payload["frames"][0]["transform_matrix"][0][3] == 1.0
+    assert payload["frames"][0]["metadata"]["time_diff_ns"] == 30
+    assert "odom_timestamp_ns" not in payload["frames"][0]
+    assert payload["metadata"]["trajectory_topic"] == "/aqua_visual_frontend/odometry"
+    assert payload["metadata"]["matched_frame_count"] == 2
+
+    saved = json.loads((pack / "transforms.json").read_text(encoding="utf-8"))
+    assert saved["format"] == "nerfstudio"
+    index = json.loads((pack / "pack_index.json").read_text(encoding="utf-8"))
+    assert index["estimated_transforms"]["transforms_format"] == "nerfstudio"
+    assert index["estimated_transforms"]["count"] == 2
+
+
+def test_nerfstudio_format_requires_intrinsics(tmp_path):
+    module = load_module()
+    manifest_path = tmp_path / "manifest.json"
+    pack = tmp_path / "pack"
+    make_manifest(manifest_path, include_camera_info=False)
+    make_pack(pack)
+
+    try:
+        module.build_transforms(
+            manifest_path,
+            pack,
+            output_format="nerfstudio",
+            reader=[(900, odom_msg(990, xyz=(1.0, 2.0, 3.0)))],
+        )
+    except ValueError as exc:
+        assert "requires CameraInfo intrinsics" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
 def test_camera_info_requires_nine_k_values():
     module = load_module()
     msg = camera_info_msg()
