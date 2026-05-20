@@ -75,6 +75,21 @@ def test_failed_motion_keeps_requested_counts():
     assert estimate.inliers == 3
 
 
+def test_filter_descriptor_matches_applies_hamming_threshold():
+    module = load_module()
+    matches = [
+        cv2.DMatch(_queryIdx=0, _trainIdx=0, _distance=12.0),
+        cv2.DMatch(_queryIdx=1, _trainIdx=1, _distance=96.0),
+        cv2.DMatch(_queryIdx=2, _trainIdx=2, _distance=97.0),
+    ]
+
+    filtered = module.filter_descriptor_matches(matches, max_distance=96.0)
+    disabled = module.filter_descriptor_matches(matches, max_distance=0.0)
+
+    assert [match.queryIdx for match in filtered] == [0, 1]
+    assert len(disabled) == 3
+
+
 def test_make_status_reports_tracking_diagnostics():
     module = load_module()
     frame = module.VisualFrame(

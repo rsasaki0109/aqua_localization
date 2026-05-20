@@ -59,6 +59,8 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
         "--reference", "/tmp/ref.tum",
         "--out-dir", str(tmp_path),
         "--translation-scale", "0.25",
+        "--max-stereo-descriptor-distance", "80",
+        "--max-temporal-descriptor-distance", "72",
         "--play-rate", "0.5",
     ])
     paths = module.default_paths(tmp_path, args.sequence)
@@ -68,6 +70,8 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
     bag_command = module.build_bag_play_command(args)
 
     assert "tracking.translation_scale:=0.25" in visual_command
+    assert "matching.max_stereo_descriptor_distance:=80.0" in visual_command
+    assert "matching.max_temporal_descriptor_distance:=72.0" in visual_command
     assert "camera.bf:=78.89165891925023" in visual_command
     assert record_command[-2:] == ["--format", "tum"]
     assert str(paths.estimate_tum) in record_command

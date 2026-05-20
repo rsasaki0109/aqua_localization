@@ -20,7 +20,7 @@ import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 import cv2
 import numpy as np
@@ -45,8 +45,10 @@ class StereoCamera:
 @dataclass(frozen=True)
 class VisualFrontendConfig:
     max_stereo_y_diff_px: float = 2.0
+    max_stereo_descriptor_distance: float = 96.0
     min_disparity_px: float = 1.0
     max_depth_m: float = 12.0
+    max_temporal_descriptor_distance: float = 96.0
     min_temporal_matches: int = 20
     min_pnp_inliers: int = 12
     min_inlier_ratio: float = 0.25
@@ -135,6 +137,12 @@ def decode_compressed_image(data: bytes) -> np.ndarray:
     return image
 
 
+def filter_descriptor_matches(matches: Iterable[cv2.DMatch], max_distance: float) -> list[cv2.DMatch]:
+    if max_distance <= 0.0:
+        return list(matches)
+    return [match for match in matches if float(match.distance) <= max_distance]
+
+
 def triangulate_stereo_features(
     left_image: np.ndarray,
     right_image: np.ndarray,
@@ -158,7 +166,8 @@ def triangulate_stereo_features(
             right_features=right_count,
         )
 
-    matches = matcher.match(left_desc, right_desc)
+    raw_matches = matcher.match(left_desc, right_desc)
+    matches = filter_descriptor_matches(raw_matches, config.max_stereo_descriptor_distance)
     points = []
     keypoints = []
     descriptors = []
@@ -216,7 +225,8 @@ def estimate_motion_pnp(
     if current.descriptors.shape[0] < config.min_temporal_matches:
         return failed_motion("not enough current stereo features")
 
-    matches = matcher.match(previous.descriptors, current.descriptors)
+    raw_matches = matcher.match(previous.descriptors, current.descriptors)
+    matches = filter_descriptor_matches(raw_matches, config.max_temporal_descriptor_distance)
     if len(matches) < config.min_temporal_matches:
         return failed_motion("not enough temporal matches", matches=len(matches))
 
@@ -479,8 +489,14 @@ def run_ros_node(argv=None) -> int:
                 max_stereo_y_diff_px=float(
                     self.declare_parameter("stereo.max_y_diff_px", 2.0).value
                 ),
+                max_stereo_descriptor_distance=float(
+                    self.declare_parameter("matching.max_stereo_descriptor_distance", 96.0).value
+                ),
                 min_disparity_px=float(self.declare_parameter("stereo.min_disparity_px", 1.0).value),
                 max_depth_m=float(self.declare_parameter("stereo.max_depth_m", 12.0).value),
+                max_temporal_descriptor_distance=float(
+                    self.declare_parameter("matching.max_temporal_descriptor_distance", 96.0).value
+                ),
                 min_temporal_matches=int(
                     self.declare_parameter("tracking.min_temporal_matches", 20).value
                 ),

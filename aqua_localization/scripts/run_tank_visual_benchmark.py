@@ -79,6 +79,12 @@ def build_visual_command(args) -> list[str]:
     command.extend(ros_param("camera.cx", args.camera_cx))
     command.extend(ros_param("camera.cy", args.camera_cy))
     command.extend(ros_param("camera.bf", args.camera_bf))
+    command.extend(
+        ros_param("matching.max_stereo_descriptor_distance", args.max_stereo_descriptor_distance)
+    )
+    command.extend(
+        ros_param("matching.max_temporal_descriptor_distance", args.max_temporal_descriptor_distance)
+    )
     command.extend(ros_param("tracking.translation_scale", args.translation_scale))
     if args.status_csv:
         command.extend(ros_param("diagnostics.status_csv_path", args.status_csv))
@@ -249,6 +255,8 @@ def parse_args(argv):
     parser.add_argument("--camera-cx", type=float, default=DEFAULT_CX)
     parser.add_argument("--camera-cy", type=float, default=DEFAULT_CY)
     parser.add_argument("--camera-bf", type=float, default=DEFAULT_BF)
+    parser.add_argument("--max-stereo-descriptor-distance", type=float, default=96.0)
+    parser.add_argument("--max-temporal-descriptor-distance", type=float, default=96.0)
     parser.add_argument("--play-rate", type=float, default=1.0)
     parser.add_argument("--startup-delay", type=float, default=1.0)
     parser.add_argument("--stop-timeout", type=float, default=5.0)
