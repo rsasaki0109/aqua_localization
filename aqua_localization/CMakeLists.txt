@@ -22,6 +22,7 @@ install(PROGRAMS
   scripts/export_3dgs_dataset_pack.py
   scripts/export_3dgs_frames.py
   scripts/export_3dgs_transforms.py
+  scripts/export_3dgs_pack_pipeline.py
   scripts/benchmark_gap_report.py
   scripts/ros1_odometry_csv_to_tum.py
   scripts/convert_scalar_pressure_bag.py
@@ -70,6 +71,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_export_3dgs_dataset_pack test/test_export_3dgs_dataset_pack.py)
   ament_add_pytest_test(test_export_3dgs_frames test/test_export_3dgs_frames.py)
   ament_add_pytest_test(test_export_3dgs_transforms test/test_export_3dgs_transforms.py)
+  ament_add_pytest_test(test_export_3dgs_pack_pipeline test/test_export_3dgs_pack_pipeline.py)
   ament_add_pytest_test(test_benchmark_gap_report test/test_benchmark_gap_report.py)
   ament_add_pytest_test(test_ros1_odometry_csv_to_tum test/test_ros1_odometry_csv_to_tum.py)
   ament_add_pytest_test(test_convert_tank_dataset_bag test/test_convert_tank_dataset_bag.py)

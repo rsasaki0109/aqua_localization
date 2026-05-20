@@ -299,25 +299,13 @@
           The reproducible track now reaches `images/`, `frames.json`, nearest-neighbour odometry poses, CameraInfo intrinsics, and base-to-camera extrinsics in `transforms.json`. Use the nerfstudio format when handing the pack to external reconstruction tools.
         </p>
         <div class="code">
-          <pre>ros2 run aqua_localization export_3dgs_manifest.py \
+          <pre>ros2 run aqua_localization export_3dgs_pack_pipeline.py \
   --bag datasets/public/tank_dataset/short_test_ros2 \
   --dataset "Tank Dataset" \
   --sequence short_test \
-  --out /tmp/tank_short_test_3dgs_manifest.json
-
-ros2 run aqua_localization export_3dgs_dataset_pack.py \
-  --manifest /tmp/tank_short_test_3dgs_manifest.json \
-  --out /tmp/tank_short_test_3dgs_pack
-
-ros2 run aqua_localization export_3dgs_frames.py \
-  --manifest /tmp/tank_short_test_3dgs_manifest.json \
-  --pack /tmp/tank_short_test_3dgs_pack \
+  --out /tmp/tank_short_test_3dgs_pack \
   --max-frames 120 \
-  --stride 2
-
-ros2 run aqua_localization export_3dgs_transforms.py \
-  --manifest /tmp/tank_short_test_3dgs_manifest.json \
-  --pack /tmp/tank_short_test_3dgs_pack \
+  --stride 2 \
   --max-time-diff 0.05 \
   --base-from-camera -0.25 -0.45 0.0 0.0 0.0 0.0 1.0 \
   --format nerfstudio</pre>
