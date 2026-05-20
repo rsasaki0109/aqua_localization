@@ -121,6 +121,10 @@ def sanitize_sequence(sequence: str, case: SweepCase) -> str:
     return run_tank_visual_benchmark.sanitize_name(f"{sequence}_{case.label}")
 
 
+def case_odom_topic(case: SweepCase) -> str:
+    return f"/aqua_visual_frontend/{case.label}/odometry"
+
+
 def benchmark_command(args, case: SweepCase, sequence: str, out_dir: Path) -> list[str]:
     command = [
         "ros2",
@@ -139,6 +143,8 @@ def benchmark_command(args, case: SweepCase, sequence: str, out_dir: Path) -> li
         args.dataset,
         "--system",
         args.system,
+        "--odom-topic",
+        case_odom_topic(case),
         "--translation-scale",
         str(args.translation_scale),
         "--max-stereo-descriptor-distance",
