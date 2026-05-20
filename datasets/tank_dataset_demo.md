@@ -214,13 +214,15 @@ ros2 run aqua_localization run_tank_visual_matching_sweep.py \
   --out-dir /tmp/aqua_tank_visual_matching_sweep \
   --sequence short_test \
   --translation-scale 0.169623465 \
+  --baseline-rmse-m 0.0194 \
   --pairs 64:64,80:80,96:96,112:112,disabled:disabled
 ```
 
 The sweep writes `visual_matching_sweep.md` with RMSE, matched duration,
 acceptance rate, median PnP inliers, and median temporal matches for each
-setting. Use `--matrix` with `--stereo-distances` and `--temporal-distances` for
-a full Cartesian grid when runtime is acceptable.
+setting. With `--baseline-rmse-m`, it also reports the gap multiplier and RMSE
+reduction needed to tie the baseline. Use `--matrix` with `--stereo-distances`
+and `--temporal-distances` for a full Cartesian grid when runtime is acceptable.
 
 Summarize the CSV after a run:
 

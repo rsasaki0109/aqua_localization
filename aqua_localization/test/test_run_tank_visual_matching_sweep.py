@@ -121,6 +121,44 @@ def test_format_markdown_selects_best_result(tmp_path):
     assert "Best RMSE in this sweep" in markdown
 
 
+def test_format_markdown_includes_baseline_gap_when_requested(tmp_path):
+    module = load_module()
+    args = SimpleNamespace(
+        sequence="short_test",
+        reference=Path("/tmp/ref.tum"),
+        translation_scale=0.25,
+        baseline_rmse_m=0.02,
+    )
+    result = module.SweepResult(
+        case=module.SweepCase(80.0, 80.0),
+        sequence="short_test_stereo_80__temporal_80",
+        out_dir=tmp_path / "80",
+        estimate_tum=tmp_path / "80.tum",
+        status_csv=tmp_path / "80.csv",
+        returncode=0,
+        rmse_m=0.10,
+        matched_seconds=10.0,
+        accepted_ratio=0.8,
+        median_pnp_inliers=30.0,
+        median_temporal_matches=50.0,
+        command=["ros2", "run", "example"],
+    )
+
+    markdown = module.format_markdown([result], args)
+
+    assert "Baseline RMSE: `0.02` m" in markdown
+    assert "| 80 | 80 | best | 0.1000 | 5.00 | 80.0% |" in markdown
+    assert "Best gap to baseline: `5.00x`" in markdown
+
+
+def test_gap_helpers_handle_invalid_values():
+    module = load_module()
+
+    assert module.gap_ratio(0.10, 0.02) == 5.0
+    assert module.improvement_to_tie_percent(0.10, 0.02) == 80.0
+    assert math.isnan(module.gap_ratio(math.nan, 0.02))
+
+
 def test_main_dry_run_writes_planned_summary(tmp_path):
     module = load_module()
     out_dir = tmp_path / "sweep"
@@ -137,14 +175,17 @@ def test_main_dry_run_writes_planned_summary(tmp_path):
         str(summary),
         "--pairs",
         "64:64,0:0",
+        "--baseline-rmse-m",
+        "0.0194",
         "--dry-run",
     ])
 
     text = summary.read_text(encoding="utf-8")
     assert rc == 0
     assert "Tank Visual Matching Sweep" in text
+    assert "Baseline RMSE: `0.0194` m" in text
     assert "stereo_64__temporal_64" in text
-    assert "| disabled | disabled | ok | n/a |" in text
+    assert "| disabled | disabled | ok | n/a | n/a | n/a% |" in text
 
 
 def test_load_status_metrics_returns_nan_for_missing_csv(tmp_path):
