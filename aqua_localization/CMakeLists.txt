@@ -17,6 +17,7 @@ install(PROGRAMS
   scripts/record_status.py
   scripts/compare_trajectories.py
   scripts/trajectory_benchmark_row.py
+  scripts/ingest_external_tum_result.py
   scripts/benchmark_gap_report.py
   scripts/ros1_odometry_csv_to_tum.py
   scripts/convert_scalar_pressure_bag.py
@@ -60,6 +61,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_record_odometry_format test/test_record_odometry_format.py)
   ament_add_pytest_test(test_compare_trajectories test/test_compare_trajectories.py)
   ament_add_pytest_test(test_trajectory_benchmark_row test/test_trajectory_benchmark_row.py)
+  ament_add_pytest_test(test_ingest_external_tum_result test/test_ingest_external_tum_result.py)
   ament_add_pytest_test(test_benchmark_gap_report test/test_benchmark_gap_report.py)
   ament_add_pytest_test(test_ros1_odometry_csv_to_tum test/test_ros1_odometry_csv_to_tum.py)
   ament_add_pytest_test(test_convert_tank_dataset_bag test/test_convert_tank_dataset_bag.py)

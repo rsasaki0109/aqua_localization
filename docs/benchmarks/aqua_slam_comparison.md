@@ -168,6 +168,34 @@ ros2 run aqua_localization ros1_odometry_csv_to_tum.py \
 The output can be passed directly to `compare_trajectories.py` or
 `trajectory_benchmark_row.py`.
 
+## External Result Ingestion
+
+After AQUA-SLAM odometry has been converted to TUM, ingest it with the same APE
+implementation used by all local benchmark rows:
+
+```bash
+ros2 run aqua_localization ingest_external_tum_result.py \
+  --reference /tmp/tank_short_test_gt.tum \
+  --estimate /tmp/tank_short_test_aqua_slam.tum \
+  --dataset "Tank Dataset" \
+  --sequence short_test \
+  --system AQUA-SLAM \
+  --config underwater_orbslam3_blue_gx5_short.yaml \
+  --commit "$AQUA_SLAM_COMMIT" \
+  --runtime "ROS 1 Docker, rosbag play short_test.bag" \
+  --export "rostopic echo -p /AQUA_SLAM/orb_odom + ros1_odometry_csv_to_tum.py" \
+  --note "external baseline" \
+  --header \
+  --manifest \
+  --out /tmp/tank_short_test_aqua_slam_ingest.md
+```
+
+The generated Markdown includes a provenance block and a benchmark row with
+dataset, sequence, system, alignment, sample count, matched seconds, mean,
+median, RMSE, max, and a note containing the external config, commit, runtime,
+and export path. Use `--append --out docs/benchmarks/...` only after confirming
+the reference trajectory, alignment mode, and exported TUM are correct.
+
 ## Decision: Where Can We Beat It?
 
 Likely current wins:
