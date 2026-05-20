@@ -66,6 +66,7 @@ The first measured head-to-head row is tracked in
 | Tank Dataset | `short_test` | `aqua_localization` | SE(3) | 5399 | 14.94 | 0.4291 | measured, lighter sensor stack |
 | Tank Dataset | `short_test` | `aqua_visual_frontend` | SE(3) | 200 | 11.25 | 0.0947 | measured with same-sequence scale fit |
 | Tank Dataset | `short_test` | `aqua_localization+visual` | SE(3) | 5399 | 14.94 | 0.3726 | fused visual position update, same-sequence scale fit |
+| Tank Dataset | `short_test` | `aqua_localization+visual` | SE(3) | 5424 | 14.95 | 0.3228 | base-frame visual odometry, same-sequence scale/extrinsic diagnostics, replay rate 0.25 |
 
 This result makes AQUA-SLAM the accuracy target to beat on Tank visual-DVL-IMU
 sequences. The fair development path is to either add a visual frontend for a
