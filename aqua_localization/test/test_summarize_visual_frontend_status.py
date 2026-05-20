@@ -41,6 +41,10 @@ def write_csv(path: Path, rows: list[dict]):
             "pnp_inliers",
             "inlier_ratio",
             "step_translation_m",
+            "decode_time_ms",
+            "stereo_time_ms",
+            "tracking_time_ms",
+            "total_time_ms",
             "accepted",
             "status",
         ])
@@ -68,6 +72,10 @@ def sample_row(**kwargs):
         "pnp_inliers": "50",
         "inlier_ratio": "0.8",
         "step_translation_m": "0.05",
+        "decode_time_ms": "1.0",
+        "stereo_time_ms": "12.0",
+        "tracking_time_ms": "3.0",
+        "total_time_ms": "16.0",
         "accepted": "1",
         "status": "accepted",
     }
@@ -113,6 +121,7 @@ def test_summarize_counts_acceptance_and_quantiles():
     assert summary["rejection_counts"]["too few pnp inliers"] == 1
     assert summary["numeric"]["stereo_points"]["median"] == 20
     assert summary["numeric"]["disparity_median_px"]["median"] == 6.0
+    assert summary["numeric"]["total_time_ms"]["median"] == 16.0
 
 
 def test_format_summary_contains_tuning_hints_for_weak_tracking():
@@ -124,6 +133,7 @@ def test_format_summary_contains_tuning_hints_for_weak_tracking():
             temporal_matches="15",
             inlier_ratio="0.2",
             step_translation_m="0.4",
+            total_time_ms="35.0",
             disparity_median_px="2.0",
             depth_p95_m="12.0",
             accepted="0",
@@ -144,6 +154,7 @@ def test_format_summary_contains_tuning_hints_for_weak_tracking():
     assert "Low temporal match count" in text
     assert "Low PnP inlier ratio" in text
     assert "Large step-translation tail" in text
+    assert "Visual processing is near or above 30 ms/frame" in text
     assert "`too few pnp inliers`" in text
 
 

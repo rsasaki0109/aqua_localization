@@ -88,6 +88,9 @@ def build_visual_command(args) -> list[str]:
     )
     command.extend(ros_param("tracking.translation_scale", args.translation_scale))
     command.extend(ros_param("topics.odometry", args.odom_topic))
+    command.extend(ros_param("orb.n_features", args.orb_n_features))
+    command.extend(ros_param("orb.fast_threshold", args.orb_fast_threshold))
+    command.extend(ros_param("opencv.threads", args.opencv_threads))
     command.extend(ros_param("extrinsics.base_from_camera.x_m", args.base_from_camera_x_m))
     command.extend(ros_param("extrinsics.base_from_camera.y_m", args.base_from_camera_y_m))
     command.extend(ros_param("extrinsics.base_from_camera.z_m", args.base_from_camera_z_m))
@@ -289,6 +292,9 @@ def parse_args(argv):
     parser.add_argument("--base-from-camera-yaw-rad", type=float, default=0.0)
     parser.add_argument("--max-stereo-descriptor-distance", type=float, default=96.0)
     parser.add_argument("--max-temporal-descriptor-distance", type=float, default=96.0)
+    parser.add_argument("--orb-n-features", type=int, default=1000)
+    parser.add_argument("--orb-fast-threshold", type=int, default=12)
+    parser.add_argument("--opencv-threads", type=int, default=0)
     parser.add_argument("--play-rate", type=float, default=1.0)
     parser.add_argument("--startup-delay", type=float, default=1.0)
     parser.add_argument("--stop-timeout", type=float, default=5.0)
@@ -303,6 +309,12 @@ def main(argv=None) -> int:
         raise ValueError("--translation-scale must be positive")
     if args.play_rate <= 0.0:
         raise ValueError("--play-rate must be positive")
+    if args.orb_n_features <= 0:
+        raise ValueError("--orb-n-features must be positive")
+    if args.orb_fast_threshold < 0:
+        raise ValueError("--orb-fast-threshold must be non-negative")
+    if args.opencv_threads < 0:
+        raise ValueError("--opencv-threads must be non-negative")
 
     paths = default_paths(args.out_dir, args.sequence)
     args.out_dir.mkdir(parents=True, exist_ok=True)

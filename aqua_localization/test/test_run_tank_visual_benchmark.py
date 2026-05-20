@@ -61,6 +61,9 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
         "--translation-scale", "0.25",
         "--max-stereo-descriptor-distance", "80",
         "--max-temporal-descriptor-distance", "72",
+        "--orb-n-features", "700",
+        "--orb-fast-threshold", "16",
+        "--opencv-threads", "2",
         "--odom-topic", "/visual_sweep/case_80/odometry",
         "--base-from-camera-x-m", "-0.25",
         "--base-from-camera-y-m", "-0.45",
@@ -75,6 +78,9 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
     assert "tracking.translation_scale:=0.25" in visual_command
     assert "matching.max_stereo_descriptor_distance:=80.0" in visual_command
     assert "matching.max_temporal_descriptor_distance:=72.0" in visual_command
+    assert "orb.n_features:=700" in visual_command
+    assert "orb.fast_threshold:=16" in visual_command
+    assert "opencv.threads:=2" in visual_command
     assert "camera.bf:=78.89165891925023" in visual_command
     assert "topics.odometry:=/visual_sweep/case_80/odometry" in visual_command
     assert "extrinsics.base_from_camera.x_m:=-0.25" in visual_command
@@ -184,3 +190,16 @@ def test_rejects_non_positive_scale():
             "--translation-scale",
             "0.0",
         ])
+
+
+def test_rejects_invalid_visual_speed_options():
+    module = load_module()
+
+    with pytest.raises(ValueError, match="orb-n-features"):
+        module.main(["--bag", "/tmp/bag", "--reference", "/tmp/ref.tum", "--orb-n-features", "0"])
+    with pytest.raises(ValueError, match="orb-fast-threshold"):
+        module.main([
+            "--bag", "/tmp/bag", "--reference", "/tmp/ref.tum", "--orb-fast-threshold", "-1"
+        ])
+    with pytest.raises(ValueError, match="opencv-threads"):
+        module.main(["--bag", "/tmp/bag", "--reference", "/tmp/ref.tum", "--opencv-threads", "-1"])

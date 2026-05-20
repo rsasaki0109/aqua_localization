@@ -120,6 +120,16 @@ def test_filter_descriptor_matches_applies_hamming_threshold():
     assert len(disabled) == 3
 
 
+def test_warm_up_feature_pipeline_runs_orb_and_matcher():
+    module = load_module()
+    orb = cv2.ORB_create(nfeatures=200)
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+    elapsed_ms = module.warm_up_feature_pipeline(orb, matcher, iterations=1)
+
+    assert elapsed_ms >= 0.0
+
+
 def test_make_status_reports_tracking_diagnostics():
     module = load_module()
     frame = module.VisualFrame(
@@ -139,8 +149,14 @@ def test_make_status_reports_tracking_diagnostics():
         inliers=8,
         matches=16,
     )
+    times = module.ProcessingTimes(
+        decode_time_ms=1.5,
+        stereo_time_ms=12.0,
+        tracking_time_ms=3.25,
+        total_time_ms=16.75,
+    )
 
-    status = module.make_status(12.5, 3, 2, 1, frame, estimate)
+    status = module.make_status(12.5, 3, 2, 1, frame, estimate, times)
     payload = json.loads(module.status_to_json(status))
 
     assert payload["left_features"] == 40
@@ -151,6 +167,10 @@ def test_make_status_reports_tracking_diagnostics():
     assert payload["pnp_inliers"] == 8
     assert payload["inlier_ratio"] == 0.5
     assert payload["step_translation_m"] == 0.5
+    assert payload["decode_time_ms"] == 1.5
+    assert payload["stereo_time_ms"] == 12.0
+    assert payload["tracking_time_ms"] == 3.25
+    assert payload["total_time_ms"] == 16.75
     assert payload["status"] == "accepted"
 
 
@@ -175,6 +195,10 @@ def test_status_csv_writer_emits_stable_columns():
         pnp_inliers=5,
         inlier_ratio=0.75,
         step_translation_m=0.125,
+        decode_time_ms=1.25,
+        stereo_time_ms=10.5,
+        tracking_time_ms=2.75,
+        total_time_ms=14.5,
         accepted=False,
         status="too few pnp inliers",
     )
@@ -187,5 +211,9 @@ def test_status_csv_writer_emits_stable_columns():
     assert rows[0]["timestamp"] == "1.250000000"
     assert rows[0]["disparity_median_px"] == "4.000000000"
     assert rows[0]["depth_p95_m"] == "3.000000000"
+    assert rows[0]["decode_time_ms"] == "1.250"
+    assert rows[0]["stereo_time_ms"] == "10.500"
+    assert rows[0]["tracking_time_ms"] == "2.750"
+    assert rows[0]["total_time_ms"] == "14.500"
     assert rows[0]["accepted"] == "0"
     assert rows[0]["status"] == "too few pnp inliers"

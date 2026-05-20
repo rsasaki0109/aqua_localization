@@ -61,6 +61,12 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
         "64",
         "--max-temporal-descriptor-distance",
         "64",
+        "--orb-n-features",
+        "700",
+        "--orb-fast-threshold",
+        "16",
+        "--opencv-threads",
+        "2",
     ])
     paths = module.default_paths(tmp_path, args.sequence)
 
@@ -71,6 +77,9 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
     assert "extrinsics.base_from_camera.x_m:=-0.25" in visual
     assert "extrinsics.base_from_camera.y_m:=-0.45" in visual
     assert "matching.max_stereo_descriptor_distance:=64.0" in visual
+    assert "orb.n_features:=700" in visual
+    assert "orb.fast_threshold:=16" in visual
+    assert "opencv.threads:=2" in visual
     assert "--params-file" in imu
     assert "/tmp/tank_dataset.yaml" in imu
     assert "topics.visual_odometry:=/visual/fusion/odometry" in imu
@@ -118,6 +127,24 @@ def test_visual_coverage_without_expected_frames_reports_processed_only(tmp_path
     )
 
 
+def test_visual_coverage_report_includes_processing_timing(tmp_path):
+    module = load_module()
+    status_csv = tmp_path / "visual_status.csv"
+    status_csv.write_text(
+        "timestamp,frame_index,accepted,status,total_time_ms,stereo_time_ms,"
+        "tracking_time_ms,decode_time_ms\n"
+        "1.0,0,1,accepted,10.0,7.0,2.0,1.0\n"
+        "2.0,1,1,accepted,20.0,14.0,4.0,2.0\n",
+        encoding="utf-8",
+    )
+    coverage = module.VisualCoverage(processed_frames=2, expected_frames=2, min_coverage=0.98)
+
+    report = module.format_visual_coverage_report(coverage, status_csv)
+
+    assert "## Processing Time" in report
+    assert "| total | 2 | 15.000 | 19.500 | 20.000 |" in report
+
+
 def test_rejects_non_positive_visual_variance():
     module = load_module()
 
@@ -150,5 +177,23 @@ def test_rejects_invalid_visual_coverage_gate():
         ])
     except ValueError as exc:
         assert "min-visual-coverage" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_rejects_invalid_visual_speed_options():
+    module = load_module()
+
+    try:
+        module.main([
+            "--bag",
+            "/tmp/tank_bag",
+            "--reference",
+            "/tmp/ref.tum",
+            "--orb-n-features",
+            "0",
+        ])
+    except ValueError as exc:
+        assert "orb-n-features" in str(exc)
     else:
         raise AssertionError("expected ValueError")
