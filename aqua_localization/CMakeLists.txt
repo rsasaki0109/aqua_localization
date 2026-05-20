@@ -39,6 +39,7 @@ install(PROGRAMS
   scripts/calibrate_sonar_covariance.py
   scripts/calibrate_visual_scale.py
   scripts/validate_visual_scale.py
+  scripts/visual_calibration_profile.py
   scripts/run_tank_visual_benchmark.py
   scripts/run_tank_visual_matching_sweep.py
   scripts/run_tank_visual_fusion_benchmark.py
@@ -65,6 +66,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_stereo_visual_odometry test/test_stereo_visual_odometry.py)
   ament_add_pytest_test(test_calibrate_visual_scale test/test_calibrate_visual_scale.py)
   ament_add_pytest_test(test_validate_visual_scale test/test_validate_visual_scale.py)
+  ament_add_pytest_test(test_visual_calibration_profile test/test_visual_calibration_profile.py)
   ament_add_pytest_test(test_run_tank_visual_benchmark test/test_run_tank_visual_benchmark.py)
   ament_add_pytest_test(test_run_tank_visual_matching_sweep test/test_run_tank_visual_matching_sweep.py)
   ament_add_pytest_test(test_run_tank_visual_fusion_benchmark test/test_run_tank_visual_fusion_benchmark.py)

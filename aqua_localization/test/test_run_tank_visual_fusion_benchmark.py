@@ -90,6 +90,51 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
     assert bag == ["ros2", "bag", "play", "/tmp/tank_bag", "--clock"]
 
 
+def test_visual_calibration_profile_supplies_defaults(tmp_path):
+    module = load_module()
+    profile = tmp_path / "visual_profile.yaml"
+    profile.write_text(
+        """
+name: short_test_diag
+frontend:
+  translation_scale: 0.2
+  max_stereo_descriptor_distance: 64
+  max_temporal_descriptor_distance: 72
+  orb_n_features: 700
+  orb_fast_threshold: 16
+  opencv_threads: 2
+base_from_camera:
+  x_m: -0.25
+  y_m: -0.45
+  z_m: 0.0
+  roll_rad: 0.0
+  pitch_rad: 0.0
+  yaw_rad: 0.0
+fusion:
+  visual_position_variance_floor: 0.01
+""",
+        encoding="utf-8",
+    )
+
+    args = module.parse_args([
+        "--visual-calibration-profile",
+        str(profile),
+        "--bag",
+        "/tmp/tank_bag",
+        "--reference",
+        "/tmp/ref.tum",
+    ])
+    paths = module.default_paths(tmp_path, args.sequence)
+    visual, imu, _recorder, _bag = module.build_commands(args, paths)
+
+    assert args.translation_scale == 0.2
+    assert args.base_from_camera_x_m == -0.25
+    assert args.orb_n_features == 700
+    assert "tracking.translation_scale:=0.2" in visual
+    assert "matching.max_temporal_descriptor_distance:=72" in visual
+    assert "imu.visual.position_variance_floor:=0.01" in imu
+
+
 def test_visual_coverage_counts_status_rows_and_formats_note(tmp_path):
     module = load_module()
     status_csv = tmp_path / "visual_status.csv"
