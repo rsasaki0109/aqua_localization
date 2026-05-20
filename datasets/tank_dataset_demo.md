@@ -46,8 +46,10 @@ ros2 run aqua_localization convert_tank_dataset_bag.py \
   --dst aqua_localization/datasets/public/tank_dataset/short_test_ros2
 ```
 
-Camera image topics are dropped by default. Pass `--include-cameras` to
-keep them.
+Camera image topics are dropped by default. Pass `--include-cameras` to keep
+them. The converter writes ROS 2 Humble-friendly `sqlite3` bags by default; use
+`--storage mcap` only when the target environment has the MCAP rosbag2 storage
+plugin installed.
 
 ## Detected topics (after conversion)
 
@@ -121,13 +123,13 @@ Umeyama SE(3) alignment yields:
 
 ```
 APE translation [m]
-  count  : 5309
-  mean   : 0.376
-  median : 0.396
-  rmse   : 0.426
-  std    : 0.201
-  min    : 0.013
-  max    : 0.772
+  count  : 5399
+  mean   : 0.380
+  median : 0.401
+  rmse   : 0.429
+  std    : 0.200
+  min    : 0.016
+  max    : 0.765
 ```
 
 This validates the DVL fusion path end-to-end on real public data: the IMU

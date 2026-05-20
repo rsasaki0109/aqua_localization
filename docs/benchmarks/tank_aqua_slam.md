@@ -7,8 +7,8 @@ sequences.
 An initial AQUA-SLAM trajectory has been recorded for `short_test.bag` with the
 upstream Docker workflow and converted into the same TUM trajectory format used
 by this repository. The current result is a first reproducibility anchor, not a
-paper claim, because the matching `aqua_localization` run still needs to be
-re-recorded under the exact same benchmark command.
+paper claim, because the two systems use different sensor frontends and
+AQUA-SLAM only publishes after its visual-inertial initialization.
 
 Upstream AQUA-SLAM publishes its main estimate on `/AQUA_SLAM/orb_odom`
 (`nav_msgs/Odometry`). Record that ROS 1 topic with `rostopic echo -p`, then
@@ -21,12 +21,10 @@ using IMU + pressure + DVL and AprilTag SLAM ground truth:
 
 | Dataset | Sequence | System | Inputs | Alignment | RMSE m | Source |
 |---------|----------|--------|--------|-----------|-------:|--------|
-| Tank Dataset | `short_test` | `aqua_localization` | IMU + pressure + DVL | SE(3) | 0.426 | [`datasets/tank_dataset_demo.md`](../../datasets/tank_dataset_demo.md) |
+| Tank Dataset | `short_test` | `aqua_localization` | IMU + pressure + DVL | SE(3) | 0.429 | [`datasets/tank_dataset_demo.md`](../../datasets/tank_dataset_demo.md) |
 
 The first AQUA-SLAM measurement below uses `short_test.bag` and the upstream
-`underwater_orbslam3_blue_gx5_short.yaml` configuration. It should be compared
-against a freshly recorded `aqua_localization` row before making a win/loss
-claim.
+`underwater_orbslam3_blue_gx5_short.yaml` configuration.
 
 ## Initial AQUA-SLAM Measurement
 
@@ -43,19 +41,33 @@ Raw-frame diagnostic for the same output, before SE(3) alignment:
 | Tank Dataset | `short_test` | AQUA-SLAM | none | 234 | 3.5186 | Confirms the odometry and AprilTag GT frames must be aligned before APE reporting. |
 
 This short clip is a useful sanity check because AQUA-SLAM initializes, creates
-keyframes, and publishes odometry, but it is only 11.65 matched seconds. The
-next benchmark step is to rerun `aqua_localization` on the same converted
-`short_test` bag and then move both systems to longer Tank sequences.
+keyframes, and publishes odometry, but it is only 11.65 matched seconds.
+
+## Current `aqua_localization` Measurement
+
+Recorded on 2026-05-20 with ROS 2 Humble, the converted `short_test` bag, and
+the Tank Dataset IMU + pressure + DVL profile:
+
+| Dataset | Sequence | System | Inputs | Alignment | Samples | Matched s | Mean m | Median m | RMSE m | Max m | Note |
+|---------|----------|--------|--------|-----------|--------:|----------:|-------:|---------:|-------:|------:|------|
+| Tank Dataset | `short_test` | `aqua_localization` | IMU + pressure + DVL | SE(3) | 5399 | 14.94 | 0.3796 | 0.4014 | 0.4291 | 0.7652 | same AprilTag GT export |
+
+This is a fair current-stack result for the lighter ROS 2 localization mode,
+but it is not sensor-equivalent to AQUA-SLAM's stereo + IMU + DVL frontend.
+AQUA-SLAM is the accuracy target on this visual-DVL-IMU sequence; the immediate
+`aqua_localization` win path is either adding a visual frontend for Tank or
+moving the claim to ROS 2 reproducibility, permissive licensing, and MBES/sonar
+datasets where this repository has stronger tooling.
 
 ## Head-to-Head Table
 
-Populate this table with `trajectory_benchmark_row.py` after both estimates are
-available for the same sequence.
+Rows are generated with `trajectory_benchmark_row.py` so both systems use the
+same APE implementation.
 
 | Dataset | Sequence | System | Alignment | Samples | Matched s | Mean m | Median m | RMSE m | Max m | Note |
 |---------|----------|--------|-----------|--------:|----------:|-------:|---------:|-------:|------:|------|
 | Tank Dataset | short_test | AQUA-SLAM | SE(3) | 234 | 11.65 | 0.0173 | 0.0165 | 0.0194 | 0.0579 | AQUA-SLAM Docker, short_test, /AQUA_SLAM/orb_odom |
-| Tank Dataset | short_test | aqua_localization | SE(3) | TBD | TBD | TBD | TBD | TBD | TBD | rerun same sequence with current stack |
+| Tank Dataset | short_test | aqua_localization | SE(3) | 5399 | 14.94 | 0.3796 | 0.4014 | 0.4291 | 0.7652 | ROS 2 Humble, IMU+pressure+DVL, same AprilTag GT export |
 | Tank Dataset | Structure_Easy | AQUA-SLAM | TBD | TBD | TBD | TBD | TBD | TBD | TBD | record AQUA-SLAM output topic to TUM |
 | Tank Dataset | Structure_Easy | aqua_localization | TBD | TBD | TBD | TBD | TBD | TBD | TBD | run closest available input mode |
 
