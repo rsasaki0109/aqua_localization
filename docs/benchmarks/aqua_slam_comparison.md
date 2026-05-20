@@ -189,8 +189,9 @@ High-value development to close the gap:
 1. Tank Dataset `Structure_Easy` benchmark harness for `aqua_localization`.
 2. AQUA-SLAM output recording and TUM conversion instructions.
 3. Fair comparison table in `docs/benchmarks/tank_aqua_slam.md`.
-4. Validate and fuse the experimental `stereo_visual_odometry.py` frontend on
-   camera-included Tank bags.
+4. Calibrate `stereo_visual_odometry.py` scale on one Tank sequence with
+   `calibrate_visual_scale.py`, then validate the visual-aided fusion on a
+   held-out Tank sequence.
 5. MBES paper path separated from stereo visual SLAM claims.
 
 ## Source Notes

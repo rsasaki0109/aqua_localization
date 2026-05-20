@@ -128,6 +128,20 @@ ros2 run aqua_localization record_odometry.py \
   --format tum
 ```
 
+Estimate the stereo translation scale on a calibration sequence:
+
+```bash
+ros2 run aqua_localization calibrate_visual_scale.py \
+  /tmp/tank_short_test_gt.tum \
+  /tmp/tank_short_test_visual_frontend.tum \
+  --ros-args
+```
+
+On the current `short_test` run this reports
+`tracking.translation_scale:=0.169623465`. Use that value only as a diagnostic
+for `short_test`; for a publishable result, calibrate on one sequence and report
+accuracy on a different held-out sequence.
+
 The published pose is in a `visual_odom -> camera_left` frame. Treat it as an
 experimental visual frontend output until a calibrated camera-to-base extrinsic
 and fusion path are wired.
@@ -137,8 +151,9 @@ accepted 271 visual odometry steps. With the nominal stereo scale it produced
 1.36 m SE(3) APE RMSE against AprilTag GT over the published 11.35 s window.
 The same trajectory falls to 0.096 m under Sim(3) alignment, showing that the
 shape is useful but the metric scale needs calibration. For diagnostics only,
-setting `tracking.translation_scale:=0.169623` gives 0.095 m SE(3) APE RMSE on
-this sequence; do not treat that same-sequence scale fit as a paper-safe result.
+setting `tracking.translation_scale:=0.169623465` gives 0.095 m SE(3) APE RMSE
+on this sequence; do not treat that same-sequence scale fit as a paper-safe
+result.
 
 The visual odometry can also be fed into `aqua_imu_loc` as a position update:
 
