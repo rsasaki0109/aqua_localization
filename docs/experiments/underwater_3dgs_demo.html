@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Underwater 3DGS Demo Track | aqua_localization</title>
+  <meta name="description" content="Interactive underwater 3D Gaussian Splatting research track for aqua_localization GitHub Pages.">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #061315;
+      --ink: #f0fbf8;
+      --muted: #a7c8c1;
+      --line: rgba(177, 231, 222, 0.18);
+      --panel: rgba(7, 23, 26, 0.86);
+      --cyan: #4ed9c5;
+      --gold: #f5c25a;
+      --coral: #ff796d;
+      --green: #8ccf7e;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background: #071719;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(340px, 42vw) 1fr;
+      background: #071719;
+    }
+
+    aside {
+      border-right: 1px solid var(--line);
+      padding: 28px clamp(20px, 4vw, 48px);
+      background: var(--bg);
+      overflow: auto;
+    }
+
+    .back {
+      display: inline-block;
+      color: var(--muted);
+      text-decoration: none;
+      margin-bottom: 38px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.4rem, 5.6vw, 5.5rem);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 1.04rem;
+      margin: 22px 0 26px;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+
+    .badge {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 10px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      white-space: nowrap;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      background: var(--panel);
+      margin-top: 16px;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 1.04rem;
+      letter-spacing: 0;
+    }
+
+    .panel p,
+    .panel li {
+      color: var(--muted);
+      line-height: 1.62;
+    }
+
+    .panel p {
+      margin: 0;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    input[type="range"] {
+      accent-color: var(--cyan);
+      width: 100%;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(16, 45, 47, 0.88);
+      color: var(--ink);
+      padding: 10px 9px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button.active {
+      background: var(--cyan);
+      border-color: var(--cyan);
+      color: #061315;
+      font-weight: 760;
+    }
+
+    main {
+      min-height: 100vh;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      align-items: end;
+      background: #092528;
+    }
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: #092528;
+    }
+
+    .hud {
+      position: relative;
+      z-index: 2;
+      margin: 24px;
+      width: min(760px, calc(100% - 48px));
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .hud-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(4, 14, 16, 0.72);
+      padding: 14px;
+      min-height: 86px;
+      backdrop-filter: blur(10px);
+    }
+
+    .hud-item strong {
+      display: block;
+      font-size: 1.5rem;
+      line-height: 1.1;
+    }
+
+    .hud-item span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      line-height: 1.35;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 980px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      main {
+        min-height: 72vh;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .segmented,
+      .hud {
+        grid-template-columns: 1fr;
+      }
+
+      .hud {
+        margin: 14px;
+        width: calc(100% - 28px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <a class="back" href="../index.html">Back to project page</a>
+      <h1>Underwater 3DGS Demo Track</h1>
+      <p class="lead">
+        This page is a public-facing research track, not a claim that aqua_localization already ships a production 3DGS mapper. It frames the next experiment: convert synchronized underwater camera frames, estimated poses, depth, and MBES structure into a reproducible splat export.
+      </p>
+      <div class="badge-row">
+        <span class="badge">GitHub Pages ready</span>
+        <span class="badge">static HTML</span>
+        <span class="badge">ROS bag inputs</span>
+        <span class="badge">future splat export</span>
+      </div>
+
+      <section class="panel controls" aria-label="Demo controls">
+        <h2>Viewer Controls</h2>
+        <label>
+          Splat density
+          <input id="density" type="range" min="350" max="2200" value="1400" step="50">
+        </label>
+        <label>
+          Water attenuation
+          <input id="attenuation" type="range" min="0" max="90" value="38" step="1">
+        </label>
+        <div class="segmented" role="group" aria-label="Scene preset">
+          <button class="active" data-scene="reef">Reef</button>
+          <button data-scene="harbor">Harbor</button>
+          <button data-scene="bathymetry">MBES</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Implementation PR Target</h2>
+        <ul>
+          <li>Export camera frames, trajectory, and depth priors from public bags.</li>
+          <li>Package a small static demo artifact for GitHub Pages.</li>
+          <li>Keep localization metrics separate from reconstruction quality claims.</li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <h2>Why It Helps</h2>
+        <p>
+          Stars come faster when visitors can see the ocean reconstruction idea immediately. The engineering bar stays honest by labeling this as a visualization and dataset-packaging track until a real 3DGS training/export pipeline lands.
+        </p>
+      </section>
+    </aside>
+
+    <main aria-label="Interactive underwater splat preview">
+      <canvas id="scene"></canvas>
+      <div class="hud" aria-label="Demo status">
+        <div class="hud-item"><strong id="hudSplats">1400</strong><span>synthetic preview splats</span></div>
+        <div class="hud-item"><strong>3</strong><span>candidate input streams</span></div>
+        <div class="hud-item"><strong>0</strong><span>benchmark claims on this page</span></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("scene");
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const densityInput = document.getElementById("density");
+    const attenuationInput = document.getElementById("attenuation");
+    const hudSplats = document.getElementById("hudSplats");
+    const sceneButtons = [...document.querySelectorAll("[data-scene]")];
+
+    let width = 0;
+    let height = 0;
+    let points = [];
+    let scene = "reef";
+    let pointer = { x: 0, y: 0 };
+
+    const palettes = {
+      reef: ["#4ed9c5", "#f5c25a", "#ff796d", "#8ccf7e", "#f0fbf8"],
+      harbor: ["#80cfd8", "#c8b47a", "#ff8d78", "#7fb19f", "#e7f2ed"],
+      bathymetry: ["#4ed9c5", "#77b7ff", "#f5c25a", "#b7f2e8", "#8ccf7e"]
+    };
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = canvas.clientWidth;
+      height = canvas.clientHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function rebuild() {
+      const count = Number(densityInput.value);
+      hudSplats.textContent = String(count);
+      const colors = palettes[scene];
+      points = [];
+      for (let i = 0; i < count; i += 1) {
+        const t = i / Math.max(1, count - 1);
+        const band = i % 13;
+        let x = (Math.random() - 0.5) * 3.0;
+        let y = (Math.random() - 0.5) * 1.7;
+        let z = (Math.random() - 0.5) * 1.4;
+
+        if (scene === "reef") {
+          const a = t * Math.PI * 8;
+          const r = 0.35 + (band / 13) * 1.25;
+          x = Math.cos(a) * r + Math.sin(t * 24) * 0.12;
+          y = Math.sin(a * 0.75) * 0.42 + Math.sin(t * 40) * 0.16;
+          z = Math.sin(a) * r * 0.42 + Math.cos(t * 19) * 0.2;
+        } else if (scene === "harbor") {
+          x = (band - 6) * 0.2 + Math.sin(t * 36) * 0.08;
+          y = Math.sin(t * Math.PI * 5) * 0.44 + (Math.random() - 0.5) * 0.34;
+          z = (t - 0.5) * 2.6 + Math.cos(band) * 0.2;
+        } else {
+          x = (Math.random() - 0.5) * 3.2;
+          z = (Math.random() - 0.5) * 2.2;
+          y = Math.sin(x * 2.5) * 0.22 + Math.cos(z * 3.2) * 0.18 + (Math.random() - 0.5) * 0.08;
+        }
+
+        points.push({
+          x,
+          y,
+          z,
+          r: 1.2 + Math.random() * 3.4,
+          c: colors[i % colors.length]
+        });
+      }
+    }
+
+    function project(p, time) {
+      const yaw = time * 0.00011 + pointer.x * 0.32;
+      const pitch = -0.18 + pointer.y * 0.18;
+      const cy = Math.cos(yaw);
+      const sy = Math.sin(yaw);
+      const cp = Math.cos(pitch);
+      const sp = Math.sin(pitch);
+      const x1 = p.x * cy - p.z * sy;
+      const z1 = p.x * sy + p.z * cy;
+      const y1 = p.y * cp - z1 * sp;
+      const z2 = p.y * sp + z1 * cp + 3.3;
+      const scale = Math.min(width, height) * 0.52 / z2;
+      return {
+        x: width * 0.5 + x1 * scale,
+        y: height * 0.46 + y1 * scale,
+        size: Math.max(1.2, p.r * scale * 0.014),
+        z: z2
+      };
+    }
+
+    function render(time) {
+      const attenuation = Number(attenuationInput.value) / 100;
+      const gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, "#0a3234");
+      gradient.addColorStop(0.5, "#0b4544");
+      gradient.addColorStop(1, "#182c25");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.globalAlpha = 0.12 + attenuation * 0.22;
+      ctx.strokeStyle = "#d7fff7";
+      for (let y = -40; y < height + 40; y += 64) {
+        ctx.beginPath();
+        for (let x = -20; x <= width + 20; x += 24) {
+          const wave = Math.sin(x * 0.012 + y * 0.03 + time * 0.0011) * 10;
+          if (x === -20) ctx.moveTo(x, y + wave);
+          else ctx.lineTo(x, y + wave);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      const ordered = points
+        .map((p) => ({ p, q: project(p, time) }))
+        .sort((a, b) => b.q.z - a.q.z);
+
+      for (const item of ordered) {
+        const fade = Math.max(0.12, Math.min(0.92, 4.1 / item.q.z - attenuation * 0.22));
+        ctx.globalAlpha = fade;
+        ctx.fillStyle = item.p.c;
+        ctx.beginPath();
+        ctx.ellipse(item.q.x, item.q.y, item.q.size * 2.1, item.q.size, 0.24, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 0.72;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < 80; i += 1) {
+        const t = i / 79;
+        const q = project({
+          x: -1.45 + t * 2.9,
+          y: Math.sin(t * Math.PI * 3) * 0.24 - 0.34,
+          z: Math.cos(t * Math.PI * 2.2) * 0.34
+        }, time);
+        if (i === 0) ctx.moveTo(q.x, q.y);
+        else ctx.lineTo(q.x, q.y);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      requestAnimationFrame(render);
+    }
+
+    densityInput.addEventListener("input", rebuild);
+    attenuationInput.addEventListener("input", () => {});
+    sceneButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        sceneButtons.forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+        scene = button.dataset.scene;
+        rebuild();
+      });
+    });
+    window.addEventListener("resize", resize);
+    window.addEventListener("pointermove", (event) => {
+      pointer.x = (event.clientX / Math.max(1, width) - 0.5) * 2;
+      pointer.y = (event.clientY / Math.max(1, height) - 0.5) * 2;
+    });
+
+    resize();
+    rebuild();
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
