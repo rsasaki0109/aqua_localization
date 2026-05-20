@@ -104,6 +104,21 @@ ros2 run aqua_localization validate_visual_scale.py \
   --markdown
 ```
 
+For single-sequence visual frontend experiments, `run_tank_visual_benchmark.py`
+can replay a camera bag, record `/aqua_visual_frontend/odometry`, emit the scale
+diagnostic, and save a Markdown benchmark row:
+
+```bash
+ros2 run aqua_localization run_tank_visual_benchmark.py \
+  --bag /path/to/tank_sequence_ros2_with_cameras \
+  --reference /tmp/tank_sequence_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_sequence \
+  --sequence tank_sequence
+```
+
+When a visual TUM file has already been recorded, pass `--estimate` instead of
+`--bag` to regenerate the scale report and benchmark row without replaying ROS.
+
 The public Tank Dataset page currently exposes `short_test` as sample data and
 requires the download form for the full sequence set, so this table keeps
 Structure_Easy and Medium rows as targets until those bags are available.
