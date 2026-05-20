@@ -7,6 +7,9 @@ The current checked-in Tank `short_test_ros2` bag is intentionally small and
 does not include camera image or CameraInfo topics. Use a Tank conversion made
 with `--include-cameras`, or an equivalent public camera bag.
 
+Tank-specific conversion and readiness checks are documented in
+[`datasets/tank_dataset_demo.md`](../../datasets/tank_dataset_demo.md#3dgs-camera-enabled-conversion-check).
+
 ## Target Artifact
 
 - Name: `tank_short_test_3dgs_pack_20frames.zip`
@@ -36,6 +39,15 @@ ros2 run aqua_localization export_3dgs_pack_pipeline.py \
 
 cd /tmp
 zip -r tank_short_test_3dgs_pack_20frames.zip tank_short_test_3dgs_pack_20frames
+```
+
+Before running the pack export, verify the camera-enabled bag:
+
+```bash
+ros2 run aqua_localization check_3dgs_bag_ready.py \
+  --bag datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --dataset "Tank Dataset" \
+  --sequence short_test
 ```
 
 ## Expected Files
