@@ -118,6 +118,11 @@ ros2 run aqua_localization run_tank_visual_benchmark.py \
 
 When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
+The bag replay mode also saves `*_visual_frontend_status.csv`, which contains
+per-frame feature counts, stereo match counts, triangulated point counts,
+temporal match counts, PnP inliers, inlier ratio, accepted/rejected state, and
+the reject reason. Use that CSV to decide whether the next tuning pass should
+focus on image features, stereo geometry, temporal matching, or PnP gates.
 
 The public Tank Dataset page currently exposes `short_test` as sample data and
 requires the download form for the full sequence set, so this table keeps

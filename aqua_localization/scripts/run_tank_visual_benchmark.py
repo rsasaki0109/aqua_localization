@@ -32,6 +32,7 @@ DEFAULT_ODOM_TOPIC = "/aqua_visual_frontend/odometry"
 @dataclass(frozen=True)
 class BenchmarkPaths:
     estimate_tum: Path
+    status_csv: Path
     scale_report: Path
     benchmark_row: Path
     replay_script: Path
@@ -45,6 +46,7 @@ def default_paths(out_dir: Path, sequence: str) -> BenchmarkPaths:
     stem = sanitize_name(sequence)
     return BenchmarkPaths(
         estimate_tum=out_dir / f"{stem}_visual_frontend.tum",
+        status_csv=out_dir / f"{stem}_visual_frontend_status.csv",
         scale_report=out_dir / f"{stem}_visual_scale_report.txt",
         benchmark_row=out_dir / f"{stem}_visual_benchmark.md",
         replay_script=out_dir / f"{stem}_visual_replay.sh",
@@ -69,6 +71,8 @@ def build_visual_command(args) -> list[str]:
     command.extend(ros_param("camera.cy", args.camera_cy))
     command.extend(ros_param("camera.bf", args.camera_bf))
     command.extend(ros_param("tracking.translation_scale", args.translation_scale))
+    if args.status_csv:
+        command.extend(ros_param("diagnostics.status_csv_path", args.status_csv))
     return command
 
 
@@ -187,6 +191,12 @@ def parse_args(argv):
     parser.add_argument("--sequence", default="short_test")
     parser.add_argument("--system", default="aqua_visual_frontend")
     parser.add_argument("--odom-topic", default=DEFAULT_ODOM_TOPIC)
+    parser.add_argument(
+        "--status-csv",
+        type=Path,
+        default=None,
+        help="Optional visual frontend diagnostics CSV. Defaults under --out-dir when --bag is used.",
+    )
     parser.add_argument("--translation-scale", type=float, default=1.0)
     parser.add_argument("--camera-fx", type=float, default=DEFAULT_FX)
     parser.add_argument("--camera-fy", type=float, default=DEFAULT_FY)
@@ -210,6 +220,8 @@ def main(argv=None) -> int:
 
     paths = default_paths(args.out_dir, args.sequence)
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    if args.status_csv is None and args.bag is not None:
+        args.status_csv = paths.status_csv
 
     estimate_tum = args.estimate if args.estimate is not None else paths.estimate_tum
     if args.bag is not None:

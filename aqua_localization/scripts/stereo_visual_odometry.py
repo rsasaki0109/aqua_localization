@@ -14,6 +14,8 @@ first ROS 2 camera-based baseline and as an input to future fusion work.
 from __future__ import annotations
 
 import argparse
+import csv
+import json
 import math
 import sys
 from dataclasses import dataclass
@@ -61,6 +63,9 @@ class VisualFrame:
     points3d: np.ndarray
     keypoints_xy: np.ndarray
     descriptors: np.ndarray
+    left_features: int = 0
+    right_features: int = 0
+    stereo_matches: int = 0
 
 
 @dataclass
@@ -71,6 +76,42 @@ class MotionEstimate:
     inliers: int
     matches: int
     reason: str = ""
+
+
+@dataclass(frozen=True)
+class VisualFrontendStatus:
+    stamp_s: float
+    frame_index: int
+    accepted_count: int
+    rejected_count: int
+    left_features: int
+    right_features: int
+    stereo_matches: int
+    stereo_points: int
+    temporal_matches: int
+    pnp_inliers: int
+    inlier_ratio: float
+    step_translation_m: float
+    accepted: bool
+    status: str
+
+
+STATUS_CSV_FIELDS = [
+    "timestamp",
+    "frame_index",
+    "accepted_count",
+    "rejected_count",
+    "left_features",
+    "right_features",
+    "stereo_matches",
+    "stereo_points",
+    "temporal_matches",
+    "pnp_inliers",
+    "inlier_ratio",
+    "step_translation_m",
+    "accepted",
+    "status",
+]
 
 
 def decode_compressed_image(data: bytes) -> np.ndarray:
@@ -91,8 +132,17 @@ def triangulate_stereo_features(
 ) -> VisualFrame:
     left_keypoints, left_desc = orb.detectAndCompute(left_image, None)
     right_keypoints, right_desc = orb.detectAndCompute(right_image, None)
+    left_count = len(left_keypoints)
+    right_count = len(right_keypoints)
     if left_desc is None or right_desc is None:
-        return VisualFrame(0.0, empty_points3d(), empty_keypoints(), empty_descriptors())
+        return VisualFrame(
+            0.0,
+            empty_points3d(),
+            empty_keypoints(),
+            empty_descriptors(),
+            left_features=left_count,
+            right_features=right_count,
+        )
 
     matches = matcher.match(left_desc, right_desc)
     points = []
@@ -116,12 +166,23 @@ def triangulate_stereo_features(
         descriptors.append(left_desc[match.queryIdx])
 
     if not points:
-        return VisualFrame(0.0, empty_points3d(), empty_keypoints(), empty_descriptors())
+        return VisualFrame(
+            0.0,
+            empty_points3d(),
+            empty_keypoints(),
+            empty_descriptors(),
+            left_features=left_count,
+            right_features=right_count,
+            stereo_matches=len(matches),
+        )
     return VisualFrame(
         0.0,
         np.asarray(points, dtype=np.float32),
         np.asarray(keypoints, dtype=np.float32),
         np.asarray(descriptors, dtype=np.uint8),
+        left_features=left_count,
+        right_features=right_count,
+        stereo_matches=len(matches),
     )
 
 
@@ -252,6 +313,72 @@ def failed_motion(reason: str, matches: int = 0, inliers: int = 0) -> MotionEsti
     )
 
 
+def make_status(
+    stamp_s: float,
+    frame_index: int,
+    accepted_count: int,
+    rejected_count: int,
+    frame: VisualFrame,
+    estimate: MotionEstimate,
+) -> VisualFrontendStatus:
+    inlier_ratio = estimate.inliers / max(1, estimate.matches)
+    step_translation_m = float(np.linalg.norm(estimate.translation_prev_to_curr))
+    return VisualFrontendStatus(
+        stamp_s=stamp_s,
+        frame_index=frame_index,
+        accepted_count=accepted_count,
+        rejected_count=rejected_count,
+        left_features=frame.left_features,
+        right_features=frame.right_features,
+        stereo_matches=frame.stereo_matches,
+        stereo_points=int(frame.points3d.shape[0]),
+        temporal_matches=estimate.matches,
+        pnp_inliers=estimate.inliers,
+        inlier_ratio=float(inlier_ratio),
+        step_translation_m=step_translation_m,
+        accepted=estimate.success,
+        status=estimate.reason if estimate.reason else "accepted",
+    )
+
+
+def status_to_dict(status: VisualFrontendStatus) -> dict:
+    return {
+        "timestamp": status.stamp_s,
+        "frame_index": status.frame_index,
+        "accepted_count": status.accepted_count,
+        "rejected_count": status.rejected_count,
+        "left_features": status.left_features,
+        "right_features": status.right_features,
+        "stereo_matches": status.stereo_matches,
+        "stereo_points": status.stereo_points,
+        "temporal_matches": status.temporal_matches,
+        "pnp_inliers": status.pnp_inliers,
+        "inlier_ratio": status.inlier_ratio,
+        "step_translation_m": status.step_translation_m,
+        "accepted": status.accepted,
+        "status": status.status,
+    }
+
+
+def status_to_json(status: VisualFrontendStatus) -> str:
+    return json.dumps(status_to_dict(status), sort_keys=True, separators=(",", ":"))
+
+
+def write_status_csv_header(fp):
+    writer = csv.DictWriter(fp, fieldnames=STATUS_CSV_FIELDS)
+    writer.writeheader()
+
+
+def write_status_csv_row(fp, status: VisualFrontendStatus):
+    row = status_to_dict(status)
+    row["timestamp"] = f"{status.stamp_s:.9f}"
+    row["inlier_ratio"] = f"{status.inlier_ratio:.9f}"
+    row["step_translation_m"] = f"{status.step_translation_m:.9f}"
+    row["accepted"] = int(status.accepted)
+    writer = csv.DictWriter(fp, fieldnames=STATUS_CSV_FIELDS)
+    writer.writerow(row)
+
+
 def stamp_to_seconds(stamp) -> float:
     return float(stamp.sec) + float(stamp.nanosec) * 1.0e-9
 
@@ -263,6 +390,7 @@ def run_ros_node(argv=None) -> int:
     from rclpy.node import Node
     from rclpy.qos import QoSProfile, ReliabilityPolicy
     from sensor_msgs.msg import CompressedImage
+    from std_msgs.msg import String
 
     class StereoVisualOdometryNode(Node):
         def __init__(self):
@@ -276,10 +404,16 @@ def run_ros_node(argv=None) -> int:
             self.odom_topic = self.declare_parameter(
                 "topics.odometry", "/aqua_visual_frontend/odometry"
             ).value
+            self.status_topic = self.declare_parameter(
+                "topics.status", "/aqua_visual_frontend/status"
+            ).value
             self.frame_id = self.declare_parameter("frames.odom", "visual_odom").value
             self.child_frame_id = self.declare_parameter("frames.camera", "camera_left").value
             self.sync_slop_s = float(self.declare_parameter("sync.slop_s", 0.02).value)
             self.buffer_size = int(self.declare_parameter("sync.buffer_size", 20).value)
+            self.status_csv_path = str(
+                self.declare_parameter("diagnostics.status_csv_path", "").value
+            )
 
             self.camera = StereoCamera(
                 fx=float(self.declare_parameter("camera.fx", 655.0).value),
@@ -333,6 +467,14 @@ def run_ros_node(argv=None) -> int:
                 CompressedImage, self.right_topic, self.on_right, qos
             )
             self.odom_pub = self.create_publisher(Odometry, self.odom_topic, 10)
+            self.status_pub = self.create_publisher(String, self.status_topic, 10)
+            self.status_csv_fp = None
+            if self.status_csv_path:
+                path = Path(self.status_csv_path)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                self.status_csv_fp = path.open("w", newline="", encoding="utf-8")
+                write_status_csv_header(self.status_csv_fp)
+                self.status_csv_fp.flush()
 
             self.left_buffer = []
             self.right_buffer = []
@@ -343,7 +485,7 @@ def run_ros_node(argv=None) -> int:
             self.rejected = 0
             self.get_logger().info(
                 f"stereo visual odometry started: left={self.left_topic} right={self.right_topic} "
-                f"odom={self.odom_topic}"
+                f"odom={self.odom_topic} status={self.status_topic}"
             )
 
         def on_left(self, msg):
@@ -389,6 +531,15 @@ def run_ros_node(argv=None) -> int:
             if self.previous_frame is None:
                 self.previous_frame = frame
                 self.publish_odometry(left_msg.header.stamp, 0, 0)
+                init_estimate = MotionEstimate(
+                    True,
+                    np.eye(3, dtype=np.float64),
+                    np.zeros(3, dtype=np.float64),
+                    0,
+                    0,
+                    "initialized",
+                )
+                self.publish_status(frame, init_estimate)
                 return
 
             estimate = estimate_motion_pnp(
@@ -410,6 +561,7 @@ def run_ros_node(argv=None) -> int:
                     f"visual odometry rejected frame {self.frames}: {estimate.reason}",
                     throttle_duration_sec=2.0,
                 )
+            self.publish_status(frame, estimate)
 
         def publish_odometry(self, stamp, inliers: int, matches: int):
             msg = Odometry()
@@ -432,6 +584,32 @@ def run_ros_node(argv=None) -> int:
                 msg.twist.covariance[0] = float(matches)
                 msg.twist.covariance[1] = float(inliers)
             self.odom_pub.publish(msg)
+
+        def publish_status(self, frame: VisualFrame, estimate: MotionEstimate):
+            status = make_status(
+                frame.stamp_s,
+                self.frames,
+                self.accepted,
+                self.rejected,
+                frame,
+                estimate,
+            )
+            msg = String()
+            msg.data = status_to_json(status)
+            self.status_pub.publish(msg)
+            if self.status_csv_fp is not None:
+                write_status_csv_row(self.status_csv_fp, status)
+                if self.frames % 100 == 0:
+                    self.status_csv_fp.flush()
+
+        def destroy_node(self) -> bool:
+            try:
+                if self.status_csv_fp is not None:
+                    self.status_csv_fp.flush()
+                    self.status_csv_fp.close()
+                    self.status_csv_fp = None
+            finally:
+                return super().destroy_node()
 
     rclpy.init(args=argv)
     node = StereoVisualOdometryNode()
