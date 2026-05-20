@@ -146,6 +146,24 @@ def odometry_to_matrix(msg):
     return matrix
 
 
+def matrix_to_list(matrix: np.ndarray):
+    return [[float(value) for value in row] for row in matrix.tolist()]
+
+
+def transform_from_xyz_quat(values):
+    if len(values) != 7:
+        raise ValueError("base_from_camera must have 7 values: x y z qx qy qz qw")
+    x, y, z, qx, qy, qz, qw = [float(value) for value in values]
+    matrix = np.eye(4, dtype=float)
+    matrix[:3, :3] = quaternion_to_matrix(qx, qy, qz, qw)
+    matrix[:3, 3] = [x, y, z]
+    return matrix
+
+
+def identity_base_from_camera():
+    return transform_from_xyz_quat([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+
+
 def odometry_sample(timestamp_ns: int, msg):
     msg_stamp = message_stamp_ns(msg)
     match_timestamp = msg_stamp if msg_stamp is not None else int(timestamp_ns)
@@ -153,7 +171,7 @@ def odometry_sample(timestamp_ns: int, msg):
         "timestamp_ns": int(timestamp_ns),
         "message_stamp_ns": msg_stamp,
         "match_timestamp_ns": int(match_timestamp),
-        "transform_matrix": odometry_to_matrix(msg).tolist(),
+        "transform_matrix": matrix_to_list(odometry_to_matrix(msg)),
     }
 
 
@@ -299,6 +317,7 @@ def to_nerfstudio_payload(aqua_payload):
             "camera_info_topic": aqua_payload.get("camera_info_topic"),
             "intrinsics_source": aqua_payload.get("intrinsics_source"),
             "camera_pose_convention": aqua_payload.get("camera_pose_convention"),
+            "base_from_camera": aqua_payload.get("base_from_camera"),
             "max_time_diff_ns": aqua_payload["max_time_diff_ns"],
             "source_frame_count": aqua_payload["source_frame_count"],
             "odometry_sample_count": aqua_payload["odometry_sample_count"],
@@ -315,6 +334,7 @@ def build_transforms(
     pack_dir: Path,
     max_time_diff_s: float = 0.05,
     output_format: str = "aqua",
+    base_from_camera_values=None,
     reader=None,
     camera_info_reader=None,
 ):
@@ -322,6 +342,11 @@ def build_transforms(
         raise ValueError("max_time_diff must be >= 0")
     if output_format not in TRANSFORM_FORMATS:
         raise ValueError(f"unsupported transforms format: {output_format}")
+    base_from_camera = (
+        transform_from_xyz_quat(base_from_camera_values)
+        if base_from_camera_values is not None
+        else identity_base_from_camera()
+    )
 
     manifest = load_json(manifest_path)
     role = trajectory_role(manifest)
@@ -376,7 +401,9 @@ def build_transforms(
                 "odom_bag_timestamp_ns": odom["timestamp_ns"],
                 "odom_message_stamp_ns": odom["message_stamp_ns"],
                 "time_diff_ns": int(diff_ns),
-                "transform_matrix": odom["transform_matrix"],
+                "transform_matrix": matrix_to_list(
+                    np.array(odom["transform_matrix"], dtype=float) @ base_from_camera
+                ),
             }
         )
 
@@ -389,7 +416,18 @@ def build_transforms(
         "trajectory_type": msg_type,
         "camera_info_topic": intrinsics_role["topic"] if intrinsics_role else None,
         "intrinsics_source": "camera_info" if intrinsics is not None else None,
-        "camera_pose_convention": "raw_ros_odometry_pose_as_camera_to_world",
+        "camera_pose_convention": "world_from_camera = world_from_base @ base_from_camera",
+        "base_from_camera": {
+            "translation_xyz_m": [float(value) for value in base_from_camera[:3, 3].tolist()],
+            "quaternion_xyzw": [
+                float(value) for value in (
+                    base_from_camera_values[3:]
+                    if base_from_camera_values is not None
+                    else [0.0, 0.0, 0.0, 1.0]
+                )
+            ],
+            "transform_matrix": matrix_to_list(base_from_camera),
+        },
         "max_time_diff_ns": max_time_diff_ns,
         "source_frame_count": len(frames_payload.get("frames", [])),
         "odometry_sample_count": len(odom_samples),
@@ -440,13 +478,27 @@ def parse_args(argv):
         default="aqua",
         help="Output transforms.json format.",
     )
+    parser.add_argument(
+        "--base-from-camera",
+        nargs=7,
+        type=float,
+        metavar=("X", "Y", "Z", "QX", "QY", "QZ", "QW"),
+        default=None,
+        help="Camera pose in the odometry base frame as x y z qx qy qz qw.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv=None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     try:
-        payload = build_transforms(args.manifest, args.pack, args.max_time_diff, args.format)
+        payload = build_transforms(
+            args.manifest,
+            args.pack,
+            args.max_time_diff,
+            args.format,
+            args.base_from_camera,
+        )
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
