@@ -286,22 +286,26 @@
         <h2>Implementation PR Target</h2>
         <ul>
           <li>Generate a JSON manifest for camera frames, trajectory, depth priors, and optional MBES/submap inputs.</li>
-          <li>Use the manifest as the contract for the future frame exporter and splat training artifact.</li>
+          <li>Create a scaffolded dataset pack with `images/`, `depth/`, `mbes/`, and `transforms_stub.json`.</li>
           <li>Keep localization metrics separate from reconstruction quality claims.</li>
         </ul>
       </section>
 
       <section class="panel">
-        <h2>Manifest Workflow</h2>
+        <h2>Manifest To Dataset Pack</h2>
         <p>
-          The first reproducible step is now a metadata-only exporter. It checks the bag's topics and records which streams can feed an underwater 3DGS pipeline.
+          The first reproducible step is metadata-only. It checks the bag's topics, records the candidate streams, then creates a stable output directory that the future frame extractor can fill.
         </p>
         <div class="code">
           <pre>ros2 run aqua_localization export_3dgs_manifest.py \
   --bag datasets/public/tank_dataset/short_test_ros2 \
   --dataset "Tank Dataset" \
   --sequence short_test \
-  --out /tmp/tank_short_test_3dgs_manifest.json</pre>
+  --out /tmp/tank_short_test_3dgs_manifest.json
+
+ros2 run aqua_localization export_3dgs_dataset_pack.py \
+  --manifest /tmp/tank_short_test_3dgs_manifest.json \
+  --out /tmp/tank_short_test_3dgs_pack</pre>
         </div>
       </section>
 
