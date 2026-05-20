@@ -288,14 +288,15 @@
           <li>Generate a JSON manifest for camera frames, trajectory, depth priors, and optional MBES/submap inputs.</li>
           <li>Create a scaffolded dataset pack with `images/`, `depth/`, `mbes/`, and `transforms_stub.json`.</li>
           <li>Extract real ROS bag image frames into `images/` and index them in `frames.json`.</li>
+          <li>Match extracted frames to nearest odometry and write `transforms.json`.</li>
           <li>Keep localization metrics separate from reconstruction quality claims.</li>
         </ul>
       </section>
 
       <section class="panel">
-        <h2>Manifest To Dataset Pack</h2>
+        <h2>Manifest To Transforms</h2>
         <p>
-          The first reproducible step is metadata-only. It checks the bag's topics, records the candidate streams, then creates a stable output directory that the future frame extractor can fill.
+          The reproducible track now reaches `images/`, `frames.json`, and nearest-neighbour odometry poses in `transforms.json`. Camera intrinsics and camera-to-base extrinsics are deliberately left as the next calibration step.
         </p>
         <div class="code">
           <pre>ros2 run aqua_localization export_3dgs_manifest.py \
@@ -312,7 +313,12 @@ ros2 run aqua_localization export_3dgs_frames.py \
   --manifest /tmp/tank_short_test_3dgs_manifest.json \
   --pack /tmp/tank_short_test_3dgs_pack \
   --max-frames 120 \
-  --stride 2</pre>
+  --stride 2
+
+ros2 run aqua_localization export_3dgs_transforms.py \
+  --manifest /tmp/tank_short_test_3dgs_manifest.json \
+  --pack /tmp/tank_short_test_3dgs_pack \
+  --max-time-diff 0.05</pre>
         </div>
       </section>
 
