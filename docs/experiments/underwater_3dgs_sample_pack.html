@@ -148,6 +148,17 @@
       border-radius: 0 8px 8px 0;
     }
 
+    .cta {
+      display: inline-block;
+      border: 1px solid var(--cyan);
+      border-radius: 8px;
+      background: rgba(78, 217, 197, 0.14);
+      color: var(--text);
+      padding: 12px 14px;
+      text-decoration: none;
+      font-weight: 760;
+    }
+
     footer {
       padding: 28px clamp(20px, 5vw, 72px);
       color: var(--muted);
@@ -166,6 +177,7 @@
     <nav>
       <a href="../index.html">Project Page</a>
       <a href="underwater_3dgs_demo.html">3DGS Demo Track</a>
+      <a href="https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3">Release v0.3</a>
       <a href="https://github.com/rsasaki0109/aqua_localization">GitHub</a>
     </nav>
     <h1>Underwater 3DGS Sample Pack Workflow</h1>
@@ -182,6 +194,19 @@
       </div>
       <p class="note">The checked-in compact Tank bag does not include camera image or CameraInfo topics. Build this artifact from a Tank conversion made with camera topics included, or from another public underwater camera bag.</p>
       <p><a href="../../datasets/tank_dataset_demo.md#3dgs-camera-enabled-conversion-check">Open the Tank camera-enabled conversion check</a></p>
+    </section>
+
+    <section>
+      <h2>Published Artifact</h2>
+      <p>
+        The first public sample pack is attached to
+        <a href="https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3">v0.3</a>.
+        It contains 20 Tank Dataset frames, 20 matched <code>/apriltag_slam/GT</code>
+        poses, manual Tank stereo intrinsics, and a nerfstudio-style
+        <code>transforms.json</code>.
+      </p>
+      <p><a class="cta" href="https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip">Download tank_short_test_3dgs_pack_20frames.zip</a></p>
+      <p class="note">This is a reproducible input pack for 3DGS tooling, not a trained Gaussian Splatting result or reconstruction-quality benchmark.</p>
     </section>
 
     <section>
