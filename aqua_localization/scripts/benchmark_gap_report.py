@@ -274,6 +274,35 @@ def format_report(gaps: list[GapRow], target_system: str, baseline_system: str) 
     return "\n".join(lines)
 
 
+def gate_failures(
+    gaps: list[GapRow],
+    max_gap_x: float | None,
+    max_improvement_to_tie_percent: float | None,
+) -> list[str]:
+    if max_gap_x is None and max_improvement_to_tie_percent is None:
+        return []
+    if not gaps:
+        return ["no matching benchmark gaps were found"]
+
+    failures = []
+    for gap in gaps:
+        case = f"{gap.dataset} {gap.sequence} {gap.alignment}"
+        if max_gap_x is not None and gap.ratio > max_gap_x:
+            failures.append(
+                f"{case}: gap {gap.ratio:.4f}x exceeds --max-gap-x {max_gap_x:.4f}"
+            )
+        if (
+            max_improvement_to_tie_percent is not None
+            and gap.improvement_to_tie_percent > max_improvement_to_tie_percent
+        ):
+            failures.append(
+                f"{case}: improvement-to-tie {gap.improvement_to_tie_percent:.4f}% "
+                f"exceeds --max-improvement-to-tie-percent "
+                f"{max_improvement_to_tie_percent:.4f}%"
+            )
+    return failures
+
+
 def parse_args(argv):
     parser = argparse.ArgumentParser(
         description="Create a Markdown RMSE gap report from benchmark tables."
@@ -287,6 +316,18 @@ def parse_args(argv):
     parser.add_argument("--target-system", required=True, help="System to improve.")
     parser.add_argument("--baseline-system", required=True, help="Baseline system to beat.")
     parser.add_argument("--out", type=Path, default=None, help="Optional Markdown output path.")
+    parser.add_argument(
+        "--max-gap-x",
+        type=float,
+        default=None,
+        help="Fail with exit code 2 if any target/baseline RMSE ratio exceeds this value.",
+    )
+    parser.add_argument(
+        "--max-improvement-to-tie-percent",
+        type=float,
+        default=None,
+        help="Fail with exit code 2 if any case needs more than this RMSE reduction to tie.",
+    )
     return parser.parse_args(argv)
 
 
@@ -295,17 +336,20 @@ def main(argv=None):
     rows = []
     for path in args.markdown:
         rows.extend(parse_markdown_benchmark_rows(path.read_text(encoding="utf-8")))
-    report = format_report(
-        compute_gaps(rows, args.target_system, args.baseline_system),
-        args.target_system,
-        args.baseline_system,
-    )
+    gaps = compute_gaps(rows, args.target_system, args.baseline_system)
+    report = format_report(gaps, args.target_system, args.baseline_system)
 
     if args.out is None:
         print(report)
     else:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(report + "\n", encoding="utf-8")
+    failures = gate_failures(gaps, args.max_gap_x, args.max_improvement_to_tie_percent)
+    if failures:
+        print("benchmark gap gate failed:", file=sys.stderr)
+        for failure in failures:
+            print(f"- {failure}", file=sys.stderr)
+        return 2
     return 0
 
 
