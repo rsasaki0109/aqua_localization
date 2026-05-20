@@ -42,6 +42,7 @@ Latest release: **[v0.2](https://github.com/rsasaki0109/aqua_localization/releas
 |------|-------------|
 | Open the visual project page | [GitHub Pages](https://rsasaki0109.github.io/aqua_localization/) |
 | Preview the underwater 3DGS research track | [3DGS demo track](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_demo.html) |
+| Build a small 3DGS sample pack artifact | [3DGS sample pack workflow](docs/experiments/underwater_3dgs_sample_pack.md) |
 | See real underwater outputs | [Public-data results](#public-data-results) |
 | Build and launch the stack | [Run it](#run-it) |
 | Try pose-graph loop closure without a bag | [Loop-closure smoke test](#loop-closure-smoke-test) |
