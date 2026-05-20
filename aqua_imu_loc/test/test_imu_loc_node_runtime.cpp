@@ -45,6 +45,23 @@ sensor_msgs::msg::FluidPressure make_pressure(
   return pressure;
 }
 
+nav_msgs::msg::Odometry make_position_odometry(
+  const rclcpp::Time & stamp, double x, double y, double z, double variance)
+{
+  nav_msgs::msg::Odometry odometry;
+  odometry.header.stamp = stamp;
+  odometry.header.frame_id = "visual_odom";
+  odometry.child_frame_id = "camera_left";
+  odometry.pose.pose.position.x = x;
+  odometry.pose.pose.position.y = y;
+  odometry.pose.pose.position.z = z;
+  odometry.pose.pose.orientation.w = 1.0;
+  odometry.pose.covariance[0] = variance;
+  odometry.pose.covariance[7] = variance;
+  odometry.pose.covariance[14] = variance;
+  return odometry;
+}
+
 template<typename Predicate>
 bool spin_until(
   rclcpp::Executor & executor,
@@ -187,6 +204,64 @@ TEST_F(ImuLocNodeRuntimeTest, PublishesOdometryStatusTfAndHandlesReset)
            status_messages.back().update_count == 0U &&
            status_messages.back().status == "waiting_for_imu";
   }));
+}
+
+TEST_F(ImuLocNodeRuntimeTest, VisualOdometryPullsPositionState)
+{
+  constexpr auto kImuTopic = "/aqua_imu_visual_runtime_test/imu";
+  constexpr auto kVisualTopic = "/aqua_imu_visual_runtime_test/visual_odom";
+  constexpr auto kOdometryTopic = "/aqua_imu_visual_runtime_test/odometry";
+  constexpr auto kStatusTopic = "/aqua_imu_visual_runtime_test/status";
+
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({
+    rclcpp::Parameter("topics.imu", std::string(kImuTopic)),
+    rclcpp::Parameter("topics.pressure", std::string("")),
+    rclcpp::Parameter("topics.visual_odometry", std::string(kVisualTopic)),
+    rclcpp::Parameter("topics.odometry", std::string(kOdometryTopic)),
+    rclcpp::Parameter("topics.status", std::string(kStatusTopic)),
+    rclcpp::Parameter("publish.tf", false),
+    rclcpp::Parameter("init.static_bias.enable", false),
+    rclcpp::Parameter("imu.visual.position_variance_floor", 0.01),
+    rclcpp::Parameter("dynamics.enable_linear_drag", false),
+  });
+
+  auto imu_node = std::make_shared<aqua_imu_loc::ImuLocNode>(options);
+  auto test_node = std::make_shared<rclcpp::Node>("aqua_imu_visual_runtime_test");
+
+  std::vector<nav_msgs::msg::Odometry> odometry_messages;
+  auto imu_pub =
+    test_node->create_publisher<sensor_msgs::msg::Imu>(kImuTopic, rclcpp::SensorDataQoS());
+  auto visual_pub =
+    test_node->create_publisher<nav_msgs::msg::Odometry>(kVisualTopic, rclcpp::SensorDataQoS());
+  auto odometry_sub = test_node->create_subscription<nav_msgs::msg::Odometry>(
+    kOdometryTopic, 10,
+    [&odometry_messages](const nav_msgs::msg::Odometry::SharedPtr msg) {
+      odometry_messages.push_back(*msg);
+    });
+
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(imu_node);
+  executor.add_node(test_node);
+
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    return imu_pub->get_subscription_count() > 0 &&
+           visual_pub->get_subscription_count() > 0;
+  }));
+
+  const auto start = test_node->now();
+  imu_pub->publish(make_stationary_imu(start));
+  imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.01)));
+  visual_pub->publish(
+    make_position_odometry(start + rclcpp::Duration::from_seconds(0.01), 2.0, 0.0, 0.0, 0.01));
+  imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.02)));
+
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    return !odometry_messages.empty() &&
+           odometry_messages.back().pose.pose.position.x > 0.5;
+  }));
+
+  EXPECT_NEAR(odometry_messages.back().pose.pose.position.x, 2.0, 0.5);
 }
 
 }  // namespace

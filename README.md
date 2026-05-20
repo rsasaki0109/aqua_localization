@@ -72,7 +72,7 @@ instead of hand-captured screenshots.
 
 | Dataset | What it shows | rerun screenshot |
 |---------|---------------|------------------|
-| **Tank Dataset `short_test`** | DVL fusion **0.43 m APE RMSE**; experimental stereo visual frontend **0.095 m** with same-sequence scale fit | [`tank_dataset_rerun.png`](docs/media/tank_dataset_rerun.png) |
+| **Tank Dataset `short_test`** | DVL fusion **0.43 m APE RMSE**; experimental visual-aided fusion **0.37 m** with same-sequence scale fit | [`tank_dataset_rerun.png`](docs/media/tank_dataset_rerun.png) |
 | **MBES-SLAM `beach_pond`** | Multibeam fans accumulated into a depth-coloured bathymetric scan | [`mbes_slam_rerun.png`](docs/media/mbes_slam_rerun.png) |
 | **NTNU `subset-fjord/fjord_1`** | Dataset SLAM baseline through a 7 m fjord dive | [`ntnu_fjord_1_rerun.png`](docs/media/ntnu_fjord_1_rerun.png) |
 | **AQUALOC `harbor_07`** | LIRMM "Dumbo" ROV underwater camera + pressure depth track | [`aqualoc_harbor_07_rerun.png`](docs/media/aqualoc_harbor_07_rerun.png) |

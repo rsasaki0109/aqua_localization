@@ -12,6 +12,10 @@ aqua_imu_loc:
       # sonar registration node, fed into the UKF as a 3D position observation.
       # Leave empty for IMU-only dead reckoning.
       sonar_odometry: ""
+      # Optional visual frontend odometry as a second 3D position observation.
+      # This accepts nav_msgs/Odometry from `stereo_visual_odometry.py` or a
+      # future visual SLAM frontend.
+      visual_odometry: ""
       # Optional DVL bottom-track velocity input as geometry_msgs/TwistStamped
       # (twist.linear.{x,y,z} in body frame). Leave empty when no DVL.
       dvl_velocity: ""
@@ -106,6 +110,12 @@ aqua_imu_loc:
       # cannot collapse the UKF position uncertainty; max_age_s drops samples
       # older than this many seconds relative to the latest IMU stamp.
       sonar:
+        position_variance_floor: 0.04
+        max_age_s: 1.0
+      # Tightly-coupled visual position fusion knobs. Active when
+      # `topics.visual_odometry` is set. Keep conservative until camera scale,
+      # camera-to-base extrinsics, and frame alignment are validated.
+      visual:
         position_variance_floor: 0.04
         max_age_s: 1.0
 

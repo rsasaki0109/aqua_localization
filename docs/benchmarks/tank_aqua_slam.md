@@ -70,11 +70,13 @@ camera-included `short_test` conversion:
 | Tank Dataset | `short_test` | `aqua_visual_frontend` | stereo only | SE(3) | 200 | 11.35 | 1.2667 | 1.2280 | 1.3649 | 2.2035 | nominal stereo scale |
 | Tank Dataset | `short_test` | `aqua_visual_frontend` | stereo only | Sim(3) | 200 | 11.35 | 0.0826 | 0.0786 | 0.0958 | 0.2458 | scale diagnostic, not paper-safe |
 | Tank Dataset | `short_test` | `aqua_visual_frontend` | stereo only | SE(3) | 200 | 11.25 | 0.0815 | 0.0792 | 0.0947 | 0.2416 | `tracking.translation_scale=0.169623`, same-sequence scale fit |
+| Tank Dataset | `short_test` | `aqua_localization+visual` | IMU + pressure + DVL + stereo | SE(3) | 5399 | 14.94 | 0.3384 | 0.2928 | 0.3726 | 0.7497 | visual position update, same-sequence scale fit, variance floor 0.0025 |
 
 The frontend is already better than the IMU + pressure + DVL row once metric
 scale is calibrated, but it still does not beat AQUA-SLAM's 0.0194 m RMSE and
-does not yet fuse IMU or DVL. The next serious step is out-of-sequence scale
-calibration and fusion into `aqua_imu_loc` as an external position observation.
+the fused result only improves the current stack from 0.4291 m to 0.3726 m.
+The next serious step is out-of-sequence scale calibration plus a calibrated
+camera-to-base transform before claiming a visual-inertial-DVL result.
 
 ## Head-to-Head Table
 
@@ -86,6 +88,7 @@ same APE implementation.
 | Tank Dataset | short_test | AQUA-SLAM | SE(3) | 234 | 11.65 | 0.0173 | 0.0165 | 0.0194 | 0.0579 | AQUA-SLAM Docker, short_test, /AQUA_SLAM/orb_odom |
 | Tank Dataset | short_test | aqua_localization | SE(3) | 5399 | 14.94 | 0.3796 | 0.4014 | 0.4291 | 0.7652 | ROS 2 Humble, IMU+pressure+DVL, same AprilTag GT export |
 | Tank Dataset | short_test | aqua_visual_frontend | SE(3) | 200 | 11.25 | 0.0815 | 0.0792 | 0.0947 | 0.2416 | stereo ORB+PnP, same-sequence scale fit |
+| Tank Dataset | short_test | aqua_localization+visual | SE(3) | 5399 | 14.94 | 0.3384 | 0.2928 | 0.3726 | 0.7497 | visual position update, same-sequence scale fit |
 | Tank Dataset | Structure_Easy | AQUA-SLAM | TBD | TBD | TBD | TBD | TBD | TBD | TBD | record AQUA-SLAM output topic to TUM |
 | Tank Dataset | Structure_Easy | aqua_localization | TBD | TBD | TBD | TBD | TBD | TBD | TBD | run closest available input mode |
 
