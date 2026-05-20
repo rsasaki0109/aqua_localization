@@ -1,0 +1,153 @@
+# AQUA-SLAM Comparison Plan
+
+This is the focused benchmark plan for comparing `aqua_localization` against
+[SenseRoboticsLab/AQUA-SLAM](https://github.com/SenseRoboticsLab/AQUA-SLAM).
+AQUA-SLAM is the closest current open-source underwater SLAM baseline for the
+Tank Dataset, so it should be treated as a serious competitor, not a generic
+checkbox baseline.
+
+Checked on 2026-05-20:
+
+- Repository: <https://github.com/SenseRoboticsLab/AQUA-SLAM>
+- License file: GPL-3.0
+- GitHub metadata from `gh repo view`: 131 stars, 14 forks
+- Publication listed in README: "AQUA-SLAM: Tightly-Coupled Underwater
+  Acoustic-Visual-Inertial SLAM with Sensor Calibration," IEEE Transactions on
+  Robotics, 2025
+
+## What AQUA-SLAM Does
+
+AQUA-SLAM is an underwater SLAM system that integrates:
+
+- DVL
+- IMU
+- stereo cameras
+- loop detection
+- sensor calibration/extrinsic parameters
+- RViz visualization
+
+Its README points users to the Tank Dataset, includes per-sequence launch files
+such as `blue_gx5_StructureEasy.launch`, and notes that different sequences may
+need different extrinsic calibration files. It also documents a known issue:
+long sequences may randomly crash due to multithreading problems.
+
+## Direct Comparison
+
+| Axis | AQUA-SLAM | `aqua_localization` | Current read |
+|------|-----------|---------------------|--------------|
+| Primary goal | Full underwater acoustic-visual-inertial SLAM | ROS 2 underwater localization, sonar registration, pose graph, replay tooling | AQUA-SLAM is stronger for full stereo+DVL+IMU SLAM today. |
+| ROS generation | ROS 1 / catkin workflow in Docker | ROS 2 Humble/Jazzy colcon packages | `aqua_localization` is stronger for ROS 2 adoption. |
+| Main sensors | DVL, IMU, stereo cameras | IMU, pressure, DVL, sonar point clouds / MBES | Different sensor emphasis; Tank Dataset is the common overlap. |
+| Dataset story | Tank Dataset focused | Tank, MBES-SLAM, NTNU, AQUALOC | `aqua_localization` is broader across public datasets. |
+| License | GPL-3.0 repository license | Apache-2.0 | `aqua_localization` is easier for permissive downstream reuse. |
+| Visual SLAM | Core capability | Not implemented as a tightly-coupled visual frontend | AQUA-SLAM wins here until visual loop closure exists. |
+| MBES bathymetry | Not the core public story | MBES replay, registration, pose graph, experimental loop closure | `aqua_localization` has the stronger MBES-specific path. |
+| Reproducibility surface | Docker and per-sequence launch files | ROS 2 launches, dataset docs, rerun exports, benchmark scripts | Needs measured setup-time comparison. |
+| Known limitations | README mentions random long-sequence crash risk | README documents drift and uncalibrated MBES loop closure | Both are honest; compare stability during replay. |
+
+## Fair Head-to-Head Tasks
+
+### 1. Tank Dataset Full SLAM
+
+This is the most important comparison.
+
+Use the same Tank Dataset sequence, ideally `Structure_Easy.bag` first because
+AQUA-SLAM documents that path.
+
+Measure:
+
+- trajectory APE RMSE / mean / median
+- depth RMSE if reference depth is available
+- tracking loss / invalid output periods
+- runtime factor
+- setup steps and required manual calibration edits
+- crash/restart count over repeated runs
+
+Expected current outcome:
+
+- AQUA-SLAM may win trajectory accuracy because it uses stereo visual features
+  and tightly-coupled acoustic-visual-inertial optimization.
+- `aqua_localization` can still win ROS 2 portability, permissive licensing,
+  simpler export tooling, and pressure/DVL fusion transparency.
+
+Paper-safe claim before running the benchmark:
+
+> AQUA-SLAM is the full underwater SLAM baseline on Tank Dataset. The first
+> `aqua_localization` benchmark should report whether its ROS 2 localization
+> stack is competitive as a lighter, more modular alternative, not claim
+> superiority over AQUA-SLAM's full visual-inertial-acoustic system.
+
+### 2. Tank Dataset Sensor-Ablation Study
+
+If the Tank Dataset topics allow it, run:
+
+| Mode | AQUA-SLAM | `aqua_localization` |
+|------|-----------|---------------------|
+| IMU only | not the main target | supported through `aqua_imu_loc` |
+| IMU + pressure | not the main target | core path |
+| IMU + pressure + DVL | partial overlap | core path |
+| IMU + DVL + stereo | core path | missing tightly-coupled stereo frontend |
+| IMU + DVL + sonar/MBES | not the Tank Dataset core | MBES path on MBES-SLAM, not Tank |
+
+This avoids an unfair comparison where one system is denied its main sensor.
+
+### 3. MBES-SLAM `beach_pond`
+
+This is not a fair AQUA-SLAM head-to-head unless AQUA-SLAM can be configured for
+the available camera/DVL/IMU topics and reference trajectory. Treat it as a
+separate `aqua_localization` strength: MBES replay, sonar registration, and
+loop-closure diagnostics.
+
+## Implementation Plan
+
+1. **Add an AQUA-SLAM runner note.**
+   Document the exact Docker, vocabulary download, Tank Dataset placement, and
+   `rosbag play` commands from the AQUA-SLAM README.
+2. **Identify AQUA-SLAM output odometry topic.**
+   Run `rostopic list` inside its Docker workflow and record the published pose
+   topic used for APE export.
+3. **Write `record_aqua_slam_tank_baseline.md`.**
+   Keep this as documentation first unless a reproducible ROS 1 container can
+   be automated cleanly from this repository.
+4. **Convert AQUA-SLAM output to TUM.**
+   Reuse the same TUM format consumed by `compare_trajectories.py`.
+5. **Run `aqua_localization` on the same Tank sequence.**
+   Use the closest available input mode and clearly state which sensors are
+   enabled.
+6. **Generate a comparison table.**
+   Include accuracy, runtime, setup steps, license, ROS generation, and failure
+   modes.
+
+## Decision: Where Can We Beat It?
+
+Likely current wins:
+
+- ROS 2 Humble/Jazzy support
+- Apache-2.0 licensing
+- broader public dataset coverage
+- pressure/DVL/sonar replay tooling
+- MBES-specific visualization and loop-status diagnostics
+- README/demo polish and reproducible exports
+
+Likely current losses:
+
+- full stereo+DVL+IMU underwater SLAM accuracy on Tank Dataset
+- published T-RO-level validation
+- tightly-coupled online calibration
+- mature visual loop closure
+
+High-value development to close the gap:
+
+1. Tank Dataset `Structure_Easy` benchmark harness for `aqua_localization`.
+2. AQUA-SLAM output recording and TUM conversion instructions.
+3. Fair comparison table in `docs/benchmarks/tank_aqua_slam.md`.
+4. Visual frontend or RTAB-Map baseline for AQUALOC/Tank visual sequences.
+5. MBES paper path separated from stereo visual SLAM claims.
+
+## Source Notes
+
+- AQUA-SLAM README: <https://github.com/SenseRoboticsLab/AQUA-SLAM>
+- AQUA-SLAM paper link from README:
+  <https://arxiv.org/pdf/2503.11420>
+- Tank Dataset link from README:
+  <https://senseroboticslab.github.io/underwater-tank-dataset/>

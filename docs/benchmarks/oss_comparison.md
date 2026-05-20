@@ -10,6 +10,7 @@ tasks that are not equivalent.
 | Project | What it is | Fair comparison role | Not a fair claim |
 |---------|------------|----------------------|------------------|
 | [`robot_localization`](https://docs.ros.org/en/jade/api/robot_localization/html/state_estimation_nodes.html) | ROS EKF/UKF state-estimation nodes for nonlinear mobile-robot sensor fusion. | Baseline for IMU, pressure-as-Z, DVL velocity, and odometry fusion on public bags. | Do not compare MBES loop closure or sonar registration directly; those are outside its scope. |
+| [AQUA-SLAM](https://github.com/SenseRoboticsLab/AQUA-SLAM) | Underwater acoustic-visual-inertial SLAM using DVL, IMU, and stereo cameras. | Closest head-to-head underwater SLAM baseline on the Tank Dataset when both systems are given a documented input mode. | Do not claim current `aqua_localization` beats it on full visual-inertial-acoustic SLAM until a replayable Tank Dataset benchmark exists. |
 | [`RTAB-Map`](https://docs.ros.org/en/rolling/p/rtabmap/index.html) | Open-source RGB-D / visual / LiDAR SLAM library and ROS package. | Baseline for camera or LiDAR-capable sequences, especially future AQUALOC visual loop-closure work. | Do not claim sonar-only superiority unless RTAB-Map is given a valid visual/LiDAR input baseline. |
 | [HoloOcean](https://byu-holoocean.github.io/holoocean-docs/v2.3.0/sensors/sensors.html) | Open-source underwater simulator with sensors including DVL, IMU, sonar, and depth. | Simulation reproducibility target for controlled sensor-ablation studies. | Do not treat simulator performance as real-ocean benchmark evidence. |
 | [Stonefish](https://stonefish.readthedocs.io/) | Marine robotics simulator with underwater vehicle and sonar simulation support. | Secondary simulation target when testing launch portability and sensor assumptions. | Do not compare as a localization stack unless a concrete estimator baseline is configured. |
@@ -22,8 +23,9 @@ The strongest paper path is not "beats every OSS package." It is:
 1. **Underwater-specific sensor fusion is easier to reproduce.**
    Show one-command replay/export paths for pressure, DVL, IMU, and sonar
    topics on multiple public bags.
-2. **Real-bag accuracy improves over a configured generic fusion baseline.**
-   Compare against `robot_localization` on the same topics, time window, and
+2. **Real-bag accuracy improves over configured baselines.**
+   Compare against `robot_localization` for generic fusion and AQUA-SLAM for
+   Tank Dataset underwater SLAM on the same sequence, time window, and
    trajectory metric.
 3. **MBES registration and loop-closure diagnostics are measurable.**
    Report accepted/rejected/no-candidate loop counts, descriptor gate behavior,
@@ -79,7 +81,11 @@ The strongest paper path is not "beats every OSS package." It is:
 4. **Add MBES loop-status benchmark artifacts.**
    Pair APE with descriptor sweep summaries, accepted/rejected counts, and a
    short false-positive review checklist.
-5. **Add RTAB-Map only when visual inputs are ready.**
+5. **Add AQUA-SLAM head-to-head on Tank Dataset.**
+   Follow [`aqua_slam_comparison.md`](aqua_slam_comparison.md), record the
+   AQUA-SLAM output trajectory, and compare with `aqua_localization` on the
+   same Tank Dataset sequence before making any paper claim.
+6. **Add RTAB-Map only when visual inputs are ready.**
    Use AQUALOC for this; do not force RTAB-Map into sonar-only comparisons.
 
 ## Paper Claim Template
@@ -100,6 +106,10 @@ a paper review.
 
 ## References Checked
 
+- AQUA-SLAM repository and README:
+  <https://github.com/SenseRoboticsLab/AQUA-SLAM>
+- AQUA-SLAM paper linked from the repository:
+  <https://arxiv.org/pdf/2503.11420>
 - `robot_localization` state-estimation nodes:
   <https://docs.ros.org/en/jade/api/robot_localization/html/state_estimation_nodes.html>
 - `robot_localization` package overview:
