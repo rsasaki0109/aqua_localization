@@ -42,6 +42,7 @@ Latest release: **[v0.3](https://github.com/rsasaki0109/aqua_localization/releas
 |------|-------------|
 | Open the visual project page | [GitHub Pages](https://rsasaki0109.github.io/aqua_localization/) |
 | Preview the underwater 3DGS research track | [3DGS demo track](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_demo.html) |
+| Inspect the 3DGS sample pack before downloading | [3DGS sample pack inspector](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html) |
 | Download the first 3DGS sample artifact | [Tank 20-frame nerfstudio pack](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
 | Build a small 3DGS sample pack artifact | [3DGS sample pack workflow](docs/experiments/underwater_3dgs_sample_pack.md) |
 | See real underwater outputs | [Public-data results](#public-data-results) |
@@ -93,6 +94,8 @@ instead of hand-captured screenshots.
 The first public 3DGS input artifact is attached to
 [v0.3](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3):
 [download `tank_short_test_3dgs_pack_20frames.zip`](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip).
+You can inspect the frames, trajectory, intrinsics, and rebuild command on the
+[static sample pack inspector](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html).
 
 It is a small Tank Dataset `short_test` pack for quick inspection and external
 reconstruction experiments: 20 PNG frames, 20 matched `/apriltag_slam/GT`

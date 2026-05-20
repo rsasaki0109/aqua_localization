@@ -24,6 +24,7 @@ Tank-specific conversion and readiness checks are documented in
 
 - Release: [`v0.3`](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3)
 - Download: [`tank_short_test_3dgs_pack_20frames.zip`](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip)
+- Inspector: [`underwater_3dgs_pack_viewer.html`](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html)
 - Generated summary: 20 frames, 20 transforms, 0 skipped transforms
 - Intrinsics source: manual Tank stereo intrinsics
 - Trajectory topic: `/apriltag_slam/GT`

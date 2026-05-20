@@ -1,0 +1,344 @@
+{
+  "artifact_name": "tank_short_test_3dgs_pack_20frames.zip",
+  "bounds": {
+    "x": [
+      1.9405524547817528,
+      2.150058587564456
+    ],
+    "y": [
+      -0.3545875787542973,
+      -0.3233201683268575
+    ],
+    "z": [
+      3.1542113575348036,
+      3.2226675783689664
+    ]
+  },
+  "camera": {
+    "cx": 306.0,
+    "cy": 256.0,
+    "fl_x": 655.0,
+    "fl_y": 655.0,
+    "h": 512,
+    "model": "pinhole",
+    "w": 612
+  },
+  "counts": {
+    "frames": 20,
+    "manifest_topics": 7,
+    "skipped_transforms": 0,
+    "transforms": 20
+  },
+  "dataset": "Tank Dataset",
+  "download_url": "https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip",
+  "formats": {
+    "frames_schema": "aqua_localization.underwater_3dgs_frames.v1",
+    "pack_schema": "aqua_localization.underwater_3dgs_dataset_pack.v1",
+    "transforms_format": "nerfstudio",
+    "transforms_schema": "aqua_localization.nerfstudio_transforms.v1"
+  },
+  "frames": [
+    {
+      "file_path": "images/frame_000000.png",
+      "index": 0,
+      "position": [
+        2.1456402914914188,
+        -0.3461112693660422,
+        3.1728249992585082
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 8,
+      "timestamp_ns": 1652274610785289772
+    },
+    {
+      "file_path": "images/frame_000001.png",
+      "index": 1,
+      "position": [
+        2.150058587564456,
+        -0.34047609549061864,
+        3.1740980736546227
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 109,
+      "timestamp_ns": 1652274611034927000
+    },
+    {
+      "file_path": "images/frame_000002.png",
+      "index": 2,
+      "position": [
+        2.148993272269668,
+        -0.33272175471912324,
+        3.1779684788155076
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 69,
+      "timestamp_ns": 1652274611285428455
+    },
+    {
+      "file_path": "images/frame_000003.png",
+      "index": 3,
+      "position": [
+        2.1460225972230913,
+        -0.340916579433202,
+        3.1738273204162835
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 76,
+      "timestamp_ns": 1652274611535623626
+    },
+    {
+      "file_path": "images/frame_000004.png",
+      "index": 4,
+      "position": [
+        2.1423350372191114,
+        -0.33222624127121586,
+        3.1769457375753447
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 50,
+      "timestamp_ns": 1652274611785694888
+    },
+    {
+      "file_path": "images/frame_000005.png",
+      "index": 5,
+      "position": [
+        2.144446938583956,
+        -0.3400477628979074,
+        3.1760214263222686
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 112,
+      "timestamp_ns": 1652274612035172589
+    },
+    {
+      "file_path": "images/frame_000006.png",
+      "index": 6,
+      "position": [
+        2.13814639796586,
+        -0.3311357458284918,
+        3.1991093962702672
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 70,
+      "timestamp_ns": 1652274612284517933
+    },
+    {
+      "file_path": "images/frame_000007.png",
+      "index": 7,
+      "position": [
+        2.1221092214213897,
+        -0.33929791134680104,
+        3.2078810814844223
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 114,
+      "timestamp_ns": 1652274612535354251
+    },
+    {
+      "file_path": "images/frame_000008.png",
+      "index": 8,
+      "position": [
+        2.1209438983016513,
+        -0.3383556904497958,
+        3.217906694447811
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 11,
+      "timestamp_ns": 1652274612785691988
+    },
+    {
+      "file_path": "images/frame_000009.png",
+      "index": 9,
+      "position": [
+        2.1153011575060594,
+        -0.331146004376939,
+        3.2226675783689664
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 105,
+      "timestamp_ns": 1652274613035711183
+    },
+    {
+      "file_path": "images/frame_000010.png",
+      "index": 10,
+      "position": [
+        2.090493283651396,
+        -0.32359784263937263,
+        3.2197426495653665
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 71,
+      "timestamp_ns": 1652274613286788631
+    },
+    {
+      "file_path": "images/frame_000011.png",
+      "index": 11,
+      "position": [
+        2.0769967215598486,
+        -0.325283509214193,
+        3.216910874285844
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 84,
+      "timestamp_ns": 1652274613535648739
+    },
+    {
+      "file_path": "images/frame_000012.png",
+      "index": 12,
+      "position": [
+        2.049222247964192,
+        -0.3233201683268575,
+        3.204729612813018
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 68,
+      "timestamp_ns": 1652274613785698720
+    },
+    {
+      "file_path": "images/frame_000013.png",
+      "index": 13,
+      "position": [
+        2.0355780084442623,
+        -0.32533188860247647,
+        3.194082583721931
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 67,
+      "timestamp_ns": 1652274614036568575
+    },
+    {
+      "file_path": "images/frame_000014.png",
+      "index": 14,
+      "position": [
+        2.0216114932119313,
+        -0.32516146853265715,
+        3.18357874925384
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 21,
+      "timestamp_ns": 1652274614285794041
+    },
+    {
+      "file_path": "images/frame_000015.png",
+      "index": 15,
+      "position": [
+        2.014136869383592,
+        -0.3247899277904927,
+        3.1755024474149556
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 11,
+      "timestamp_ns": 1652274614536277544
+    },
+    {
+      "file_path": "images/frame_000016.png",
+      "index": 16,
+      "position": [
+        2.0008185854777554,
+        -0.3346590192221287,
+        3.163036326209262
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 50,
+      "timestamp_ns": 1652274614784986446
+    },
+    {
+      "file_path": "images/frame_000017.png",
+      "index": 17,
+      "position": [
+        1.9746292167559132,
+        -0.346076214205022,
+        3.1596413038201026
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 74,
+      "timestamp_ns": 1652274615035297558
+    },
+    {
+      "file_path": "images/frame_000018.png",
+      "index": 18,
+      "position": [
+        1.948417207739066,
+        -0.3545875787542973,
+        3.1542118685605853
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 95,
+      "timestamp_ns": 1652274615285690689
+    },
+    {
+      "file_path": "images/frame_000019.png",
+      "index": 19,
+      "position": [
+        1.9405524547817528,
+        -0.35388039320607817,
+        3.1542113575348036
+      ],
+      "source_height": 512,
+      "source_width": 612,
+      "time_diff_ns": 84,
+      "timestamp_ns": 1652274615535700476
+    }
+  ],
+  "inputs": {
+    "bag": "/tmp/short_test_ros2_with_cameras_sqlite3",
+    "camera_info_topic": null,
+    "depth_topic": "/pressure",
+    "image_topic": "/camera/left/image_dehazed/compressed",
+    "mbes_topic": null,
+    "trajectory_topic": "/apriltag_slam/GT"
+  },
+  "intrinsics_source": "manual",
+  "options": {
+    "base_from_camera": [
+      -0.25,
+      -0.45,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "camera_intrinsics": [
+      612.0,
+      512.0,
+      655.0,
+      655.0,
+      306.0,
+      256.0
+    ],
+    "camera_model": "pinhole",
+    "distortion_params": null,
+    "image_format": "png",
+    "jpeg_quality": 92,
+    "max_frames": 20,
+    "max_time_diff": 0.05,
+    "stride": 5,
+    "transforms_format": "nerfstudio"
+  },
+  "release": "v0.3",
+  "schema": "aqua_localization.underwater_3dgs_pack_viewer.v1",
+  "sequence": "short_test",
+  "warnings": [
+    "missing optional MBES/submap prior topic"
+  ]
+}
