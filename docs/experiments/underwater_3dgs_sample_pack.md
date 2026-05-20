@@ -35,6 +35,8 @@ ros2 run aqua_localization export_3dgs_pack_pipeline.py \
   --stride 5 \
   --max-time-diff 0.05 \
   --base-from-camera -0.25 -0.45 0.0 0.0 0.0 0.0 1.0 \
+  --camera-intrinsics 612 512 655.0 655.0 306.0 256.0 \
+  --trajectory-topic /apriltag_slam/GT \
   --format nerfstudio
 
 cd /tmp
@@ -47,7 +49,9 @@ Before running the pack export, verify the camera-enabled bag:
 ros2 run aqua_localization check_3dgs_bag_ready.py \
   --bag datasets/public/tank_dataset/short_test_ros2_with_cameras \
   --dataset "Tank Dataset" \
-  --sequence short_test
+  --sequence short_test \
+  --trajectory-topic /apriltag_slam/GT \
+  --allow-manual-intrinsics
 ```
 
 ## Expected Files
@@ -77,6 +81,12 @@ The image count should match `summary.json` `counts.frames`. If
 `counts.transforms` is lower than `counts.frames`, inspect skipped timestamps in
 `transforms.json` metadata and increase `--max-time-diff` only if the bag clocks
 are known to be consistent.
+
+Tank `short_test` does not publish `CameraInfo` in the converted camera bag, so
+the command above passes the same stereo intrinsics used by the visual frontend.
+If a future bag includes a valid `sensor_msgs/CameraInfo` topic, drop
+`--allow-manual-intrinsics` and `--camera-intrinsics` and let the pipeline read
+intrinsics from the bag.
 
 ## Example `summary.json`
 

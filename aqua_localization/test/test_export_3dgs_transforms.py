@@ -248,9 +248,34 @@ def test_nerfstudio_format_requires_intrinsics(tmp_path):
             reader=[(900, odom_msg(990, xyz=(1.0, 2.0, 3.0)))],
         )
     except ValueError as exc:
-        assert "requires CameraInfo intrinsics" in str(exc)
+        assert "requires camera intrinsics" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_nerfstudio_format_accepts_manual_intrinsics(tmp_path):
+    module = load_module()
+    manifest_path = tmp_path / "manifest.json"
+    pack = tmp_path / "pack"
+    make_manifest(manifest_path, include_camera_info=False)
+    make_pack(pack)
+
+    payload = module.build_transforms(
+        manifest_path,
+        pack,
+        output_format="nerfstudio",
+        camera_intrinsics_values=[612, 512, 655.0, 655.0, 306.0, 256.0],
+        camera_model="pinhole",
+        distortion_params=[0.0, 0.0, 0.0, 0.0],
+        reader=[(900, odom_msg(990, xyz=(1.0, 2.0, 3.0)))],
+    )
+
+    assert payload["format"] == "nerfstudio"
+    assert payload["w"] == 612
+    assert payload["h"] == 512
+    assert payload["fl_x"] == 655.0
+    assert payload["metadata"]["intrinsics_source"] == "manual"
+    assert payload["distortion_params"] == [0.0, 0.0, 0.0, 0.0]
 
 
 def test_base_from_camera_translation_is_applied(tmp_path):

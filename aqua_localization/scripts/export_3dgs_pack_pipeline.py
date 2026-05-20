@@ -38,6 +38,14 @@ def manifest_args_from_pipeline(args):
 
 
 def build_summary(args, manifest, pack_index, frames_payload, transforms_payload):
+    warnings = manifest.get("warnings", [])
+    if args.camera_intrinsics is not None:
+        warnings = [
+            warning
+            for warning in warnings
+            if warning != "missing required camera intrinsics topic"
+        ]
+
     return {
         "schema": PIPELINE_SCHEMA,
         "dataset": manifest.get("dataset"),
@@ -59,6 +67,9 @@ def build_summary(args, manifest, pack_index, frames_payload, transforms_payload
             "max_time_diff": args.max_time_diff,
             "transforms_format": args.format,
             "base_from_camera": args.base_from_camera,
+            "camera_intrinsics": args.camera_intrinsics,
+            "camera_model": args.camera_model,
+            "distortion_params": args.distortion_params,
         },
         "paths": {
             "manifest": "manifest.json",
@@ -83,7 +94,7 @@ def build_summary(args, manifest, pack_index, frames_payload, transforms_payload
             "transforms_schema": transforms_payload.get("schema"),
             "transforms_format": transforms_payload.get("format", "aqua"),
         },
-        "warnings": manifest.get("warnings", []),
+        "warnings": warnings,
         "status": "complete",
     }
 
@@ -112,6 +123,9 @@ def run_pipeline(args):
         max_time_diff_s=args.max_time_diff,
         output_format=args.format,
         base_from_camera_values=args.base_from_camera,
+        camera_intrinsics_values=args.camera_intrinsics,
+        camera_model=args.camera_model,
+        distortion_params=args.distortion_params,
     )
     summary = build_summary(args, manifest, pack_index, frames_payload, transforms_payload)
     write_json(args.out / "summary.json", summary)
@@ -140,6 +154,22 @@ def parse_args(argv):
         metavar=("X", "Y", "Z", "QX", "QY", "QZ", "QW"),
         default=None,
         help="Camera pose in the odometry base frame as x y z qx qy qz qw.",
+    )
+    parser.add_argument(
+        "--camera-intrinsics",
+        nargs=6,
+        type=float,
+        metavar=("W", "H", "FL_X", "FL_Y", "CX", "CY"),
+        default=None,
+        help="Manual camera intrinsics as w h fl_x fl_y cx cy when no CameraInfo topic exists.",
+    )
+    parser.add_argument("--camera-model", default="pinhole", help="Camera model label used with --camera-intrinsics.")
+    parser.add_argument(
+        "--distortion-params",
+        nargs="*",
+        type=float,
+        default=None,
+        help="Optional distortion parameters used with --camera-intrinsics.",
     )
     parser.add_argument("--image-topic", help="Override camera image topic.")
     parser.add_argument("--camera-info-topic", help="Override CameraInfo topic.")
