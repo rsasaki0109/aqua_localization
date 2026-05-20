@@ -24,6 +24,12 @@ NUMERIC_FIELDS = [
     "right_features",
     "stereo_matches",
     "stereo_points",
+    "disparity_min_px",
+    "disparity_median_px",
+    "disparity_p95_px",
+    "depth_min_m",
+    "depth_median_m",
+    "depth_p95_m",
     "temporal_matches",
     "pnp_inliers",
     "inlier_ratio",
@@ -41,6 +47,12 @@ class VisualStatusSample:
     right_features: int
     stereo_matches: int
     stereo_points: int
+    disparity_min_px: float
+    disparity_median_px: float
+    disparity_p95_px: float
+    depth_min_m: float
+    depth_median_m: float
+    depth_p95_m: float
     temporal_matches: int
     pnp_inliers: int
     inlier_ratio: float
@@ -77,6 +89,12 @@ def sample_from_row(row: dict[str, str]) -> VisualStatusSample:
         right_features=parse_int(row, "right_features"),
         stereo_matches=parse_int(row, "stereo_matches"),
         stereo_points=parse_int(row, "stereo_points"),
+        disparity_min_px=parse_float(row, "disparity_min_px"),
+        disparity_median_px=parse_float(row, "disparity_median_px"),
+        disparity_p95_px=parse_float(row, "disparity_p95_px"),
+        depth_min_m=parse_float(row, "depth_min_m"),
+        depth_median_m=parse_float(row, "depth_median_m"),
+        depth_p95_m=parse_float(row, "depth_p95_m"),
         temporal_matches=parse_int(row, "temporal_matches"),
         pnp_inliers=parse_int(row, "pnp_inliers"),
         inlier_ratio=parse_float(row, "inlier_ratio"),
@@ -210,12 +228,18 @@ def tuning_hints(summary: dict) -> list[str]:
         hints.append("More than 20% of frames were rejected; inspect the dominant rejection reason first.")
 
     stereo_points_median = float(numeric["stereo_points"]["median"])
+    disparity_median = float(numeric["disparity_median_px"]["median"])
+    depth_p95 = float(numeric["depth_p95_m"]["p95"])
     temporal_matches_median = float(numeric["temporal_matches"]["median"])
     inlier_ratio_median = float(numeric["inlier_ratio"]["median"])
     step_p95 = float(numeric["step_translation_m"]["p95"])
 
     if math.isfinite(stereo_points_median) and stereo_points_median < 80:
         hints.append("Low stereo point count: tune ORB/image preprocessing, masks, or stereo disparity gates.")
+    if math.isfinite(disparity_median) and disparity_median < 4.0:
+        hints.append("Median disparity is low; far features are making metric scale sensitive to pixel noise.")
+    if math.isfinite(depth_p95) and depth_p95 > 10.0:
+        hints.append("Depth tail is near the maximum range; consider a tighter stereo.max_depth_m or depth-weighted tracking.")
     if math.isfinite(temporal_matches_median) and temporal_matches_median < 40:
         hints.append("Low temporal match count: improve descriptor matching or add a stronger tracking stage.")
     if math.isfinite(inlier_ratio_median) and inlier_ratio_median < 0.5:

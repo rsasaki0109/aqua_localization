@@ -1,6 +1,7 @@
 """Pure helper tests for stereo_visual_odometry.py."""
 
 import importlib.util
+import csv
 import io
 import json
 import sys
@@ -81,6 +82,7 @@ def test_make_status_reports_tracking_diagnostics():
         points3d=np.zeros((11, 3), dtype=np.float32),
         keypoints_xy=np.zeros((11, 2), dtype=np.float32),
         descriptors=np.zeros((11, 32), dtype=np.uint8),
+        disparities_px=np.array([2.0, 4.0, 8.0], dtype=np.float32),
         left_features=40,
         right_features=35,
         stereo_matches=20,
@@ -98,6 +100,8 @@ def test_make_status_reports_tracking_diagnostics():
 
     assert payload["left_features"] == 40
     assert payload["stereo_points"] == 11
+    assert payload["disparity_median_px"] == 4.0
+    assert payload["depth_median_m"] == 0.0
     assert payload["temporal_matches"] == 16
     assert payload["pnp_inliers"] == 8
     assert payload["inlier_ratio"] == 0.5
@@ -116,6 +120,12 @@ def test_status_csv_writer_emits_stable_columns():
         right_features=9,
         stereo_matches=8,
         stereo_points=7,
+        disparity_min_px=2.0,
+        disparity_median_px=4.0,
+        disparity_p95_px=8.0,
+        depth_min_m=1.0,
+        depth_median_m=2.0,
+        depth_p95_m=3.0,
         temporal_matches=6,
         pnp_inliers=5,
         inlier_ratio=0.75,
@@ -128,7 +138,9 @@ def test_status_csv_writer_emits_stable_columns():
     module.write_status_csv_header(fp)
     module.write_status_csv_row(fp, status)
 
-    lines = fp.getvalue().splitlines()
-    assert lines[0].startswith("timestamp,frame_index,accepted_count")
-    assert "1.250000000,2,1,1,10,9,8,7,6,5,0.750000000,0.125000000,0" in lines[1]
-    assert lines[1].endswith(",too few pnp inliers")
+    rows = list(csv.DictReader(io.StringIO(fp.getvalue())))
+    assert rows[0]["timestamp"] == "1.250000000"
+    assert rows[0]["disparity_median_px"] == "4.000000000"
+    assert rows[0]["depth_p95_m"] == "3.000000000"
+    assert rows[0]["accepted"] == "0"
+    assert rows[0]["status"] == "too few pnp inliers"

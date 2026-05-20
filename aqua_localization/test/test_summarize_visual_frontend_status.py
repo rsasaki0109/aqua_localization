@@ -31,6 +31,12 @@ def write_csv(path: Path, rows: list[dict]):
             "right_features",
             "stereo_matches",
             "stereo_points",
+            "disparity_min_px",
+            "disparity_median_px",
+            "disparity_p95_px",
+            "depth_min_m",
+            "depth_median_m",
+            "depth_p95_m",
             "temporal_matches",
             "pnp_inliers",
             "inlier_ratio",
@@ -52,6 +58,12 @@ def sample_row(**kwargs):
         "right_features": "95",
         "stereo_matches": "80",
         "stereo_points": "70",
+        "disparity_min_px": "2.0",
+        "disparity_median_px": "6.0",
+        "disparity_p95_px": "18.0",
+        "depth_min_m": "1.0",
+        "depth_median_m": "4.0",
+        "depth_p95_m": "8.0",
         "temporal_matches": "60",
         "pnp_inliers": "50",
         "inlier_ratio": "0.8",
@@ -100,6 +112,7 @@ def test_summarize_counts_acceptance_and_quantiles():
     assert summary["duration_s"] == 2.0
     assert summary["rejection_counts"]["too few pnp inliers"] == 1
     assert summary["numeric"]["stereo_points"]["median"] == 20
+    assert summary["numeric"]["disparity_median_px"]["median"] == 6.0
 
 
 def test_format_summary_contains_tuning_hints_for_weak_tracking():
@@ -111,6 +124,8 @@ def test_format_summary_contains_tuning_hints_for_weak_tracking():
             temporal_matches="15",
             inlier_ratio="0.2",
             step_translation_m="0.4",
+            disparity_median_px="2.0",
+            depth_p95_m="12.0",
             accepted="0",
             status="too few pnp inliers",
         ))
@@ -124,6 +139,8 @@ def test_format_summary_contains_tuning_hints_for_weak_tracking():
     assert "Accepted: 0 (0.0%)" in text
     assert "| stereo_points |" in text
     assert "Low stereo point count" in text
+    assert "Median disparity is low" in text
+    assert "Depth tail is near the maximum range" in text
     assert "Low temporal match count" in text
     assert "Low PnP inlier ratio" in text
     assert "Large step-translation tail" in text

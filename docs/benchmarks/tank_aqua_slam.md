@@ -120,9 +120,10 @@ When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
 The bag replay mode also saves `*_visual_frontend_status.csv`, which contains
 per-frame feature counts, stereo match counts, triangulated point counts,
-temporal match counts, PnP inliers, inlier ratio, accepted/rejected state, and
-the reject reason. Use that CSV to decide whether the next tuning pass should
-focus on image features, stereo geometry, temporal matching, or PnP gates.
+disparity/depth statistics, temporal match counts, PnP inliers, inlier ratio,
+accepted/rejected state, and the reject reason. Use that CSV to decide whether
+the next tuning pass should focus on image features, stereo geometry, temporal
+matching, or PnP gates.
 It also emits `*_visual_frontend_status.md` via
 `summarize_visual_frontend_status.py`, so each visual benchmark run carries a
 short tuning report next to the trajectory metrics. The same run writes
