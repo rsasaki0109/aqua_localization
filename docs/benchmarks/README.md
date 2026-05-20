@@ -10,8 +10,8 @@ datasets and baseline comparisons.
 - [`fjord_1_yaw_frame.md`](fjord_1_yaw_frame.md): yaw-frame diagnosis for the
   same NTNU sequence.
 - [`tank_aqua_slam.md`](tank_aqua_slam.md): first AQUA-SLAM Docker measurement
-  on Tank Dataset `short_test` plus the next same-sequence `aqua_localization`
-  rerun target.
+  on Tank Dataset `short_test`, current `aqua_localization` rows, and the RMSE
+  gap to the baseline.
 
 ## Comparison Planning
 
@@ -23,7 +23,8 @@ datasets and baseline comparisons.
   baseline.
 - [`tank_aqua_slam.md`](tank_aqua_slam.md): Tank Dataset head-to-head table and
   commands for AQUA-SLAM, including ROS 1 `/AQUA_SLAM/orb_odom` export into TUM
-  format.
+  format. Use `benchmark_gap_report.py` on this page to compute the current
+  RMSE gap and the percentage improvement needed to tie the baseline.
 
 The comparison plan is intentionally conservative. It separates sensor-fusion,
 visual/LiDAR SLAM, underwater simulation, and MBES replay work so each baseline
