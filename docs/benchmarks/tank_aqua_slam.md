@@ -90,6 +90,24 @@ ros2 run aqua_localization calibrate_visual_scale.py \
 For paper-safe reporting, the calibration TUM and validation TUM must come from
 different sequences.
 
+Once full Tank Dataset access is available, use `validate_visual_scale.py` to
+separate calibration and held-out validation:
+
+```bash
+ros2 run aqua_localization validate_visual_scale.py \
+  --calibration-reference /tmp/tank_structure_easy_gt.tum \
+  --calibration-estimate /tmp/tank_structure_easy_visual.tum \
+  --validation-reference /tmp/tank_medium_gt.tum \
+  --validation-estimate /tmp/tank_medium_visual.tum \
+  --calibration-sequence Structure_Easy \
+  --validation-sequence Medium \
+  --markdown
+```
+
+The public Tank Dataset page currently exposes `short_test` as sample data and
+requires the download form for the full sequence set, so this table keeps
+Structure_Easy and Medium rows as targets until those bags are available.
+
 ## Head-to-Head Table
 
 Rows are generated with `trajectory_benchmark_row.py` so both systems use the
@@ -101,6 +119,7 @@ same APE implementation.
 | Tank Dataset | short_test | aqua_localization | SE(3) | 5399 | 14.94 | 0.3796 | 0.4014 | 0.4291 | 0.7652 | ROS 2 Humble, IMU+pressure+DVL, same AprilTag GT export |
 | Tank Dataset | short_test | aqua_visual_frontend | SE(3) | 200 | 11.25 | 0.0815 | 0.0792 | 0.0947 | 0.2416 | stereo ORB+PnP, same-sequence scale fit from calibrate_visual_scale.py |
 | Tank Dataset | short_test | aqua_localization+visual | SE(3) | 5399 | 14.94 | 0.3384 | 0.2928 | 0.3726 | 0.7497 | visual position update, same-sequence scale fit |
+| Tank Dataset | Medium | aqua_visual_frontend | TBD | TBD | TBD | TBD | TBD | TBD | TBD | held-out validation after scale calibration on Structure_Easy |
 | Tank Dataset | Structure_Easy | AQUA-SLAM | TBD | TBD | TBD | TBD | TBD | TBD | TBD | record AQUA-SLAM output topic to TUM |
 | Tank Dataset | Structure_Easy | aqua_localization | TBD | TBD | TBD | TBD | TBD | TBD | TBD | run closest available input mode |
 

@@ -191,7 +191,7 @@ High-value development to close the gap:
 3. Fair comparison table in `docs/benchmarks/tank_aqua_slam.md`.
 4. Calibrate `stereo_visual_odometry.py` scale on one Tank sequence with
    `calibrate_visual_scale.py`, then validate the visual-aided fusion on a
-   held-out Tank sequence.
+   held-out Tank sequence with `validate_visual_scale.py`.
 5. MBES paper path separated from stereo visual SLAM claims.
 
 ## Source Notes
