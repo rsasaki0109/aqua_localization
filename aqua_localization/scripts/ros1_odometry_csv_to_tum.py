@@ -54,18 +54,21 @@ def parse_float(value: str) -> float:
     return float(value)
 
 
+def normalize_timestamp(raw: float, time_unit: str) -> float:
+    if time_unit == "nanoseconds":
+        return raw * 1e-9
+    if time_unit == "seconds":
+        return raw
+    return raw * 1e-9 if raw > 1e12 else raw
+
+
 def timestamp_from_row(row: dict, headers, time_unit: str) -> float:
     if "field.header.stamp" in row and row["field.header.stamp"].strip():
-        return parse_float(row["field.header.stamp"])
+        return normalize_timestamp(parse_float(row["field.header.stamp"]), time_unit)
     if "header.stamp" in row and row["header.stamp"].strip():
-        return parse_float(row["header.stamp"])
+        return normalize_timestamp(parse_float(row["header.stamp"]), time_unit)
     if "%time" in row and row["%time"].strip():
-        raw = parse_float(row["%time"])
-        if time_unit == "nanoseconds":
-            return raw * 1e-9
-        if time_unit == "seconds":
-            return raw
-        return raw * 1e-9 if raw > 1e12 else raw
+        return normalize_timestamp(parse_float(row["%time"]), time_unit)
 
     normalized = {normalize_header(h): h for h in headers}
     sec_col = normalized.get("header.stamp.secs") or normalized.get("header.stamp.sec")

@@ -35,6 +35,12 @@ Upstream source inspection shows the primary odometry output topic is
 `/AQUA_SLAM/orb_odom` (`nav_msgs/Odometry`), published from
 `src/RosHandling.cpp`.
 
+An initial Docker run on `short_test.bag` was completed on 2026-05-20. AQUA-SLAM
+initialized, created keyframes, published 234 odometry samples, and reached
+0.0194 m APE RMSE after rigid SE(3) alignment against `/apriltag_slam/GT`. The
+same output has 3.5186 m raw-frame RMSE before alignment, so benchmark tables
+must state the alignment mode explicitly.
+
 ## Direct Comparison
 
 | Axis | AQUA-SLAM | `aqua_localization` | Current read |
@@ -48,6 +54,22 @@ Upstream source inspection shows the primary odometry output topic is
 | MBES bathymetry | Not the core public story | MBES replay, registration, pose graph, experimental loop closure | `aqua_localization` has the stronger MBES-specific path. |
 | Reproducibility surface | Docker and per-sequence launch files | ROS 2 launches, dataset docs, rerun exports, benchmark scripts | Needs measured setup-time comparison. |
 | Known limitations | README mentions random long-sequence crash risk | README documents drift and uncalibrated MBES loop closure | Both are honest; compare stability during replay. |
+
+## Initial Measured Result
+
+The first measured head-to-head row is tracked in
+[`tank_aqua_slam.md`](tank_aqua_slam.md). Current status:
+
+| Dataset | Sequence | System | Alignment | Samples | Matched s | RMSE m | Status |
+|---------|----------|--------|-----------|--------:|----------:|-------:|--------|
+| Tank Dataset | `short_test` | AQUA-SLAM | SE(3) | 234 | 11.65 | 0.0194 | measured |
+| Tank Dataset | `short_test` | `aqua_localization` | SE(3) | TBD | TBD | TBD | rerun needed under same command |
+
+This result makes AQUA-SLAM the accuracy target to beat on Tank visual-DVL-IMU
+sequences. The fair development path is to first reproduce the
+`aqua_localization` row with the same AprilTag GT export and comparison script,
+then improve the ROS 2 stack or scope the paper claim toward permissive ROS 2
+localization and MBES-specific replay strengths.
 
 ## Fair Head-to-Head Tasks
 
@@ -124,9 +146,8 @@ loop-closure diagnostics.
 
 ## AQUA-SLAM TUM Export
 
-Inside the AQUA-SLAM ROS 1 Docker container, after launching
-`blue_gx5_StructureEasy.launch` and starting `rosbag play`, record the odometry
-CSV:
+Inside the AQUA-SLAM ROS 1 Docker container, after launching an AQUA-SLAM
+config and starting `rosbag play`, record the odometry CSV:
 
 ```bash
 rostopic echo -p /AQUA_SLAM/orb_odom > /tmp/aqua_slam_orb_odom.csv
@@ -137,7 +158,7 @@ Then convert that CSV with this repository's ROS 2-side helper:
 ```bash
 ros2 run aqua_localization ros1_odometry_csv_to_tum.py \
   --csv /tmp/aqua_slam_orb_odom.csv \
-  --out /tmp/tank_structure_easy_aqua_slam.tum \
+  --out /tmp/tank_short_test_aqua_slam.tum \
   --time-unit auto
 ```
 
