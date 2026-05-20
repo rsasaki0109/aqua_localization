@@ -40,6 +40,8 @@ Latest release: **[v0.2](https://github.com/rsasaki0109/aqua_localization/releas
 
 | Goal | Where to go |
 |------|-------------|
+| Open the visual project page | [`docs/index.html`](docs/index.html) |
+| Preview the underwater 3DGS research track | [`docs/experiments/underwater_3dgs_demo.html`](docs/experiments/underwater_3dgs_demo.html) |
 | See real underwater outputs | [Public-data results](#public-data-results) |
 | Build and launch the stack | [Run it](#run-it) |
 | Try pose-graph loop closure without a bag | [Loop-closure smoke test](#loop-closure-smoke-test) |

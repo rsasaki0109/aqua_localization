@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>aqua_localization | Underwater Localization Lab</title>
+  <meta name="description" content="ROS 2 underwater localization demos, public dataset results, and experimental 3DGS research notes for aqua_localization.">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #061315;
+      --panel: rgba(9, 27, 31, 0.78);
+      --panel-strong: rgba(13, 40, 45, 0.94);
+      --line: rgba(169, 223, 216, 0.2);
+      --text: #eef8f5;
+      --muted: #a8c8c0;
+      --cyan: #4ed9c5;
+      --gold: #f5c25a;
+      --coral: #ff796d;
+      --green: #8ccf7e;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-width: 320px;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .hero {
+      min-height: 92vh;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      align-items: center;
+      isolation: isolate;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .hero canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      background: #071719;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background:
+        linear-gradient(90deg, rgba(6, 19, 21, 0.92), rgba(6, 19, 21, 0.56) 48%, rgba(6, 19, 21, 0.18)),
+        linear-gradient(180deg, rgba(6, 19, 21, 0.08), rgba(6, 19, 21, 0.88));
+    }
+
+    .nav {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 20px clamp(18px, 4vw, 56px);
+      color: var(--muted);
+    }
+
+    .brand {
+      color: var(--text);
+      font-weight: 750;
+      letter-spacing: 0;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .nav-links a,
+    .button {
+      border: 1px solid var(--line);
+      background: rgba(7, 22, 24, 0.68);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.92rem;
+      line-height: 1.1;
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .nav-links a:hover,
+    .button:hover {
+      border-color: rgba(78, 217, 197, 0.72);
+      background: rgba(12, 47, 50, 0.84);
+      transform: translateY(-1px);
+    }
+
+    .button.primary {
+      background: var(--cyan);
+      border-color: var(--cyan);
+      color: #061315;
+      font-weight: 760;
+    }
+
+    .hero-copy {
+      width: min(1120px, calc(100% - 36px));
+      margin: 0 auto;
+      padding-top: 72px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--gold);
+      font-size: 0.86rem;
+      text-transform: uppercase;
+      font-weight: 760;
+      letter-spacing: 0.08em;
+      margin-bottom: 18px;
+    }
+
+    .hero h1 {
+      font-size: clamp(3.15rem, 7.2vw, 7.5rem);
+      max-width: 980px;
+      margin: 0;
+      line-height: 0.92;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      max-width: 690px;
+      margin: 24px 0 0;
+      color: var(--muted);
+      font-size: clamp(1.05rem, 1.7vw, 1.28rem);
+      line-height: 1.65;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 32px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .metric {
+      background: #081b1e;
+      padding: 28px clamp(18px, 4vw, 48px);
+      min-height: 126px;
+    }
+
+    .metric strong {
+      display: block;
+      color: var(--text);
+      font-size: clamp(1.7rem, 3vw, 2.5rem);
+      line-height: 1;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.45;
+    }
+
+    main {
+      background: #071719;
+    }
+
+    .section {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 72px 0;
+    }
+
+    .section h2 {
+      margin: 0 0 18px;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1.04;
+      letter-spacing: 0;
+    }
+
+    .section > p {
+      margin: 0 0 28px;
+      max-width: 760px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 1.03rem;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .shot {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel-strong);
+      box-shadow: var(--shadow);
+    }
+
+    .shot img {
+      width: 100%;
+      display: block;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      background: #102629;
+    }
+
+    .shot figcaption {
+      padding: 16px 18px 18px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .shot b {
+      color: var(--text);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .tracks {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .track {
+      border-top: 3px solid var(--cyan);
+      background: var(--panel);
+      padding: 22px;
+      border-radius: 8px;
+      min-height: 214px;
+    }
+
+    .track:nth-child(2) {
+      border-top-color: var(--gold);
+    }
+
+    .track:nth-child(3) {
+      border-top-color: var(--coral);
+    }
+
+    .track h3 {
+      margin: 0 0 10px;
+      font-size: 1.1rem;
+    }
+
+    .track p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .command {
+      margin-top: 26px;
+      border: 1px solid var(--line);
+      background: #041012;
+      border-radius: 8px;
+      overflow: auto;
+    }
+
+    pre {
+      margin: 0;
+      padding: 18px;
+      color: #d4f8ef;
+      line-height: 1.55;
+      font-size: 0.94rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      padding: 28px clamp(18px, 4vw, 56px);
+      display: flex;
+      gap: 14px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      background: #061315;
+    }
+
+    @media (max-width: 820px) {
+      .nav {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .nav-links {
+        justify-content: flex-start;
+      }
+
+      .hero {
+        min-height: 88vh;
+      }
+
+      .hero-copy {
+        padding-top: 138px;
+      }
+
+      .metrics,
+      .gallery,
+      .tracks {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="hero" aria-label="Underwater localization hero">
+    <canvas id="bathymetry" aria-hidden="true"></canvas>
+    <nav class="nav" aria-label="Primary navigation">
+      <a class="brand" href="./">aqua_localization</a>
+      <div class="nav-links">
+        <a href="#results">Results</a>
+        <a href="#tracks">Research Tracks</a>
+        <a href="experiments/underwater_3dgs_demo.html">3DGS Demo</a>
+        <a href="https://github.com/rsasaki0109/aqua_localization">GitHub</a>
+      </div>
+    </nav>
+    <div class="hero-copy">
+      <div class="eyebrow">ROS 2 underwater localization lab</div>
+      <h1>Ocean data, pose graphs, and acoustic 3D maps.</h1>
+      <p>
+        aqua_localization fuses IMU, pressure, DVL, sonar registration, and g2o pose-graph constraints on public underwater datasets. The next visual track explores how multibeam bathymetry and camera frames could feed an underwater 3D Gaussian Splatting demo.
+      </p>
+      <div class="hero-actions">
+        <a class="button primary" href="experiments/underwater_3dgs_demo.html">Open 3DGS demo track</a>
+        <a class="button" href="https://github.com/rsasaki0109/aqua_localization#run-it">Run the stack</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="metrics" aria-label="Project highlights">
+    <div class="metric"><strong>4</strong><span>public underwater dataset demo paths</span></div>
+    <div class="metric"><strong>ROS 2</strong><span>Humble and Jazzy bring-up scripts</span></div>
+    <div class="metric"><strong>g2o</strong><span>SE(3) pose graph backend</span></div>
+    <div class="metric"><strong>3DGS</strong><span>experimental visualization roadmap</span></div>
+  </div>
+
+  <main>
+    <section class="section" id="results">
+      <h2>Replayable Underwater Results</h2>
+      <p>
+        The project page keeps the visual story tied to committed demo artifacts: rerun captures, smoke tests, and dataset-specific scripts instead of screenshots that cannot be reproduced.
+      </p>
+      <div class="gallery">
+        <figure class="shot">
+          <img src="media/tank_dataset_rerun.png" alt="Tank Dataset short_test trajectory and plots in rerun">
+          <figcaption><b>Tank Dataset short_test</b>DVL, pressure, IMU, visual-aided fusion, and AprilTag ground truth in a compact underwater sequence.</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="media/mbes_slam_rerun.png" alt="MBES-SLAM beach pond sonar map in rerun">
+          <figcaption><b>MBES-SLAM beach_pond</b>Multibeam sonar fans accumulated into bathymetric structure for registration and loop-closure tuning.</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="media/ntnu_fjord_1_rerun.png" alt="NTNU fjord dataset replay in rerun">
+          <figcaption><b>NTNU fjord_1</b>Fjord replay focused on dataset ingestion, reference trajectories, and underwater SLAM comparison hooks.</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="media/aqualoc_harbor_07_rerun.png" alt="AQUALOC harbor 07 underwater camera and trajectory in rerun">
+          <figcaption><b>AQUALOC harbor_07</b>Camera, depth, and trajectory inspection for public visual-inertial underwater localization experiments.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="tracks">
+      <h2>Research Tracks</h2>
+      <p>
+        The current roadmap is practical: keep the estimator reliable, make sonar loop closure measurable, and expose visual reconstruction experiments as demos before claiming benchmark wins.
+      </p>
+      <div class="tracks">
+        <article class="track">
+          <h3>Localization Core</h3>
+          <p>15-state UKF, pressure-depth updates, DVL velocity fusion, sonar odometry, and pose-graph constraints remain the foundation.</p>
+        </article>
+        <article class="track">
+          <h3>MBES Loop Closure</h3>
+          <p>Submap candidates, registration gates, status summaries, and RViz/rerun inspection make false positives visible before they become papers.</p>
+        </article>
+        <article class="track">
+          <h3>Underwater 3DGS</h3>
+          <p>A GitHub Pages demo track for camera-plus-bathymetry reconstruction, dataset packaging, and future splat export experiments.</p>
+        </article>
+      </div>
+      <div class="command">
+        <pre>ros2 run aqua_localization pose_graph_loop_smoke.sh
+ros2 run aqua_localization rerun_export.py --bag datasets/public/tank_dataset/demo_with_estimate --out /tmp/tank.rrd
+rerun /tmp/tank.rrd</pre>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Apache-2.0 underwater localization research stack</span>
+    <a href="https://github.com/rsasaki0109/aqua_localization">github.com/rsasaki0109/aqua_localization</a>
+  </footer>
+
+  <script>
+    const canvas = document.getElementById("bathymetry");
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const points = [];
+    const track = [];
+    const colors = ["#4ed9c5", "#f5c25a", "#ff796d", "#8ccf7e", "#b7f2e8"];
+    let width = 0;
+    let height = 0;
+    let pointer = { x: 0, y: 0 };
+
+    for (let i = 0; i < 1300; i += 1) {
+      const angle = i * 0.035;
+      const radius = 0.9 + Math.sin(i * 0.017) * 0.22 + (i % 37) * 0.005;
+      points.push({
+        x: Math.cos(angle) * radius + Math.sin(i * 0.011) * 0.24,
+        y: Math.sin(angle) * radius * 0.54 + Math.cos(i * 0.019) * 0.18,
+        z: (i % 180) / 180 - 0.5 + Math.sin(angle * 2.0) * 0.14,
+        r: 1.7 + (i % 7) * 0.34,
+        c: colors[i % colors.length]
+      });
+    }
+
+    for (let i = 0; i < 96; i += 1) {
+      const t = i / 95;
+      track.push({
+        x: -1.15 + t * 2.3,
+        y: Math.sin(t * Math.PI * 2.2) * 0.26,
+        z: -0.22 + Math.cos(t * Math.PI * 2) * 0.11
+      });
+    }
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = canvas.clientWidth;
+      height = canvas.clientHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function project(p, time) {
+      const yaw = time * 0.00013 + pointer.x * 0.18;
+      const pitch = -0.22 + pointer.y * 0.12;
+      const cy = Math.cos(yaw);
+      const sy = Math.sin(yaw);
+      const cp = Math.cos(pitch);
+      const sp = Math.sin(pitch);
+      const x1 = p.x * cy - p.z * sy;
+      const z1 = p.x * sy + p.z * cy;
+      const y1 = p.y * cp - z1 * sp;
+      const z2 = p.y * sp + z1 * cp + 3.0;
+      const scale = Math.min(width, height) * 0.48 / z2;
+      return {
+        x: width * 0.66 + x1 * scale,
+        y: height * 0.52 + y1 * scale,
+        s: scale,
+        z: z2
+      };
+    }
+
+    function draw(time) {
+      ctx.fillStyle = "#071719";
+      ctx.fillRect(0, 0, width, height);
+
+      const water = ctx.createLinearGradient(0, 0, width, height);
+      water.addColorStop(0, "#09292b");
+      water.addColorStop(0.46, "#0b3b3d");
+      water.addColorStop(1, "#17302b");
+      ctx.fillStyle = water;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.globalAlpha = 0.16;
+      ctx.strokeStyle = "#b7f2e8";
+      ctx.lineWidth = 1;
+      for (let y = 80; y < height; y += 58) {
+        ctx.beginPath();
+        for (let x = 0; x <= width; x += 24) {
+          const wave = Math.sin(x * 0.015 + time * 0.001 + y * 0.04) * 8;
+          if (x === 0) ctx.moveTo(x, y + wave);
+          else ctx.lineTo(x, y + wave);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      const ordered = points
+        .map((p) => ({ p, q: project(p, time) }))
+        .sort((a, b) => b.q.z - a.q.z);
+
+      for (const item of ordered) {
+        const size = Math.max(1.4, item.p.r * item.q.s * 0.014);
+        ctx.globalAlpha = Math.max(0.22, Math.min(0.88, 3.8 / item.q.z));
+        ctx.fillStyle = item.p.c;
+        ctx.beginPath();
+        ctx.ellipse(item.q.x, item.q.y, size * 1.8, size, 0.18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 0.86;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      track.forEach((p, index) => {
+        const q = project(p, time);
+        if (index === 0) ctx.moveTo(q.x, q.y);
+        else ctx.lineTo(q.x, q.y);
+      });
+      ctx.stroke();
+
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(draw);
+    }
+
+    window.addEventListener("resize", resize);
+    window.addEventListener("pointermove", (event) => {
+      pointer.x = (event.clientX / Math.max(1, width) - 0.5) * 2;
+      pointer.y = (event.clientY / Math.max(1, height) - 0.5) * 2;
+    });
+
+    resize();
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>
