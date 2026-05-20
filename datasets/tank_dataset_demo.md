@@ -197,6 +197,16 @@ reason. Use this before tuning thresholds: low stereo points means image/stereo
 triangulation is the bottleneck, while low PnP inliers means temporal tracking
 or outlier rejection is the bottleneck.
 
+Summarize the CSV after a run:
+
+```bash
+ros2 run aqua_localization summarize_visual_frontend_status.py \
+  /tmp/tank_short_test_visual_status.csv \
+  --summary-out /tmp/tank_short_test_visual_status.md
+```
+
+The benchmark runner creates the same summary automatically in bag replay mode.
+
 On `short_test`, the first camera-only run processed 272 stereo pairs and
 accepted 271 visual odometry steps. With the nominal stereo scale it produced
 1.36 m SE(3) APE RMSE against AprilTag GT over the published 11.35 s window.

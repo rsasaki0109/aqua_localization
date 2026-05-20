@@ -123,6 +123,9 @@ per-frame feature counts, stereo match counts, triangulated point counts,
 temporal match counts, PnP inliers, inlier ratio, accepted/rejected state, and
 the reject reason. Use that CSV to decide whether the next tuning pass should
 focus on image features, stereo geometry, temporal matching, or PnP gates.
+It also emits `*_visual_frontend_status.md` via
+`summarize_visual_frontend_status.py`, so each visual benchmark run carries a
+short tuning report next to the trajectory metrics.
 
 The public Tank Dataset page currently exposes `short_test` as sample data and
 requires the download form for the full sequence set, so this table keeps
