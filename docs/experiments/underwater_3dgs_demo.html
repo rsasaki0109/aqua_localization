@@ -115,6 +115,23 @@
       padding-left: 18px;
     }
 
+    .code {
+      margin: 12px 0 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: auto;
+      background: #041012;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      color: #d4f8ef;
+      line-height: 1.5;
+      font-size: 0.88rem;
+      white-space: pre-wrap;
+    }
+
     .controls {
       display: grid;
       gap: 14px;
@@ -268,10 +285,24 @@
       <section class="panel">
         <h2>Implementation PR Target</h2>
         <ul>
-          <li>Export camera frames, trajectory, and depth priors from public bags.</li>
-          <li>Package a small static demo artifact for GitHub Pages.</li>
+          <li>Generate a JSON manifest for camera frames, trajectory, depth priors, and optional MBES/submap inputs.</li>
+          <li>Use the manifest as the contract for the future frame exporter and splat training artifact.</li>
           <li>Keep localization metrics separate from reconstruction quality claims.</li>
         </ul>
+      </section>
+
+      <section class="panel">
+        <h2>Manifest Workflow</h2>
+        <p>
+          The first reproducible step is now a metadata-only exporter. It checks the bag's topics and records which streams can feed an underwater 3DGS pipeline.
+        </p>
+        <div class="code">
+          <pre>ros2 run aqua_localization export_3dgs_manifest.py \
+  --bag datasets/public/tank_dataset/short_test_ros2 \
+  --dataset "Tank Dataset" \
+  --sequence short_test \
+  --out /tmp/tank_short_test_3dgs_manifest.json</pre>
+        </div>
       </section>
 
       <section class="panel">
