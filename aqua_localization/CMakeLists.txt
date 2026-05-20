@@ -16,6 +16,7 @@ install(PROGRAMS
   scripts/record_odometry.py
   scripts/record_status.py
   scripts/compare_trajectories.py
+  scripts/trajectory_benchmark_row.py
   scripts/convert_scalar_pressure_bag.py
   scripts/bench_fjord_1.sh
   scripts/diagnose_yaw_frame.py
@@ -45,6 +46,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_inspect_bag_topics test/test_inspect_bag_topics.py)
   ament_add_pytest_test(test_record_odometry_format test/test_record_odometry_format.py)
   ament_add_pytest_test(test_compare_trajectories test/test_compare_trajectories.py)
+  ament_add_pytest_test(test_trajectory_benchmark_row test/test_trajectory_benchmark_row.py)
   ament_add_pytest_test(test_convert_scalar_pressure_bag test/test_convert_scalar_pressure_bag.py)
   ament_add_pytest_test(test_diagnose_yaw_frame test/test_diagnose_yaw_frame.py)
   ament_add_pytest_test(test_plot_trajectories test/test_plot_trajectories.py)

@@ -18,6 +18,8 @@ datasets and baseline comparisons.
 - [`aqua_slam_comparison.md`](aqua_slam_comparison.md): focused comparison
   plan for SenseRoboticsLab/AQUA-SLAM, the closest current underwater SLAM
   baseline.
+- [`tank_aqua_slam.md`](tank_aqua_slam.md): result table target and commands
+  for the Tank Dataset head-to-head against AQUA-SLAM.
 
 The comparison plan is intentionally conservative. It separates sensor-fusion,
 visual/LiDAR SLAM, underwater simulation, and MBES replay work so each baseline

@@ -110,13 +110,14 @@ loop-closure diagnostics.
    Keep this as documentation first unless a reproducible ROS 1 container can
    be automated cleanly from this repository.
 4. **Convert AQUA-SLAM output to TUM.**
-   Reuse the same TUM format consumed by `compare_trajectories.py`.
+   Reuse the same TUM format consumed by `compare_trajectories.py`, then create
+   rows with `trajectory_benchmark_row.py`.
 5. **Run `aqua_localization` on the same Tank sequence.**
    Use the closest available input mode and clearly state which sensors are
    enabled.
 6. **Generate a comparison table.**
-   Include accuracy, runtime, setup steps, license, ROS generation, and failure
-   modes.
+   Start with [`tank_aqua_slam.md`](tank_aqua_slam.md), then include accuracy,
+   runtime, setup steps, license, ROS generation, and failure modes.
 
 ## Decision: Where Can We Beat It?
 
