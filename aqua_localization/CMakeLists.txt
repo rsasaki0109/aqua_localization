@@ -40,6 +40,7 @@ install(PROGRAMS
   scripts/validate_visual_scale.py
   scripts/run_tank_visual_benchmark.py
   scripts/summarize_visual_frontend_status.py
+  scripts/analyze_visual_drift.py
   scripts/export_mbes_loop_status.py
   scripts/pose_graph_loop_demo.py
   scripts/pose_graph_loop_smoke.sh
@@ -60,6 +61,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_validate_visual_scale test/test_validate_visual_scale.py)
   ament_add_pytest_test(test_run_tank_visual_benchmark test/test_run_tank_visual_benchmark.py)
   ament_add_pytest_test(test_summarize_visual_frontend_status test/test_summarize_visual_frontend_status.py)
+  ament_add_pytest_test(test_analyze_visual_drift test/test_analyze_visual_drift.py)
   ament_add_pytest_test(test_convert_scalar_pressure_bag test/test_convert_scalar_pressure_bag.py)
   ament_add_pytest_test(test_diagnose_yaw_frame test/test_diagnose_yaw_frame.py)
   ament_add_pytest_test(test_plot_trajectories test/test_plot_trajectories.py)

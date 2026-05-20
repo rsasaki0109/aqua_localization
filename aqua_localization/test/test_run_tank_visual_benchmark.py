@@ -45,6 +45,7 @@ def test_default_paths_sanitize_sequence_name(tmp_path):
     assert paths.estimate_tum == tmp_path / "Tank_short_test_visual_frontend.tum"
     assert paths.status_csv == tmp_path / "Tank_short_test_visual_frontend_status.csv"
     assert paths.status_summary == tmp_path / "Tank_short_test_visual_frontend_status.md"
+    assert paths.drift_report == tmp_path / "Tank_short_test_visual_drift.md"
     assert paths.scale_report == tmp_path / "Tank_short_test_visual_scale_report.txt"
     assert paths.benchmark_row == tmp_path / "Tank_short_test_visual_benchmark.md"
     assert paths.replay_script == tmp_path / "Tank_short_test_visual_replay.sh"
@@ -110,6 +111,8 @@ def test_evaluate_writes_scale_report_and_markdown_row(tmp_path):
         "--out-dir", str(tmp_path),
         "--sequence", "short_test",
         "--translation-scale", "1.0",
+        "--drift-window-s", "10.0",
+        "--drift-min-samples", "2",
     ])
     paths = module.default_paths(tmp_path, args.sequence)
 
@@ -118,6 +121,8 @@ def test_evaluate_writes_scale_report_and_markdown_row(tmp_path):
     assert "recommended tracking.translation_scale: 0.250000000" in text
     assert paths.scale_report.exists()
     assert paths.benchmark_row.exists()
+    assert paths.drift_report.exists()
+    assert "Visual Drift Analysis" in paths.drift_report.read_text(encoding="utf-8")
     assert "same-sequence Sim(3) scale diagnostic=0.250000000" in paths.benchmark_row.read_text(
         encoding="utf-8")
 
@@ -142,6 +147,8 @@ def test_evaluate_writes_status_summary_when_csv_is_available(tmp_path):
         "--out-dir", str(tmp_path),
         "--sequence", "short_test",
         "--status-csv", str(status_csv),
+        "--drift-window-s", "10.0",
+        "--drift-min-samples", "2",
     ])
     paths = module.default_paths(tmp_path, args.sequence)
 
