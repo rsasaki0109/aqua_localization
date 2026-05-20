@@ -41,6 +41,7 @@ install(PROGRAMS
   scripts/validate_visual_scale.py
   scripts/run_tank_visual_benchmark.py
   scripts/run_tank_visual_matching_sweep.py
+  scripts/sweep_visual_extrinsics.py
   scripts/summarize_visual_frontend_status.py
   scripts/analyze_visual_drift.py
   scripts/analyze_visual_motion_segments.py
@@ -65,6 +66,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_validate_visual_scale test/test_validate_visual_scale.py)
   ament_add_pytest_test(test_run_tank_visual_benchmark test/test_run_tank_visual_benchmark.py)
   ament_add_pytest_test(test_run_tank_visual_matching_sweep test/test_run_tank_visual_matching_sweep.py)
+  ament_add_pytest_test(test_sweep_visual_extrinsics test/test_sweep_visual_extrinsics.py)
   ament_add_pytest_test(test_summarize_visual_frontend_status test/test_summarize_visual_frontend_status.py)
   ament_add_pytest_test(test_analyze_visual_drift test/test_analyze_visual_drift.py)
   ament_add_pytest_test(test_analyze_visual_motion_segments test/test_analyze_visual_motion_segments.py)
