@@ -1,0 +1,465 @@
+#!/usr/bin/env python3
+"""Lightweight stereo visual odometry frontend for underwater replay bags.
+
+The node is intentionally small and dependency-light: it consumes synchronized
+left/right `sensor_msgs/CompressedImage` frames, triangulates ORB features from
+stereo disparity, estimates frame-to-frame motion with PnP/RANSAC, and publishes
+a `nav_msgs/Odometry` trajectory on `/aqua_visual_frontend/odometry`.
+
+It is a visual frontend, not a full SLAM system: there is no loop closure, local
+bundle adjustment, relocalization, or IMU coupling. The output is useful as the
+first ROS 2 camera-based baseline and as an input to future fusion work.
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+import cv2
+import numpy as np
+
+
+@dataclass(frozen=True)
+class StereoCamera:
+    fx: float
+    fy: float
+    cx: float
+    cy: float
+    bf: float
+
+    @property
+    def matrix(self) -> np.ndarray:
+        return np.asarray(
+            [[self.fx, 0.0, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]],
+            dtype=np.float64,
+        )
+
+
+@dataclass(frozen=True)
+class VisualFrontendConfig:
+    max_stereo_y_diff_px: float = 2.0
+    min_disparity_px: float = 1.0
+    max_depth_m: float = 12.0
+    min_temporal_matches: int = 20
+    min_pnp_inliers: int = 12
+    min_inlier_ratio: float = 0.25
+    ransac_reprojection_error_px: float = 3.0
+    max_step_translation_m: float = 2.0
+    translation_scale: float = 1.0
+    position_variance_floor_m2: float = 0.04
+    rotation_variance_floor_rad2: float = 0.05
+
+
+@dataclass
+class VisualFrame:
+    stamp_s: float
+    points3d: np.ndarray
+    keypoints_xy: np.ndarray
+    descriptors: np.ndarray
+
+
+@dataclass
+class MotionEstimate:
+    success: bool
+    rotation_prev_to_curr: np.ndarray
+    translation_prev_to_curr: np.ndarray
+    inliers: int
+    matches: int
+    reason: str = ""
+
+
+def decode_compressed_image(data: bytes) -> np.ndarray:
+    encoded = np.frombuffer(data, dtype=np.uint8)
+    image = cv2.imdecode(encoded, cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise ValueError("failed to decode compressed image")
+    return image
+
+
+def triangulate_stereo_features(
+    left_image: np.ndarray,
+    right_image: np.ndarray,
+    camera: StereoCamera,
+    config: VisualFrontendConfig,
+    orb: cv2.ORB,
+    matcher: cv2.BFMatcher,
+) -> VisualFrame:
+    left_keypoints, left_desc = orb.detectAndCompute(left_image, None)
+    right_keypoints, right_desc = orb.detectAndCompute(right_image, None)
+    if left_desc is None or right_desc is None:
+        return VisualFrame(0.0, empty_points3d(), empty_keypoints(), empty_descriptors())
+
+    matches = matcher.match(left_desc, right_desc)
+    points = []
+    keypoints = []
+    descriptors = []
+    for match in matches:
+        left_pt = left_keypoints[match.queryIdx].pt
+        right_pt = right_keypoints[match.trainIdx].pt
+        if abs(left_pt[1] - right_pt[1]) > config.max_stereo_y_diff_px:
+            continue
+        disparity = left_pt[0] - right_pt[0]
+        if disparity < config.min_disparity_px:
+            continue
+        z = camera.bf / disparity
+        if not math.isfinite(z) or z <= 0.0 or z > config.max_depth_m:
+            continue
+        x = (left_pt[0] - camera.cx) * z / camera.fx
+        y = (left_pt[1] - camera.cy) * z / camera.fy
+        points.append((x, y, z))
+        keypoints.append(left_pt)
+        descriptors.append(left_desc[match.queryIdx])
+
+    if not points:
+        return VisualFrame(0.0, empty_points3d(), empty_keypoints(), empty_descriptors())
+    return VisualFrame(
+        0.0,
+        np.asarray(points, dtype=np.float32),
+        np.asarray(keypoints, dtype=np.float32),
+        np.asarray(descriptors, dtype=np.uint8),
+    )
+
+
+def estimate_motion_pnp(
+    previous: VisualFrame,
+    current: VisualFrame,
+    camera: StereoCamera,
+    config: VisualFrontendConfig,
+    matcher: cv2.BFMatcher,
+) -> MotionEstimate:
+    if previous.descriptors.shape[0] < config.min_temporal_matches:
+        return failed_motion("not enough previous stereo features")
+    if current.descriptors.shape[0] < config.min_temporal_matches:
+        return failed_motion("not enough current stereo features")
+
+    matches = matcher.match(previous.descriptors, current.descriptors)
+    if len(matches) < config.min_temporal_matches:
+        return failed_motion("not enough temporal matches", matches=len(matches))
+
+    object_points = np.asarray(
+        [previous.points3d[match.queryIdx] for match in matches], dtype=np.float32
+    )
+    image_points = np.asarray(
+        [current.keypoints_xy[match.trainIdx] for match in matches], dtype=np.float32
+    )
+    ok, rvec, tvec, inliers = cv2.solvePnPRansac(
+        object_points,
+        image_points,
+        camera.matrix,
+        np.zeros((4, 1), dtype=np.float64),
+        iterationsCount=100,
+        reprojectionError=config.ransac_reprojection_error_px,
+        confidence=0.99,
+        flags=cv2.SOLVEPNP_ITERATIVE,
+    )
+    if not ok or inliers is None:
+        return failed_motion("pnp failed", matches=len(matches))
+
+    inlier_count = int(inliers.shape[0])
+    if inlier_count < config.min_pnp_inliers:
+        return failed_motion("too few pnp inliers", matches=len(matches), inliers=inlier_count)
+    inlier_ratio = inlier_count / max(1, len(matches))
+    if inlier_ratio < config.min_inlier_ratio:
+        return failed_motion("low pnp inlier ratio", matches=len(matches), inliers=inlier_count)
+
+    rotation, _ = cv2.Rodrigues(rvec)
+    translation = tvec.reshape(3).astype(np.float64) * config.translation_scale
+    if float(np.linalg.norm(translation)) > config.max_step_translation_m:
+        return failed_motion("translation gate rejected step", matches=len(matches), inliers=inlier_count)
+
+    return MotionEstimate(True, rotation, translation, inlier_count, len(matches))
+
+
+def update_world_pose(
+    world_from_previous: np.ndarray,
+    rotation_prev_to_curr: np.ndarray,
+    translation_prev_to_curr: np.ndarray,
+) -> np.ndarray:
+    """Compose a camera pose from a PnP transform.
+
+    OpenCV PnP returns X_curr = R * X_prev + t. The published pose is
+    world_from_camera, so the frame increment is the inverse transform.
+    """
+    curr_from_prev = np.eye(4, dtype=np.float64)
+    curr_from_prev[:3, :3] = rotation_prev_to_curr
+    curr_from_prev[:3, 3] = translation_prev_to_curr
+    prev_from_curr = np.linalg.inv(curr_from_prev)
+    return world_from_previous @ prev_from_curr
+
+
+def rotation_matrix_to_quaternion(rotation: np.ndarray) -> tuple[float, float, float, float]:
+    trace = float(np.trace(rotation))
+    if trace > 0.0:
+        s = math.sqrt(trace + 1.0) * 2.0
+        qw = 0.25 * s
+        qx = (rotation[2, 1] - rotation[1, 2]) / s
+        qy = (rotation[0, 2] - rotation[2, 0]) / s
+        qz = (rotation[1, 0] - rotation[0, 1]) / s
+    elif rotation[0, 0] > rotation[1, 1] and rotation[0, 0] > rotation[2, 2]:
+        s = math.sqrt(1.0 + rotation[0, 0] - rotation[1, 1] - rotation[2, 2]) * 2.0
+        qw = (rotation[2, 1] - rotation[1, 2]) / s
+        qx = 0.25 * s
+        qy = (rotation[0, 1] + rotation[1, 0]) / s
+        qz = (rotation[0, 2] + rotation[2, 0]) / s
+    elif rotation[1, 1] > rotation[2, 2]:
+        s = math.sqrt(1.0 + rotation[1, 1] - rotation[0, 0] - rotation[2, 2]) * 2.0
+        qw = (rotation[0, 2] - rotation[2, 0]) / s
+        qx = (rotation[0, 1] + rotation[1, 0]) / s
+        qy = 0.25 * s
+        qz = (rotation[1, 2] + rotation[2, 1]) / s
+    else:
+        s = math.sqrt(1.0 + rotation[2, 2] - rotation[0, 0] - rotation[1, 1]) * 2.0
+        qw = (rotation[1, 0] - rotation[0, 1]) / s
+        qx = (rotation[0, 2] + rotation[2, 0]) / s
+        qy = (rotation[1, 2] + rotation[2, 1]) / s
+        qz = 0.25 * s
+    norm = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
+    return qx / norm, qy / norm, qz / norm, qw / norm
+
+
+def covariance_diagonal(config: VisualFrontendConfig, inliers: int) -> list[float]:
+    inliers = max(1, int(inliers))
+    pos_var = max(config.position_variance_floor_m2, 2.0 / inliers)
+    rot_var = max(config.rotation_variance_floor_rad2, 1.0 / inliers)
+    return [pos_var, pos_var, pos_var, rot_var, rot_var, rot_var]
+
+
+def empty_points3d() -> np.ndarray:
+    return np.empty((0, 3), dtype=np.float32)
+
+
+def empty_keypoints() -> np.ndarray:
+    return np.empty((0, 2), dtype=np.float32)
+
+
+def empty_descriptors() -> np.ndarray:
+    return np.empty((0, 32), dtype=np.uint8)
+
+
+def failed_motion(reason: str, matches: int = 0, inliers: int = 0) -> MotionEstimate:
+    return MotionEstimate(
+        False,
+        np.eye(3, dtype=np.float64),
+        np.zeros(3, dtype=np.float64),
+        inliers,
+        matches,
+        reason,
+    )
+
+
+def stamp_to_seconds(stamp) -> float:
+    return float(stamp.sec) + float(stamp.nanosec) * 1.0e-9
+
+
+def run_ros_node(argv=None) -> int:
+    import rclpy
+    from nav_msgs.msg import Odometry
+    from rclpy.executors import ExternalShutdownException
+    from rclpy.node import Node
+    from rclpy.qos import QoSProfile, ReliabilityPolicy
+    from sensor_msgs.msg import CompressedImage
+
+    class StereoVisualOdometryNode(Node):
+        def __init__(self):
+            super().__init__("aqua_stereo_visual_odometry")
+            self.left_topic = self.declare_parameter(
+                "topics.left_image", "/camera/left/image_dehazed/compressed"
+            ).value
+            self.right_topic = self.declare_parameter(
+                "topics.right_image", "/camera/right/image_dehazed/compressed"
+            ).value
+            self.odom_topic = self.declare_parameter(
+                "topics.odometry", "/aqua_visual_frontend/odometry"
+            ).value
+            self.frame_id = self.declare_parameter("frames.odom", "visual_odom").value
+            self.child_frame_id = self.declare_parameter("frames.camera", "camera_left").value
+            self.sync_slop_s = float(self.declare_parameter("sync.slop_s", 0.02).value)
+            self.buffer_size = int(self.declare_parameter("sync.buffer_size", 20).value)
+
+            self.camera = StereoCamera(
+                fx=float(self.declare_parameter("camera.fx", 655.0).value),
+                fy=float(self.declare_parameter("camera.fy", 655.0).value),
+                cx=float(self.declare_parameter("camera.cx", 306.0).value),
+                cy=float(self.declare_parameter("camera.cy", 256.0).value),
+                bf=float(self.declare_parameter("camera.bf", 78.89165891925023).value),
+            )
+            self.config = VisualFrontendConfig(
+                max_stereo_y_diff_px=float(
+                    self.declare_parameter("stereo.max_y_diff_px", 2.0).value
+                ),
+                min_disparity_px=float(self.declare_parameter("stereo.min_disparity_px", 1.0).value),
+                max_depth_m=float(self.declare_parameter("stereo.max_depth_m", 12.0).value),
+                min_temporal_matches=int(
+                    self.declare_parameter("tracking.min_temporal_matches", 20).value
+                ),
+                min_pnp_inliers=int(self.declare_parameter("tracking.min_pnp_inliers", 12).value),
+                min_inlier_ratio=float(
+                    self.declare_parameter("tracking.min_inlier_ratio", 0.25).value
+                ),
+                ransac_reprojection_error_px=float(
+                    self.declare_parameter("tracking.ransac_reprojection_error_px", 3.0).value
+                ),
+                max_step_translation_m=float(
+                    self.declare_parameter("tracking.max_step_translation_m", 2.0).value
+                ),
+                translation_scale=float(
+                    self.declare_parameter("tracking.translation_scale", 1.0).value
+                ),
+                position_variance_floor_m2=float(
+                    self.declare_parameter("covariance.position_floor_m2", 0.04).value
+                ),
+                rotation_variance_floor_rad2=float(
+                    self.declare_parameter("covariance.rotation_floor_rad2", 0.05).value
+                ),
+            )
+
+            nfeatures = int(self.declare_parameter("orb.n_features", 1000).value)
+            fast_threshold = int(self.declare_parameter("orb.fast_threshold", 12).value)
+            self.orb = cv2.ORB_create(nfeatures=nfeatures, fastThreshold=fast_threshold)
+            self.stereo_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+            self.temporal_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+            qos = QoSProfile(depth=20)
+            qos.reliability = ReliabilityPolicy.BEST_EFFORT
+            self.left_sub = self.create_subscription(
+                CompressedImage, self.left_topic, self.on_left, qos
+            )
+            self.right_sub = self.create_subscription(
+                CompressedImage, self.right_topic, self.on_right, qos
+            )
+            self.odom_pub = self.create_publisher(Odometry, self.odom_topic, 10)
+
+            self.left_buffer = []
+            self.right_buffer = []
+            self.previous_frame: Optional[VisualFrame] = None
+            self.world_from_camera = np.eye(4, dtype=np.float64)
+            self.frames = 0
+            self.accepted = 0
+            self.rejected = 0
+            self.get_logger().info(
+                f"stereo visual odometry started: left={self.left_topic} right={self.right_topic} "
+                f"odom={self.odom_topic}"
+            )
+
+        def on_left(self, msg):
+            self.left_buffer.append(msg)
+            self.left_buffer = self.left_buffer[-self.buffer_size :]
+            self.try_process()
+
+        def on_right(self, msg):
+            self.right_buffer.append(msg)
+            self.right_buffer = self.right_buffer[-self.buffer_size :]
+            self.try_process()
+
+        def try_process(self):
+            if not self.left_buffer or not self.right_buffer:
+                return
+            left_msg = self.left_buffer[-1]
+            left_t = stamp_to_seconds(left_msg.header.stamp)
+            right_msg = min(
+                self.right_buffer,
+                key=lambda msg: abs(stamp_to_seconds(msg.header.stamp) - left_t),
+            )
+            right_t = stamp_to_seconds(right_msg.header.stamp)
+            if abs(right_t - left_t) > self.sync_slop_s:
+                return
+            self.left_buffer.clear()
+            self.right_buffer = [msg for msg in self.right_buffer if msg is not right_msg]
+            self.process_pair(left_msg, right_msg)
+
+        def process_pair(self, left_msg, right_msg):
+            try:
+                left = decode_compressed_image(bytes(left_msg.data))
+                right = decode_compressed_image(bytes(right_msg.data))
+            except ValueError as exc:
+                self.get_logger().warn(str(exc))
+                return
+
+            frame = triangulate_stereo_features(
+                left, right, self.camera, self.config, self.orb, self.stereo_matcher
+            )
+            frame.stamp_s = stamp_to_seconds(left_msg.header.stamp)
+            self.frames += 1
+
+            if self.previous_frame is None:
+                self.previous_frame = frame
+                self.publish_odometry(left_msg.header.stamp, 0, 0)
+                return
+
+            estimate = estimate_motion_pnp(
+                self.previous_frame, frame, self.camera, self.config, self.temporal_matcher
+            )
+            if estimate.success:
+                self.world_from_camera = update_world_pose(
+                    self.world_from_camera,
+                    estimate.rotation_prev_to_curr,
+                    estimate.translation_prev_to_curr,
+                )
+                self.previous_frame = frame
+                self.accepted += 1
+                self.publish_odometry(left_msg.header.stamp, estimate.inliers, estimate.matches)
+            else:
+                self.rejected += 1
+                self.previous_frame = frame
+                self.get_logger().warn(
+                    f"visual odometry rejected frame {self.frames}: {estimate.reason}",
+                    throttle_duration_sec=2.0,
+                )
+
+        def publish_odometry(self, stamp, inliers: int, matches: int):
+            msg = Odometry()
+            msg.header.stamp = stamp
+            msg.header.frame_id = self.frame_id
+            msg.child_frame_id = self.child_frame_id
+            position = self.world_from_camera[:3, 3]
+            msg.pose.pose.position.x = float(position[0])
+            msg.pose.pose.position.y = float(position[1])
+            msg.pose.pose.position.z = float(position[2])
+            qx, qy, qz, qw = rotation_matrix_to_quaternion(self.world_from_camera[:3, :3])
+            msg.pose.pose.orientation.x = qx
+            msg.pose.pose.orientation.y = qy
+            msg.pose.pose.orientation.z = qz
+            msg.pose.pose.orientation.w = qw
+            diag = covariance_diagonal(self.config, inliers)
+            for i, value in enumerate(diag):
+                msg.pose.covariance[i * 6 + i] = float(value)
+            if matches > 0:
+                msg.twist.covariance[0] = float(matches)
+                msg.twist.covariance[1] = float(inliers)
+            self.odom_pub.publish(msg)
+
+    rclpy.init(args=argv)
+    node = StereoVisualOdometryNode()
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        if rclpy.ok():
+            node.get_logger().info(
+                f"visual odometry stopped: frames={node.frames} "
+                f"accepted={node.accepted} rejected={node.rejected}"
+            )
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+    return 0
+
+
+def parse_args(argv):
+    parser = argparse.ArgumentParser(description="Run the stereo visual odometry ROS 2 node.")
+    return parser.parse_known_args(argv)[0]
+
+
+def main(argv=None) -> int:
+    parse_args(argv if argv is not None else sys.argv[1:])
+    return run_ros_node(argv)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

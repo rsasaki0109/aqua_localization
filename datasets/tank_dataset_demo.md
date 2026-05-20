@@ -47,9 +47,16 @@ ros2 run aqua_localization convert_tank_dataset_bag.py \
 ```
 
 Camera image topics are dropped by default. Pass `--include-cameras` to keep
-them. The converter writes ROS 2 Humble-friendly `sqlite3` bags by default; use
-`--storage mcap` only when the target environment has the MCAP rosbag2 storage
-plugin installed.
+them for visual odometry experiments. The converter writes ROS 2
+Humble-friendly `sqlite3` bags by default; use `--storage mcap` only when the
+target environment has the MCAP rosbag2 storage plugin installed.
+
+```bash
+ros2 run aqua_localization convert_tank_dataset_bag.py \
+  --src aqua_localization/datasets/public/tank_dataset/short_test.bag \
+  --dst aqua_localization/datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --include-cameras
+```
 
 ## Detected topics (after conversion)
 
@@ -87,6 +94,51 @@ ros2 bag play \
   aqua_localization/datasets/public/tank_dataset/short_test_ros2 \
   --clock
 ```
+
+## Experimental stereo visual frontend
+
+The package includes a lightweight ROS 2 stereo visual odometry frontend for
+Tank-style compressed stereo topics. It is not a full SLAM system like
+AQUA-SLAM: it has no loop closure, local map optimization, relocalization, or
+IMU coupling. It is useful as the first camera-only ROS 2 baseline and as a
+future position-aiding source.
+
+```bash
+# Terminal A: stereo ORB + PnP visual odometry.
+ros2 run aqua_localization stereo_visual_odometry.py --ros-args \
+  -p use_sim_time:=true \
+  -p camera.fx:=655.0 \
+  -p camera.fy:=655.0 \
+  -p camera.cx:=306.0 \
+  -p camera.cy:=256.0 \
+  -p camera.bf:=78.89165891925023
+
+# Terminal B: camera-included bag.
+ros2 bag play \
+  aqua_localization/datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --clock
+```
+
+Record the visual trajectory just like the IMU/DVL estimate:
+
+```bash
+ros2 run aqua_localization record_odometry.py \
+  --topic /aqua_visual_frontend/odometry \
+  --out /tmp/tank_short_test_visual_frontend.tum \
+  --format tum
+```
+
+The published pose is in a `visual_odom -> camera_left` frame. Treat it as an
+experimental visual frontend output until a calibrated camera-to-base extrinsic
+and fusion path are wired.
+
+On `short_test`, the first camera-only run processed 272 stereo pairs and
+accepted 271 visual odometry steps. With the nominal stereo scale it produced
+1.36 m SE(3) APE RMSE against AprilTag GT over the published 11.35 s window.
+The same trajectory falls to 0.096 m under Sim(3) alignment, showing that the
+shape is useful but the metric scale needs calibration. For diagnostics only,
+setting `tracking.translation_scale:=0.169623` gives 0.095 m SE(3) APE RMSE on
+this sequence; do not treat that same-sequence scale fit as a paper-safe result.
 
 ## Verification topics
 

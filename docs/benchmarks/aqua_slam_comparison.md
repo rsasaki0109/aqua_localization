@@ -50,7 +50,7 @@ must state the alignment mode explicitly.
 | Main sensors | DVL, IMU, stereo cameras | IMU, pressure, DVL, sonar point clouds / MBES | Different sensor emphasis; Tank Dataset is the common overlap. |
 | Dataset story | Tank Dataset focused | Tank, MBES-SLAM, NTNU, AQUALOC | `aqua_localization` is broader across public datasets. |
 | License | GPL-3.0 repository license | Apache-2.0 | `aqua_localization` is easier for permissive downstream reuse. |
-| Visual SLAM | Core capability | Not implemented as a tightly-coupled visual frontend | AQUA-SLAM wins here until visual loop closure exists. |
+| Visual SLAM | Core capability | Experimental stereo ORB + PnP odometry frontend, no loop closure or visual-inertial coupling yet | AQUA-SLAM still wins here until visual odometry is fused and benchmarked. |
 | MBES bathymetry | Not the core public story | MBES replay, registration, pose graph, experimental loop closure | `aqua_localization` has the stronger MBES-specific path. |
 | Reproducibility surface | Docker and per-sequence launch files | ROS 2 launches, dataset docs, rerun exports, benchmark scripts | Needs measured setup-time comparison. |
 | Known limitations | README mentions random long-sequence crash risk | README documents drift and uncalibrated MBES loop closure | Both are honest; compare stability during replay. |
@@ -64,6 +64,7 @@ The first measured head-to-head row is tracked in
 |---------|----------|--------|-----------|--------:|----------:|-------:|--------|
 | Tank Dataset | `short_test` | AQUA-SLAM | SE(3) | 234 | 11.65 | 0.0194 | measured |
 | Tank Dataset | `short_test` | `aqua_localization` | SE(3) | 5399 | 14.94 | 0.4291 | measured, lighter sensor stack |
+| Tank Dataset | `short_test` | `aqua_visual_frontend` | SE(3) | 200 | 11.25 | 0.0947 | measured with same-sequence scale fit |
 
 This result makes AQUA-SLAM the accuracy target to beat on Tank visual-DVL-IMU
 sequences. The fair development path is to either add a visual frontend for a
@@ -187,7 +188,8 @@ High-value development to close the gap:
 1. Tank Dataset `Structure_Easy` benchmark harness for `aqua_localization`.
 2. AQUA-SLAM output recording and TUM conversion instructions.
 3. Fair comparison table in `docs/benchmarks/tank_aqua_slam.md`.
-4. Visual frontend or RTAB-Map baseline for AQUALOC/Tank visual sequences.
+4. Validate and fuse the experimental `stereo_visual_odometry.py` frontend on
+   camera-included Tank bags.
 5. MBES paper path separated from stereo visual SLAM claims.
 
 ## Source Notes
