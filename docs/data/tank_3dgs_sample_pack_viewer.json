@@ -338,6 +338,15 @@
   "release": "v0.3",
   "schema": "aqua_localization.underwater_3dgs_pack_viewer.v1",
   "sequence": "short_test",
+  "training_readiness": {
+    "checked_by": "check_3dgs_training_ready.py",
+    "failures": [],
+    "format": "nerfstudio",
+    "frame_count": 20,
+    "image_count": 20,
+    "ready": true,
+    "warnings": []
+  },
   "warnings": [
     "missing optional MBES/submap prior topic"
   ]

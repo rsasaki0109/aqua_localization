@@ -106,7 +106,8 @@ You can inspect the frames, trajectory, intrinsics, and rebuild command on the
 It is a small Tank Dataset `short_test` pack for quick inspection and external
 reconstruction experiments: 20 PNG frames, 20 matched `/apriltag_slam/GT`
 poses, manual Tank stereo intrinsics, and a nerfstudio-style `transforms.json`.
-This is an input-pack artifact, not a trained Gaussian Splatting result.
+The training readiness gate passes with `check_3dgs_training_ready.py`. This is
+an input-pack artifact, not a trained Gaussian Splatting result.
 
 ## Next Milestones
 
