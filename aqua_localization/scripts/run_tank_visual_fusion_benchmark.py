@@ -253,6 +253,7 @@ def build_imu_command(args) -> list[str]:
     ]
     if args.use_sim_time:
         command.extend(run_tank_visual_benchmark.ros_param("use_sim_time", "true"))
+    command.extend(run_tank_visual_benchmark.ros_param("topics.odometry", args.fused_odom_topic))
     command.extend(run_tank_visual_benchmark.ros_param("topics.visual_odometry", args.visual_odom_topic))
     command.extend(
         run_tank_visual_benchmark.ros_param(

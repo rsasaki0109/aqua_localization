@@ -142,6 +142,32 @@ def test_format_markdown_reports_baseline_and_standalone_delta(tmp_path):
     assert "Best fused row is still `0.0053` m worse than standalone visual." in text
 
 
+def test_evaluate_result_handles_empty_fused_tum(tmp_path):
+    module = load_module()
+    args = SimpleNamespace(
+        reference=Path("/tmp/ref.tum"),
+        expected_visual_frames=0,
+        min_visual_coverage=0.98,
+    )
+    case = module.SweepCase(0.01, 0.25)
+    sequence = "empty_case"
+    paths = module.run_tank_visual_fusion_benchmark.default_paths(tmp_path, sequence)
+    paths.fused_tum.write_text("", encoding="utf-8")
+
+    result = module.evaluate_result(
+        args,
+        case,
+        sequence,
+        tmp_path,
+        command=["ros2", "run", "example"],
+        returncode=1,
+    )
+
+    assert math.isnan(result.rmse_m)
+    assert math.isnan(result.matched_seconds)
+    assert result.returncode == 1
+
+
 def test_main_dry_run_writes_planned_summary(tmp_path):
     module = load_module()
     out_dir = tmp_path / "sweep"

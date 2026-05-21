@@ -49,6 +49,8 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
         "/tmp/tank_dataset.yaml",
         "--visual-odom-topic",
         "/visual/fusion/odometry",
+        "--fused-odom-topic",
+        "/fusion/output",
         "--translation-scale",
         "0.169623465",
         "--visual-position-variance-floor",
@@ -84,6 +86,7 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
     assert "opencv.threads:=2" in visual
     assert "--params-file" in imu
     assert "/tmp/tank_dataset.yaml" in imu
+    assert "topics.odometry:=/fusion/output" in imu
     assert "topics.visual_odometry:=/visual/fusion/odometry" in imu
     assert "imu.visual.position_variance_floor:=0.01" in imu
     assert "imu.visual.max_age_s:=0.25" in imu
