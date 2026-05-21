@@ -38,6 +38,27 @@ def write_metadata(path: Path, topics, duration_ns=120_000_000_000, total=1000):
     return path
 
 
+def write_metadata_count_after_topic(path: Path, topics):
+    lines = [
+        "rosbag2_bagfile_information:",
+        "  duration:",
+        "    nanoseconds: 120000000000",
+        "  message_count: 1000",
+        "  topics_with_message_count:",
+    ]
+    for name, msg_type, count in topics:
+        lines.extend(
+            [
+                "    - topic_metadata:",
+                f"        name: {name}",
+                f"        type: {msg_type}",
+                f"      message_count: {count}",
+            ]
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
 def good_topics():
     return [
         ("/norbit/detections", "sensor_msgs/msg/PointCloud2", 120),
@@ -56,6 +77,21 @@ def test_parse_metadata_reads_duration_counts_and_topics(tmp_path):
     assert metadata.message_count == 1000
     assert len(metadata.topics) == 3
     assert metadata.topics[0].name == "/nav/processed/microstrain/imu/madgwick"
+
+
+def test_parse_metadata_reads_sqlite_count_after_topic_format(tmp_path):
+    module = load_module()
+    metadata_path = write_metadata_count_after_topic(
+        tmp_path / "metadata.yaml",
+        good_topics(),
+    )
+
+    metadata = module.parse_metadata(metadata_path)
+
+    assert len(metadata.topics) == 3
+    assert {topic.name: topic.count for topic in metadata.topics}[
+        "/norbit/detections"
+    ] == 120
 
 
 def test_ready_bag_passes_required_roles(tmp_path):

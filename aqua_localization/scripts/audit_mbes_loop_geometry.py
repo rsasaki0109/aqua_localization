@@ -266,6 +266,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--keyframe-topic", default="/aqua_pose_graph/keyframe")
     parser.add_argument("--max-accepted", type=int, default=100)
     parser.add_argument("--min-plan-distance-m", type=float, default=2.0)
+    parser.add_argument(
+        "--require-complete",
+        action="store_true",
+        help="Return a non-zero status if any accepted loop lacks keyframe geometry",
+    )
 
     parser.add_argument("--max-fitness", type=float, default=2.0)
     parser.add_argument("--max-translation-m", type=float, default=5.0)
@@ -292,17 +297,18 @@ def main(argv: list[str] | None = None) -> int:
         max_rows=args.max_accepted,
         min_plan_distance_m=args.min_plan_distance_m,
     )
+    missing_rows = missing_geometry_rows(
+        audit_rows,
+        keyframes,
+        max_rows=args.max_accepted,
+    )
     text = format_report(
         geometry_rows,
         args=args,
         total_accepted=sum(1 for row in status_rows if row.accepted),
         keyframe_count=len(keyframes),
         keyframe_range=keyframe_id_range(keyframes),
-        missing_rows=missing_geometry_rows(
-            audit_rows,
-            keyframes,
-            max_rows=args.max_accepted,
-        ),
+        missing_rows=missing_rows,
     )
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -310,6 +316,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote MBES loop geometry review to {args.out}")
     else:
         print(text)
+    if args.require_complete and missing_rows:
+        print(
+            f"accepted-loop geometry is incomplete: {len(missing_rows)} row(s) missing",
+            file=sys.stderr,
+        )
+        return 3
     return 0
 
 
