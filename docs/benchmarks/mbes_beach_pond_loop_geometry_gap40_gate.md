@@ -10,6 +10,7 @@
 - Accepted loops with keyframe geometry: 16
 - Accepted loops missing keyframe geometry: 1
 - Keyframes loaded: 1172
+- Loaded keyframe ID range: 0 -> 1171
 - High / medium / low review rows: 5 / 6 / 5
 
 ## Review Table
@@ -35,9 +36,9 @@
 
 ## Missing Keyframe Geometry
 
-| Rank | Priority | Candidate -> Current | Gap | Flags |
-|-----:|----------|----------------------|----:|-------|
-| 1 | high | 1105 -> 1231 | 126 | rotation near gate |
+| Rank | Priority | Candidate -> Current | Missing side | Gap | Flags |
+|-----:|----------|----------------------|--------------|----:|-------|
+| 1 | high | 1105 -> 1231 | current | 126 | rotation near gate |
 
 ## Interpretation
 

@@ -30,6 +30,12 @@ class GeometryAuditRow:
     review_focus: str
 
 
+@dataclass(frozen=True)
+class MissingGeometryRow:
+    audit_row: audit.AuditRow
+    missing_side: str
+
+
 def euclidean_xy(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
@@ -100,15 +106,30 @@ def missing_geometry_rows(
     keyframes: dict[int, marker_helpers.KeyframePose],
     *,
     max_rows: int,
-) -> list[audit.AuditRow]:
-    missing: list[audit.AuditRow] = []
+) -> list[MissingGeometryRow]:
+    missing: list[MissingGeometryRow] = []
     for item in list(audit_rows)[:max_rows]:
-        if (
-            item.row.candidate_id not in keyframes or
-            item.row.current_id not in keyframes
-        ):
-            missing.append(item)
+        candidate_missing = item.row.candidate_id not in keyframes
+        current_missing = item.row.current_id not in keyframes
+        if not candidate_missing and not current_missing:
+            continue
+        if candidate_missing and current_missing:
+            missing_side = "candidate,current"
+        elif candidate_missing:
+            missing_side = "candidate"
+        else:
+            missing_side = "current"
+        missing.append(MissingGeometryRow(item, missing_side))
     return missing
+
+
+def keyframe_id_range(
+    keyframes: dict[int, marker_helpers.KeyframePose],
+) -> tuple[int, int] | None:
+    if not keyframes:
+        return None
+    ids = keyframes.keys()
+    return min(ids), max(ids)
 
 
 def format_xyz(xyz: tuple[float, float, float]) -> str:
@@ -125,13 +146,19 @@ def format_summary(
     total_accepted: int,
     keyframe_count: int,
     missing_count: int,
+    keyframe_range: tuple[int, int] | None,
 ) -> list[str]:
     priorities = Counter(row.audit_row.priority for row in rows)
+    range_text = (
+        f"{keyframe_range[0]} -> {keyframe_range[1]}"
+        if keyframe_range is not None else "n/a"
+    )
     return [
         f"- Accepted loops in CSV: {total_accepted}",
         f"- Accepted loops with keyframe geometry: {len(rows)}",
         f"- Accepted loops missing keyframe geometry: {missing_count}",
         f"- Keyframes loaded: {keyframe_count}",
+        f"- Loaded keyframe ID range: {range_text}",
         f"- High / medium / low review rows: "
         f"{priorities['high']} / {priorities['medium']} / {priorities['low']}",
     ]
@@ -161,20 +188,22 @@ def format_geometry_table(rows: list[GeometryAuditRow]) -> list[str]:
     return lines
 
 
-def format_missing_table(rows: list[audit.AuditRow]) -> list[str]:
+def format_missing_table(rows: list[MissingGeometryRow]) -> list[str]:
     if not rows:
         return ["- None"]
     lines = [
-        "| Rank | Priority | Candidate -> Current | Gap | Flags |",
-        "|-----:|----------|----------------------|----:|-------|",
+        "| Rank | Priority | Candidate -> Current | Missing side | Gap | Flags |",
+        "|-----:|----------|----------------------|--------------|----:|-------|",
     ]
     for rank, item in enumerate(rows, start=1):
-        flags = ", ".join(item.flags) if item.flags else "none"
+        audit_row = item.audit_row
+        flags = ", ".join(audit_row.flags) if audit_row.flags else "none"
         lines.append(
             "| "
-            f"{rank} | {item.priority} | "
-            f"{item.row.candidate_id} -> {item.row.current_id} | "
-            f"{item.keyframe_gap} | {flags} |"
+            f"{rank} | {audit_row.priority} | "
+            f"{audit_row.row.candidate_id} -> {audit_row.row.current_id} | "
+            f"{item.missing_side} | "
+            f"{audit_row.keyframe_gap} | {flags} |"
         )
     return lines
 
@@ -185,7 +214,8 @@ def format_report(
     args: argparse.Namespace,
     total_accepted: int,
     keyframe_count: int,
-    missing_rows: list[audit.AuditRow] | None = None,
+    keyframe_range: tuple[int, int] | None,
+    missing_rows: list[MissingGeometryRow] | None = None,
 ) -> str:
     missing_rows = missing_rows or []
     lines = [
@@ -204,6 +234,7 @@ def format_report(
             total_accepted=total_accepted,
             keyframe_count=keyframe_count,
             missing_count=len(missing_rows),
+            keyframe_range=keyframe_range,
         ),
         "",
         "## Review Table",
@@ -266,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
         args=args,
         total_accepted=sum(1 for row in status_rows if row.accepted),
         keyframe_count=len(keyframes),
+        keyframe_range=keyframe_id_range(keyframes),
         missing_rows=missing_geometry_rows(
             audit_rows,
             keyframes,
