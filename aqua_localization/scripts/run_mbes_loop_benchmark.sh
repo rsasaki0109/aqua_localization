@@ -38,17 +38,42 @@ RECORD_ENV_ARGS=(
   "MBES_OUT=$MBES_OUT"
   "MBES_DURATION=$MBES_DURATION"
 )
+AUDIT_ARGS=()
 
 for optional_name in \
   ROS_SETUP RECORD_STORAGE RECORD_TOPIC_FLAG PLAY_DURATION_ARG \
   POSE_GRAPH_KEYFRAME_TRANSLATION_M POSE_GRAPH_KEYFRAME_ROTATION_RAD \
   MBES_LOOP_MIN_POINTS MBES_LOOP_VOXEL_LEAF_M \
-  MBES_LOOP_MIN_KEYFRAME_SEPARATION MBES_LOOP_MAX_DISTANCE_M
+  MBES_LOOP_MIN_KEYFRAME_SEPARATION MBES_LOOP_MAX_DISTANCE_M \
+  MBES_LOOP_MAX_FITNESS_SCORE MBES_LOOP_MAX_CORRECTION_TRANSLATION_M \
+  MBES_LOOP_MAX_CORRECTION_ROTATION_RAD \
+  MBES_LOOP_DESCRIPTOR_MAX_CENTROID_DISTANCE_M \
+  MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO \
+  MBES_LOOP_DESCRIPTOR_MIN_POINT_COUNT_RATIO
 do
   if [[ -n "${!optional_name+x}" ]]; then
     RECORD_ENV_ARGS+=("$optional_name=${!optional_name}")
   fi
 done
+
+if [[ -n "${MBES_LOOP_MAX_FITNESS_SCORE+x}" ]]; then
+  AUDIT_ARGS+=("--max-fitness" "$MBES_LOOP_MAX_FITNESS_SCORE")
+fi
+if [[ -n "${MBES_LOOP_MAX_CORRECTION_TRANSLATION_M+x}" ]]; then
+  AUDIT_ARGS+=("--max-translation-m" "$MBES_LOOP_MAX_CORRECTION_TRANSLATION_M")
+fi
+if [[ -n "${MBES_LOOP_MAX_CORRECTION_ROTATION_RAD+x}" ]]; then
+  AUDIT_ARGS+=("--max-rotation-rad" "$MBES_LOOP_MAX_CORRECTION_ROTATION_RAD")
+fi
+if [[ -n "${MBES_LOOP_MIN_KEYFRAME_SEPARATION+x}" ]]; then
+  AUDIT_ARGS+=("--min-keyframe-separation" "$MBES_LOOP_MIN_KEYFRAME_SEPARATION")
+fi
+if [[ -n "${MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO+x}" ]]; then
+  AUDIT_ARGS+=("--descriptor-extent-warn" "$MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO")
+fi
+if [[ -n "${MBES_LOOP_DESCRIPTOR_MIN_POINT_COUNT_RATIO+x}" ]]; then
+  AUDIT_ARGS+=("--descriptor-point-ratio-warn" "$MBES_LOOP_DESCRIPTOR_MIN_POINT_COUNT_RATIO")
+fi
 
 run_cmd() {
   printf '+'
@@ -113,13 +138,15 @@ run_cmd ros2 run aqua_localization mbes_loop_benchmark_row.py \
 
 run_cmd ros2 run aqua_localization audit_mbes_loop_candidates.py \
   --csv "$STATUS_CSV" \
-  --out "$AUDIT_OUT"
+  --out "$AUDIT_OUT" \
+  "${AUDIT_ARGS[@]}"
 
 run_cmd ros2 run aqua_localization plot_mbes_loop_audit.py \
   --bag "$MBES_OUT" \
   --csv "$STATUS_CSV" \
   --out "$AUDIT_PLOT_OUT" \
-  --title "$DATASET $SEQUENCE accepted loop audit"
+  --title "$DATASET $SEQUENCE accepted loop audit" \
+  "${AUDIT_ARGS[@]}"
 
 cat <<EOF
 
