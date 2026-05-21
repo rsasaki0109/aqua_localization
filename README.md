@@ -113,7 +113,7 @@ an input-pack artifact, not a trained Gaussian Splatting result.
 
 | Milestone | Why it matters |
 |-----------|----------------|
-| **3DGS training smoke test** | Prove the published Tank sample pack can run through a small nerfstudio/gsplat-style training path without hidden local files. |
+| **3DGS training smoke test** | Prove the published Tank sample pack can run through a small nerfstudio/gsplat-style training path, with a report template for the exact command and result. |
 | **MBES threshold sweep** | Turn experimental loop-closure tuning into accepted/rejected/false-positive summaries on a real bag. |
 | **AQUA-SLAM comparison run** | Keep the benchmark story reproducible by filling comparison tables from scripts instead of hand-written claims. |
 
@@ -126,6 +126,8 @@ ros2 run aqua_localization check_3dgs_training_ready.py \
 
 Training smoke-test plan:
 [`docs/experiments/underwater_3dgs_training_smoke.md`](docs/experiments/underwater_3dgs_training_smoke.md).
+Report template:
+[`docs/experiments/underwater_3dgs_training_smoke_report.md`](docs/experiments/underwater_3dgs_training_smoke_report.md).
 
 ## Run It
 

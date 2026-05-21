@@ -74,5 +74,8 @@ all outputs under `/tmp/aqua_3dgs_smoke/`.
 - elapsed time and GPU/CPU note
 - failure note if the tool rejects the tiny 20-frame pack
 
+Record the run with
+[`underwater_3dgs_training_smoke_report.md`](underwater_3dgs_training_smoke_report.md).
+
 Do not report reconstruction quality from this smoke test. A real comparison
 needs a larger sequence, held-out views, and a separate metric plan.
