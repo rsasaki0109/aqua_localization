@@ -56,6 +56,7 @@ install(PROGRAMS
   scripts/summarize_visual_frontend_status.py
   scripts/analyze_visual_drift.py
   scripts/analyze_visual_motion_segments.py
+  scripts/check_mbes_benchmark_ready.py
   scripts/export_mbes_loop_status.py
   scripts/mbes_loop_benchmark_row.py
   scripts/pose_graph_loop_demo.py
@@ -93,6 +94,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_summarize_visual_frontend_status test/test_summarize_visual_frontend_status.py)
   ament_add_pytest_test(test_analyze_visual_drift test/test_analyze_visual_drift.py)
   ament_add_pytest_test(test_analyze_visual_motion_segments test/test_analyze_visual_motion_segments.py)
+  ament_add_pytest_test(test_check_mbes_benchmark_ready test/test_check_mbes_benchmark_ready.py)
   ament_add_pytest_test(test_convert_scalar_pressure_bag test/test_convert_scalar_pressure_bag.py)
   ament_add_pytest_test(test_diagnose_yaw_frame test/test_diagnose_yaw_frame.py)
   ament_add_pytest_test(test_plot_trajectories test/test_plot_trajectories.py)

@@ -16,6 +16,16 @@ measured loop counts yet.
 
 ## Reproducible Run
 
+Check that the local `beach_pond` bag has the required MBES, reference odometry,
+and IMU topics before launching a benchmark run:
+
+```bash
+ros2 run aqua_localization check_mbes_benchmark_ready.py \
+  --bag /path/to/beach_pond_ros2 \
+  --out /tmp/mbes_beach_pond_readiness.md \
+  --min-duration-s 60
+```
+
 Record a results-included replay bag with loop diagnostics:
 
 ```bash
@@ -50,6 +60,7 @@ Expected generated files:
 
 | Artifact | Purpose |
 |----------|---------|
+| `/tmp/mbes_beach_pond_readiness.md` | Preflight report for required topics, message counts, and bag duration. |
 | `/tmp/mbes_beach_pond_loop_status.csv` | Raw `/mbes_loop_closure/status` samples for every tested candidate. |
 | `/tmp/mbes_beach_pond_loop_status.md` | Accepted/rejected/no-candidate counts, status reasons, fitness, correction, and descriptor quantiles. |
 | `/tmp/mbes_beach_pond_descriptor_sweep.md` | Candidate descriptor threshold grid for pre-registration gating. |
@@ -83,6 +94,7 @@ accepted loop candidates against the RViz markers or rerun overlay.
 Promote `mbes-beach-pond-loop-status` from `scaffolded` to `measured` only when:
 
 - the exported summary has nonzero status samples,
+- the readiness report passes for the source bag,
 - the measurement table above is filled from the generated summary,
 - every accepted loop has a false-positive audit note,
 - the descriptor sweep is linked or copied into this benchmark folder, and
