@@ -36,21 +36,15 @@ Latest release: **[v0.4](https://github.com/rsasaki0109/aqua_localization/releas
   <img src="docs/media/aqua_pipeline.svg" alt="aqua_localization pipeline from underwater sensors to filtering, sonar registration, pose graph loop closure, and visualization" width="92%">
 </p>
 
-## Start Here
+## Quick Links
 
-| Goal | Where to go |
-|------|-------------|
-| Open the visual project page | [GitHub Pages](https://rsasaki0109.github.io/aqua_localization/) |
-| Preview the underwater 3DGS research track | [3DGS demo track](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_demo.html) |
-| Inspect the 3DGS sample pack before downloading | [3DGS sample pack inspector](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html) |
-| Download the first 3DGS sample artifact | [Tank 20-frame nerfstudio pack](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
-| Build a small 3DGS sample pack artifact | [3DGS sample pack workflow](docs/experiments/underwater_3dgs_sample_pack.md) |
-| See real underwater outputs | [Public-data results](#public-data-results) |
-| Build and launch the stack | [Run it](#run-it) |
-| Try pose-graph loop closure without a bag | [Loop-closure smoke test](#loop-closure-smoke-test) |
-| Tune MBES loop closure on a real bag | [Experimental MBES loop closure](#experimental-mbes-loop-closure) |
-| Understand package ownership | [Stack map](#stack-map) |
-| Check known limits before using it | [Project status](#project-status) |
+| Path | Start here |
+|------|------------|
+| **Visual overview** | [GitHub Pages](https://rsasaki0109.github.io/aqua_localization/) and [public-data results](#public-data-results) |
+| **Run the ROS stack** | [Build and launch](#run-it), then follow the [Tank Dataset demo](datasets/tank_dataset_demo.md) |
+| **Loop-closure demo** | [No-bag smoke test](#loop-closure-smoke-test) or [real-bag MBES tuning](#experimental-mbes-loop-closure) |
+| **Underwater 3DGS track** | [Demo page](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_demo.html), [sample inspector](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html), and [v0.3 pack](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
+| **Architecture and status** | [Stack map](#stack-map), [project status](#project-status), and [benchmark plans](docs/benchmarks/) |
 
 ## What It Does
 
@@ -91,11 +85,15 @@ instead of hand-captured screenshots.
 
 ## Underwater 3DGS Sample Pack
 
-The first public 3DGS input artifact is attached to
-[v0.3](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3):
-[download `tank_short_test_3dgs_pack_20frames.zip`](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip).
-You can inspect the frames, trajectory, intrinsics, and rebuild command on the
-[static sample pack inspector](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html).
+The first public 3DGS input artifact is a small Tank Dataset `short_test`
+pack for quick inspection and external reconstruction experiments:
+
+| Item | Link |
+|------|------|
+| Release | [`v0.3`](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3) |
+| Download | [`tank_short_test_3dgs_pack_20frames.zip`](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
+| Inspect before downloading | [Static sample pack inspector](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html) |
+| Rebuild the artifact | [3DGS sample pack workflow](docs/experiments/underwater_3dgs_sample_pack.md) |
 
 <p align="center">
   <a href="https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html">
@@ -103,11 +101,10 @@ You can inspect the frames, trajectory, intrinsics, and rebuild command on the
   </a>
 </p>
 
-It is a small Tank Dataset `short_test` pack for quick inspection and external
-reconstruction experiments: 20 PNG frames, 20 matched `/apriltag_slam/GT`
-poses, manual Tank stereo intrinsics, and a nerfstudio-style `transforms.json`.
-The training readiness gate passes with `check_3dgs_training_ready.py`. This is
-an input-pack artifact, not a trained Gaussian Splatting result.
+Contents: 20 PNG frames, 20 matched `/apriltag_slam/GT` poses, manual Tank
+stereo intrinsics, and a nerfstudio-style `transforms.json`. The training
+readiness gate passes with `check_3dgs_training_ready.py`. This is an
+input-pack artifact, not a trained Gaussian Splatting result.
 
 ## Next Milestones
 
@@ -124,10 +121,9 @@ ros2 run aqua_localization check_3dgs_training_ready.py \
   --pack /tmp/tank_short_test_3dgs_pack_20frames
 ```
 
-Training smoke-test plan:
-[`docs/experiments/underwater_3dgs_training_smoke.md`](docs/experiments/underwater_3dgs_training_smoke.md).
-Report template:
-[`docs/experiments/underwater_3dgs_training_smoke_report.md`](docs/experiments/underwater_3dgs_training_smoke_report.md).
+Training smoke-test docs:
+[`plan`](docs/experiments/underwater_3dgs_training_smoke.md) and
+[`report template`](docs/experiments/underwater_3dgs_training_smoke_report.md).
 
 ## Run It
 
@@ -251,14 +247,17 @@ remaining work is threshold tuning, candidate reliability, information
 matrix calibration, and eventually visual loop closure for AQUALOC. ESKF
 backend, magnetometer fusion, and acoustic positioning are also on the list.
 
-Plan and state of the stack: [`PLAN.md`](PLAN.md).
-Verified-feature checklist: [`docs/mvp_checklist.md`](docs/mvp_checklist.md).
-Per-platform benchmarks: [`docs/benchmarks/`](docs/benchmarks).
-OSS comparison plan: [`docs/benchmarks/oss_comparison.md`](docs/benchmarks/oss_comparison.md).
-AQUA-SLAM comparison plan: [`docs/benchmarks/aqua_slam_comparison.md`](docs/benchmarks/aqua_slam_comparison.md).
-Tank vs AQUA-SLAM table: [`docs/benchmarks/tank_aqua_slam.md`](docs/benchmarks/tank_aqua_slam.md).
-Public launch checklist: [`docs/public_launch_checklist.md`](docs/public_launch_checklist.md).
-MBES loop closure plan: [`docs/mbes_loop_closure.md`](docs/mbes_loop_closure.md).
+Planning and validation references:
+
+| Area | Link |
+|------|------|
+| Overall plan | [`PLAN.md`](PLAN.md) |
+| Verified features | [`docs/mvp_checklist.md`](docs/mvp_checklist.md) |
+| Benchmarks | [`docs/benchmarks/`](docs/benchmarks) |
+| OSS comparison | [`oss_comparison.md`](docs/benchmarks/oss_comparison.md) |
+| AQUA-SLAM comparison | [`aqua_slam_comparison.md`](docs/benchmarks/aqua_slam_comparison.md) and [`tank_aqua_slam.md`](docs/benchmarks/tank_aqua_slam.md) |
+| MBES loop closure | [`docs/mbes_loop_closure.md`](docs/mbes_loop_closure.md) |
+| Public launch | [`docs/public_launch_checklist.md`](docs/public_launch_checklist.md) |
 
 ### Honest Limitations
 
