@@ -39,13 +39,14 @@ def build_report(args):
     missing = []
     for role in REQUIRED_ROLES:
         entry = roles.get(role, {})
-        ok = role_ready(entry)
+        ok = role_ready(entry) or (role == "camera_info" and args.allow_manual_intrinsics)
         required[role] = {
             "ready": ok,
             "topic": entry.get("topic"),
             "type": entry.get("type"),
             "message_count": entry.get("message_count"),
             "status": entry.get("status"),
+            "manual_intrinsics_allowed": role == "camera_info" and args.allow_manual_intrinsics,
         }
         if not ok:
             missing.append(role)
@@ -61,15 +62,24 @@ def build_report(args):
             "status": entry.get("status"),
         }
 
+    warnings = manifest.get("warnings", [])
+    if args.allow_manual_intrinsics:
+        warnings = [
+            warning
+            for warning in warnings
+            if warning != "missing required camera intrinsics topic"
+        ]
+
     return {
         "dataset": args.dataset,
         "sequence": args.sequence,
         "bag": str(args.bag),
         "ready": not missing,
+        "manual_intrinsics_allowed": args.allow_manual_intrinsics,
         "required": required,
         "optional": optional,
         "missing_required_roles": missing,
-        "warnings": manifest.get("warnings", []),
+        "warnings": warnings,
     }
 
 
@@ -108,6 +118,11 @@ def parse_args(argv):
     parser.add_argument("--trajectory-topic", help="Override estimated trajectory topic.")
     parser.add_argument("--depth-topic", help="Override depth or pressure topic.")
     parser.add_argument("--mbes-topic", help="Override optional MBES/submap PointCloud2 topic.")
+    parser.add_argument(
+        "--allow-manual-intrinsics",
+        action="store_true",
+        help="Treat a missing CameraInfo topic as ready when manual intrinsics will be supplied to the 3DGS exporter.",
+    )
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
     return parser.parse_args(argv)
 

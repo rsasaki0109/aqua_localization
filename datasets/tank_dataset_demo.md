@@ -80,7 +80,9 @@ After converting with cameras, run the metadata-only readiness check:
 ros2 run aqua_localization check_3dgs_bag_ready.py \
   --bag aqua_localization/datasets/public/tank_dataset/short_test_ros2_with_cameras \
   --dataset "Tank Dataset" \
-  --sequence short_test
+  --sequence short_test \
+  --trajectory-topic /apriltag_slam/GT \
+  --allow-manual-intrinsics
 ```
 
 If the source bag uses different camera topic names, pass explicit overrides:
@@ -91,8 +93,8 @@ ros2 run aqua_localization check_3dgs_bag_ready.py \
   --dataset "Tank Dataset" \
   --sequence short_test \
   --image-topic /camera/left/image_raw \
-  --camera-info-topic /camera/left/camera_info \
-  --trajectory-topic /aqua_visual_frontend/odometry
+  --trajectory-topic /apriltag_slam/GT \
+  --allow-manual-intrinsics
 ```
 
 Once the check reports `3DGS bag ready: true`, create a small nerfstudio-style
@@ -109,8 +111,16 @@ ros2 run aqua_localization export_3dgs_pack_pipeline.py \
   --stride 5 \
   --max-time-diff 0.05 \
   --base-from-camera -0.25 -0.45 0.0 0.0 0.0 0.0 1.0 \
+  --camera-intrinsics 612 512 655.0 655.0 306.0 256.0 \
+  --trajectory-topic /apriltag_slam/GT \
   --format nerfstudio
 ```
+
+The Tank camera conversion may not contain a `sensor_msgs/msg/CameraInfo`
+topic. In that case, pass the same intrinsics used by the visual frontend via
+`--allow-manual-intrinsics` and `--camera-intrinsics`. If a future conversion
+includes CameraInfo, drop the manual intrinsics and let the pipeline read them
+from the bag.
 
 See the [3DGS sample pack workflow](../docs/experiments/underwater_3dgs_sample_pack.md)
 for release artifact naming, zip commands, and JSON sanity checks.

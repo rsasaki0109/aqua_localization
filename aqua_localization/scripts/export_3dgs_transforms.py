@@ -234,7 +234,7 @@ def camera_info_payload(timestamp_ns: int, msg):
     if len(k) < 9:
         raise ValueError("CameraInfo.k must contain 9 values")
     return {
-        "source": "sensor_msgs/msg/CameraInfo",
+        "source": "camera_info",
         "timestamp_ns": int(timestamp_ns),
         "message_stamp_ns": message_stamp_ns(msg),
         "topic_width": int(getattr(msg, "width", 0)),
@@ -247,6 +247,27 @@ def camera_info_payload(timestamp_ns: int, msg):
         "cy": float(k[5]),
         "camera_model": str(getattr(msg, "distortion_model", "") or "unknown"),
         "distortion_params": [float(value) for value in d],
+    }
+
+
+def manual_intrinsics_payload(values, camera_model: str, distortion_params):
+    if len(values) != 6:
+        raise ValueError("camera intrinsics must have 6 values: w h fl_x fl_y cx cy")
+    w, h, fl_x, fl_y, cx, cy = values
+    return {
+        "source": "manual",
+        "timestamp_ns": None,
+        "message_stamp_ns": None,
+        "topic_width": int(w),
+        "topic_height": int(h),
+        "w": int(w),
+        "h": int(h),
+        "fl_x": float(fl_x),
+        "fl_y": float(fl_y),
+        "cx": float(cx),
+        "cy": float(cy),
+        "camera_model": camera_model,
+        "distortion_params": [float(value) for value in (distortion_params or [])],
     }
 
 
@@ -277,7 +298,7 @@ def update_pack_index(pack_dir: Path, pack_index, transforms_payload):
 
 def to_nerfstudio_payload(aqua_payload):
     if aqua_payload.get("intrinsics_source") is None:
-        raise ValueError("nerfstudio format requires CameraInfo intrinsics")
+        raise ValueError("nerfstudio format requires camera intrinsics")
 
     frames = []
     for frame in aqua_payload["frames"]:
@@ -335,6 +356,9 @@ def build_transforms(
     max_time_diff_s: float = 0.05,
     output_format: str = "aqua",
     base_from_camera_values=None,
+    camera_intrinsics_values=None,
+    camera_model: str = "pinhole",
+    distortion_params=None,
     reader=None,
     camera_info_reader=None,
 ):
@@ -362,12 +386,16 @@ def build_transforms(
         reader = read_rosbag_odometry(bag_path_from_manifest(manifest), topic, storage_id)
 
     intrinsics = None
-    if camera_info_reader is None and intrinsics_role is not None:
+    if camera_intrinsics_values is not None:
+        intrinsics = manual_intrinsics_payload(
+            camera_intrinsics_values, camera_model, distortion_params
+        )
+    elif camera_info_reader is None and intrinsics_role is not None:
         storage_id = manifest.get("bag", {}).get("storage_identifier")
         camera_info_reader = read_rosbag_camera_info(
             bag_path_from_manifest(manifest), intrinsics_role["topic"], storage_id
         )
-    if camera_info_reader is not None:
+    if intrinsics is None and camera_info_reader is not None:
         intrinsics = collect_camera_info(camera_info_reader)
 
     odom_samples = collect_odometry_samples(reader)
@@ -415,7 +443,7 @@ def build_transforms(
         "trajectory_topic": topic,
         "trajectory_type": msg_type,
         "camera_info_topic": intrinsics_role["topic"] if intrinsics_role else None,
-        "intrinsics_source": "camera_info" if intrinsics is not None else None,
+        "intrinsics_source": intrinsics["source"] if intrinsics is not None else None,
         "camera_pose_convention": "world_from_camera = world_from_base @ base_from_camera",
         "base_from_camera": {
             "translation_xyz_m": [float(value) for value in base_from_camera[:3, 3].tolist()],
@@ -437,7 +465,7 @@ def build_transforms(
         "skipped_frames": skipped,
         "notes": [
             "Transforms are nearest-neighbour matches between extracted image timestamps and odometry.",
-            "Camera-to-base extrinsics are not applied in this exporter.",
+            "Camera-to-base extrinsics are applied when --base-from-camera is supplied.",
         ],
     }
     if intrinsics is not None:
@@ -486,6 +514,26 @@ def parse_args(argv):
         default=None,
         help="Camera pose in the odometry base frame as x y z qx qy qz qw.",
     )
+    parser.add_argument(
+        "--camera-intrinsics",
+        nargs=6,
+        type=float,
+        metavar=("W", "H", "FL_X", "FL_Y", "CX", "CY"),
+        default=None,
+        help="Manual camera intrinsics as w h fl_x fl_y cx cy when no CameraInfo topic exists.",
+    )
+    parser.add_argument(
+        "--camera-model",
+        default="pinhole",
+        help="Camera model label used with --camera-intrinsics.",
+    )
+    parser.add_argument(
+        "--distortion-params",
+        nargs="*",
+        type=float,
+        default=None,
+        help="Optional distortion parameters used with --camera-intrinsics.",
+    )
     return parser.parse_args(argv)
 
 
@@ -498,6 +546,9 @@ def main(argv=None) -> int:
             args.max_time_diff,
             args.format,
             args.base_from_camera,
+            args.camera_intrinsics,
+            args.camera_model,
+            args.distortion_params,
         )
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)

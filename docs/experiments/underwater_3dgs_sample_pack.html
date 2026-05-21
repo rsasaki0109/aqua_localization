@@ -192,7 +192,9 @@ source install/setup.bash
 ros2 run aqua_localization check_3dgs_bag_ready.py \
   --bag datasets/public/tank_dataset/short_test_ros2_with_cameras \
   --dataset "Tank Dataset" \
-  --sequence short_test
+  --sequence short_test \
+  --trajectory-topic /apriltag_slam/GT \
+  --allow-manual-intrinsics
 
 ros2 run aqua_localization export_3dgs_pack_pipeline.py \
   --bag datasets/public/tank_dataset/short_test_ros2_with_cameras \
@@ -204,10 +206,17 @@ ros2 run aqua_localization export_3dgs_pack_pipeline.py \
   --stride 5 \
   --max-time-diff 0.05 \
   --base-from-camera -0.25 -0.45 0.0 0.0 0.0 0.0 1.0 \
+  --camera-intrinsics 612 512 655.0 655.0 306.0 256.0 \
+  --trajectory-topic /apriltag_slam/GT \
   --format nerfstudio
 
 cd /tmp
 zip -r tank_short_test_3dgs_pack_20frames.zip tank_short_test_3dgs_pack_20frames</pre>
+    </section>
+
+    <section>
+      <h2>Tank Intrinsics Note</h2>
+      <p>Tank <code>short_test</code> camera conversions may not include <code>sensor_msgs/CameraInfo</code>. The sample command passes the same stereo intrinsics used by the visual frontend and marks the readiness check as manual-intrinsics aware. If a future bag includes CameraInfo, remove <code>--allow-manual-intrinsics</code> and <code>--camera-intrinsics</code> and let the pipeline read intrinsics from the bag.</p>
     </section>
 
     <section>

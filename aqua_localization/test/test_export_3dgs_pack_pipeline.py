@@ -78,12 +78,18 @@ def test_pipeline_runs_all_steps_with_summary(tmp_path, monkeypatch):
         max_time_diff_s,
         output_format,
         base_from_camera_values,
+        camera_intrinsics_values,
+        camera_model,
+        distortion_params,
     ):
         assert manifest_path == out / "manifest.json"
         assert pack_dir == out
         assert max_time_diff_s == 0.07
         assert output_format == "nerfstudio"
         assert base_from_camera_values == [0.1, 0.2, 0.3, 0.0, 0.0, 0.0, 1.0]
+        assert camera_intrinsics_values == [612.0, 512.0, 655.0, 655.0, 306.0, 256.0]
+        assert camera_model == "pinhole"
+        assert distortion_params == [0.0, 0.0]
         payload = {
             "schema": "aqua_localization.nerfstudio_transforms.v1",
             "format": "nerfstudio",
@@ -126,6 +132,18 @@ def test_pipeline_runs_all_steps_with_summary(tmp_path, monkeypatch):
             "0.0",
             "0.0",
             "1.0",
+            "--camera-intrinsics",
+            "612",
+            "512",
+            "655",
+            "655",
+            "306",
+            "256",
+            "--camera-model",
+            "pinhole",
+            "--distortion-params",
+            "0.0",
+            "0.0",
         ]
     )
     summary = module.run_pipeline(args)
@@ -136,6 +154,7 @@ def test_pipeline_runs_all_steps_with_summary(tmp_path, monkeypatch):
     assert summary["counts"]["transforms"] == 1
     assert summary["counts"]["skipped_transforms"] == 1
     assert summary["formats"]["transforms_format"] == "nerfstudio"
+    assert summary["options"]["camera_intrinsics"] == [612.0, 512.0, 655.0, 655.0, 306.0, 256.0]
     assert summary["inputs"]["image_topic"] == "/camera/left/image_raw"
     assert (out / "manifest.json").is_file()
     assert (out / "pack_index.json").is_file()

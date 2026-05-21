@@ -86,6 +86,27 @@ def test_missing_camera_info_fails(tmp_path):
     assert "camera_info" in report["missing_required_roles"]
 
 
+def test_missing_camera_info_can_use_manual_intrinsics(tmp_path):
+    module = load_module()
+    write_metadata(
+        tmp_path,
+        [
+            ("/camera/left/image_raw", "sensor_msgs/msg/Image", 20),
+            ("/aqua_visual_frontend/odometry", "nav_msgs/msg/Odometry", 20),
+        ],
+    )
+
+    args = module.parse_args(["--bag", str(tmp_path), "--allow-manual-intrinsics"])
+    report = module.build_report(args)
+
+    assert report["ready"] is True
+    assert report["manual_intrinsics_allowed"] is True
+    assert report["required"]["camera_info"]["ready"] is True
+    assert report["required"]["camera_info"]["manual_intrinsics_allowed"] is True
+    assert report["missing_required_roles"] == []
+    assert "missing required camera intrinsics topic" not in report["warnings"]
+
+
 def test_cli_returns_nonzero_when_not_ready(tmp_path):
     write_metadata(
         tmp_path,
