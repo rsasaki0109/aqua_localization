@@ -24,6 +24,8 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "POSE_GRAPH_KEYFRAME_TRANSLATION_M": "1.0",
             "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD": "0.4",
             "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO": "5.0",
+            "AUDIT_MAX_ACCEPTED": "77",
+            "AUDIT_MAX_MARKERS": "88",
         }
     )
 
@@ -50,6 +52,8 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0" in proc.stdout
     assert "--max-rotation-rad 0.4" in proc.stdout
     assert "--descriptor-extent-warn 5.0" in proc.stdout
+    assert "--max-accepted 77" in proc.stdout
+    assert "--max-markers 88" in proc.stdout
     assert "MBES loop benchmark artifacts:" in proc.stdout
 
 
@@ -78,3 +82,5 @@ def test_dry_run_uses_default_artifact_names(tmp_path):
     assert str(tmp_path / "out/mbes_beach_pond_benchmark_row.md") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_loop_audit.md") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_loop_audit.png") in proc.stdout
+    assert "--max-accepted 100" in proc.stdout
+    assert "--max-markers 100" in proc.stdout

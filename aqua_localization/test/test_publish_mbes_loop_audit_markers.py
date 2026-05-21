@@ -103,4 +103,4 @@ def test_parse_args_defaults_to_audit_marker_topic(tmp_path):
 
     assert args.topic == "/mbes_loop_audit/markers"
     assert args.keyframe_topic == "/aqua_pose_graph/keyframe"
-    assert args.max_markers == 35
+    assert args.max_markers == 100

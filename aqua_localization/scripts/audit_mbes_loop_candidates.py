@@ -269,7 +269,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--csv", required=True, type=Path, help="Loop-status CSV")
     parser.add_argument("--out", type=Path, help="Optional Markdown output path")
-    parser.add_argument("--max-accepted", type=int, default=50)
+    parser.add_argument("--max-accepted", type=int, default=100)
     parser.add_argument("--max-reasons", type=int, default=12)
     parser.add_argument("--max-fitness", type=float, default=2.0)
     parser.add_argument("--max-translation-m", type=float, default=5.0)

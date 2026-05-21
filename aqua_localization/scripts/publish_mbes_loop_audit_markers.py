@@ -265,7 +265,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--topic", default="/mbes_loop_audit/markers",
                         help="MarkerArray topic to publish")
     parser.add_argument("--frame", default="map")
-    parser.add_argument("--max-markers", type=int, default=35)
+    parser.add_argument("--max-markers", type=int, default=100)
     parser.add_argument("--label-z-offset", type=float, default=1.0)
     parser.add_argument("--publish-count", type=int, default=5)
     parser.add_argument("--period-s", type=float, default=0.5)

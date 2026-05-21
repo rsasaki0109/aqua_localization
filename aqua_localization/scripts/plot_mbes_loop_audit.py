@@ -118,7 +118,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="Output plot path, usually .png or .svg")
     parser.add_argument("--title", default="MBES beach_pond accepted loop audit")
     parser.add_argument("--keyframe-topic", default="/aqua_pose_graph/keyframe")
-    parser.add_argument("--max-markers", type=int, default=35)
+    parser.add_argument("--max-markers", type=int, default=100)
     parser.add_argument("--max-labels", type=int, default=12)
     parser.add_argument("--label-z-offset", type=float, default=1.0)
 
