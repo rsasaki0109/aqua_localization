@@ -223,6 +223,48 @@ visual motion estimator itself: temporal feature stability, PnP outlier
 handling, motion prior use, or visual-inertial/DVL coupling, rather than only
 static scale or intrinsics.
 
+PnP/RANSAC quality gates can be swept on the same fixed window:
+
+```bash
+ros2 run aqua_localization run_tank_visual_pnp_sweep.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_pnp_sweep_1125 \
+  --sequence short_test_visual_pnp_1125 \
+  --start-offset-s 0.0 \
+  --duration-s 11.25 \
+  --translation-scale 0.095 \
+  --reprojection-errors-px 2,3,4,6 \
+  --min-inlier-ratios 0.25,0.5,0.65,0.8 \
+  --max-step-translation-m 0.02,0.05,0.10,2.0 \
+  --baseline-rmse-m 0.0194
+```
+
+The PnP sweep reports RMSE, accepted ratio, rejected-frame count, dominant
+reject reason, median PnP inliers, median inlier ratio, and median temporal
+matches. A useful result here is not only a lower RMSE: if stricter gates create
+rejections without reducing RMSE, the next target is motion prediction or
+multi-sensor coupling rather than more aggressive PnP filtering.
+
+Initial PnP sweeps on 2026-05-22 used the best static calibration candidate
+from the previous sweep (`translation_scale=0.095`, `camera_bf_scale=1.05`,
+`camera_f_scale=0.98`, `base_from_camera=(-0.15,-0.55,0)`). A moderate sweep
+over reprojection error `2/3/4 px`, min inlier ratio `0.25/0.65`, and max step
+`0.02/2.0 m` did not improve beyond `0.1139 m`. A stricter ratio sweep found a
+small improvement:
+
+| reproj px | min ratio | max step m | Accepted | Rejected | RMSE m | Gap to AQUA-SLAM |
+|----------:|----------:|-----------:|---------:|---------:|-------:|-----------------:|
+| 4.0 | 0.85 | 0.02 | 97.3% | 6 | 0.1128 | 5.81x |
+| 3.0 | 0.85 | 0.02 | 87.5% | 28 | 0.1214 | 6.26x |
+| 4.0 | 0.90 | 0.02 | 74.6% | 57 | 0.1433 | 7.39x |
+
+This says PnP gate tightening can remove a few bad updates, but it is not the
+main gap to AQUA-SLAM. Very strict inlier-ratio gates reject too many frames
+and make the trajectory worse. The next likely win is adding a motion prior or
+multi-sensor coupling so rejected visual steps can be bridged instead of simply
+dropped.
+
 When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
 The bag replay mode also saves `*_visual_frontend_status.csv`, which contains

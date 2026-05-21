@@ -87,6 +87,12 @@ def build_visual_command(args) -> list[str]:
         ros_param("matching.max_temporal_descriptor_distance", args.max_temporal_descriptor_distance)
     )
     command.extend(ros_param("tracking.translation_scale", args.translation_scale))
+    command.extend(ros_param("tracking.min_pnp_inliers", args.min_pnp_inliers))
+    command.extend(ros_param("tracking.min_inlier_ratio", args.min_inlier_ratio))
+    command.extend(ros_param("tracking.ransac_iterations", args.ransac_iterations))
+    command.extend(ros_param("tracking.ransac_reprojection_error_px", args.ransac_reprojection_error_px))
+    command.extend(ros_param("tracking.ransac_confidence", args.ransac_confidence))
+    command.extend(ros_param("tracking.max_step_translation_m", args.max_step_translation_m))
     command.extend(ros_param("topics.odometry", args.odom_topic))
     command.extend(ros_param("orb.n_features", args.orb_n_features))
     command.extend(ros_param("orb.fast_threshold", args.orb_fast_threshold))
@@ -295,6 +301,12 @@ def parse_args(argv):
         help="Optional visual frontend diagnostics CSV. Defaults under --out-dir when --bag is used.",
     )
     parser.add_argument("--translation-scale", type=float, default=1.0)
+    parser.add_argument("--min-pnp-inliers", type=int, default=12)
+    parser.add_argument("--min-inlier-ratio", type=float, default=0.25)
+    parser.add_argument("--ransac-iterations", type=int, default=100)
+    parser.add_argument("--ransac-reprojection-error-px", type=float, default=3.0)
+    parser.add_argument("--ransac-confidence", type=float, default=0.99)
+    parser.add_argument("--max-step-translation-m", type=float, default=2.0)
     parser.add_argument("--drift-window-s", type=float, default=3.0)
     parser.add_argument("--drift-stride-s", type=float, default=1.0)
     parser.add_argument("--drift-min-samples", type=int, default=20)
@@ -343,6 +355,18 @@ def main(argv=None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     if args.translation_scale <= 0.0:
         raise ValueError("--translation-scale must be positive")
+    if args.min_pnp_inliers < 0:
+        raise ValueError("--min-pnp-inliers must be non-negative")
+    if not 0.0 <= args.min_inlier_ratio <= 1.0:
+        raise ValueError("--min-inlier-ratio must be in [0, 1]")
+    if args.ransac_iterations <= 0:
+        raise ValueError("--ransac-iterations must be positive")
+    if args.ransac_reprojection_error_px <= 0.0:
+        raise ValueError("--ransac-reprojection-error-px must be positive")
+    if not 0.0 < args.ransac_confidence < 1.0:
+        raise ValueError("--ransac-confidence must be in (0, 1)")
+    if args.max_step_translation_m <= 0.0:
+        raise ValueError("--max-step-translation-m must be positive")
     if args.play_rate <= 0.0:
         raise ValueError("--play-rate must be positive")
     if args.start_offset_s is not None and args.start_offset_s < 0.0:

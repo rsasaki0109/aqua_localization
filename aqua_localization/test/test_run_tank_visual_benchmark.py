@@ -61,6 +61,12 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
         "--reference", "/tmp/ref.tum",
         "--out-dir", str(tmp_path),
         "--translation-scale", "0.25",
+        "--min-pnp-inliers", "20",
+        "--min-inlier-ratio", "0.6",
+        "--ransac-iterations", "200",
+        "--ransac-reprojection-error-px", "2.5",
+        "--ransac-confidence", "0.995",
+        "--max-step-translation-m", "0.05",
         "--max-stereo-descriptor-distance", "80",
         "--max-temporal-descriptor-distance", "72",
         "--orb-n-features", "700",
@@ -82,6 +88,12 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
     bag_command = module.build_bag_play_command(args)
 
     assert "tracking.translation_scale:=0.25" in visual_command
+    assert "tracking.min_pnp_inliers:=20" in visual_command
+    assert "tracking.min_inlier_ratio:=0.6" in visual_command
+    assert "tracking.ransac_iterations:=200" in visual_command
+    assert "tracking.ransac_reprojection_error_px:=2.5" in visual_command
+    assert "tracking.ransac_confidence:=0.995" in visual_command
+    assert "tracking.max_step_translation_m:=0.05" in visual_command
     assert "matching.max_stereo_descriptor_distance:=80.0" in visual_command
     assert "matching.max_temporal_descriptor_distance:=72.0" in visual_command
     assert "orb.n_features:=700" in visual_command
@@ -244,3 +256,7 @@ def test_rejects_invalid_visual_speed_options():
         ])
     with pytest.raises(ValueError, match="opencv-threads"):
         module.main(["--bag", "/tmp/bag", "--reference", "/tmp/ref.tum", "--opencv-threads", "-1"])
+    with pytest.raises(ValueError, match="min-inlier-ratio"):
+        module.main(["--bag", "/tmp/bag", "--reference", "/tmp/ref.tum", "--min-inlier-ratio", "1.2"])
+    with pytest.raises(ValueError, match="ransac-confidence"):
+        module.main(["--bag", "/tmp/bag", "--reference", "/tmp/ref.tum", "--ransac-confidence", "1.0"])

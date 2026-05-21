@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Sweep Tank direct-visual calibration parameters on a fixed replay window."""
+"""Sweep Tank direct-visual PnP/RANSAC quality gates on a fixed window."""
 
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from dataclasses import dataclass
 import itertools
 import math
@@ -18,46 +19,53 @@ import summarize_visual_frontend_status
 
 
 @dataclass(frozen=True)
-class CalibrationCase:
-    translation_scale: float
-    camera_bf_scale: float
-    camera_f_scale: float
-    base_x_m: float
-    base_y_m: float
+class PnpCase:
+    reprojection_error_px: float
+    min_inlier_ratio: float
+    max_step_translation_m: float
+    min_pnp_inliers: int
+    ransac_iterations: int
+    ransac_confidence: float
 
     @property
     def label(self) -> str:
         parts = [
-            ("scale", self.translation_scale),
-            ("bf", self.camera_bf_scale),
-            ("f", self.camera_f_scale),
-            ("x", self.base_x_m),
-            ("y", self.base_y_m),
+            ("repr", self.reprojection_error_px),
+            ("ratio", self.min_inlier_ratio),
+            ("step", self.max_step_translation_m),
+            ("inl", float(self.min_pnp_inliers)),
+            ("iter", float(self.ransac_iterations)),
+            ("conf", self.ransac_confidence),
         ]
         return "__".join(f"{name}_{format_label_number(value)}" for name, value in parts)
 
 
 @dataclass(frozen=True)
-class CalibrationResult:
-    case: CalibrationCase
+class PnpSweepResult:
+    case: PnpCase
     sequence: str
     out_dir: Path
-    estimate_tum: Path
-    status_csv: Path
     rmse_m: float
     matched_seconds: float
     samples: int
-    sim3_scale: float
     accepted_ratio: float
-    median_pnp_inliers: float
-    median_temporal_matches: float
-    processed_frames: int
-    accepted_frames: int
     rejected_frames: int
+    dominant_rejection: str
+    median_pnp_inliers: float
+    median_inlier_ratio: float
+    median_temporal_matches: float
+    error: str = ""
 
 
 def parse_float_list(value: str) -> list[float]:
     values = [float(part.strip()) for part in value.split(",") if part.strip()]
+    if not values:
+        raise ValueError("candidate list is empty")
+    return values
+
+
+def parse_int_list(value: str) -> list[int]:
+    values = [int(part.strip()) for part in value.split(",") if part.strip()]
     if not values:
         raise ValueError("candidate list is empty")
     return values
@@ -97,26 +105,28 @@ def improvement_to_tie_percent(rmse_m: float, baseline_rmse_m: float) -> float:
     return max(0.0, (1.0 - baseline_rmse_m / rmse_m) * 100.0)
 
 
-def build_cases(args) -> list[CalibrationCase]:
+def build_cases(args) -> list[PnpCase]:
     cases = [
-        CalibrationCase(scale, bf_scale, f_scale, base_x, base_y)
-        for scale, bf_scale, f_scale, base_x, base_y in itertools.product(
-            parse_float_list(args.translation_scales),
-            parse_float_list(args.camera_bf_scales),
-            parse_float_list(args.camera_f_scales),
-            parse_float_list(args.base_from_camera_x_m),
-            parse_float_list(args.base_from_camera_y_m),
+        PnpCase(reproj, ratio, step, min_inliers, iterations, confidence)
+        for reproj, ratio, step, min_inliers, iterations, confidence in itertools.product(
+            parse_float_list(args.reprojection_errors_px),
+            parse_float_list(args.min_inlier_ratios),
+            parse_float_list(args.max_step_translation_m),
+            parse_int_list(args.min_pnp_inliers),
+            parse_int_list(args.ransac_iterations),
+            parse_float_list(args.ransac_confidences),
         )
     ]
     seen = set()
     unique = []
     for case in cases:
         key = (
-            case.translation_scale,
-            case.camera_bf_scale,
-            case.camera_f_scale,
-            case.base_x_m,
-            case.base_y_m,
+            case.reprojection_error_px,
+            case.min_inlier_ratio,
+            case.max_step_translation_m,
+            case.min_pnp_inliers,
+            case.ransac_iterations,
+            case.ransac_confidence,
         )
         if key in seen:
             continue
@@ -125,7 +135,7 @@ def build_cases(args) -> list[CalibrationCase]:
     return unique
 
 
-def case_args(args, case: CalibrationCase, sequence: str, out_dir: Path):
+def case_args(args, case: PnpCase, sequence: str, out_dir: Path):
     return SimpleNamespace(
         bag=args.bag,
         reference=args.reference,
@@ -140,20 +150,26 @@ def case_args(args, case: CalibrationCase, sequence: str, out_dir: Path):
         duration_s=args.duration_s,
         start_stamp_s=args.start_stamp_s,
         end_stamp_s=args.end_stamp_s,
-        translation_scale=case.translation_scale,
+        translation_scale=args.translation_scale,
+        min_pnp_inliers=case.min_pnp_inliers,
+        min_inlier_ratio=case.min_inlier_ratio,
+        ransac_iterations=case.ransac_iterations,
+        ransac_reprojection_error_px=case.reprojection_error_px,
+        ransac_confidence=case.ransac_confidence,
+        max_step_translation_m=case.max_step_translation_m,
         drift_window_s=args.drift_window_s,
         drift_stride_s=args.drift_stride_s,
         drift_min_samples=args.drift_min_samples,
         segment_s=args.segment_s,
         segment_stride_s=args.segment_stride_s,
         segment_min_reference_motion_m=args.segment_min_reference_motion_m,
-        camera_fx=args.camera_fx * case.camera_f_scale,
-        camera_fy=args.camera_fy * case.camera_f_scale,
+        camera_fx=args.camera_fx,
+        camera_fy=args.camera_fy,
         camera_cx=args.camera_cx,
         camera_cy=args.camera_cy,
-        camera_bf=args.camera_bf * case.camera_bf_scale,
-        base_from_camera_x_m=case.base_x_m,
-        base_from_camera_y_m=case.base_y_m,
+        camera_bf=args.camera_bf,
+        base_from_camera_x_m=args.base_from_camera_x_m,
+        base_from_camera_y_m=args.base_from_camera_y_m,
         base_from_camera_z_m=args.base_from_camera_z_m,
         base_from_camera_roll_rad=args.base_from_camera_roll_rad,
         base_from_camera_pitch_rad=args.base_from_camera_pitch_rad,
@@ -161,12 +177,6 @@ def case_args(args, case: CalibrationCase, sequence: str, out_dir: Path):
         publish_base_pose=args.publish_base_pose,
         max_stereo_descriptor_distance=args.max_stereo_descriptor_distance,
         max_temporal_descriptor_distance=args.max_temporal_descriptor_distance,
-        min_pnp_inliers=args.min_pnp_inliers,
-        min_inlier_ratio=args.min_inlier_ratio,
-        ransac_iterations=args.ransac_iterations,
-        ransac_reprojection_error_px=args.ransac_reprojection_error_px,
-        ransac_confidence=args.ransac_confidence,
-        max_step_translation_m=args.max_step_translation_m,
         orb_n_features=args.orb_n_features,
         orb_fast_threshold=args.orb_fast_threshold,
         opencv_threads=args.opencv_threads,
@@ -175,55 +185,67 @@ def case_args(args, case: CalibrationCase, sequence: str, out_dir: Path):
     )
 
 
-def load_status_metrics(status_csv: Path) -> tuple[float, float, float]:
+def status_metrics(status_csv: Path) -> tuple[float, int, str, float, float, float]:
     if not status_csv.exists():
-        return math.nan, math.nan, math.nan
-    summary = summarize_visual_frontend_status.summarize(
-        summarize_visual_frontend_status.read_csv(status_csv)
-    )
+        return math.nan, 0, "missing status", math.nan, math.nan, math.nan
+    samples = summarize_visual_frontend_status.read_csv(status_csv)
+    summary = summarize_visual_frontend_status.summarize(samples)
     moving = summary["moving_numeric"]
+    rejections: Counter = summary["rejection_counts"]
+    dominant = rejections.most_common(1)[0][0] if rejections else "none"
     return (
         float(summary["acceptance_ratio"]),
+        int(summary["rejected"]),
+        dominant,
         float(moving["pnp_inliers"]["median"]),
+        float(moving["inlier_ratio"]["median"]),
         float(moving["temporal_matches"]["median"]),
     )
 
 
-def evaluate_case(args, case: CalibrationCase, sequence: str, out_dir: Path) -> CalibrationResult:
+def evaluate_case(args, case: PnpCase, sequence: str, out_dir: Path) -> PnpSweepResult:
     current_args = case_args(args, case, sequence, out_dir)
     paths = run_tank_visual_benchmark.default_paths(out_dir, sequence)
     current_args.status_csv = paths.status_csv
-    result = run_tank_visual_direct_benchmark.run_direct(current_args, paths)
-    run_tank_visual_benchmark.evaluate(current_args, paths.estimate_tum, paths)
-    stats, _ = compare_trajectories.compare(
-        args.reference, paths.estimate_tum, with_scale=False, no_align=False
-    )
-    sim3_stats, _ = compare_trajectories.compare(
-        args.reference, paths.estimate_tum, with_scale=True, no_align=False
-    )
-    accepted_ratio, median_pnp_inliers, median_temporal_matches = load_status_metrics(
-        paths.status_csv
-    )
-    return CalibrationResult(
+    run_tank_visual_direct_benchmark.run_direct(current_args, paths)
+    error = ""
+    try:
+        stats, _ = compare_trajectories.compare(
+            args.reference, paths.estimate_tum, with_scale=False, no_align=False
+        )
+    except Exception as exc:
+        error = str(exc)
+        stats = {"rmse": math.nan, "matched_seconds": math.nan, "count": 0}
+    try:
+        run_tank_visual_benchmark.evaluate(current_args, paths.estimate_tum, paths)
+    except Exception as exc:
+        error = str(exc)
+    (
+        accepted_ratio,
+        rejected_frames,
+        dominant_rejection,
+        median_pnp_inliers,
+        median_inlier_ratio,
+        median_temporal_matches,
+    ) = status_metrics(paths.status_csv)
+    return PnpSweepResult(
         case=case,
         sequence=sequence,
         out_dir=out_dir,
-        estimate_tum=paths.estimate_tum,
-        status_csv=paths.status_csv,
         rmse_m=float(stats["rmse"]),
         matched_seconds=float(stats["matched_seconds"]),
         samples=int(stats["count"]),
-        sim3_scale=float(sim3_stats["alignment"]["scale"]),
         accepted_ratio=accepted_ratio,
+        rejected_frames=rejected_frames,
+        dominant_rejection=dominant_rejection,
         median_pnp_inliers=median_pnp_inliers,
+        median_inlier_ratio=median_inlier_ratio,
         median_temporal_matches=median_temporal_matches,
-        processed_frames=result.processed_frames,
-        accepted_frames=result.accepted,
-        rejected_frames=result.rejected,
+        error=error,
     )
 
 
-def run_sweep(args) -> list[CalibrationResult]:
+def run_sweep(args) -> list[PnpSweepResult]:
     args.out_dir.mkdir(parents=True, exist_ok=True)
     results = []
     for case in build_cases(args):
@@ -237,74 +259,58 @@ def has_baseline(args) -> bool:
     return math.isfinite(float(getattr(args, "baseline_rmse_m", math.nan)))
 
 
-def format_markdown(results: list[CalibrationResult], args) -> str:
-    best = min(results, key=lambda result: result.rmse_m) if results else None
+def format_markdown(results: list[PnpSweepResult], args) -> str:
+    valid = [result for result in results if not result.error and math.isfinite(result.rmse_m)]
+    best = min(valid, key=lambda result: result.rmse_m) if valid else None
     include_baseline = has_baseline(args)
-    header = [
-        "scale",
-        "bf x",
-        "f x",
-        "base x",
-        "base y",
-        "Status",
-        "RMSE m",
-    ]
-    separator = [
-        "-----:",
-        "----:",
-        "---:",
-        "------:",
-        "------:",
-        "--------",
-        "-------:",
-    ]
+    header = ["reproj px", "min ratio", "max step", "min inl", "iters", "conf", "Status", "RMSE m"]
+    separator = ["---------:", "---------:", "--------:", "-------:", "-----:", "----:", "--------", "-------:"]
     if include_baseline:
         header.extend(["Gap x", "Improvement to tie"])
         separator.extend(["------:", "-------------------:"])
     header.extend([
         "Matched s",
         "Samples",
-        "Sim(3) scale",
-        "Processed",
         "Accepted",
-        "Median PnP inliers",
-        "Median temporal matches",
+        "Rejected",
+        "Reject reason",
+        "Median inliers",
+        "Median ratio",
+        "Median matches",
         "Output",
     ])
     separator.extend([
         "----------:",
         "--------:",
+        "---------:",
+        "---------:",
+        "-------------",
+        "--------------:",
         "------------:",
-        "---------:",
-        "---------:",
-        "-------------------:",
-        "------------------------:",
+        "-------------:",
         "--------",
     ])
     lines = [
-        "# Tank Visual Calibration Sweep",
+        "# Tank Visual PnP Quality Sweep",
         "",
         f"Sequence: `{args.sequence}`",
         f"Reference: `{args.reference}`",
         f"Window: start offset `{args.start_offset_s}` s, duration `{args.duration_s}` s",
-        f"Camera base fx/fy/bf: `{args.camera_fx:g}` / `{args.camera_fy:g}` / `{args.camera_bf:g}`",
+        f"Translation scale: `{args.translation_scale:g}`",
     ]
     if include_baseline:
         lines.append(f"Baseline RMSE: `{args.baseline_rmse_m:g}` m")
-    lines.extend([
-        "",
-        "| " + " | ".join(header) + " |",
-        "| " + " | ".join(separator) + " |",
-    ])
+    lines.extend(["", "| " + " | ".join(header) + " |", "| " + " | ".join(separator) + " |"])
     for result in results:
         c = result.case
-        marker = "best" if best is result else "ok"
+        marker = "failed" if result.error else "best" if best is result else "ok"
         cells = [
-            format_float(c.translation_scale, 6),
-            format_float(c.camera_bf_scale, 4),
-            format_float(c.camera_f_scale, 4),
-            format_float(c.base_x_m, 3),
-            format_float(c.base_y_m, 3),
+            format_float(c.reprojection_error_px, 2),
+            format_float(c.min_inlier_ratio, 2),
+            format_float(c.max_step_translation_m, 3),
+            str(c.min_pnp_inliers),
+            str(c.ransac_iterations),
+            format_float(c.ransac_confidence, 3),
             marker,
             format_float(result.rmse_m),
         ]
@@ -316,10 +322,11 @@ def format_markdown(results: list[CalibrationResult], args) -> str:
         cells.extend([
             format_float(result.matched_seconds, 2),
             str(result.samples),
-            format_float(result.sim3_scale, 6),
-            str(result.processed_frames),
             format_percent(result.accepted_ratio),
+            str(result.rejected_frames),
+            result.dominant_rejection,
             format_float(result.median_pnp_inliers, 1),
+            format_float(result.median_inlier_ratio, 3),
             format_float(result.median_temporal_matches, 1),
             f"`{result.out_dir}`",
         ])
@@ -333,11 +340,12 @@ def format_markdown(results: list[CalibrationResult], args) -> str:
             "",
             (
                 f"Best RMSE: `{format_float(best.rmse_m)}` m with "
-                f"`translation_scale={format_float(c.translation_scale, 9)}`, "
-                f"`camera_bf_scale={format_float(c.camera_bf_scale, 6)}`, "
-                f"`camera_f_scale={format_float(c.camera_f_scale, 6)}`, "
-                f"`base_from_camera=({format_float(c.base_x_m, 3)}, "
-                f"{format_float(c.base_y_m, 3)}, {format_float(args.base_from_camera_z_m, 3)})`."
+                f"`reprojection_error={format_float(c.reprojection_error_px, 2)}px`, "
+                f"`min_inlier_ratio={format_float(c.min_inlier_ratio, 2)}`, "
+                f"`max_step_translation={format_float(c.max_step_translation_m, 3)}m`, "
+                f"`min_pnp_inliers={c.min_pnp_inliers}`, "
+                f"`ransac_iterations={c.ransac_iterations}`, "
+                f"`ransac_confidence={format_float(c.ransac_confidence, 3)}`."
             ),
         ])
         if include_baseline:
@@ -351,28 +359,28 @@ def format_markdown(results: list[CalibrationResult], args) -> str:
     return "\n".join(lines)
 
 
-def write_results_csv(path: Path, results: list[CalibrationResult], args) -> None:
+def write_results_csv(path: Path, results: list[PnpSweepResult], args) -> None:
     import csv
 
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
-        "translation_scale",
-        "camera_bf_scale",
-        "camera_f_scale",
-        "camera_fx",
-        "camera_fy",
-        "camera_bf",
-        "base_from_camera_x_m",
-        "base_from_camera_y_m",
+        "reprojection_error_px",
+        "min_inlier_ratio",
+        "max_step_translation_m",
+        "min_pnp_inliers",
+        "ransac_iterations",
+        "ransac_confidence",
         "rmse_m",
         "gap_to_baseline",
         "matched_seconds",
         "samples",
-        "sim3_scale",
-        "processed_frames",
         "accepted_ratio",
+        "rejected_frames",
+        "dominant_rejection",
         "median_pnp_inliers",
+        "median_inlier_ratio",
         "median_temporal_matches",
+        "error",
         "out_dir",
     ]
     with path.open("w", newline="", encoding="utf-8") as fp:
@@ -381,34 +389,34 @@ def write_results_csv(path: Path, results: list[CalibrationResult], args) -> Non
         for result in results:
             c = result.case
             writer.writerow({
-                "translation_scale": c.translation_scale,
-                "camera_bf_scale": c.camera_bf_scale,
-                "camera_f_scale": c.camera_f_scale,
-                "camera_fx": args.camera_fx * c.camera_f_scale,
-                "camera_fy": args.camera_fy * c.camera_f_scale,
-                "camera_bf": args.camera_bf * c.camera_bf_scale,
-                "base_from_camera_x_m": c.base_x_m,
-                "base_from_camera_y_m": c.base_y_m,
+                "reprojection_error_px": c.reprojection_error_px,
+                "min_inlier_ratio": c.min_inlier_ratio,
+                "max_step_translation_m": c.max_step_translation_m,
+                "min_pnp_inliers": c.min_pnp_inliers,
+                "ransac_iterations": c.ransac_iterations,
+                "ransac_confidence": c.ransac_confidence,
                 "rmse_m": result.rmse_m,
                 "gap_to_baseline": gap_ratio(result.rmse_m, args.baseline_rmse_m),
                 "matched_seconds": result.matched_seconds,
                 "samples": result.samples,
-                "sim3_scale": result.sim3_scale,
-                "processed_frames": result.processed_frames,
                 "accepted_ratio": result.accepted_ratio,
+                "rejected_frames": result.rejected_frames,
+                "dominant_rejection": result.dominant_rejection,
                 "median_pnp_inliers": result.median_pnp_inliers,
+                "median_inlier_ratio": result.median_inlier_ratio,
                 "median_temporal_matches": result.median_temporal_matches,
+                "error": result.error,
                 "out_dir": str(result.out_dir),
             })
 
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(
-        description="Sweep direct Tank visual calibration parameters on a fixed window."
+        description="Sweep direct Tank visual PnP/RANSAC quality gates on a fixed window."
     )
     parser.add_argument("--bag", required=True, type=Path)
     parser.add_argument("--reference", required=True, type=Path)
-    parser.add_argument("--out-dir", type=Path, default=Path("/tmp/aqua_tank_visual_calibration_sweep"))
+    parser.add_argument("--out-dir", type=Path, default=Path("/tmp/aqua_tank_visual_pnp_sweep"))
     parser.add_argument("--summary-out", type=Path, default=None)
     parser.add_argument("--csv-out", type=Path, default=None)
     parser.add_argument("--dataset", default="Tank Dataset")
@@ -421,9 +429,13 @@ def parse_args(argv):
     parser.add_argument("--duration-s", type=float, default=11.25)
     parser.add_argument("--start-stamp-s", type=float, default=None)
     parser.add_argument("--end-stamp-s", type=float, default=None)
-    parser.add_argument("--translation-scales", default="0.08,0.095,0.105024091,0.115,0.13")
-    parser.add_argument("--camera-bf-scales", default="1.0")
-    parser.add_argument("--camera-f-scales", default="1.0")
+    parser.add_argument("--translation-scale", type=float, default=0.095)
+    parser.add_argument("--reprojection-errors-px", default="2,3,4,6")
+    parser.add_argument("--min-inlier-ratios", default="0.25,0.5,0.65,0.8")
+    parser.add_argument("--max-step-translation-m", default="0.02,0.05,0.1,2.0")
+    parser.add_argument("--min-pnp-inliers", default="12")
+    parser.add_argument("--ransac-iterations", default="100")
+    parser.add_argument("--ransac-confidences", default="0.99")
     parser.add_argument("--baseline-rmse-m", type=float, default=math.nan)
     parser.add_argument("--drift-window-s", type=float, default=3.0)
     parser.add_argument("--drift-stride-s", type=float, default=1.0)
@@ -436,8 +448,8 @@ def parse_args(argv):
     parser.add_argument("--camera-cx", type=float, default=run_tank_visual_benchmark.DEFAULT_CX)
     parser.add_argument("--camera-cy", type=float, default=run_tank_visual_benchmark.DEFAULT_CY)
     parser.add_argument("--camera-bf", type=float, default=run_tank_visual_benchmark.DEFAULT_BF)
-    parser.add_argument("--base-from-camera-x-m", default="-0.25")
-    parser.add_argument("--base-from-camera-y-m", default="-0.45")
+    parser.add_argument("--base-from-camera-x-m", type=float, default=-0.25)
+    parser.add_argument("--base-from-camera-y-m", type=float, default=-0.45)
     parser.add_argument("--base-from-camera-z-m", type=float, default=0.0)
     parser.add_argument("--base-from-camera-roll-rad", type=float, default=0.0)
     parser.add_argument("--base-from-camera-pitch-rad", type=float, default=0.0)
@@ -445,12 +457,6 @@ def parse_args(argv):
     parser.add_argument("--publish-base-pose", action="store_true")
     parser.add_argument("--max-stereo-descriptor-distance", type=float, default=64.0)
     parser.add_argument("--max-temporal-descriptor-distance", type=float, default=64.0)
-    parser.add_argument("--min-pnp-inliers", type=int, default=12)
-    parser.add_argument("--min-inlier-ratio", type=float, default=0.25)
-    parser.add_argument("--ransac-iterations", type=int, default=100)
-    parser.add_argument("--ransac-reprojection-error-px", type=float, default=3.0)
-    parser.add_argument("--ransac-confidence", type=float, default=0.99)
-    parser.add_argument("--max-step-translation-m", type=float, default=2.0)
     parser.add_argument("--orb-n-features", type=int, default=700)
     parser.add_argument("--orb-fast-threshold", type=int, default=16)
     parser.add_argument("--opencv-threads", type=int, default=2)
@@ -460,45 +466,40 @@ def parse_args(argv):
 
 
 def validate_args(args) -> None:
+    if args.translation_scale <= 0.0:
+        raise ValueError("--translation-scale must be positive")
     if args.sync_slop_s < 0.0:
         raise ValueError("--sync-slop-s must be non-negative")
     if args.start_offset_s is not None and args.start_offset_s < 0.0:
         raise ValueError("--start-offset-s must be non-negative")
     if args.duration_s is not None and args.duration_s <= 0.0:
         raise ValueError("--duration-s must be positive")
-    if args.camera_fx <= 0.0 or args.camera_fy <= 0.0:
-        raise ValueError("--camera-fx and --camera-fy must be positive")
-    if args.camera_bf <= 0.0:
-        raise ValueError("--camera-bf must be positive")
     if args.orb_n_features <= 0:
         raise ValueError("--orb-n-features must be positive")
-    if args.min_pnp_inliers < 0:
-        raise ValueError("--min-pnp-inliers must be non-negative")
-    if not 0.0 <= args.min_inlier_ratio <= 1.0:
-        raise ValueError("--min-inlier-ratio must be in [0, 1]")
-    if args.ransac_iterations <= 0:
-        raise ValueError("--ransac-iterations must be positive")
-    if args.ransac_reprojection_error_px <= 0.0:
-        raise ValueError("--ransac-reprojection-error-px must be positive")
-    if not 0.0 < args.ransac_confidence < 1.0:
-        raise ValueError("--ransac-confidence must be in (0, 1)")
-    if args.max_step_translation_m <= 0.0:
-        raise ValueError("--max-step-translation-m must be positive")
     if args.orb_fast_threshold < 0:
         raise ValueError("--orb-fast-threshold must be non-negative")
     if args.opencv_threads < 0:
         raise ValueError("--opencv-threads must be non-negative")
     if math.isfinite(args.baseline_rmse_m) and args.baseline_rmse_m <= 0.0:
         raise ValueError("--baseline-rmse-m must be positive")
-    for scale in parse_float_list(args.translation_scales):
-        if scale <= 0.0:
-            raise ValueError("--translation-scales values must be positive")
-    for scale in parse_float_list(args.camera_bf_scales):
-        if scale <= 0.0:
-            raise ValueError("--camera-bf-scales values must be positive")
-    for scale in parse_float_list(args.camera_f_scales):
-        if scale <= 0.0:
-            raise ValueError("--camera-f-scales values must be positive")
+    for value in parse_float_list(args.reprojection_errors_px):
+        if value <= 0.0:
+            raise ValueError("--reprojection-errors-px values must be positive")
+    for value in parse_float_list(args.min_inlier_ratios):
+        if not 0.0 <= value <= 1.0:
+            raise ValueError("--min-inlier-ratios values must be in [0, 1]")
+    for value in parse_float_list(args.max_step_translation_m):
+        if value <= 0.0:
+            raise ValueError("--max-step-translation-m values must be positive")
+    for value in parse_int_list(args.min_pnp_inliers):
+        if value < 0:
+            raise ValueError("--min-pnp-inliers values must be non-negative")
+    for value in parse_int_list(args.ransac_iterations):
+        if value <= 0:
+            raise ValueError("--ransac-iterations values must be positive")
+    for value in parse_float_list(args.ransac_confidences):
+        if not 0.0 < value < 1.0:
+            raise ValueError("--ransac-confidences values must be in (0, 1)")
 
 
 def main(argv=None) -> int:
@@ -506,13 +507,13 @@ def main(argv=None) -> int:
     validate_args(args)
     results = run_sweep(args)
     summary = format_markdown(results, args)
-    summary_out = args.summary_out or (args.out_dir / "visual_calibration_sweep.md")
-    csv_out = args.csv_out or (args.out_dir / "visual_calibration_sweep.csv")
+    summary_out = args.summary_out or (args.out_dir / "visual_pnp_sweep.md")
+    csv_out = args.csv_out or (args.out_dir / "visual_pnp_sweep.csv")
     summary_out.parent.mkdir(parents=True, exist_ok=True)
     summary_out.write_text(summary, encoding="utf-8")
     write_results_csv(csv_out, results, args)
-    print(f"wrote calibration sweep summary: {summary_out}")
-    print(f"wrote calibration sweep csv: {csv_out}")
+    print(f"wrote PnP sweep summary: {summary_out}")
+    print(f"wrote PnP sweep csv: {csv_out}")
     return 0
 
 
