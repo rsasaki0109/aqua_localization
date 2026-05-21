@@ -53,6 +53,8 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
         "0.169623465",
         "--visual-position-variance-floor",
         "0.01",
+        "--visual-max-age-s",
+        "0.25",
         "--base-from-camera-x-m",
         "-0.25",
         "--base-from-camera-y-m",
@@ -84,6 +86,7 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
     assert "/tmp/tank_dataset.yaml" in imu
     assert "topics.visual_odometry:=/visual/fusion/odometry" in imu
     assert "imu.visual.position_variance_floor:=0.01" in imu
+    assert "imu.visual.max_age_s:=0.25" in imu
     assert args.post_play_delay == 2.0
     assert recorder[:3] == ["ros2", "run", "aqua_localization"]
     assert str(paths.fused_tum) in recorder
@@ -204,6 +207,24 @@ def test_rejects_non_positive_visual_variance():
         ])
     except ValueError as exc:
         assert "visual-position-variance-floor" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_rejects_non_positive_visual_max_age():
+    module = load_module()
+
+    try:
+        module.main([
+            "--bag",
+            "/tmp/tank_bag",
+            "--reference",
+            "/tmp/ref.tum",
+            "--visual-max-age-s",
+            "0.0",
+        ])
+    except ValueError as exc:
+        assert "visual-max-age-s" in str(exc)
     else:
         raise AssertionError("expected ValueError")
 

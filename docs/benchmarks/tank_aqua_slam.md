@@ -375,6 +375,34 @@ best fused `aqua_localization+visual` row is `0.1228 m` worse than standalone
 visual. The next accuracy PR should therefore attack visual covariance, timing,
 or coupling rather than another descriptor-only sweep.
 
+Sweep the visual fusion covariance and timing knobs directly:
+
+```bash
+ros2 run aqua_localization run_tank_visual_fusion_sweep.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_fusion_covariance_sweep \
+  --summary-out /tmp/aqua_tank_visual_fusion_covariance_sweep.md \
+  --sequence short_test_visual_fusion_covariance \
+  --translation-scale 0.169623465 \
+  --base-from-camera-x-m -0.25 \
+  --base-from-camera-y-m -0.45 \
+  --max-stereo-descriptor-distance 64 \
+  --max-temporal-descriptor-distance 64 \
+  --orb-n-features 700 \
+  --orb-fast-threshold 16 \
+  --opencv-threads 2 \
+  --expected-visual-frames 300 \
+  --baseline-rmse-m 0.0194 \
+  --standalone-visual-rmse-m 0.0947 \
+  --pairs 0.005:0.1,0.01:0.25,0.02:0.5,0.04:1.0
+```
+
+The sweep assigns unique visual and fused odometry topics per case, so repeated
+bag replays do not mix stale publishers into the recorder. Use the
+`Delta vs standalone` column as the regression target: the fused result should
+move toward `0.0000 m` before claiming visual+DVL progress toward AQUA-SLAM.
+
 Before updating the head-to-head table after a matching change, run the visual
 matching sweep so the selected ORB descriptor-distance gates are evidence-based:
 
