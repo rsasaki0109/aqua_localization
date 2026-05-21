@@ -16,12 +16,15 @@ measured loop counts yet.
 
 ## Reproducible Run
 
+First acquire and convert the source bag using
+[`datasets/mbes_slam_beach_pond_acquisition.md`](../../datasets/mbes_slam_beach_pond_acquisition.md).
+
 Check that the local `beach_pond` bag has the required MBES, reference odometry,
 and IMU topics before launching a benchmark run:
 
 ```bash
 ros2 run aqua_localization check_mbes_benchmark_ready.py \
-  --bag /path/to/beach_pond_ros2 \
+  --bag datasets/public/mbes_slam/beach_pond_ros2 \
   --out /tmp/mbes_beach_pond_readiness.md \
   --min-duration-s 60
 ```
@@ -29,7 +32,8 @@ ros2 run aqua_localization check_mbes_benchmark_ready.py \
 Record a results-included replay bag with loop diagnostics:
 
 ```bash
-MBES_SRC=/path/to/beach_pond_ros2 \
+WORKSPACE=$PWD \
+MBES_SRC=$PWD/datasets/public/mbes_slam/beach_pond_ros2 \
 MBES_OUT=/tmp/aqua_mbes_beach_pond_with_loop_status \
 MBES_DURATION=120 \
 ./aqua_localization/scripts/record_mbes_demo.sh

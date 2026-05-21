@@ -96,20 +96,24 @@ def test_check_ready_fails_when_measured_command_missing(tmp_path):
     assert failures == ["tank-short-test: measured/ready case has no command"]
 
 
-def test_doc_artifact_check_only_requires_docs_paths(tmp_path):
+def test_repo_artifact_check_requires_docs_and_dataset_paths(tmp_path):
     module = load_module()
     manifest = sample_manifest()
     manifest["cases"][0]["artifacts"] = [
         "docs/benchmarks/tank_aqua_slam.md",
+        "datasets/mbes_slam_beach_pond_acquisition.md",
         "visual frontend status CSV",
     ]
     path = tmp_path / "manifest.json"
     doc = tmp_path / "docs" / "benchmarks" / "tank_aqua_slam.md"
     doc.parent.mkdir(parents=True)
     doc.write_text("# Tank", encoding="utf-8")
+    dataset_doc = tmp_path / "datasets" / "mbes_slam_beach_pond_acquisition.md"
+    dataset_doc.parent.mkdir(parents=True)
+    dataset_doc.write_text("# MBES", encoding="utf-8")
     path.write_text(json.dumps(manifest), encoding="utf-8")
 
-    failures = module.doc_artifact_failures(module.load_manifest(path), tmp_path)
+    failures = module.repo_artifact_failures(module.load_manifest(path), tmp_path)
 
     assert failures == []
 
@@ -121,9 +125,9 @@ def test_doc_artifact_check_reports_missing_docs_path(tmp_path):
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
 
-    failures = module.doc_artifact_failures(module.load_manifest(path), tmp_path)
+    failures = module.repo_artifact_failures(module.load_manifest(path), tmp_path)
 
-    assert failures == ["tank-short-test: missing documented artifact docs/benchmarks/missing.md"]
+    assert failures == ["tank-short-test: missing repository artifact docs/benchmarks/missing.md"]
 
 
 def test_cli_writes_filtered_report(tmp_path):
