@@ -15,6 +15,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "DRY_RUN": "1",
             "WORKSPACE": str(tmp_path),
             "MBES_SRC": str(tmp_path / "beach_pond_ros2"),
+            "MBES_PREPARE_HUMBLE_METADATA": "1",
             "MBES_OUT": str(tmp_path / "recorded"),
             "MBES_DURATION": "42",
             "OUT_DIR": str(tmp_path / "out"),
@@ -39,6 +40,9 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     )
 
     assert "check_mbes_benchmark_ready.py" in proc.stdout
+    assert "prepare_rosbag2_humble_metadata.py" in proc.stdout
+    assert "rosbags-convert" in proc.stdout
+    assert "--dst-storage sqlite3" in proc.stdout
     assert "record_mbes_demo.sh" in proc.stdout
     assert "export_mbes_loop_status.py" in proc.stdout
     assert "mbes_loop_benchmark_row.py" in proc.stdout
@@ -52,6 +56,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "POSE_GRAPH_KEYFRAME_TRANSLATION_M=1.0" in proc.stdout
     assert "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4" in proc.stdout
     assert "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0" in proc.stdout
+    assert f"MBES_SRC={tmp_path / 'out/mbes_source_humble_sqlite'}" in proc.stdout
     assert "PLAY_TOPIC_ARGS=--topics\\ /norbit/detections" in proc.stdout
     assert "--max-rotation-rad 0.4" in proc.stdout
     assert "--descriptor-extent-warn 5.0" in proc.stdout
