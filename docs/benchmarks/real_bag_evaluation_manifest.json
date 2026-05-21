@@ -63,6 +63,7 @@
       "artifacts": [
         "datasets/mbes_slam_beach_pond_acquisition.md",
         "docs/benchmarks/mbes_beach_pond_loop_status.md",
+        "run_mbes_loop_benchmark.sh",
         "readiness report",
         "rerun export",
         "RViz loop markers",
