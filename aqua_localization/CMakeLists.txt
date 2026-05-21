@@ -19,6 +19,7 @@ install(PROGRAMS
   scripts/trajectory_benchmark_row.py
   scripts/ingest_external_tum_result.py
   scripts/check_3dgs_bag_ready.py
+  scripts/check_3dgs_training_ready.py
   scripts/export_3dgs_manifest.py
   scripts/export_3dgs_dataset_pack.py
   scripts/export_3dgs_frames.py
@@ -69,6 +70,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_trajectory_benchmark_row test/test_trajectory_benchmark_row.py)
   ament_add_pytest_test(test_ingest_external_tum_result test/test_ingest_external_tum_result.py)
   ament_add_pytest_test(test_check_3dgs_bag_ready test/test_check_3dgs_bag_ready.py)
+  ament_add_pytest_test(test_check_3dgs_training_ready test/test_check_3dgs_training_ready.py)
   ament_add_pytest_test(test_export_3dgs_manifest test/test_export_3dgs_manifest.py)
   ament_add_pytest_test(test_export_3dgs_dataset_pack test/test_export_3dgs_dataset_pack.py)
   ament_add_pytest_test(test_export_3dgs_frames test/test_export_3dgs_frames.py)

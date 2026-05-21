@@ -116,6 +116,13 @@ This is an input-pack artifact, not a trained Gaussian Splatting result.
 | **MBES threshold sweep** | Turn experimental loop-closure tuning into accepted/rejected/false-positive summaries on a real bag. |
 | **AQUA-SLAM comparison run** | Keep the benchmark story reproducible by filling comparison tables from scripts instead of hand-written claims. |
 
+Start the 3DGS training path with the local readiness check:
+
+```bash
+ros2 run aqua_localization check_3dgs_training_ready.py \
+  --pack /tmp/tank_short_test_3dgs_pack_20frames
+```
+
 ## Run It
 
 ### Build
