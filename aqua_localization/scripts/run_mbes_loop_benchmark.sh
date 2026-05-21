@@ -30,6 +30,7 @@ STATUS_CSV="$OUT_DIR/mbes_beach_pond_loop_status.csv"
 SUMMARY_OUT="$OUT_DIR/mbes_beach_pond_loop_status.md"
 DESCRIPTOR_SWEEP_OUT="$OUT_DIR/mbes_beach_pond_descriptor_sweep.md"
 ROW_OUT="$OUT_DIR/mbes_beach_pond_benchmark_row.md"
+AUDIT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.md"
 RECORD_ENV_ARGS=(
   "WORKSPACE=$WORKSPACE"
   "MBES_SRC=$MBES_SRC"
@@ -109,6 +110,10 @@ run_cmd ros2 run aqua_localization mbes_loop_benchmark_row.py \
   --header \
   --out "$ROW_OUT"
 
+run_cmd ros2 run aqua_localization audit_mbes_loop_candidates.py \
+  --csv "$STATUS_CSV" \
+  --out "$AUDIT_OUT"
+
 cat <<EOF
 
 MBES loop benchmark artifacts:
@@ -118,4 +123,5 @@ MBES loop benchmark artifacts:
   summary:          $SUMMARY_OUT
   descriptor sweep: $DESCRIPTOR_SWEEP_OUT
   benchmark row:    $ROW_OUT
+  audit report:      $AUDIT_OUT
 EOF
