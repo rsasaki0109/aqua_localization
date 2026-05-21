@@ -162,6 +162,8 @@ def test_build_transforms_matches_nearest_odometry(tmp_path):
     assert payload["frames"][0]["transform_matrix"][0][3] == 1.0
     assert payload["frames"][0]["transform_matrix"][1][3] == 2.0
     assert payload["frames"][0]["transform_matrix"][2][3] == 3.0
+    assert payload["base_from_camera"]["translation_xyz_m"] == [0.0, 0.0, 0.0]
+    assert payload["base_from_camera"]["quaternion_xyzw"] == [0.0, 0.0, 0.0, 1.0]
     assert abs(payload["frames"][1]["transform_matrix"][0][0]) < 1e-12
     assert abs(payload["frames"][1]["transform_matrix"][1][0] - 1.0) < 1e-12
     assert payload["skipped_frames"][0]["reason"] == "time_diff_exceeded"
@@ -222,6 +224,7 @@ def test_build_transforms_can_write_nerfstudio_format(tmp_path):
     assert "odom_timestamp_ns" not in payload["frames"][0]
     assert payload["metadata"]["trajectory_topic"] == "/aqua_visual_frontend/odometry"
     assert payload["metadata"]["matched_frame_count"] == 2
+    assert payload["metadata"]["base_from_camera"]["translation_xyz_m"] == [0.0, 0.0, 0.0]
 
     saved = json.loads((pack / "transforms.json").read_text(encoding="utf-8"))
     assert saved["format"] == "nerfstudio"
@@ -248,6 +251,53 @@ def test_nerfstudio_format_requires_intrinsics(tmp_path):
         assert "requires CameraInfo intrinsics" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_base_from_camera_translation_is_applied(tmp_path):
+    module = load_module()
+    manifest_path = tmp_path / "manifest.json"
+    pack = tmp_path / "pack"
+    make_manifest(manifest_path)
+    make_pack(pack)
+
+    payload = module.build_transforms(
+        manifest_path,
+        pack,
+        max_time_diff_s=0.000001,
+        base_from_camera_values=[0.25, -0.45, 0.1, 0.0, 0.0, 0.0, 1.0],
+        reader=[(900, odom_msg(990, xyz=(1.0, 2.0, 3.0)))],
+        camera_info_reader=[(480, camera_info_msg())],
+    )
+
+    matrix = payload["frames"][0]["transform_matrix"]
+    assert matrix[0][3] == 1.25
+    assert matrix[1][3] == 1.55
+    assert matrix[2][3] == 3.1
+    assert payload["base_from_camera"]["translation_xyz_m"] == [0.25, -0.45, 0.1]
+
+
+def test_base_from_camera_rotation_is_composed(tmp_path):
+    module = load_module()
+    manifest_path = tmp_path / "manifest.json"
+    pack = tmp_path / "pack"
+    make_manifest(manifest_path)
+    make_pack(pack)
+    yaw90 = [0.0, 0.0, math.sin(math.pi / 4.0), math.cos(math.pi / 4.0)]
+
+    payload = module.build_transforms(
+        manifest_path,
+        pack,
+        max_time_diff_s=0.000001,
+        base_from_camera_values=[0.0, 0.0, 0.0, *yaw90],
+        reader=[(900, odom_msg(990, xyz=(0.0, 0.0, 0.0)))],
+        camera_info_reader=[(480, camera_info_msg())],
+    )
+
+    matrix = payload["frames"][0]["transform_matrix"]
+    assert abs(matrix[0][0]) < 1e-12
+    assert abs(matrix[0][1] + 1.0) < 1e-12
+    assert abs(matrix[1][0] - 1.0) < 1e-12
+    assert abs(matrix[1][1]) < 1e-12
 
 
 def test_camera_info_requires_nine_k_values():
