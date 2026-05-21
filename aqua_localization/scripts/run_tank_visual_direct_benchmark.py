@@ -35,6 +35,12 @@ class ImageRecord:
 
 @dataclass(frozen=True)
 class DirectVisualResult:
+    input_left_records: int
+    input_right_records: int
+    window_left_records: int
+    window_right_records: int
+    window_start_s: float | None
+    window_end_s: float | None
     stereo_pairs: int
     processed_frames: int
     accepted: int
@@ -89,6 +95,49 @@ def pair_stereo_records(
                 pairs.append((left, right))
                 right_index += 1
     return pairs
+
+
+def resolve_record_window(args, left_records: list[ImageRecord]) -> tuple[float | None, float | None]:
+    if args.start_offset_s is not None and args.start_stamp_s is not None:
+        raise ValueError("--start-offset-s and --start-stamp-s cannot be used together")
+    if args.duration_s is not None and args.end_stamp_s is not None:
+        raise ValueError("--duration-s and --end-stamp-s cannot be used together")
+    if args.start_offset_s is not None and args.start_offset_s < 0.0:
+        raise ValueError("--start-offset-s must be non-negative")
+    if args.duration_s is not None and args.duration_s <= 0.0:
+        raise ValueError("--duration-s must be positive")
+
+    if left_records:
+        origin_s = left_records[0].stamp_s
+    else:
+        origin_s = 0.0
+
+    start_s = args.start_stamp_s
+    if args.start_offset_s is not None:
+        start_s = origin_s + args.start_offset_s
+
+    end_s = args.end_stamp_s
+    if args.duration_s is not None:
+        if start_s is None:
+            start_s = origin_s
+        end_s = start_s + args.duration_s
+
+    if start_s is not None and end_s is not None and end_s <= start_s:
+        raise ValueError("record window end must be greater than start")
+    return start_s, end_s
+
+
+def filter_records_by_window(
+        records: list[ImageRecord],
+        start_s: float | None,
+        end_s: float | None) -> list[ImageRecord]:
+    if start_s is None and end_s is None:
+        return records
+    return [
+        record for record in records
+        if (start_s is None or record.stamp_s >= start_s)
+        and (end_s is None or record.stamp_s < end_s)
+    ]
 
 
 def visual_config_from_args(args):
@@ -230,6 +279,12 @@ def process_stereo_pairs_direct(
             status_fp.flush()
 
     return DirectVisualResult(
+        input_left_records=len(pairs),
+        input_right_records=len(pairs),
+        window_left_records=len(pairs),
+        window_right_records=len(pairs),
+        window_start_s=None,
+        window_end_s=None,
         stereo_pairs=len(pairs),
         processed_frames=processed,
         accepted=accepted,
@@ -242,8 +297,25 @@ def process_stereo_pairs_direct(
 def run_direct(args, paths: run_tank_visual_benchmark.BenchmarkPaths) -> DirectVisualResult:
     left_records = read_compressed_image_records(args.bag, args.left_topic)
     right_records = read_compressed_image_records(args.bag, args.right_topic)
-    pairs = pair_stereo_records(left_records, right_records, args.sync_slop_s)
-    return process_stereo_pairs_direct(args, pairs, paths.estimate_tum, paths.status_csv)
+    window_start_s, window_end_s = resolve_record_window(args, left_records)
+    window_left_records = filter_records_by_window(left_records, window_start_s, window_end_s)
+    window_right_records = filter_records_by_window(right_records, window_start_s, window_end_s)
+    pairs = pair_stereo_records(window_left_records, window_right_records, args.sync_slop_s)
+    result = process_stereo_pairs_direct(args, pairs, paths.estimate_tum, paths.status_csv)
+    return DirectVisualResult(
+        input_left_records=len(left_records),
+        input_right_records=len(right_records),
+        window_left_records=len(window_left_records),
+        window_right_records=len(window_right_records),
+        window_start_s=window_start_s,
+        window_end_s=window_end_s,
+        stereo_pairs=result.stereo_pairs,
+        processed_frames=result.processed_frames,
+        accepted=result.accepted,
+        rejected=result.rejected,
+        decode_failures=result.decode_failures,
+        warmup_ms=result.warmup_ms,
+    )
 
 
 def parse_args(argv):
@@ -259,6 +331,30 @@ def parse_args(argv):
     parser.add_argument("--left-topic", default=DEFAULT_LEFT_TOPIC)
     parser.add_argument("--right-topic", default=DEFAULT_RIGHT_TOPIC)
     parser.add_argument("--sync-slop-s", type=float, default=0.02)
+    parser.add_argument(
+        "--start-offset-s",
+        type=float,
+        default=None,
+        help="Start direct replay this many seconds after the first left camera frame.",
+    )
+    parser.add_argument(
+        "--duration-s",
+        type=float,
+        default=None,
+        help="Replay only this many seconds after the selected window start.",
+    )
+    parser.add_argument(
+        "--start-stamp-s",
+        type=float,
+        default=None,
+        help="Start direct replay at this absolute ROS stamp in seconds.",
+    )
+    parser.add_argument(
+        "--end-stamp-s",
+        type=float,
+        default=None,
+        help="End direct replay before this absolute ROS stamp in seconds.",
+    )
     parser.add_argument("--translation-scale", type=float, default=1.0)
     parser.add_argument("--drift-window-s", type=float, default=3.0)
     parser.add_argument("--drift-stride-s", type=float, default=1.0)
@@ -307,10 +403,16 @@ def main(argv=None) -> int:
     result = run_direct(args, paths)
     print(
         "direct visual replay: "
+        f"input_left={result.input_left_records} input_right={result.input_right_records} "
+        f"window_left={result.window_left_records} window_right={result.window_right_records} "
         f"pairs={result.stereo_pairs} processed={result.processed_frames} "
         f"accepted={result.accepted} rejected={result.rejected} "
         f"decode_failures={result.decode_failures} warmup_ms={result.warmup_ms:.1f}"
     )
+    if result.window_start_s is not None or result.window_end_s is not None:
+        start = "start" if result.window_start_s is None else f"{result.window_start_s:.9f}"
+        end = "end" if result.window_end_s is None else f"{result.window_end_s:.9f}"
+        print(f"direct visual window: [{start}, {end})")
     print(run_tank_visual_benchmark.evaluate(args, paths.estimate_tum, paths))
     return 0
 

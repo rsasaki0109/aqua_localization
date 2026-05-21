@@ -3,8 +3,10 @@
 import importlib.util
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 
 SCRIPT_PATH = (
@@ -51,6 +53,50 @@ def test_pair_stereo_records_matches_in_time_order():
     ]
 
 
+def test_resolve_record_window_uses_first_left_stamp_for_offset_duration():
+    module = load_module()
+    args = SimpleNamespace(
+        start_offset_s=1.5,
+        duration_s=2.0,
+        start_stamp_s=None,
+        end_stamp_s=None,
+    )
+    records = [
+        module.ImageRecord(10.0, b"left0"),
+        module.ImageRecord(11.0, b"left1"),
+    ]
+
+    assert module.resolve_record_window(args, records) == (11.5, 13.5)
+
+
+def test_filter_records_by_window_uses_exclusive_end():
+    module = load_module()
+    records = [
+        module.ImageRecord(10.0, b"before"),
+        module.ImageRecord(11.0, b"start"),
+        module.ImageRecord(12.0, b"inside"),
+        module.ImageRecord(13.0, b"end"),
+    ]
+
+    filtered = module.filter_records_by_window(records, start_s=11.0, end_s=13.0)
+
+    assert [record.data for record in filtered] == [b"start", b"inside"]
+
+
+def test_resolve_record_window_rejects_ambiguous_options():
+    module = load_module()
+    records = [module.ImageRecord(10.0, b"left")]
+    args = SimpleNamespace(
+        start_offset_s=1.0,
+        duration_s=None,
+        start_stamp_s=10.5,
+        end_stamp_s=None,
+    )
+
+    with pytest.raises(ValueError, match="start-offset-s"):
+        module.resolve_record_window(args, records)
+
+
 def test_format_tum_pose_line_uses_position_and_quaternion():
     module = load_module()
     pose = np.eye(4)
@@ -75,3 +121,7 @@ def test_parse_args_defaults_to_direct_system():
     assert args.left_topic == module.DEFAULT_LEFT_TOPIC
     assert args.right_topic == module.DEFAULT_RIGHT_TOPIC
     assert args.sync_slop_s == 0.02
+    assert args.start_offset_s is None
+    assert args.duration_s is None
+    assert args.start_stamp_s is None
+    assert args.end_stamp_s is None
