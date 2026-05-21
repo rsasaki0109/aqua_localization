@@ -246,6 +246,13 @@
       color: var(--muted);
     }
 
+    .playback {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
     .actions {
       display: flex;
       gap: 10px;
@@ -255,13 +262,16 @@
     .button {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       min-height: 42px;
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 10px 13px;
       background: rgba(7, 22, 24, 0.76);
       color: var(--text);
+      font: inherit;
       font-weight: 650;
+      cursor: pointer;
     }
 
     .button.primary {
@@ -269,6 +279,11 @@
       background: var(--cyan);
       color: #061315;
       font-weight: 780;
+    }
+
+    .button:disabled {
+      cursor: not-allowed;
+      opacity: 0.52;
     }
 
     .details {
@@ -365,6 +380,12 @@
       .slider-row {
         grid-template-columns: 1fr;
       }
+
+      .playback,
+      .actions,
+      .button {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -419,7 +440,15 @@
       </div>
 
       <div class="tools">
-        <span id="packSummary">20 frames, 20 poses, nerfstudio transforms</span>
+        <div>
+          <strong id="playbackState">Paused</strong>
+          <span id="packSummary">20 frames, 20 poses, nerfstudio transforms</span>
+        </div>
+        <div class="playback" aria-label="Playback controls">
+          <button class="button primary" id="playButton" type="button" disabled>Play</button>
+          <button class="button" id="pauseButton" type="button" disabled>Pause</button>
+          <button class="button" id="resetButton" type="button" disabled>Reset view</button>
+        </div>
         <div class="actions">
           <a class="button primary" id="downloadLink" href="https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip">Download pack</a>
           <a class="button" href="../data/tank_3dgs_sample_pack_viewer.json">Open JSON</a>
@@ -457,12 +486,21 @@
     const trajectoryCtx = trajectoryCanvas.getContext("2d", { alpha: false });
     const frameSlider = document.getElementById("frameSlider");
     const thumbs = document.getElementById("thumbs");
+    const playButton = document.getElementById("playButton");
+    const pauseButton = document.getElementById("pauseButton");
+    const resetButton = document.getElementById("resetButton");
+    const playbackState = document.getElementById("playbackState");
     const sheet = new Image();
 
     let pack = null;
     let activeIndex = 0;
     let angle = -0.62;
     let sheetReady = false;
+    let playing = false;
+    let animationId = null;
+    let lastFrameAt = 0;
+    const defaultAngle = -0.62;
+    const frameIntervalMs = 650;
 
     sheet.src = "../media/tank_3dgs_sample_contact_sheet.jpg";
     sheet.addEventListener("load", () => {
@@ -608,7 +646,7 @@
       ctx.globalAlpha = 1;
       ctx.fillStyle = "#f2fbf8";
       ctx.font = "700 13px system-ui, sans-serif";
-      ctx.fillText("3D camera path", 16, 24);
+      ctx.fillText(playing ? "3D camera path - playing" : "3D camera path", 16, 24);
     }
 
     function selectFrame(index) {
@@ -628,6 +666,41 @@
 
       renderFrame();
       renderTrajectory();
+    }
+
+    function setPlaying(nextPlaying) {
+      playing = nextPlaying;
+      playbackState.textContent = playing ? "Playing" : "Paused";
+      playButton.disabled = playing;
+      pauseButton.disabled = !playing;
+
+      if (playing && !animationId) {
+        lastFrameAt = performance.now();
+        animationId = requestAnimationFrame(playbackTick);
+      }
+
+      if (!playing && animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+        renderTrajectory();
+      }
+    }
+
+    function playbackTick(now) {
+      if (!playing || !pack) {
+        animationId = null;
+        return;
+      }
+
+      angle += 0.006;
+      if (now - lastFrameAt >= frameIntervalMs) {
+        selectFrame((activeIndex + 1) % pack.frames.length);
+        lastFrameAt = now;
+      } else {
+        renderTrajectory();
+      }
+
+      animationId = requestAnimationFrame(playbackTick);
     }
 
     function populate(data) {
@@ -651,10 +724,26 @@
       });
 
       selectFrame(0);
+      resetButton.disabled = false;
+      setPlaying(false);
     }
 
     frameSlider.addEventListener("input", (event) => {
       selectFrame(Number(event.target.value));
+    });
+
+    playButton.addEventListener("click", () => {
+      setPlaying(true);
+    });
+
+    pauseButton.addEventListener("click", () => {
+      setPlaying(false);
+    });
+
+    resetButton.addEventListener("click", () => {
+      setPlaying(false);
+      angle = defaultAngle;
+      selectFrame(0);
     });
 
     window.addEventListener("resize", () => {
