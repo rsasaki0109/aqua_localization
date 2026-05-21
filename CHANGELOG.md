@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added a 3DGS training readiness checker for nerfstudio-style sample packs.
+- Added the v0.3 sample pack readiness result to the static inspector.
 - Planned: 3DGS training smoke test from the published Tank sample pack.
 - Planned: MBES loop-closure threshold sweep and status summary on a real bag.
 - Planned: AQUA-SLAM comparison run with reproducible tables.

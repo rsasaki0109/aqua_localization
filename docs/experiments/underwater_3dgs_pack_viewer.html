@@ -134,7 +134,7 @@
 
     .metrics {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 1px;
       background: var(--line);
       border-top: 1px solid var(--line);
@@ -331,6 +331,7 @@
     <div class="metric"><strong id="metricTransforms">20</strong><span>matched transforms</span></div>
     <div class="metric"><strong id="metricSkipped">0</strong><span>skipped transforms</span></div>
     <div class="metric"><strong id="metricFormat">nerfstudio</strong><span>export format</span></div>
+    <div class="metric"><strong id="metricTrainingReady">pass</strong><span>training readiness</span></div>
   </div>
 
   <main>
@@ -357,6 +358,8 @@
           <div class="kv"><span>Trajectory topic</span><strong id="trajectoryTopic">loading</strong></div>
           <div class="kv"><span>Intrinsics</span><strong id="intrinsics">loading</strong></div>
           <div class="kv"><span>Camera model</span><strong id="cameraModel">loading</strong></div>
+          <div class="kv"><span>Training gate</span><strong id="trainingGate">loading</strong></div>
+          <div class="kv"><span>Checked by</span><strong id="checkedBy">loading</strong></div>
           <div class="kv"><span>Artifact</span><strong id="artifactName">loading</strong></div>
           <a class="button primary" id="downloadPanel" href="https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip">Download zip</a>
         </aside>
@@ -493,12 +496,15 @@
       document.getElementById("metricTransforms").textContent = data.counts.transforms;
       document.getElementById("metricSkipped").textContent = data.counts.skipped_transforms;
       document.getElementById("metricFormat").textContent = data.formats.transforms_format;
+      document.getElementById("metricTrainingReady").textContent = data.training_readiness.ready ? "pass" : "fail";
       document.getElementById("dataset").textContent = data.dataset;
       document.getElementById("sequence").textContent = data.sequence;
       document.getElementById("imageTopic").textContent = data.inputs.image_topic;
       document.getElementById("trajectoryTopic").textContent = data.inputs.trajectory_topic;
       document.getElementById("intrinsics").textContent = `${data.intrinsics_source} ${data.camera.w}x${data.camera.h}`;
       document.getElementById("cameraModel").textContent = `${data.camera.model} fx=${data.camera.fl_x}`;
+      document.getElementById("trainingGate").textContent = data.training_readiness.ready ? "ready" : "not ready";
+      document.getElementById("checkedBy").textContent = data.training_readiness.checked_by;
       document.getElementById("artifactName").textContent = data.artifact_name;
       document.getElementById("downloadTop").href = data.download_url;
       document.getElementById("downloadPanel").href = data.download_url;
