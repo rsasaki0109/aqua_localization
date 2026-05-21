@@ -32,6 +32,16 @@ custom AUVs, and `uuv_simulator`. ROS 2 Humble and Jazzy are supported.
 
 Latest release: **[v0.4](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.4)**.
 
+## Results Snapshot
+
+| Track | Current artifact | Status |
+|-------|------------------|--------|
+| **Tank Dataset localization** | `short_test` DVL fusion: **0.43 m APE RMSE**; visual-aided fusion: **0.37 m** with same-sequence scale fit | Replayable public-data result |
+| **MBES bathymetry replay** | MBES-SLAM `beach_pond` multibeam fans exported to rerun and RViz tuning views | Working sonar visualization and registration path |
+| **Pose graph loop closure** | No-bag smoke demo plus experimental MBES loop-candidate markers and status diagnostics | Backend shipped, real-bag tuning still in progress |
+| **Underwater 3DGS** | v0.3 Tank 20-frame nerfstudio-style input pack with static inspector and readiness gate | Input artifact published, training smoke test next |
+| **OSS comparison** | AQUA-SLAM Docker anchor recorded on Tank `short_test`; comparison plan and tables live in `docs/benchmarks` | Accuracy target identified, no superiority claim yet |
+
 <p align="center">
   <img src="docs/media/aqua_pipeline.svg" alt="aqua_localization pipeline from underwater sensors to filtering, sonar registration, pose graph loop closure, and visualization" width="92%">
 </p>
