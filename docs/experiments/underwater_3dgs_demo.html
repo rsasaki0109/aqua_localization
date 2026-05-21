@@ -288,7 +288,7 @@
           <li>Generate a JSON manifest for camera frames, trajectory, depth priors, and optional MBES/submap inputs.</li>
           <li>Create a scaffolded dataset pack with `images/`, `depth/`, `mbes/`, and `transforms_stub.json`.</li>
           <li>Extract real ROS bag image frames into `images/` and index them in `frames.json`.</li>
-          <li>Match extracted frames to nearest odometry and write `transforms.json`.</li>
+          <li>Match extracted frames to nearest odometry and write `transforms.json` with CameraInfo intrinsics.</li>
           <li>Keep localization metrics separate from reconstruction quality claims.</li>
         </ul>
       </section>
@@ -296,7 +296,7 @@
       <section class="panel">
         <h2>Manifest To Transforms</h2>
         <p>
-          The reproducible track now reaches `images/`, `frames.json`, and nearest-neighbour odometry poses in `transforms.json`. Camera intrinsics and camera-to-base extrinsics are deliberately left as the next calibration step.
+          The reproducible track now reaches `images/`, `frames.json`, nearest-neighbour odometry poses, and CameraInfo intrinsics in `transforms.json`. Camera-to-base extrinsics are deliberately left as the next calibration step.
         </p>
         <div class="code">
           <pre>ros2 run aqua_localization export_3dgs_manifest.py \

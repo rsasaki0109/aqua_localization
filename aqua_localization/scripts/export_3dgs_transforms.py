@@ -47,6 +47,15 @@ def trajectory_role(manifest):
     return role
 
 
+def camera_info_role(manifest):
+    role = manifest.get("roles", {}).get("camera_info", {})
+    if role.get("status") != "found" or not role.get("topic"):
+        return None
+    if role.get("type") != "sensor_msgs/msg/CameraInfo":
+        raise ValueError(f"unsupported camera_info topic type: {role.get('type')}")
+    return role
+
+
 def stamp_to_ns(stamp):
     if stamp is None:
         return None
@@ -82,6 +91,29 @@ def read_rosbag_odometry(bag_path: Path, topic: str, storage_id: str | None = No
         if current_topic != topic:
             continue
         yield timestamp_ns, deserialize_message(data, Odometry)
+
+
+def read_rosbag_camera_info(bag_path: Path, topic: str, storage_id: str | None = None):
+    try:
+        import rosbag2_py
+        from rclpy.serialization import deserialize_message
+        from sensor_msgs.msg import CameraInfo
+    except ImportError as exc:
+        raise RuntimeError(
+            "ROS 2 Python bag dependencies are unavailable. Source your ROS 2 workspace "
+            "or run this command inside a ROS 2 environment."
+        ) from exc
+
+    storage_options = rosbag2_py.StorageOptions(uri=str(bag_path), storage_id=storage_id or "")
+    converter_options = rosbag2_py.ConverterOptions("", "")
+    reader = rosbag2_py.SequentialReader()
+    reader.open(storage_options, converter_options)
+
+    while reader.has_next():
+        current_topic, data, timestamp_ns = reader.read_next()
+        if current_topic != topic:
+            continue
+        yield timestamp_ns, deserialize_message(data, CameraInfo)
 
 
 def quaternion_to_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
@@ -170,6 +202,34 @@ def collect_odometry_samples(reader):
     return samples
 
 
+def collect_camera_info(reader):
+    for timestamp_ns, msg in reader:
+        return camera_info_payload(int(timestamp_ns), msg)
+    return None
+
+
+def camera_info_payload(timestamp_ns: int, msg):
+    k = list(getattr(msg, "k", []) or [])
+    d = list(getattr(msg, "d", []) or [])
+    if len(k) < 9:
+        raise ValueError("CameraInfo.k must contain 9 values")
+    return {
+        "source": "sensor_msgs/msg/CameraInfo",
+        "timestamp_ns": int(timestamp_ns),
+        "message_stamp_ns": message_stamp_ns(msg),
+        "topic_width": int(getattr(msg, "width", 0)),
+        "topic_height": int(getattr(msg, "height", 0)),
+        "w": int(getattr(msg, "width", 0)),
+        "h": int(getattr(msg, "height", 0)),
+        "fl_x": float(k[0]),
+        "fl_y": float(k[4]),
+        "cx": float(k[2]),
+        "cy": float(k[5]),
+        "camera_model": str(getattr(msg, "distortion_model", "") or "unknown"),
+        "distortion_params": [float(value) for value in d],
+    }
+
+
 def update_pack_index(pack_dir: Path, pack_index, transforms_payload):
     paths = pack_index.setdefault("paths", {})
     paths["transforms"] = "transforms.json"
@@ -182,6 +242,7 @@ def update_pack_index(pack_dir: Path, pack_index, transforms_payload):
         "trajectory_type": transforms_payload["trajectory_type"],
         "max_time_diff_ns": transforms_payload["max_time_diff_ns"],
         "skipped_count": transforms_payload["skipped_count"],
+        "intrinsics_source": transforms_payload.get("intrinsics_source"),
     }
     write_json(pack_dir / "pack_index.json", pack_index)
 
@@ -191,12 +252,14 @@ def build_transforms(
     pack_dir: Path,
     max_time_diff_s: float = 0.05,
     reader=None,
+    camera_info_reader=None,
 ):
     if max_time_diff_s < 0.0:
         raise ValueError("max_time_diff must be >= 0")
 
     manifest = load_json(manifest_path)
     role = trajectory_role(manifest)
+    intrinsics_role = camera_info_role(manifest)
     topic = role["topic"]
     msg_type = role["type"]
     frames_payload = load_frames(pack_dir)
@@ -206,6 +269,15 @@ def build_transforms(
     if reader is None:
         storage_id = manifest.get("bag", {}).get("storage_identifier")
         reader = read_rosbag_odometry(bag_path_from_manifest(manifest), topic, storage_id)
+
+    intrinsics = None
+    if camera_info_reader is None and intrinsics_role is not None:
+        storage_id = manifest.get("bag", {}).get("storage_identifier")
+        camera_info_reader = read_rosbag_camera_info(
+            bag_path_from_manifest(manifest), intrinsics_role["topic"], storage_id
+        )
+    if camera_info_reader is not None:
+        intrinsics = collect_camera_info(camera_info_reader)
 
     odom_samples = collect_odometry_samples(reader)
     if not odom_samples:
@@ -248,6 +320,8 @@ def build_transforms(
         "sequence": manifest.get("sequence"),
         "trajectory_topic": topic,
         "trajectory_type": msg_type,
+        "camera_info_topic": intrinsics_role["topic"] if intrinsics_role else None,
+        "intrinsics_source": "camera_info" if intrinsics is not None else None,
         "camera_pose_convention": "raw_ros_odometry_pose_as_camera_to_world",
         "max_time_diff_ns": max_time_diff_ns,
         "source_frame_count": len(frames_payload.get("frames", [])),
@@ -258,9 +332,23 @@ def build_transforms(
         "skipped_frames": skipped,
         "notes": [
             "Transforms are nearest-neighbour matches between extracted image timestamps and odometry.",
-            "Camera intrinsics and camera-to-base extrinsics are not applied in this exporter.",
+            "Camera-to-base extrinsics are not applied in this exporter.",
         ],
     }
+    if intrinsics is not None:
+        payload.update(
+            {
+                "w": intrinsics["w"],
+                "h": intrinsics["h"],
+                "fl_x": intrinsics["fl_x"],
+                "fl_y": intrinsics["fl_y"],
+                "cx": intrinsics["cx"],
+                "cy": intrinsics["cy"],
+                "camera_model": intrinsics["camera_model"],
+                "distortion_params": intrinsics["distortion_params"],
+                "camera_info": intrinsics,
+            }
+        )
     write_json(pack_dir / "transforms.json", payload)
     update_pack_index(pack_dir, pack_index, payload)
     return payload

@@ -24,7 +24,29 @@ def write_json(path: Path, payload):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def make_manifest(path: Path, trajectory_type="nav_msgs/msg/Odometry", status="found"):
+def make_manifest(
+    path: Path,
+    trajectory_type="nav_msgs/msg/Odometry",
+    status="found",
+    include_camera_info=True,
+):
+    roles = {
+        "trajectory": {
+            "topic": "/aqua_visual_frontend/odometry",
+            "type": trajectory_type,
+            "message_count": 3,
+            "status": status,
+            "required": True,
+        }
+    }
+    if include_camera_info:
+        roles["camera_info"] = {
+            "topic": "/camera/left/camera_info",
+            "type": "sensor_msgs/msg/CameraInfo",
+            "message_count": 1,
+            "status": "found",
+            "required": True,
+        }
     manifest = {
         "schema": "aqua_localization.underwater_3dgs_manifest.v1",
         "dataset": "Tank Dataset",
@@ -33,15 +55,7 @@ def make_manifest(path: Path, trajectory_type="nav_msgs/msg/Odometry", status="f
             "path": "datasets/public/tank_dataset/short_test_ros2",
             "storage_identifier": "mcap",
         },
-        "roles": {
-            "trajectory": {
-                "topic": "/aqua_visual_frontend/odometry",
-                "type": trajectory_type,
-                "message_count": 3,
-                "status": status,
-                "required": True,
-            }
-        },
+        "roles": roles,
     }
     write_json(path, manifest)
     return manifest
@@ -99,6 +113,17 @@ def odom_msg(message_stamp_ns, xyz=(0.0, 0.0, 0.0), quat=(0.0, 0.0, 0.0, 1.0)):
     )
 
 
+def camera_info_msg(message_stamp_ns=500, width=640, height=480):
+    return SimpleNamespace(
+        header=SimpleNamespace(stamp=stamp_from_ns(message_stamp_ns)),
+        width=width,
+        height=height,
+        k=[520.0, 0.0, 321.0, 0.0, 521.0, 239.0, 0.0, 0.0, 1.0],
+        d=[0.1, -0.02, 0.001, 0.002, 0.0],
+        distortion_model="plumb_bob",
+    )
+
+
 def test_build_transforms_matches_nearest_odometry(tmp_path):
     module = load_module()
     manifest_path = tmp_path / "manifest.json"
@@ -116,9 +141,20 @@ def test_build_transforms_matches_nearest_odometry(tmp_path):
             (1_900, odom_msg(2_000, xyz=(4.0, 5.0, 6.0), quat=yaw90)),
             (7_000, odom_msg(7_000, xyz=(7.0, 8.0, 9.0))),
         ],
+        camera_info_reader=[(480, camera_info_msg())],
     )
 
     assert payload["schema"] == module.TRANSFORMS_SCHEMA
+    assert payload["camera_info_topic"] == "/camera/left/camera_info"
+    assert payload["intrinsics_source"] == "camera_info"
+    assert payload["w"] == 640
+    assert payload["h"] == 480
+    assert payload["fl_x"] == 520.0
+    assert payload["fl_y"] == 521.0
+    assert payload["cx"] == 321.0
+    assert payload["cy"] == 239.0
+    assert payload["camera_model"] == "plumb_bob"
+    assert payload["distortion_params"] == [0.1, -0.02, 0.001, 0.002, 0.0]
     assert payload["frame_count"] == 2
     assert payload["skipped_count"] == 1
     assert payload["frames"][0]["file_path"] == "images/frame_000000.png"
@@ -136,6 +172,39 @@ def test_build_transforms_matches_nearest_odometry(tmp_path):
     assert index["status"] == "transforms_estimated"
     assert index["paths"]["transforms"] == "transforms.json"
     assert index["estimated_transforms"]["count"] == 2
+    assert index["estimated_transforms"]["intrinsics_source"] == "camera_info"
+
+
+def test_build_transforms_allows_missing_camera_info(tmp_path):
+    module = load_module()
+    manifest_path = tmp_path / "manifest.json"
+    pack = tmp_path / "pack"
+    make_manifest(manifest_path, include_camera_info=False)
+    make_pack(pack)
+
+    payload = module.build_transforms(
+        manifest_path,
+        pack,
+        max_time_diff_s=0.000001,
+        reader=[(900, odom_msg(990, xyz=(1.0, 2.0, 3.0)))],
+    )
+
+    assert payload["camera_info_topic"] is None
+    assert payload["intrinsics_source"] is None
+    assert "fl_x" not in payload
+
+
+def test_camera_info_requires_nine_k_values():
+    module = load_module()
+    msg = camera_info_msg()
+    msg.k = [1.0, 2.0]
+
+    try:
+        module.camera_info_payload(1, msg)
+    except ValueError as exc:
+        assert "CameraInfo.k" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
 
 
 def test_zero_norm_quaternion_raises(tmp_path):
@@ -150,6 +219,7 @@ def test_zero_norm_quaternion_raises(tmp_path):
             manifest_path,
             pack,
             reader=[(1_000, odom_msg(1_020, quat=(0.0, 0.0, 0.0, 0.0)))],
+            camera_info_reader=[],
         )
     except ValueError as exc:
         assert "zero-norm quaternion" in str(exc)
