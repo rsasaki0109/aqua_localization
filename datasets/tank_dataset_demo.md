@@ -58,6 +58,63 @@ ros2 run aqua_localization convert_tank_dataset_bag.py \
   --include-cameras
 ```
 
+## 3DGS camera-enabled conversion check
+
+The underwater 3DGS sample-pack workflow needs a camera-enabled bag. The
+compact `short_test_ros2` bag used for IMU/DVL tests intentionally does not
+include camera topics, so build a second conversion with `--include-cameras`
+and verify it before running the pack pipeline.
+
+Expected minimum topics:
+
+| Role | Expected type | Example topic |
+|------|---------------|---------------|
+| Camera image | `sensor_msgs/msg/Image` or `sensor_msgs/msg/CompressedImage` | `/camera/left/image_raw` |
+| Camera intrinsics | `sensor_msgs/msg/CameraInfo` | `/camera/left/camera_info` |
+| Estimated trajectory | `nav_msgs/msg/Odometry` | `/aqua_visual_frontend/odometry` |
+| Depth/pressure prior | `sensor_msgs/msg/FluidPressure` or depth-like scalar/odometry | `/pressure` |
+
+After converting with cameras, run the metadata-only readiness check:
+
+```bash
+ros2 run aqua_localization check_3dgs_bag_ready.py \
+  --bag aqua_localization/datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --dataset "Tank Dataset" \
+  --sequence short_test
+```
+
+If the source bag uses different camera topic names, pass explicit overrides:
+
+```bash
+ros2 run aqua_localization check_3dgs_bag_ready.py \
+  --bag aqua_localization/datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --dataset "Tank Dataset" \
+  --sequence short_test \
+  --image-topic /camera/left/image_raw \
+  --camera-info-topic /camera/left/camera_info \
+  --trajectory-topic /aqua_visual_frontend/odometry
+```
+
+Once the check reports `3DGS bag ready: true`, create a small nerfstudio-style
+sample pack:
+
+```bash
+ros2 run aqua_localization export_3dgs_pack_pipeline.py \
+  --bag aqua_localization/datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --dataset "Tank Dataset" \
+  --sequence short_test \
+  --out /tmp/tank_short_test_3dgs_pack_20frames \
+  --force \
+  --max-frames 20 \
+  --stride 5 \
+  --max-time-diff 0.05 \
+  --base-from-camera -0.25 -0.45 0.0 0.0 0.0 0.0 1.0 \
+  --format nerfstudio
+```
+
+See the [3DGS sample pack workflow](../docs/experiments/underwater_3dgs_sample_pack.md)
+for release artifact naming, zip commands, and JSON sanity checks.
+
 ## Detected topics (after conversion)
 
 | Topic                | Type                              | Messages | Rate (Hz) | Use |

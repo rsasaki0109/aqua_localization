@@ -181,12 +181,18 @@
         <div class="card"><strong>Scope</strong><span>20 frames, intrinsics, odometry poses, base-to-camera extrinsic</span></div>
       </div>
       <p class="note">The checked-in compact Tank bag does not include camera image or CameraInfo topics. Build this artifact from a Tank conversion made with camera topics included, or from another public underwater camera bag.</p>
+      <p><a href="../../datasets/tank_dataset_demo.md#3dgs-camera-enabled-conversion-check">Open the Tank camera-enabled conversion check</a></p>
     </section>
 
     <section>
       <h2>Build Command</h2>
       <pre>source /opt/ros/humble/setup.bash
 source install/setup.bash
+
+ros2 run aqua_localization check_3dgs_bag_ready.py \
+  --bag datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --dataset "Tank Dataset" \
+  --sequence short_test
 
 ros2 run aqua_localization export_3dgs_pack_pipeline.py \
   --bag datasets/public/tank_dataset/short_test_ros2_with_cameras \
