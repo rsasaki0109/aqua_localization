@@ -339,6 +339,21 @@ ros2 run aqua_localization benchmark_gap_report.py \
 Tighten those numbers after each real accuracy improvement. For example,
 `--max-gap-x 4.0` intentionally fails today because the current gap is `4.88x`.
 
+For a broader progress ladder across all measured `aqua_*` rows, generate
+[`aqua_slam_progress.md`](aqua_slam_progress.md):
+
+```bash
+ros2 run aqua_localization aqua_slam_progress_report.py \
+  docs/benchmarks/tank_aqua_slam.md \
+  --out docs/benchmarks/aqua_slam_progress.md
+```
+
+The current best row is `aqua_visual_frontend` at `0.0947 m` RMSE, which is
+`4.88x` the AQUA-SLAM `short_test` RMSE and a `77.9%` improvement over the
+IMU+pressure+DVL `aqua_localization` anchor. The fused
+`aqua_localization+visual` row improves that anchor by `49.3%`, but still needs
+a `91.1%` RMSE reduction to tie AQUA-SLAM.
+
 Before updating the head-to-head table after a matching change, run the visual
 matching sweep so the selected ORB descriptor-distance gates are evidence-based:
 
