@@ -183,6 +183,46 @@ median stereo sync delta difference `0.000 ms`, and only the final five direct
 frames outside the ROS replay window. This means the earlier ROS/direct gap was
 primarily a window mismatch, not a different visual frontend trajectory.
 
+Once replay and direct trajectories match on the same window, use the direct
+path for faster calibration sweeps:
+
+```bash
+ros2 run aqua_localization run_tank_visual_calibration_sweep.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_calibration_sweep_1125 \
+  --sequence short_test_visual_calibration_1125 \
+  --start-offset-s 0.0 \
+  --duration-s 11.25 \
+  --translation-scales 0.08,0.095,0.105024091,0.115,0.13 \
+  --camera-bf-scales 0.95,1.0,1.05 \
+  --camera-f-scales 0.98,1.0,1.02 \
+  --base-from-camera-x-m -0.25 \
+  --base-from-camera-y-m -0.45 \
+  --baseline-rmse-m 0.0194
+```
+
+The sweep writes a CSV and Markdown summary with the best RMSE, Sim(3) scale
+diagnostic, accepted-frame ratio, median PnP inliers, median temporal matches,
+and the remaining gap to the AQUA-SLAM `0.0194 m` reference row. Keep this
+window fixed while deciding whether the remaining error is scale-only, stereo
+geometry, or base-frame extrinsics.
+
+Initial calibration sweeps on 2026-05-22 showed that these simple calibration
+levers do not close the AQUA-SLAM gap on the `11.25` second window:
+
+| Sweep | Best setting | RMSE m | Gap to AQUA-SLAM | Readout |
+|-------|--------------|-------:|-----------------:|---------|
+| scale only | `translation_scale=0.095` | 0.1177 | 6.07x | scale is not the main remaining error |
+| bf/f geometry | `translation_scale=0.095`, `camera_bf_scale=1.05`, `camera_f_scale=0.98` | 0.1164 | 6.00x | small improvement only |
+| base x/y | `translation_scale=0.095`, `camera_bf_scale=1.05`, `camera_f_scale=0.98`, `base_from_camera=(-0.15,-0.55,0)` | 0.1139 | 5.87x | comparable to the ROS replay window row |
+
+The best sweep row still needs about an `83%` RMSE reduction to tie
+AQUA-SLAM's `0.0194 m` row. The next accuracy work should therefore target the
+visual motion estimator itself: temporal feature stability, PnP outlier
+handling, motion prior use, or visual-inertial/DVL coupling, rather than only
+static scale or intrinsics.
+
 When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
 The bag replay mode also saves `*_visual_frontend_status.csv`, which contains
