@@ -139,12 +139,41 @@
       font-weight: 800;
     }
 
+    .secondary-links {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.94rem;
+      font-weight: 650;
+    }
+
+    .secondary-links a {
+      border-bottom: 1px solid rgba(190, 232, 224, 0.34);
+    }
+
     .preview {
       display: block;
+      position: relative;
       border: 1px solid var(--line);
       border-radius: 8px;
       overflow: hidden;
       background: var(--surface);
+    }
+
+    .preview::after {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      content: "Open viewer";
+      border: 1px solid rgba(78, 217, 197, 0.6);
+      border-radius: 8px;
+      padding: 9px 12px;
+      background: rgba(6, 19, 21, 0.78);
+      color: var(--text);
+      font-weight: 800;
+      backdrop-filter: blur(12px);
     }
 
     .preview img {
@@ -191,7 +220,7 @@
       }
 
       h1 {
-        font-size: clamp(2.45rem, 13vw, 3.6rem);
+        font-size: clamp(2.15rem, 10.4vw, 2.9rem);
       }
 
       .actions,
@@ -201,6 +230,10 @@
 
       .actions {
         display: grid;
+        max-width: 300px;
+      }
+
+      .secondary-links {
         max-width: 300px;
       }
 
@@ -227,15 +260,16 @@
     <main>
       <section class="copy" aria-label="Underwater 3DGS sample">
         <p class="eyebrow">Underwater 3DGS sample</p>
-        <h1>Play the sample viewer.</h1>
+        <h1>Underwater 3DGS viewer.</h1>
         <p>
-          20 real Tank Dataset frames, matched poses, and a 3D camera path.
-          This is an input pack for experiments, not a trained splat.
+          Open 20 real Tank Dataset frames with matched poses and a 3D camera path.
         </p>
         <div class="actions">
           <a class="button primary" href="experiments/underwater_3dgs_pack_viewer.html">Play viewer</a>
-          <a class="button" href="https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip">Download pack</a>
-          <a class="button" href="experiments/underwater_3dgs_training_smoke_report.md">Read smoke report</a>
+        </div>
+        <div class="secondary-links">
+          <a href="https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip">Download pack</a>
+          <a href="experiments/underwater_3dgs_training_smoke_report.md">Smoke report</a>
         </div>
       </section>
 
@@ -247,10 +281,10 @@
       </a>
 
       <div class="facts" aria-label="Sample facts">
-        <span>20 frames</span>
-        <span>20 poses</span>
-        <span>nerfstudio-style</span>
-        <span>readiness pass</span>
+        <span>20 real frames</span>
+        <span>matched poses</span>
+        <span>3D camera path</span>
+        <span>sample pack</span>
       </div>
     </main>
 
