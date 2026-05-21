@@ -57,6 +57,7 @@ install(PROGRAMS
   scripts/analyze_visual_drift.py
   scripts/analyze_visual_motion_segments.py
   scripts/export_mbes_loop_status.py
+  scripts/mbes_loop_benchmark_row.py
   scripts/pose_graph_loop_demo.py
   scripts/pose_graph_loop_smoke.sh
   DESTINATION lib/${PROJECT_NAME}
@@ -99,6 +100,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_make_synthetic_sonar_bag test/test_make_synthetic_sonar_bag.py)
   ament_add_pytest_test(test_rerun_export_mbes_helpers test/test_rerun_export_mbes_helpers.py)
   ament_add_pytest_test(test_export_mbes_loop_status test/test_export_mbes_loop_status.py)
+  ament_add_pytest_test(test_mbes_loop_benchmark_row test/test_mbes_loop_benchmark_row.py)
 endif()
 
 ament_package()

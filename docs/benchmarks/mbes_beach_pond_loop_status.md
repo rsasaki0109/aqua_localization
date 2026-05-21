@@ -35,6 +35,17 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --descriptor-sweep-out /tmp/mbes_beach_pond_descriptor_sweep.md
 ```
 
+Generate the benchmark table row from the exported CSV:
+
+```bash
+ros2 run aqua_localization mbes_loop_benchmark_row.py \
+  --csv /tmp/mbes_beach_pond_loop_status.csv \
+  --dataset MBES-SLAM \
+  --sequence beach_pond \
+  --duration 120 \
+  --note "first real replay"
+```
+
 Expected generated files:
 
 | Artifact | Purpose |
@@ -42,6 +53,7 @@ Expected generated files:
 | `/tmp/mbes_beach_pond_loop_status.csv` | Raw `/mbes_loop_closure/status` samples for every tested candidate. |
 | `/tmp/mbes_beach_pond_loop_status.md` | Accepted/rejected/no-candidate counts, status reasons, fitness, correction, and descriptor quantiles. |
 | `/tmp/mbes_beach_pond_descriptor_sweep.md` | Candidate descriptor threshold grid for pre-registration gating. |
+| `mbes_loop_benchmark_row.py` output | One Markdown row for the measurement table below. |
 
 ## Measurement Table
 
