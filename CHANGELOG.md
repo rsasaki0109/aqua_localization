@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recorded a readiness-only 3DGS training smoke report for the published Tank
+  sample pack.
 - Planned: 3DGS training smoke test from the published Tank sample pack.
 - Planned: MBES loop-closure threshold sweep and status summary on a real bag.
 - Planned: AQUA-SLAM comparison run with reproducible tables.
