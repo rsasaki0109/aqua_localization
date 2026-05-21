@@ -65,4 +65,5 @@ def test_parse_args_defaults_to_all_tuned_accepted_loops(tmp_path):
 
     assert args.max_markers == 100
     assert args.max_labels == 12
+    assert args.priority == "all"
     assert args.keyframe_topic == "/aqua_pose_graph/keyframe"

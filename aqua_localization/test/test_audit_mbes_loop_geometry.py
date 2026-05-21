@@ -145,6 +145,7 @@ def test_format_report_contains_geometry_table(tmp_path):
         max_fitness=2.0,
         max_translation_m=5.0,
         max_rotation_rad=0.5,
+        priority="all",
     )
 
     text = module.format_report(
@@ -177,5 +178,6 @@ def test_parse_args_defaults(tmp_path):
 
     assert args.keyframe_topic == "/aqua_pose_graph/keyframe"
     assert args.max_accepted == 100
+    assert args.priority == "all"
     assert args.min_plan_distance_m == 2.0
     assert not args.require_complete

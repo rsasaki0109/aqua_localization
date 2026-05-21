@@ -70,7 +70,8 @@
         "mbes_loop_status.csv",
         "descriptor sweep report",
         "accepted-loop audit report",
-        "accepted-loop geometry review"
+        "accepted-loop geometry review",
+        "high-priority accepted-loop audit packet"
       ],
       "command": "MBES_PREPARE_HUMBLE_METADATA=1 MBES_LOOP_MIN_POINTS=120 MBES_LOOP_VOXEL_LEAF_M=0.25 MBES_LOOP_MIN_KEYFRAME_SEPARATION=40 MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4 MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0 ros2 run aqua_localization run_mbes_loop_benchmark.sh",
       "next_step": "Use the prepared-source strict gate geometry worksheet to finish RViz/rerun review: 44/44 accepted loops have keyframe positions with no missing geometry, and 14 high-priority review rows need visual plausibility notes before using the row as accuracy evidence.",

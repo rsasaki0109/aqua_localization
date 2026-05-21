@@ -229,6 +229,7 @@ def format_report(
         "",
         "## Summary",
         "",
+        f"- Priority filter: {args.priority}",
         *format_summary(
             rows,
             total_accepted=total_accepted,
@@ -265,6 +266,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="Optional Markdown output path")
     parser.add_argument("--keyframe-topic", default="/aqua_pose_graph/keyframe")
     parser.add_argument("--max-accepted", type=int, default=100)
+    parser.add_argument(
+        "--priority",
+        choices=("all", "high", "medium", "low"),
+        default="all",
+        help="Only include accepted loops with this audit priority",
+    )
     parser.add_argument("--min-plan-distance-m", type=float, default=2.0)
     parser.add_argument(
         "--require-complete",
@@ -290,7 +297,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"failed to build MBES loop geometry review: {exc}", file=sys.stderr)
         return 2
 
-    audit_rows = audit.accepted_audit_rows(status_rows, args)
+    audit_rows = audit.filter_audit_rows(
+        audit.accepted_audit_rows(status_rows, args),
+        args.priority,
+    )
     geometry_rows = build_geometry_rows(
         audit_rows,
         keyframes,

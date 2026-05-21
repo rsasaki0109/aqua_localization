@@ -41,7 +41,7 @@ Fairness notes:
 - Baselines: `dataset reference odometry`, `no-sonar fusion`
 - Inputs: MBES point returns, IMU, reference odometry
 - Reference: dataset reference odometry when available
-- Artifacts: `datasets/mbes_slam_beach_pond_acquisition.md`, `docs/benchmarks/mbes_beach_pond_loop_status.md`, `run_mbes_loop_benchmark.sh`, `readiness report`, `rerun export`, `RViz loop markers`, `mbes_loop_status.csv`, `descriptor sweep report`, `accepted-loop audit report`, `accepted-loop geometry review`
+- Artifacts: `datasets/mbes_slam_beach_pond_acquisition.md`, `docs/benchmarks/mbes_beach_pond_loop_status.md`, `run_mbes_loop_benchmark.sh`, `readiness report`, `rerun export`, `RViz loop markers`, `mbes_loop_status.csv`, `descriptor sweep report`, `accepted-loop audit report`, `accepted-loop geometry review`, `high-priority accepted-loop audit packet`
 
 ```bash
 MBES_PREPARE_HUMBLE_METADATA=1 MBES_LOOP_MIN_POINTS=120 MBES_LOOP_VOXEL_LEAF_M=0.25 MBES_LOOP_MIN_KEYFRAME_SEPARATION=40 MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4 MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0 ros2 run aqua_localization run_mbes_loop_benchmark.sh

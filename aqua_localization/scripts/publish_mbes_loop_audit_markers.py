@@ -266,6 +266,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="MarkerArray topic to publish")
     parser.add_argument("--frame", default="map")
     parser.add_argument("--max-markers", type=int, default=100)
+    parser.add_argument(
+        "--priority",
+        choices=("all", "high", "medium", "low"),
+        default="all",
+        help="Only publish accepted loops with this audit priority",
+    )
     parser.add_argument("--label-z-offset", type=float, default=1.0)
     parser.add_argument("--publish-count", type=int, default=5)
     parser.add_argument("--period-s", type=float, default=0.5)
@@ -284,7 +290,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         rows = audit.read_loop_status_csv(args.csv)
         keyframes = read_keyframe_poses(args.bag, args.keyframe_topic)
-        audit_rows = audit.accepted_audit_rows(rows, args)
+        audit_rows = audit.filter_audit_rows(
+            audit.accepted_audit_rows(rows, args),
+            args.priority,
+        )
         specs = build_marker_specs(
             audit_rows,
             keyframes,

@@ -27,6 +27,11 @@ The stricter rotation/descriptor gate run is tracked in
 [`mbes_beach_pond_loop_audit_gap40_gate.md`](mbes_beach_pond_loop_audit_gap40_gate.md).
 Its accepted-loop keyframe geometry worksheet is
 [`mbes_beach_pond_loop_geometry_gap40_gate.md`](mbes_beach_pond_loop_geometry_gap40_gate.md).
+The focused high-priority audit packet is
+[`mbes_beach_pond_loop_audit_high_priority.md`](mbes_beach_pond_loop_audit_high_priority.md),
+[`mbes_beach_pond_loop_geometry_high_priority.md`](mbes_beach_pond_loop_geometry_high_priority.md),
+and the plan-view PNG
+[`mbes_beach_pond_loop_audit_high_priority.png`](../media/mbes_beach_pond_loop_audit_high_priority.png).
 
 ## Reproducible Run
 
@@ -135,6 +140,7 @@ Expected generated files:
 | `audit_mbes_loop_candidates.py` output | Accepted-loop visual audit priority list. |
 | `plot_mbes_loop_audit.py` output | Plan-view PNG of the pose graph and accepted-loop audit priorities. |
 | `audit_mbes_loop_geometry.py` output | Accepted-loop keyframe geometry worksheet for RViz/rerun review. |
+| `--priority high` audit outputs | Focused 14-row high-priority checklist, geometry worksheet, and plan-view PNG for first-pass RViz/rerun review. |
 
 Publish the accepted-loop audit overlay in RViz:
 
@@ -156,6 +162,18 @@ ros2 run aqua_localization plot_mbes_loop_audit.py \
   --bag /tmp/aqua_mbes_beach_pond_tuned_120 \
   --csv /tmp/aqua_mbes_loop_benchmark_tuned_120/mbes_beach_pond_loop_status.csv \
   --out docs/media/mbes_beach_pond_loop_audit.png
+```
+
+For the prepared-source strict gate run, start the visual audit with only the
+high-priority accepted loops:
+
+```bash
+ros2 run aqua_localization plot_mbes_loop_audit.py \
+  --bag /tmp/aqua_mbes_beach_pond_strict_source_120 \
+  --csv /tmp/aqua_mbes_loop_benchmark_strict_source_120/mbes_beach_pond_loop_status.csv \
+  --priority high \
+  --max-labels 14 \
+  --out docs/media/mbes_beach_pond_loop_audit_high_priority.png
 ```
 
 ## Measurement Table
