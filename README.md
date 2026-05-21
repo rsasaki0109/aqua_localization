@@ -124,6 +124,9 @@ ros2 run aqua_localization check_3dgs_training_ready.py \
   --pack /tmp/tank_short_test_3dgs_pack_20frames
 ```
 
+Training smoke-test plan:
+[`docs/experiments/underwater_3dgs_training_smoke.md`](docs/experiments/underwater_3dgs_training_smoke.md).
+
 ## Run It
 
 ### Build
