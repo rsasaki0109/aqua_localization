@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Planned: 3DGS training smoke test from the published Tank sample pack.
+- Planned: MBES loop-closure threshold sweep and status summary on a real bag.
+- Planned: AQUA-SLAM comparison run with reproducible tables.
+
 ## v0.4 - 2026-05-21
 
 This is a presentation and infrastructure release for the underwater 3DGS

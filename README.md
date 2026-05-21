@@ -108,6 +108,14 @@ reconstruction experiments: 20 PNG frames, 20 matched `/apriltag_slam/GT`
 poses, manual Tank stereo intrinsics, and a nerfstudio-style `transforms.json`.
 This is an input-pack artifact, not a trained Gaussian Splatting result.
 
+## Next Milestones
+
+| Milestone | Why it matters |
+|-----------|----------------|
+| **3DGS training smoke test** | Prove the published Tank sample pack can run through a small nerfstudio/gsplat-style training path without hidden local files. |
+| **MBES threshold sweep** | Turn experimental loop-closure tuning into accepted/rejected/false-positive summaries on a real bag. |
+| **AQUA-SLAM comparison run** | Keep the benchmark story reproducible by filling comparison tables from scripts instead of hand-written claims. |
+
 ## Run It
 
 ### Build

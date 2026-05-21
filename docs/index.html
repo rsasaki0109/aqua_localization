@@ -255,7 +255,8 @@
       gap: 14px;
     }
 
-    .track {
+    .track,
+    .milestone {
       border-top: 3px solid var(--cyan);
       background: var(--panel);
       padding: 22px;
@@ -263,20 +264,24 @@
       min-height: 214px;
     }
 
-    .track:nth-child(2) {
+    .track:nth-child(2),
+    .milestone:nth-child(2) {
       border-top-color: var(--gold);
     }
 
-    .track:nth-child(3) {
+    .track:nth-child(3),
+    .milestone:nth-child(3) {
       border-top-color: var(--coral);
     }
 
-    .track h3 {
+    .track h3,
+    .milestone h3 {
       margin: 0 0 10px;
       font-size: 1.1rem;
     }
 
-    .track p {
+    .track p,
+    .milestone p {
       margin: 0;
       color: var(--muted);
       line-height: 1.6;
@@ -330,7 +335,8 @@
 
       .metrics,
       .gallery,
-      .tracks {
+      .tracks,
+      .milestones {
         grid-template-columns: 1fr;
       }
     }
@@ -421,6 +427,29 @@
         <pre>ros2 run aqua_localization pose_graph_loop_smoke.sh
 ros2 run aqua_localization rerun_export.py --bag datasets/public/tank_dataset/demo_with_estimate --out /tmp/tank.rrd
 rerun /tmp/tank.rrd</pre>
+      </div>
+    </section>
+
+    <section class="section" id="milestones">
+      <h2>Next Milestones</h2>
+      <p>
+        The post-v0.4 plan is intentionally measurable: train from the published
+        sample pack, quantify MBES loop-closure tuning, and keep external
+        comparisons reproducible.
+      </p>
+      <div class="tracks milestones">
+        <article class="milestone">
+          <h3>3DGS Training Smoke Test</h3>
+          <p>Run the v0.3 Tank sample pack through a small nerfstudio or gsplat-style training path and document every dependency.</p>
+        </article>
+        <article class="milestone">
+          <h3>MBES Threshold Sweep</h3>
+          <p>Export loop-closure status summaries from a real bag so accepted, rejected, and suspicious candidates are visible.</p>
+        </article>
+        <article class="milestone">
+          <h3>AQUA-SLAM Comparison</h3>
+          <p>Fill comparison tables from reproducible runs instead of narrative claims, starting with Tank and AQUALOC coverage.</p>
+        </article>
       </div>
     </section>
   </main>
