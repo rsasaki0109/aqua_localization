@@ -91,9 +91,84 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
     assert "imu.visual.position_variance_floor:=0.01" in imu
     assert "imu.visual.max_age_s:=0.25" in imu
     assert args.post_play_delay == 2.0
+    assert args.visual_ready_timeout == 10.0
+    assert args.visual_ready_poll_s == 0.1
     assert recorder[:3] == ["ros2", "run", "aqua_localization"]
     assert str(paths.fused_tum) in recorder
     assert bag == ["ros2", "bag", "play", "/tmp/tank_bag", "--clock"]
+
+
+def test_visual_readiness_detects_status_csv_header(tmp_path):
+    module = load_module()
+    paths = module.default_paths(tmp_path, "short_test")
+    paths.visual_status_csv.write_text(
+        "timestamp,frame_index,accepted_count,rejected_count\n",
+        encoding="utf-8",
+    )
+
+    assert module.visual_status_csv_ready(paths.visual_status_csv)
+
+    class Process:
+        def poll(self):
+            return None
+
+    readiness = module.wait_for_visual_frontend_ready(
+        paths, Process(), timeout_s=1.0, poll_s=0.01
+    )
+
+    assert readiness.source.startswith("status csv")
+    assert readiness.elapsed_s >= 0.0
+
+
+def test_visual_readiness_detects_started_log(tmp_path):
+    module = load_module()
+    paths = module.default_paths(tmp_path, "short_test")
+    paths.visual_log.write_text(
+        "some line\nstereo visual odometry started: left=/left right=/right\n",
+        encoding="utf-8",
+    )
+
+    assert module.visual_log_ready(paths.visual_log)
+
+    class Process:
+        def poll(self):
+            return None
+
+    readiness = module.wait_for_visual_frontend_ready(
+        paths, Process(), timeout_s=1.0, poll_s=0.01
+    )
+
+    assert readiness.source.startswith("log marker")
+
+
+def test_visual_readiness_reports_early_process_exit(tmp_path):
+    module = load_module()
+    paths = module.default_paths(tmp_path, "short_test")
+
+    class Process:
+        def poll(self):
+            return 2
+
+    try:
+        module.wait_for_visual_frontend_ready(paths, Process(), timeout_s=1.0, poll_s=0.01)
+    except RuntimeError as exc:
+        assert "exited before readiness gate" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError")
+
+
+def test_clear_stale_run_outputs_removes_readiness_and_estimate_files(tmp_path):
+    module = load_module()
+    paths = module.default_paths(tmp_path, "short_test")
+    paths.visual_status_csv.write_text("timestamp,frame_index,\n", encoding="utf-8")
+    paths.fused_tum.write_text("1 0 0 0 0 0 0 1\n", encoding="utf-8")
+    paths.benchmark_row.write_text("keep\n", encoding="utf-8")
+
+    module.clear_stale_run_outputs(paths)
+
+    assert not paths.visual_status_csv.exists()
+    assert not paths.fused_tum.exists()
+    assert paths.benchmark_row.exists()
 
 
 def test_visual_calibration_profile_supplies_defaults(tmp_path):

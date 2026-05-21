@@ -211,6 +211,10 @@ def benchmark_command(args, case: SweepCase, sequence: str, out_dir: Path) -> li
         str(args.min_visual_coverage),
         "--startup-delay",
         str(args.startup_delay),
+        "--visual-ready-timeout",
+        str(args.visual_ready_timeout),
+        "--visual-ready-poll-s",
+        str(args.visual_ready_poll_s),
         "--post-play-delay",
         str(args.post_play_delay),
         "--stop-timeout",
@@ -412,6 +416,8 @@ def parse_args(argv):
     )
     parser.add_argument("--matrix", action="store_true")
     parser.add_argument("--startup-delay", type=float, default=1.0)
+    parser.add_argument("--visual-ready-timeout", type=float, default=10.0)
+    parser.add_argument("--visual-ready-poll-s", type=float, default=0.1)
     parser.add_argument("--post-play-delay", type=float, default=2.0)
     parser.add_argument("--stop-timeout", type=float, default=5.0)
     parser.add_argument("--no-sim-time", dest="use_sim_time", action="store_false")
@@ -437,6 +443,10 @@ def main(argv=None) -> int:
         raise ValueError("--expected-visual-frames must be non-negative")
     if not 0.0 < args.min_visual_coverage <= 1.0:
         raise ValueError("--min-visual-coverage must be in (0, 1]")
+    if args.visual_ready_timeout < 0.0:
+        raise ValueError("--visual-ready-timeout must be non-negative")
+    if args.visual_ready_poll_s <= 0.0:
+        raise ValueError("--visual-ready-poll-s must be positive")
     if math.isfinite(args.baseline_rmse_m) and args.baseline_rmse_m <= 0.0:
         raise ValueError("--baseline-rmse-m must be positive")
     if math.isfinite(args.standalone_visual_rmse_m) and args.standalone_visual_rmse_m <= 0.0:
