@@ -41,7 +41,7 @@
       "id": "mbes-beach-pond-loop-status",
       "dataset": "MBES-SLAM",
       "sequence": "beach_pond",
-      "status": "scaffolded",
+      "status": "measured",
       "comparison_group": "MBES registration and loop diagnostics",
       "target_system": "aqua_localization MBES frontend",
       "baselines": [
@@ -70,11 +70,12 @@
         "mbes_loop_status.csv",
         "descriptor sweep report"
       ],
-      "command": "ros2 run aqua_localization export_mbes_loop_status.py --bag /path/to/replay.bag --out /tmp/mbes_loop_status.csv --summary-out /tmp/mbes_loop_status.md",
-      "next_step": "Run a real replay with loop status export, then add a false-positive audit note next to the APE row.",
+      "command": "MBES_LOOP_MIN_POINTS=120 MBES_LOOP_VOXEL_LEAF_M=0.25 ros2 run aqua_localization run_mbes_loop_benchmark.sh",
+      "next_step": "Audit the 35 accepted loops from the 120 s tuned beach_pond replay in RViz/rerun before using the row as accuracy evidence.",
       "fairness_notes": [
         "Do not compare this as a full visual SLAM task.",
-        "Keep MBES loop closure claims separate from generic fusion baselines."
+        "Keep MBES loop closure claims separate from generic fusion baselines.",
+        "The measured row is a loop-status tuning result, not a validated full-trajectory SLAM win."
       ]
     },
     {

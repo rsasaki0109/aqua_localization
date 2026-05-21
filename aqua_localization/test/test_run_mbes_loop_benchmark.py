@@ -19,6 +19,9 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "MBES_DURATION": "42",
             "OUT_DIR": str(tmp_path / "out"),
             "NOTE": "dry run",
+            "MBES_LOOP_MIN_POINTS": "120",
+            "MBES_LOOP_VOXEL_LEAF_M": "0.25",
+            "POSE_GRAPH_KEYFRAME_TRANSLATION_M": "1.0",
         }
     )
 
@@ -36,6 +39,9 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "mbes_loop_benchmark_row.py" in proc.stdout
     assert "--duration 42" in proc.stdout
     assert "--note dry\\ run" in proc.stdout
+    assert "MBES_LOOP_MIN_POINTS=120" in proc.stdout
+    assert "MBES_LOOP_VOXEL_LEAF_M=0.25" in proc.stdout
+    assert "POSE_GRAPH_KEYFRAME_TRANSLATION_M=1.0" in proc.stdout
     assert "MBES loop benchmark artifacts:" in proc.stdout
 
 

@@ -24,6 +24,34 @@ MBES_DURATION="${MBES_DURATION:-60}"
 RECORD_STORAGE="${RECORD_STORAGE:-mcap}"
 RECORD_TOPIC_FLAG="${RECORD_TOPIC_FLAG---topics}"
 PLAY_DURATION_ARG="${PLAY_DURATION_ARG---playback-duration}"
+POSE_GRAPH_KEYFRAME_TRANSLATION_M="${POSE_GRAPH_KEYFRAME_TRANSLATION_M:-}"
+POSE_GRAPH_KEYFRAME_ROTATION_RAD="${POSE_GRAPH_KEYFRAME_ROTATION_RAD:-}"
+MBES_LOOP_MIN_POINTS="${MBES_LOOP_MIN_POINTS:-}"
+MBES_LOOP_VOXEL_LEAF_M="${MBES_LOOP_VOXEL_LEAF_M:-}"
+MBES_LOOP_MIN_KEYFRAME_SEPARATION="${MBES_LOOP_MIN_KEYFRAME_SEPARATION:-}"
+MBES_LOOP_MAX_DISTANCE_M="${MBES_LOOP_MAX_DISTANCE_M:-}"
+
+POSE_GRAPH_PARAM_ARGS=()
+if [[ -n "$POSE_GRAPH_KEYFRAME_TRANSLATION_M" ]]; then
+  POSE_GRAPH_PARAM_ARGS+=("-p" "keyframe.translation_m:=$POSE_GRAPH_KEYFRAME_TRANSLATION_M")
+fi
+if [[ -n "$POSE_GRAPH_KEYFRAME_ROTATION_RAD" ]]; then
+  POSE_GRAPH_PARAM_ARGS+=("-p" "keyframe.rotation_rad:=$POSE_GRAPH_KEYFRAME_ROTATION_RAD")
+fi
+
+MBES_LOOP_PARAM_ARGS=()
+if [[ -n "$MBES_LOOP_MIN_POINTS" ]]; then
+  MBES_LOOP_PARAM_ARGS+=("-p" "submaps.min_points:=$MBES_LOOP_MIN_POINTS")
+fi
+if [[ -n "$MBES_LOOP_VOXEL_LEAF_M" ]]; then
+  MBES_LOOP_PARAM_ARGS+=("-p" "submaps.voxel_leaf_m:=$MBES_LOOP_VOXEL_LEAF_M")
+fi
+if [[ -n "$MBES_LOOP_MIN_KEYFRAME_SEPARATION" ]]; then
+  MBES_LOOP_PARAM_ARGS+=("-p" "candidates.min_keyframe_separation:=$MBES_LOOP_MIN_KEYFRAME_SEPARATION")
+fi
+if [[ -n "$MBES_LOOP_MAX_DISTANCE_M" ]]; then
+  MBES_LOOP_PARAM_ARGS+=("-p" "candidates.max_distance_m:=$MBES_LOOP_MAX_DISTANCE_M")
+fi
 
 cd "$WORKSPACE"
 # shellcheck disable=SC1091
@@ -49,12 +77,14 @@ SON_PID=$!
 
 ros2 run aqua_pose_graph pose_graph_node --ros-args \
   --params-file "$POSE_GRAPH_PROFILE" \
+  "${POSE_GRAPH_PARAM_ARGS[@]}" \
   -p use_sim_time:=true \
   > /tmp/aqua_record_mbes_pose_graph.log 2>&1 &
 PG_PID=$!
 
 ros2 run aqua_sonar_loc mbes_loop_closure_node --ros-args \
   --params-file "$MBES_LOOP_PROFILE" \
+  "${MBES_LOOP_PARAM_ARGS[@]}" \
   -p use_sim_time:=true \
   > /tmp/aqua_record_mbes_loop_closure.log 2>&1 &
 LOOP_PID=$!

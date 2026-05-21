@@ -30,6 +30,23 @@ STATUS_CSV="$OUT_DIR/mbes_beach_pond_loop_status.csv"
 SUMMARY_OUT="$OUT_DIR/mbes_beach_pond_loop_status.md"
 DESCRIPTOR_SWEEP_OUT="$OUT_DIR/mbes_beach_pond_descriptor_sweep.md"
 ROW_OUT="$OUT_DIR/mbes_beach_pond_benchmark_row.md"
+RECORD_ENV_ARGS=(
+  "WORKSPACE=$WORKSPACE"
+  "MBES_SRC=$MBES_SRC"
+  "MBES_OUT=$MBES_OUT"
+  "MBES_DURATION=$MBES_DURATION"
+)
+
+for optional_name in \
+  ROS_SETUP RECORD_STORAGE RECORD_TOPIC_FLAG PLAY_DURATION_ARG \
+  POSE_GRAPH_KEYFRAME_TRANSLATION_M POSE_GRAPH_KEYFRAME_ROTATION_RAD \
+  MBES_LOOP_MIN_POINTS MBES_LOOP_VOXEL_LEAF_M \
+  MBES_LOOP_MIN_KEYFRAME_SEPARATION MBES_LOOP_MAX_DISTANCE_M
+do
+  if [[ -n "${!optional_name+x}" ]]; then
+    RECORD_ENV_ARGS+=("$optional_name=${!optional_name}")
+  fi
+done
 
 run_cmd() {
   printf '+'
@@ -75,13 +92,7 @@ run_cmd ros2 run aqua_localization check_mbes_benchmark_ready.py \
   --out "$READINESS_OUT" \
   --min-duration-s "$MIN_DURATION_S"
 
-run_env_cmd \
-  "WORKSPACE=$WORKSPACE" \
-  "MBES_SRC=$MBES_SRC" \
-  "MBES_OUT=$MBES_OUT" \
-  "MBES_DURATION=$MBES_DURATION" \
-  -- \
-  "$RECORD_SCRIPT"
+run_env_cmd "${RECORD_ENV_ARGS[@]}" -- "$RECORD_SCRIPT"
 
 run_cmd ros2 run aqua_localization export_mbes_loop_status.py \
   --bag "$MBES_OUT" \
