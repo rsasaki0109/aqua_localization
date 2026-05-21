@@ -208,8 +208,8 @@ def format_summary(rows: list[LoopStatusRow]) -> list[str]:
 
 def format_audit_table(audit_rows: list[AuditRow], max_rows: int) -> list[str]:
     lines = [
-        "| Rank | Priority | Candidate -> Current | Gap | Fitness | Correction m | Rotation rad | Descriptor c/e/r | Flags | Audit note |",
-        "|-----:|----------|----------------------|----:|--------:|-------------:|-------------:|------------------|-------|------------|",
+        "| Rank | Priority | Candidate -> Current | Gap | Fitness | Correction m | Rotation rad | Descriptor c/e/r | Flags | Decision | Reviewer note | Action |",
+        "|-----:|----------|----------------------|----:|--------:|-------------:|-------------:|------------------|-------|----------|---------------|--------|",
     ]
     for rank, item in enumerate(audit_rows[:max_rows], start=1):
         row = item.row
@@ -225,7 +225,7 @@ def format_audit_table(audit_rows: list[AuditRow], max_rows: int) -> list[str]:
             f"{item.keyframe_gap} | {format_float(row.fitness_score)} | "
             f"{format_float(row.correction_translation_m)} | "
             f"{format_float(row.correction_rotation_rad)} | {descriptor} | "
-            f"{flags} | TODO: inspect accepted marker geometry |"
+            f"{flags} | TODO | TODO: inspect accepted marker geometry | TODO |"
         )
     return lines
 
@@ -270,6 +270,10 @@ def format_report(rows: list[LoopStatusRow], args) -> str:
         "edge connects a plausible revisit, not an adjacent duplicate or an obvious "
         "registration jump. Keep the benchmark row labelled unaudited until every "
         "accepted loop above has a note.",
+        "",
+        "Decision values: `keep`, `reject`, or `unclear`. Action values: `keep`, "
+        "`tighten translation`, `tighten rotation`, `descriptor reject`, or "
+        "`manual reject`.",
         "",
     ]
     return "\n".join(lines)
