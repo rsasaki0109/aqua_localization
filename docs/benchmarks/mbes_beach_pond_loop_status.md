@@ -21,6 +21,8 @@ Do not treat the accepted loops as validated accuracy evidence yet. The next
 step is a visual false-positive audit in RViz/rerun and a longer replay window.
 The generated audit priority list for the current run is
 [`mbes_beach_pond_loop_audit.md`](mbes_beach_pond_loop_audit.md).
+The stricter keyframe-separation run is tracked in
+[`mbes_beach_pond_loop_audit_gap40.md`](mbes_beach_pond_loop_audit_gap40.md).
 
 ## Reproducible Run
 
@@ -58,6 +60,12 @@ MBES_LOOP_MIN_POINTS=120 \
 MBES_LOOP_VOXEL_LEAF_M=0.25 \
 NOTE="real replay, duration 120s, min_points=120, voxel=0.25, Humble sqlite" \
 ros2 run aqua_localization run_mbes_loop_benchmark.sh
+```
+
+To suppress near-neighbor accepted loops during audit, add:
+
+```bash
+MBES_LOOP_MIN_KEYFRAME_SEPARATION=40
 ```
 
 To run the steps manually, first check that the local `beach_pond` bag has the
@@ -145,6 +153,7 @@ completed.
 | Dataset | Sequence | Duration s | Status samples | Accepted | Rejected | No candidate | Converged | Median fitness | P95 correction m | Notes |
 |---------|----------|-----------:|---------------:|---------:|---------:|-------------:|----------:|---------------:|-----------------:|-------|
 | MBES-SLAM | `beach_pond` | 120 | 277 | 35 | 178 | 64 | 163 | 0.1930 | 3.7891 | unaudited tuning run, `min_points=120`, `voxel=0.25`, Humble sqlite |
+| MBES-SLAM | `beach_pond` | 120 | 338 | 35 | 194 | 109 | 133 | 0.9520 | 2.9900 | unaudited stricter candidate run, `min_points=120`, `voxel=0.25`, `min_keyframe_separation=40`, Humble sqlite |
 
 ## Tuning Summary
 
@@ -167,6 +176,22 @@ The descriptor sweep suggests useful first-pass descriptor gates around
 load without removing most plausible candidates. Keep descriptor gates disabled
 until the accepted-loop audit is complete.
 
+### Candidate-Separation Sweep
+
+The first false-positive-control sweep raised
+`candidates.min_keyframe_separation` from `20` to `40` while keeping
+`submaps.min_points=120` and `submaps.voxel_leaf_m=0.25`. This keeps accepted
+loop count unchanged but removes short-gap accepted loops and improves accepted
+loop fitness/correction tails.
+
+| Setting | Accepted | Short-gap accepted <= 40 | Accepted fitness median | Accepted fitness P95 | Accepted correction P95 m |
+|---------|---------:|-------------------------:|------------------------:|---------------------:|--------------------------:|
+| separation 20 | 35 | 11 | 0.1107 | 0.8911 | 3.3794 |
+| separation 40 | 35 | 0 | 0.0506 | 0.4520 | 2.4376 |
+
+This does not validate the loops by itself; it only removes a clear near-neighbor
+risk class before RViz/rerun inspection.
+
 ## False-Positive Audit
 
 Before marking this case `measured` in
@@ -175,7 +200,7 @@ accepted loop candidates against the RViz markers or rerun overlay.
 
 | Check | Required evidence | Result |
 |-------|-------------------|--------|
-| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | Pending for the 35 accepted loops in the tuned 120 s run. |
+| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | Pending for both 35-loop rows; use the gap40 audit first because short-gap accepted loops are removed. |
 | Pose-graph effect | `/aqua_pose_graph/path` changes in the expected direction after loop insertion. | TBD |
 | Registration gate | Accepted candidates have finite fitness and correction below the configured gate. | PASS for exported status: accepted fitness P95 `0.891069`, configured max `2.0`. |
 | Descriptor gate | Descriptor sweep keeps enough plausible candidates while reducing obvious misses. | Candidate starting point: centroid `1.29 m`, extent ratio `5.69`, point-count ratio `0.42`; not enabled yet. |
