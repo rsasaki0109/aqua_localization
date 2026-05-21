@@ -14,6 +14,8 @@ import numpy as np
 
 
 TRANSFORMS_SCHEMA = "aqua_localization.underwater_3dgs_transforms.v1"
+NERFSTUDIO_SCHEMA = "aqua_localization.nerfstudio_transforms.v1"
+TRANSFORM_FORMATS = {"aqua", "nerfstudio"}
 
 
 def load_json(path: Path):
@@ -231,31 +233,95 @@ def camera_info_payload(timestamp_ns: int, msg):
 
 
 def update_pack_index(pack_dir: Path, pack_index, transforms_payload):
+    metadata = transforms_payload.get("metadata", {})
+    frame_count = transforms_payload.get("frame_count", len(transforms_payload.get("frames", [])))
+    trajectory_topic = transforms_payload.get("trajectory_topic", metadata.get("trajectory_topic"))
+    trajectory_type = transforms_payload.get("trajectory_type", metadata.get("trajectory_type"))
+    max_time_diff_ns = transforms_payload.get("max_time_diff_ns", metadata.get("max_time_diff_ns"))
+    skipped_count = transforms_payload.get("skipped_count", metadata.get("skipped_count", 0))
+    intrinsics_source = transforms_payload.get("intrinsics_source", metadata.get("intrinsics_source"))
     paths = pack_index.setdefault("paths", {})
     paths["transforms"] = "transforms.json"
     paths["frames"] = "frames.json"
     pack_index["status"] = "transforms_estimated"
     pack_index["estimated_transforms"] = {
         "schema": transforms_payload["schema"],
-        "count": transforms_payload["frame_count"],
-        "trajectory_topic": transforms_payload["trajectory_topic"],
-        "trajectory_type": transforms_payload["trajectory_type"],
-        "max_time_diff_ns": transforms_payload["max_time_diff_ns"],
-        "skipped_count": transforms_payload["skipped_count"],
-        "intrinsics_source": transforms_payload.get("intrinsics_source"),
+        "count": frame_count,
+        "trajectory_topic": trajectory_topic,
+        "trajectory_type": trajectory_type,
+        "max_time_diff_ns": max_time_diff_ns,
+        "skipped_count": skipped_count,
+        "intrinsics_source": intrinsics_source,
+        "transforms_format": transforms_payload.get("format", "aqua"),
     }
     write_json(pack_dir / "pack_index.json", pack_index)
+
+
+def to_nerfstudio_payload(aqua_payload):
+    if aqua_payload.get("intrinsics_source") is None:
+        raise ValueError("nerfstudio format requires CameraInfo intrinsics")
+
+    frames = []
+    for frame in aqua_payload["frames"]:
+        frames.append(
+            {
+                "file_path": frame["file_path"],
+                "transform_matrix": frame["transform_matrix"],
+                "metadata": {
+                    "timestamp_ns": frame.get("timestamp_ns"),
+                    "frame_match_timestamp_ns": frame.get("frame_match_timestamp_ns"),
+                    "odom_timestamp_ns": frame.get("odom_timestamp_ns"),
+                    "odom_bag_timestamp_ns": frame.get("odom_bag_timestamp_ns"),
+                    "odom_message_stamp_ns": frame.get("odom_message_stamp_ns"),
+                    "time_diff_ns": frame.get("time_diff_ns"),
+                },
+            }
+        )
+
+    return {
+        "schema": NERFSTUDIO_SCHEMA,
+        "format": "nerfstudio",
+        "dataset": aqua_payload.get("dataset"),
+        "sequence": aqua_payload.get("sequence"),
+        "camera_model": aqua_payload["camera_model"],
+        "fl_x": aqua_payload["fl_x"],
+        "fl_y": aqua_payload["fl_y"],
+        "cx": aqua_payload["cx"],
+        "cy": aqua_payload["cy"],
+        "w": aqua_payload["w"],
+        "h": aqua_payload["h"],
+        "distortion_params": aqua_payload.get("distortion_params", []),
+        "frames": frames,
+        "metadata": {
+            "source_schema": aqua_payload["schema"],
+            "trajectory_topic": aqua_payload["trajectory_topic"],
+            "trajectory_type": aqua_payload["trajectory_type"],
+            "camera_info_topic": aqua_payload.get("camera_info_topic"),
+            "intrinsics_source": aqua_payload.get("intrinsics_source"),
+            "camera_pose_convention": aqua_payload.get("camera_pose_convention"),
+            "max_time_diff_ns": aqua_payload["max_time_diff_ns"],
+            "source_frame_count": aqua_payload["source_frame_count"],
+            "odometry_sample_count": aqua_payload["odometry_sample_count"],
+            "matched_frame_count": aqua_payload["frame_count"],
+            "skipped_count": aqua_payload["skipped_count"],
+            "skipped_frames": aqua_payload["skipped_frames"],
+            "notes": aqua_payload.get("notes", []),
+        },
+    }
 
 
 def build_transforms(
     manifest_path: Path,
     pack_dir: Path,
     max_time_diff_s: float = 0.05,
+    output_format: str = "aqua",
     reader=None,
     camera_info_reader=None,
 ):
     if max_time_diff_s < 0.0:
         raise ValueError("max_time_diff must be >= 0")
+    if output_format not in TRANSFORM_FORMATS:
+        raise ValueError(f"unsupported transforms format: {output_format}")
 
     manifest = load_json(manifest_path)
     role = trajectory_role(manifest)
@@ -316,6 +382,7 @@ def build_transforms(
 
     payload = {
         "schema": TRANSFORMS_SCHEMA,
+        "format": "aqua",
         "dataset": manifest.get("dataset"),
         "sequence": manifest.get("sequence"),
         "trajectory_topic": topic,
@@ -349,9 +416,10 @@ def build_transforms(
                 "camera_info": intrinsics,
             }
         )
-    write_json(pack_dir / "transforms.json", payload)
-    update_pack_index(pack_dir, pack_index, payload)
-    return payload
+    output_payload = to_nerfstudio_payload(payload) if output_format == "nerfstudio" else payload
+    write_json(pack_dir / "transforms.json", output_payload)
+    update_pack_index(pack_dir, pack_index, output_payload)
+    return output_payload
 
 
 def parse_args(argv):
@@ -366,13 +434,19 @@ def parse_args(argv):
         default=0.05,
         help="Maximum frame-to-odometry timestamp difference in seconds.",
     )
+    parser.add_argument(
+        "--format",
+        choices=sorted(TRANSFORM_FORMATS),
+        default="aqua",
+        help="Output transforms.json format.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv=None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     try:
-        payload = build_transforms(args.manifest, args.pack, args.max_time_diff)
+        payload = build_transforms(args.manifest, args.pack, args.max_time_diff, args.format)
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
