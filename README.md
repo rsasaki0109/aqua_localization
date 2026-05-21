@@ -30,7 +30,7 @@ four [rerun.io](https://rerun.io) renderings, no synthetic bag or
 simulator-only demo as the headline result. Targets BlueROV2-class ROVs,
 custom AUVs, and `uuv_simulator`. ROS 2 Humble and Jazzy are supported.
 
-Latest release: **[v0.4](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.4)**.
+Latest release: **[v0.5](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.5)**.
 
 ## Results Snapshot
 
