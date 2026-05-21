@@ -25,6 +25,8 @@ The stricter keyframe-separation run is tracked in
 [`mbes_beach_pond_loop_audit_gap40.md`](mbes_beach_pond_loop_audit_gap40.md).
 The stricter rotation/descriptor gate run is tracked in
 [`mbes_beach_pond_loop_audit_gap40_gate.md`](mbes_beach_pond_loop_audit_gap40_gate.md).
+Its accepted-loop keyframe geometry worksheet is
+[`mbes_beach_pond_loop_geometry_gap40_gate.md`](mbes_beach_pond_loop_geometry_gap40_gate.md).
 
 ## Reproducible Run
 
@@ -130,6 +132,7 @@ Expected generated files:
 | `mbes_loop_benchmark_row.py` output | One Markdown row for the measurement table below. |
 | `audit_mbes_loop_candidates.py` output | Accepted-loop visual audit priority list. |
 | `plot_mbes_loop_audit.py` output | Plan-view PNG of the pose graph and accepted-loop audit priorities. |
+| `audit_mbes_loop_geometry.py` output | Accepted-loop keyframe geometry worksheet for RViz/rerun review. |
 
 Publish the accepted-loop audit overlay in RViz:
 
@@ -227,7 +230,7 @@ accepted loop candidates against the RViz markers or rerun overlay.
 
 | Check | Required evidence | Result |
 |-------|-------------------|--------|
-| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | Pending; use the 17-loop strict gate audit first, then compare against gap40 if it removes plausible loops. |
+| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | In progress; the strict gate geometry worksheet resolves keyframe positions for 16/17 accepted loops. One high-priority row (`1105 -> 1231`) is missing keyframe geometry and must be checked in the replay bag before promotion. |
 | Pose-graph effect | `/aqua_pose_graph/path` changes in the expected direction after loop insertion. | TBD |
 | Registration gate | Accepted candidates have finite fitness and correction below the configured gate. | PASS mechanically for the strict gate row, but the two translation-near-gate accepted loops still need visual audit. |
 | Descriptor gate | Descriptor sweep keeps enough plausible candidates while reducing obvious misses. | `descriptor.max_extent_ratio=5.0` is active in the strict gate row; centroid and point-count gates remain disabled. |
