@@ -854,8 +854,7 @@ def run_ros_node(argv=None) -> int:
             self.status_pub.publish(msg)
             if self.status_csv_fp is not None:
                 write_status_csv_row(self.status_csv_fp, status)
-                if self.frames % 100 == 0:
-                    self.status_csv_fp.flush()
+                self.status_csv_fp.flush()
 
         def destroy_node(self) -> bool:
             try:
