@@ -190,6 +190,18 @@ def readiness_failures(cases: Iterable[EvaluationCase]) -> list[str]:
     return failures
 
 
+def doc_artifact_failures(cases: Iterable[EvaluationCase], repo_root: Path) -> list[str]:
+    failures = []
+    for case in cases:
+        for artifact in case.artifacts:
+            if not artifact.startswith("docs/"):
+                continue
+            path = repo_root / artifact
+            if not path.exists():
+                failures.append(f"{case.case_id}: missing documented artifact {artifact}")
+    return failures
+
+
 def parse_args(argv):
     parser = argparse.ArgumentParser(
         description="Render a real-bag benchmark manifest into Markdown."
@@ -207,6 +219,17 @@ def parse_args(argv):
         action="store_true",
         help="Fail if measured/ready cases are missing commands or cases lack metrics/baselines.",
     )
+    parser.add_argument(
+        "--check-doc-artifacts",
+        action="store_true",
+        help="Fail if artifact entries that look like docs/... paths do not exist.",
+    )
+    parser.add_argument(
+        "--repo-root",
+        type=Path,
+        default=Path.cwd(),
+        help="Repository root used by --check-doc-artifacts. Defaults to the current directory.",
+    )
     return parser.parse_args(argv)
 
 
@@ -220,6 +243,13 @@ def main(argv=None):
 
     if args.check_ready:
         failures = readiness_failures(cases)
+        if failures:
+            for failure in failures:
+                print(f"benchmark manifest check failed: {failure}", file=sys.stderr)
+            return 2
+
+    if args.check_doc_artifacts:
+        failures = doc_artifact_failures(cases, args.repo_root)
         if failures:
             for failure in failures:
                 print(f"benchmark manifest check failed: {failure}", file=sys.stderr)

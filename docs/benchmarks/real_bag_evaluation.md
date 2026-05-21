@@ -41,7 +41,7 @@ Fairness notes:
 - Baselines: `dataset reference odometry`, `no-sonar fusion`
 - Inputs: MBES point returns, IMU, reference odometry
 - Reference: dataset reference odometry when available
-- Artifacts: `rerun export`, `RViz loop markers`, `mbes_loop_status.csv`, `descriptor sweep report`
+- Artifacts: `docs/benchmarks/mbes_beach_pond_loop_status.md`, `rerun export`, `RViz loop markers`, `mbes_loop_status.csv`, `descriptor sweep report`
 
 ```bash
 ros2 run aqua_localization export_mbes_loop_status.py --bag /path/to/replay.bag --out /tmp/mbes_loop_status.csv --summary-out /tmp/mbes_loop_status.md
