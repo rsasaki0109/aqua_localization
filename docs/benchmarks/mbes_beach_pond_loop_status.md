@@ -33,6 +33,9 @@ The focused high-priority audit packet has `Decision`, `Reviewer note`, and
 [`mbes_beach_pond_loop_geometry_high_priority.md`](mbes_beach_pond_loop_geometry_high_priority.md),
 and the plan-view PNG
 [`mbes_beach_pond_loop_audit_high_priority.png`](../media/mbes_beach_pond_loop_audit_high_priority.png).
+Use `check_mbes_loop_audit_decisions.py --require-complete` before promoting
+that row from `unaudited`; it must fail while any high-priority decision,
+reviewer note, or action remains `TODO`.
 
 ## Reproducible Run
 
@@ -175,6 +178,15 @@ ros2 run aqua_localization plot_mbes_loop_audit.py \
   --priority high \
   --max-labels 14 \
   --out docs/media/mbes_beach_pond_loop_audit_high_priority.png
+```
+
+Check whether the high-priority decision worksheet is complete:
+
+```bash
+ros2 run aqua_localization check_mbes_loop_audit_decisions.py \
+  --report docs/benchmarks/mbes_beach_pond_loop_audit_high_priority.md \
+  --out /tmp/mbes_beach_pond_loop_audit_decision_summary.md \
+  --require-complete
 ```
 
 ## Measurement Table

@@ -62,6 +62,7 @@ install(PROGRAMS
   scripts/mbes_loop_benchmark_row.py
   scripts/audit_mbes_loop_candidates.py
   scripts/audit_mbes_loop_geometry.py
+  scripts/check_mbes_loop_audit_decisions.py
   scripts/publish_mbes_loop_audit_markers.py
   scripts/plot_mbes_loop_audit.py
   scripts/run_mbes_loop_benchmark.sh
@@ -112,6 +113,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_mbes_loop_benchmark_row test/test_mbes_loop_benchmark_row.py)
   ament_add_pytest_test(test_audit_mbes_loop_candidates test/test_audit_mbes_loop_candidates.py)
   ament_add_pytest_test(test_audit_mbes_loop_geometry test/test_audit_mbes_loop_geometry.py)
+  ament_add_pytest_test(test_check_mbes_loop_audit_decisions test/test_check_mbes_loop_audit_decisions.py)
   ament_add_pytest_test(test_publish_mbes_loop_audit_markers test/test_publish_mbes_loop_audit_markers.py)
   ament_add_pytest_test(test_plot_mbes_loop_audit test/test_plot_mbes_loop_audit.py)
   ament_add_pytest_test(test_run_mbes_loop_benchmark test/test_run_mbes_loop_benchmark.py)
