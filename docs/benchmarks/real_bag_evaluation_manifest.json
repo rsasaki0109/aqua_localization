@@ -1,0 +1,144 @@
+{
+  "schema": "aqua_localization.real_bag_evaluation.v1",
+  "updated": "2026-05-22",
+  "cases": [
+    {
+      "id": "tank-short-test-aqua-slam",
+      "dataset": "Tank Dataset",
+      "sequence": "short_test",
+      "status": "measured",
+      "comparison_group": "visual-dvl-imu SLAM",
+      "target_system": "aqua_localization+visual",
+      "baselines": [
+        "AQUA-SLAM"
+      ],
+      "inputs": [
+        "stereo",
+        "IMU",
+        "DVL",
+        "pressure"
+      ],
+      "reference": "AprilTag ground truth TUM trajectory",
+      "metrics": [
+        "translation APE RMSE",
+        "matched seconds",
+        "visual coverage",
+        "replay rate"
+      ],
+      "artifacts": [
+        "docs/benchmarks/tank_aqua_slam.md",
+        "visual frontend status CSV",
+        "TUM trajectories"
+      ],
+      "command": "ros2 run aqua_localization run_tank_visual_fusion_benchmark.py --profile tank_short_test_light --replay-rate 1.0",
+      "next_step": "Beat or narrow the AQUA-SLAM SE(3) RMSE gap on the same short_test window before claiming accuracy superiority.",
+      "fairness_notes": [
+        "AQUA-SLAM uses the full stereo + IMU + DVL frontend.",
+        "Report SE(3) alignment and sample count with every row."
+      ]
+    },
+    {
+      "id": "mbes-beach-pond-loop-status",
+      "dataset": "MBES-SLAM",
+      "sequence": "beach_pond",
+      "status": "scaffolded",
+      "comparison_group": "MBES registration and loop diagnostics",
+      "target_system": "aqua_localization MBES frontend",
+      "baselines": [
+        "dataset reference odometry",
+        "no-sonar fusion"
+      ],
+      "inputs": [
+        "MBES point returns",
+        "IMU",
+        "reference odometry"
+      ],
+      "reference": "dataset reference odometry when available",
+      "metrics": [
+        "translation APE RMSE",
+        "registration residual",
+        "loop accepted/rejected/no-candidate counts",
+        "descriptor gate pass rate"
+      ],
+      "artifacts": [
+        "rerun export",
+        "RViz loop markers",
+        "mbes_loop_status.csv",
+        "descriptor sweep report"
+      ],
+      "command": "ros2 run aqua_localization export_mbes_loop_status.py --bag /path/to/replay.bag --out /tmp/mbes_loop_status.csv --summary-out /tmp/mbes_loop_status.md",
+      "next_step": "Run a real replay with loop status export, then add a false-positive audit note next to the APE row.",
+      "fairness_notes": [
+        "Do not compare this as a full visual SLAM task.",
+        "Keep MBES loop closure claims separate from generic fusion baselines."
+      ]
+    },
+    {
+      "id": "ntnu-fjord-1-control",
+      "dataset": "NTNU",
+      "sequence": "subset-fjord/fjord_1",
+      "status": "measured",
+      "comparison_group": "IMU and pressure control case",
+      "target_system": "aqua_imu_loc",
+      "baselines": [
+        "dataset baseline trajectory",
+        "future robot_localization IMU-only config"
+      ],
+      "inputs": [
+        "IMU",
+        "pressure"
+      ],
+      "reference": "dataset baseline trajectory",
+      "metrics": [
+        "translation APE RMSE",
+        "depth RMSE",
+        "yaw-frame diagnostic"
+      ],
+      "artifacts": [
+        "docs/benchmarks/fjord_1.md",
+        "docs/benchmarks/fjord_1_yaw_frame.md"
+      ],
+      "command": "ros2 run aqua_localization bench_fjord_1.sh",
+      "next_step": "Add robot_localization as a generic fusion baseline for the same inputs.",
+      "fairness_notes": [
+        "This is a control case, not a strong SLAM win condition.",
+        "Use it to show why aiding sensors matter underwater."
+      ]
+    },
+    {
+      "id": "aqualoc-harbor-07-visual",
+      "dataset": "AQUALOC",
+      "sequence": "harbor_07",
+      "status": "planned",
+      "comparison_group": "future visual localization",
+      "target_system": "aqua_localization visual frontend",
+      "baselines": [
+        "RTAB-Map",
+        "dataset reference trajectory if usable"
+      ],
+      "inputs": [
+        "stereo",
+        "IMU",
+        "pressure"
+      ],
+      "reference": "TBD",
+      "metrics": [
+        "visual odometry availability",
+        "translation APE RMSE",
+        "depth RMSE",
+        "tracking dropout count"
+      ],
+      "artifacts": [
+        "camera calibration notes",
+        "TUM trajectories",
+        "tracking status CSV"
+      ],
+      "command": "",
+      "next_step": "Confirm camera calibration and reference trajectory before adding a visual SLAM baseline.",
+      "fairness_notes": [
+        "Only compare RTAB-Map after valid visual inputs are configured.",
+        "Do not use sonar-only results as a visual SLAM superiority claim."
+      ]
+    }
+  ]
+}

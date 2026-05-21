@@ -13,6 +13,23 @@ datasets and baseline comparisons.
   on Tank Dataset `short_test`, current `aqua_localization` rows, and the RMSE
   gap to the baseline.
 
+## Real-Bag Evaluation Manifest
+
+[`real_bag_evaluation_manifest.json`](real_bag_evaluation_manifest.json) pins
+the dataset cases that should become repeatable benchmark evidence before any
+"beats another OSS" claim is made. The rendered run sheet lives at
+[`real_bag_evaluation.md`](real_bag_evaluation.md). Regenerate it with:
+
+```bash
+ros2 run aqua_localization benchmark_manifest_report.py \
+  docs/benchmarks/real_bag_evaluation_manifest.json \
+  --out /tmp/aqua_real_bag_evaluation.md \
+  --check-ready
+```
+
+Use `--status measured`, `--status scaffolded`, or `--status planned` to focus
+the report before a benchmark session.
+
 ## Comparison Planning
 
 - [`oss_comparison.md`](oss_comparison.md): protocol for comparing
