@@ -97,6 +97,12 @@ The first public 3DGS input artifact is attached to
 You can inspect the frames, trajectory, intrinsics, and rebuild command on the
 [static sample pack inspector](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html).
 
+<p align="center">
+  <a href="https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html">
+    <img src="docs/media/3dgs_pack_inspector.png" alt="aqua_localization 3DGS sample pack inspector showing Tank frames, trajectory metadata, and download link" width="92%">
+  </a>
+</p>
+
 It is a small Tank Dataset `short_test` pack for quick inspection and external
 reconstruction experiments: 20 PNG frames, 20 matched `/apriltag_slam/GT`
 poses, manual Tank stereo intrinsics, and a nerfstudio-style `transforms.json`.
