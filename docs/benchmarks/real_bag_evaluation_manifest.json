@@ -61,6 +61,7 @@
         "descriptor gate pass rate"
       ],
       "artifacts": [
+        "docs/benchmarks/mbes_beach_pond_loop_status.md",
         "rerun export",
         "RViz loop markers",
         "mbes_loop_status.csv",

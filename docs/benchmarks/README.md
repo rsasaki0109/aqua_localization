@@ -12,6 +12,9 @@ datasets and baseline comparisons.
 - [`tank_aqua_slam.md`](tank_aqua_slam.md): first AQUA-SLAM Docker measurement
   on Tank Dataset `short_test`, current `aqua_localization` rows, and the RMSE
   gap to the baseline.
+- [`mbes_beach_pond_loop_status.md`](mbes_beach_pond_loop_status.md):
+  scaffolded real-bag artifact for MBES loop-status counts, descriptor sweep
+  output, and false-positive audit notes.
 
 ## Real-Bag Evaluation Manifest
 
@@ -24,7 +27,8 @@ the dataset cases that should become repeatable benchmark evidence before any
 ros2 run aqua_localization benchmark_manifest_report.py \
   docs/benchmarks/real_bag_evaluation_manifest.json \
   --out /tmp/aqua_real_bag_evaluation.md \
-  --check-ready
+  --check-ready \
+  --check-doc-artifacts
 ```
 
 Use `--status measured`, `--status scaffolded`, or `--status planned` to focus
