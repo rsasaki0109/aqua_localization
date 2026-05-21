@@ -159,6 +159,33 @@ disparity/depth statistics, temporal match counts, PnP inliers, inlier ratio,
 accepted/rejected state, and the reject reason. Use that CSV to decide whether
 the next tuning pass should focus on image features, stereo geometry, temporal
 matching, or PnP gates.
+
+When `ros2 bag play` itself is suspected of dropping or corrupting camera
+delivery, bypass ROS replay for the visual frontend and read the compressed
+images directly from the rosbag2 sqlite file:
+
+```bash
+ros2 run aqua_localization run_tank_visual_direct_benchmark.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_direct_scaled_check \
+  --sequence short_test_visual_direct_scaled_check \
+  --translation-scale 0.151788798 \
+  --base-from-camera-x-m -0.25 \
+  --base-from-camera-y-m -0.45 \
+  --max-stereo-descriptor-distance 64 \
+  --max-temporal-descriptor-distance 64 \
+  --orb-n-features 700 \
+  --orb-fast-threshold 16 \
+  --opencv-threads 2
+```
+
+On 2026-05-22 this direct replay path read `300` stereo pairs, processed
+`300/300` frames, accepted `299` frame-to-frame updates, and had `0` decode
+failures on `short_test`. The resulting SE(3) RMSE was `0.1907 m`, so it is not
+an accuracy win over the best visual row; it is a replay-isolation baseline that
+proves the bag's camera messages are decodable and keeps visual frontend tuning
+independent from ROS bag playback delivery issues.
 It also emits `*_visual_frontend_status.md` via
 `summarize_visual_frontend_status.py`, so each visual benchmark run carries a
 short tuning report next to the trajectory metrics. The same run writes
@@ -293,6 +320,7 @@ same APE implementation.
 | Tank Dataset | short_test | AQUA-SLAM | SE(3) | 234 | 11.65 | 0.0173 | 0.0165 | 0.0194 | 0.0579 | AQUA-SLAM Docker, short_test, /AQUA_SLAM/orb_odom |
 | Tank Dataset | short_test | aqua_localization | SE(3) | 5399 | 14.94 | 0.3796 | 0.4014 | 0.4291 | 0.7652 | ROS 2 Humble, IMU+pressure+DVL, same AprilTag GT export |
 | Tank Dataset | short_test | aqua_visual_frontend | SE(3) | 200 | 11.25 | 0.0815 | 0.0792 | 0.0947 | 0.2416 | stereo ORB+PnP, same-sequence scale fit from calibrate_visual_scale.py |
+| Tank Dataset | short_test_visual_direct_scaled_check | aqua_visual_frontend_direct | SE(3) | 300 | 14.95 | 0.1710 | 0.1768 | 0.1907 | 0.3282 | direct rosbag2 sqlite image replay, 300/300 visual frames, scale 0.151788798 |
 | Tank Dataset | short_test | aqua_localization+visual | SE(3) | 5399 | 14.94 | 0.3384 | 0.2928 | 0.3726 | 0.7497 | visual position update, same-sequence scale fit |
 | Tank Dataset | short_test | aqua_localization+visual | SE(3) | 5424 | 14.95 | 0.2579 | 0.2220 | 0.3228 | 1.2305 | base-frame visual odometry, same-sequence scale/extrinsic diagnostics, replay rate 0.25, visual coverage 300/300 |
 | Tank Dataset | short_test | aqua_localization+visual | SE(3) | 5400 | 14.95 | 0.1793 | 0.1394 | 0.2175 | 0.8564 | visual warmup, base-frame visual odometry, 700 ORB features, replay rate 1.0, visual coverage 300/300 |
