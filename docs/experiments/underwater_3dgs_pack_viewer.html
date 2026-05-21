@@ -309,6 +309,7 @@
     <div class="nav-links">
       <a href="underwater_3dgs_demo.html">3DGS Demo</a>
       <a href="underwater_3dgs_sample_pack.html">Workflow</a>
+      <a href="underwater_3dgs_training_smoke.html">Training Smoke</a>
       <a href="https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3">Release v0.3</a>
     </div>
   </nav>
@@ -378,6 +379,11 @@
 
     <section>
       <h2>Rebuild Command</h2>
+      <p>
+        After rebuilding or downloading the pack, use the
+        <a href="underwater_3dgs_training_smoke.html">training smoke-test guide</a>
+        to run the readiness gate before external training tools.
+      </p>
       <pre>ros2 run aqua_localization export_3dgs_pack_pipeline.py \
   --bag datasets/public/tank_dataset/short_test_ros2_with_cameras \
   --dataset "Tank Dataset" \
