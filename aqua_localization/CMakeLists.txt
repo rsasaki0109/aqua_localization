@@ -58,6 +58,7 @@ install(PROGRAMS
   scripts/run_tank_visual_fusion_sweep.py
   scripts/sweep_visual_extrinsics.py
   scripts/summarize_visual_frontend_status.py
+  scripts/compare_visual_trajectories.py
   scripts/analyze_visual_drift.py
   scripts/analyze_visual_motion_segments.py
   scripts/check_mbes_benchmark_ready.py
@@ -107,6 +108,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_run_tank_visual_fusion_sweep test/test_run_tank_visual_fusion_sweep.py)
   ament_add_pytest_test(test_sweep_visual_extrinsics test/test_sweep_visual_extrinsics.py)
   ament_add_pytest_test(test_summarize_visual_frontend_status test/test_summarize_visual_frontend_status.py)
+  ament_add_pytest_test(test_compare_visual_trajectories test/test_compare_visual_trajectories.py)
   ament_add_pytest_test(test_analyze_visual_drift test/test_analyze_visual_drift.py)
   ament_add_pytest_test(test_analyze_visual_motion_segments test/test_analyze_visual_motion_segments.py)
   ament_add_pytest_test(test_check_mbes_benchmark_ready test/test_check_mbes_benchmark_ready.py)

@@ -219,6 +219,25 @@ improved it to `0.1182 m`. That narrows the replay-isolation gap but still does
 not reproduce the older `0.0947 m` ROS replay visual row, so the next accuracy
 work should compare the direct and ROS visual trajectories on the same window
 before adding new frontend logic.
+
+When both ROS replay and direct-replay TUM files are available, compare them
+directly before interpreting either one as a frontend accuracy result:
+
+```bash
+ros2 run aqua_localization compare_visual_trajectories.py \
+  --baseline /tmp/tank_short_test_visual_frontend.tum \
+  --target /tmp/aqua_tank_visual_direct_1125_scale0105_check/short_test_visual_direct_1125_scale0105_check_visual_frontend.tum \
+  --out /tmp/aqua_tank_visual_direct_1125_scale0105_check/ros_vs_direct_visual_comparison.md \
+  --csv /tmp/aqua_tank_visual_direct_1125_scale0105_check/ros_vs_direct_visual_errors.csv \
+  --drift-threshold-m 0.05 \
+  --drift-consecutive-samples 5
+```
+
+The report aligns the target trajectory onto the baseline, writes per-sample
+errors, reports raw and aligned path-length ratios, and marks the first
+timestamp where the aligned error stays above the drift threshold. Use it to
+decide whether the gap comes from timestamp pairing/replay behavior, stale ROS
+publishers, or true visual motion-estimation differences.
 It also emits `*_visual_frontend_status.md` via
 `summarize_visual_frontend_status.py`, so each visual benchmark run carries a
 short tuning report next to the trajectory metrics. The same run writes
