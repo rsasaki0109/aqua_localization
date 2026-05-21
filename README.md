@@ -39,7 +39,7 @@ Latest release: **[v0.4](https://github.com/rsasaki0109/aqua_localization/releas
 | **Tank Dataset localization** | `short_test` DVL fusion: **0.43 m APE RMSE**; visual-aided fusion: **0.37 m** with same-sequence scale fit | Replayable public-data result |
 | **MBES bathymetry replay** | MBES-SLAM `beach_pond` multibeam fans exported to rerun and RViz tuning views | Working sonar visualization and registration path |
 | **Pose graph loop closure** | No-bag smoke demo plus experimental MBES loop-candidate markers and status diagnostics | Backend shipped, real-bag tuning still in progress |
-| **Underwater 3DGS** | v0.3 Tank 20-frame nerfstudio-style input pack with static inspector and readiness gate | Input artifact published, training smoke test next |
+| **Underwater 3DGS** | v0.3 Tank 20-frame nerfstudio-style input pack with an interactive playback viewer and readiness gate | Input artifact published, training smoke test next |
 | **OSS comparison** | AQUA-SLAM Docker anchor recorded on Tank `short_test`; comparison plan and tables live in `docs/benchmarks` | Accuracy target identified, no superiority claim yet |
 
 <p align="center">
@@ -53,7 +53,7 @@ Latest release: **[v0.4](https://github.com/rsasaki0109/aqua_localization/releas
 | **Visual overview** | [GitHub Pages](https://rsasaki0109.github.io/aqua_localization/) and [public-data results](#public-data-results) |
 | **Run the ROS stack** | [Build and launch](#run-it), then follow the [Tank Dataset demo](datasets/tank_dataset_demo.md) |
 | **Loop-closure demo** | [No-bag smoke test](#loop-closure-smoke-test) or [real-bag MBES tuning](#experimental-mbes-loop-closure) |
-| **Underwater 3DGS track** | [Demo page](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_demo.html), [sample inspector](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html), and [v0.3 pack](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
+| **Underwater 3DGS track** | [Play the sample viewer](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html), [open the demo page](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_demo.html), or download the [v0.3 pack](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
 | **Architecture and status** | [Stack map](#stack-map), [project status](#project-status), and [benchmark plans](docs/benchmarks/) |
 
 ## What It Does
@@ -102,12 +102,12 @@ pack for quick inspection and external reconstruction experiments:
 |------|------|
 | Release | [`v0.3`](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3) |
 | Download | [`tank_short_test_3dgs_pack_20frames.zip`](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
-| Inspect before downloading | [Static sample pack inspector](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html) |
+| Play before downloading | [Interactive frame + 3D camera-path viewer](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html) |
 | Rebuild the artifact | [3DGS sample pack workflow](docs/experiments/underwater_3dgs_sample_pack.md) |
 
 <p align="center">
   <a href="https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html">
-    <img src="docs/media/3dgs_pack_inspector.png" alt="aqua_localization 3DGS sample pack inspector showing Tank frames, trajectory metadata, and download link" width="92%">
+    <img src="docs/media/3dgs_pack_inspector.png" alt="aqua_localization 3DGS sample viewer showing Tank frames, trajectory metadata, and download link" width="92%">
   </a>
 </p>
 
