@@ -20,6 +20,7 @@ from typing import Iterable
 
 
 NUMERIC_FIELDS = [
+    "stereo_sync_delta_ms",
     "left_features",
     "right_features",
     "stereo_matches",
@@ -44,6 +45,8 @@ NUMERIC_FIELDS = [
 @dataclass(frozen=True)
 class VisualStatusSample:
     timestamp: float
+    right_timestamp: float
+    stereo_sync_delta_ms: float
     frame_index: int
     accepted_count: int
     rejected_count: int
@@ -90,6 +93,8 @@ def parse_float(row: dict[str, str], field: str) -> float:
 def sample_from_row(row: dict[str, str]) -> VisualStatusSample:
     return VisualStatusSample(
         timestamp=parse_float(row, "timestamp"),
+        right_timestamp=parse_float(row, "right_timestamp"),
+        stereo_sync_delta_ms=parse_float(row, "stereo_sync_delta_ms"),
         frame_index=parse_int(row, "frame_index"),
         accepted_count=parse_int(row, "accepted_count"),
         rejected_count=parse_int(row, "rejected_count"),
