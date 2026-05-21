@@ -112,6 +112,7 @@ Expected generated files:
 | `/tmp/mbes_beach_pond_descriptor_sweep.md` | Candidate descriptor threshold grid for pre-registration gating. |
 | `mbes_loop_benchmark_row.py` output | One Markdown row for the measurement table below. |
 | `audit_mbes_loop_candidates.py` output | Accepted-loop visual audit priority list. |
+| `plot_mbes_loop_audit.py` output | Plan-view PNG of the pose graph and accepted-loop audit priorities. |
 
 Publish the accepted-loop audit overlay in RViz:
 
@@ -125,6 +126,15 @@ Add `/mbes_loop_audit/markers` as a `MarkerArray` display beside the normal
 `/mbes_loop_closure/markers` topic. Red edges are the highest-priority accepted
 loops to inspect first; labels show rank, priority, keyframe IDs, fitness, and
 translation correction.
+
+For a quick non-interactive audit preview, generate the plan-view PNG:
+
+```bash
+ros2 run aqua_localization plot_mbes_loop_audit.py \
+  --bag /tmp/aqua_mbes_beach_pond_tuned_120 \
+  --csv /tmp/aqua_mbes_loop_benchmark_tuned_120/mbes_beach_pond_loop_status.csv \
+  --out docs/media/mbes_beach_pond_loop_audit.png
+```
 
 ## Measurement Table
 
