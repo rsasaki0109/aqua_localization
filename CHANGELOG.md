@@ -2,13 +2,26 @@
 
 ## Unreleased
 
+- Planned: 3DGS training smoke test from the published Tank sample pack.
+- Planned: MBES loop-closure threshold sweep and status summary on a real bag.
+- Planned: AQUA-SLAM comparison run with reproducible tables.
+
+## v0.5 - 2026-05-22
+
+This release makes the underwater 3DGS sample track easier to see, share, and
+inspect from GitHub Pages. The downloadable sample pack remains attached to
+v0.3.
+
+- Simplified the GitHub Pages landing page around the underwater 3DGS sample.
+- Reworked the sample pack inspector into a frame + 3D camera-path viewer.
+- Added Play, Pause, and Reset controls for the 20-frame Tank sample.
+- Refreshed the README/GitHub Pages screenshot to show the interactive viewer.
+- Added Open Graph and Twitter card metadata for the 3DGS Pages entry points.
+- Updated README entry points to highlight the playable sample viewer.
 - Added a 3DGS training readiness checker for nerfstudio-style sample packs.
 - Added the v0.3 sample pack readiness result to the static inspector.
 - Added a public 3DGS training smoke-test guide.
 - Added a 3DGS training smoke-test report template.
-- Planned: 3DGS training smoke test from the published Tank sample pack.
-- Planned: MBES loop-closure threshold sweep and status summary on a real bag.
-- Planned: AQUA-SLAM comparison run with reproducible tables.
 
 ## v0.4 - 2026-05-21
 
