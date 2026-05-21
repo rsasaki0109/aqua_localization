@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3DGS Sample Pack Workflow | aqua_localization</title>
+  <meta name="description" content="Small release artifact workflow for underwater 3DGS sample packs generated from aqua_localization public bags.">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #061315;
+      --band: #071719;
+      --panel: rgba(8, 28, 31, 0.86);
+      --line: rgba(177, 231, 222, 0.18);
+      --text: #effbf8;
+      --muted: #a9c9c2;
+      --cyan: #4ed9c5;
+      --gold: #f5c25a;
+      --coral: #ff796d;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    header {
+      min-height: 42vh;
+      padding: 28px clamp(20px, 5vw, 72px) 54px;
+      background:
+        linear-gradient(120deg, rgba(6, 19, 21, 0.96), rgba(9, 58, 58, 0.78)),
+        url("../media/tank_dataset_rerun.png") center / cover;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      align-content: end;
+    }
+
+    nav {
+      position: absolute;
+      top: 20px;
+      left: clamp(20px, 5vw, 72px);
+      right: clamp(20px, 5vw, 72px);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      color: var(--muted);
+    }
+
+    nav a {
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 12px;
+      background: rgba(4, 16, 18, 0.7);
+    }
+
+    h1 {
+      max-width: 980px;
+      margin: 86px 0 0;
+      font-size: clamp(2.6rem, 6vw, 6.8rem);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 760px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 1.08rem;
+    }
+
+    main {
+      background: var(--band);
+    }
+
+    section {
+      width: min(1080px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 54px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: clamp(1.7rem, 3.4vw, 3rem);
+      letter-spacing: 0;
+    }
+
+    p,
+    li {
+      color: var(--muted);
+      line-height: 1.68;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 18px;
+    }
+
+    .card strong {
+      display: block;
+      color: var(--text);
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+
+    pre {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #041012;
+      color: #d7fff7;
+      padding: 16px;
+      line-height: 1.52;
+      font-size: 0.92rem;
+    }
+
+    code {
+      color: #d7fff7;
+    }
+
+    .note {
+      border-left: 4px solid var(--gold);
+      padding: 14px 16px;
+      background: rgba(245, 194, 90, 0.09);
+      color: var(--muted);
+      border-radius: 0 8px 8px 0;
+    }
+
+    footer {
+      padding: 28px clamp(20px, 5vw, 72px);
+      color: var(--muted);
+      background: var(--bg);
+    }
+
+    @media (max-width: 780px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="../index.html">Project Page</a>
+      <a href="underwater_3dgs_demo.html">3DGS Demo Track</a>
+      <a href="https://github.com/rsasaki0109/aqua_localization">GitHub</a>
+    </nav>
+    <h1>Underwater 3DGS Sample Pack Workflow</h1>
+    <p class="lead">A small, release-ready artifact pattern for publishing 20-frame nerfstudio-style 3DGS input packs from public underwater bags.</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Artifact Target</h2>
+      <div class="grid">
+        <div class="card"><strong>Name</strong><span><code>tank_short_test_3dgs_pack_20frames.zip</code></span></div>
+        <div class="card"><strong>Format</strong><span>nerfstudio-style <code>transforms.json</code></span></div>
+        <div class="card"><strong>Scope</strong><span>20 frames, intrinsics, odometry poses, base-to-camera extrinsic</span></div>
+      </div>
+      <p class="note">The checked-in compact Tank bag does not include camera image or CameraInfo topics. Build this artifact from a Tank conversion made with camera topics included, or from another public underwater camera bag.</p>
+    </section>
+
+    <section>
+      <h2>Build Command</h2>
+      <pre>source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+ros2 run aqua_localization export_3dgs_pack_pipeline.py \
+  --bag datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --dataset "Tank Dataset" \
+  --sequence short_test \
+  --out /tmp/tank_short_test_3dgs_pack_20frames \
+  --force \
+  --max-frames 20 \
+  --stride 5 \
+  --max-time-diff 0.05 \
+  --base-from-camera -0.25 -0.45 0.0 0.0 0.0 0.0 1.0 \
+  --format nerfstudio
+
+cd /tmp
+zip -r tank_short_test_3dgs_pack_20frames.zip tank_short_test_3dgs_pack_20frames</pre>
+    </section>
+
+    <section>
+      <h2>Expected Files</h2>
+      <pre>tank_short_test_3dgs_pack_20frames/
+  README.md
+  manifest.json
+  pack_index.json
+  summary.json
+  frames.json
+  transforms.json
+  images/
+    frame_000000.png
+    ...</pre>
+    </section>
+
+    <section>
+      <h2>Minimal Checks</h2>
+      <pre>python3 -m json.tool /tmp/tank_short_test_3dgs_pack_20frames/summary.json >/dev/null
+python3 -m json.tool /tmp/tank_short_test_3dgs_pack_20frames/transforms.json >/dev/null
+find /tmp/tank_short_test_3dgs_pack_20frames/images -type f | wc -l</pre>
+    </section>
+
+    <section>
+      <h2>Release Checklist</h2>
+      <ol>
+        <li>Build the pack from a camera-enabled public bag.</li>
+        <li>Run the JSON and image-count checks.</li>
+        <li>Upload <code>tank_short_test_3dgs_pack_20frames.zip</code> to the next GitHub Release.</li>
+        <li>Add the Release URL to the 3DGS demo page.</li>
+        <li>Keep the wording experimental until a trained reconstruction artifact is published.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer>
+    <span>aqua_localization underwater 3DGS artifact workflow</span>
+  </footer>
+</body>
+</html>
