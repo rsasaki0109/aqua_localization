@@ -136,6 +136,19 @@ Visualization Manager:
       Topic:
         Value: /mbes_loop_closure/markers
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MBES loop audit overlay
+      Namespaces:
+        mbes_loop_audit/high: true
+        mbes_loop_audit/high_label: true
+        mbes_loop_audit/medium: true
+        mbes_loop_audit/medium_label: true
+        mbes_loop_audit/low: true
+        mbes_loop_audit/low_label: true
+      Topic:
+        Value: /mbes_loop_audit/markers
+      Value: true
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path

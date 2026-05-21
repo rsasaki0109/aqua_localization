@@ -113,6 +113,19 @@ Expected generated files:
 | `mbes_loop_benchmark_row.py` output | One Markdown row for the measurement table below. |
 | `audit_mbes_loop_candidates.py` output | Accepted-loop visual audit priority list. |
 
+Publish the accepted-loop audit overlay in RViz:
+
+```bash
+ros2 run aqua_localization publish_mbes_loop_audit_markers.py \
+  --bag /tmp/aqua_mbes_beach_pond_tuned_120 \
+  --csv /tmp/aqua_mbes_loop_benchmark_tuned_120/mbes_beach_pond_loop_status.csv
+```
+
+Add `/mbes_loop_audit/markers` as a `MarkerArray` display beside the normal
+`/mbes_loop_closure/markers` topic. Red edges are the highest-priority accepted
+loops to inspect first; labels show rank, priority, keyframe IDs, fitness, and
+translation correction.
+
 ## Measurement Table
 
 Fill this table only from exported summaries. Rows marked `unaudited` must not
