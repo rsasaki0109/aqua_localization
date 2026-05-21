@@ -341,11 +341,11 @@
       <p class="eyebrow">Underwater 3DGS sample</p>
       <h1><span>Underwater</span><span>3DGS Sample</span></h1>
       <p class="lead">
-        A simple entry point for viewing the Tank Dataset image pack, matched
-        poses, and localization outputs behind aqua_localization.
+        A simple entry point for playing the Tank Dataset frame sample,
+        matched poses, and camera path behind aqua_localization.
       </p>
       <div class="actions">
-        <a class="button primary" href="experiments/underwater_3dgs_pack_viewer.html">Open sample viewer</a>
+        <a class="button primary" href="experiments/underwater_3dgs_pack_viewer.html">Play sample viewer</a>
         <a class="button" href="experiments/underwater_3dgs_demo.html">Open 3D demo</a>
         <a class="button" href="https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip">Download pack</a>
       </div>
@@ -358,12 +358,13 @@
       <p>
         The published v0.3 pack contains real Tank Dataset frames, matched
         trajectory poses, camera intrinsics, and a nerfstudio-style
-        `transforms.json`. It is an input pack for underwater 3DGS experiments,
-        not a trained splat yet.
+        `transforms.json`. The viewer adds playback controls for the frame
+        sample and 3D camera path. It is an input pack for underwater 3DGS
+        experiments, not a trained splat yet.
       </p>
       <div class="focus">
-        <a class="preview" href="experiments/underwater_3dgs_pack_viewer.html" aria-label="Open the 3DGS sample pack viewer">
-          <img src="media/3dgs_pack_inspector.png" alt="3DGS sample pack inspector with underwater frames, trajectory metadata, and download link">
+        <a class="preview" href="experiments/underwater_3dgs_pack_viewer.html" aria-label="Play the 3DGS sample viewer">
+          <img src="media/3dgs_pack_inspector.png" alt="3DGS sample viewer with underwater frames, trajectory metadata, and download link">
         </a>
         <div class="facts" aria-label="3DGS sample contents">
           <div class="fact">
@@ -379,8 +380,8 @@
             <span>The pack includes intrinsics and a nerfstudio-style transform file.</span>
           </div>
           <div class="fact">
-            <strong>Static viewer</strong>
-            <span>No install needed: inspect the artifact directly in GitHub Pages.</span>
+            <strong>Playable viewer</strong>
+            <span>No install needed: play the sample directly in GitHub Pages.</span>
           </div>
         </div>
       </div>
