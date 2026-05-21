@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3DGS Sample Pack Inspector | aqua_localization</title>
+  <meta name="description" content="Static inspector for the aqua_localization Tank Dataset underwater 3DGS sample pack artifact.">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #061315;
+      --band: #071719;
+      --panel: rgba(8, 28, 31, 0.88);
+      --panel-strong: rgba(11, 39, 43, 0.94);
+      --line: rgba(177, 231, 222, 0.18);
+      --text: #effbf8;
+      --muted: #a9c9c2;
+      --cyan: #4ed9c5;
+      --gold: #f5c25a;
+      --coral: #ff796d;
+      --green: #8ccf7e;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 8;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 16px clamp(18px, 4vw, 56px);
+      border-bottom: 1px solid var(--line);
+      background: rgba(6, 19, 21, 0.92);
+      backdrop-filter: blur(14px);
+    }
+
+    nav a {
+      text-decoration: none;
+      color: var(--muted);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    header {
+      padding: 72px clamp(18px, 5vw, 72px) 44px;
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(110deg, rgba(6, 19, 21, 0.96), rgba(6, 19, 21, 0.42)),
+        url("../media/tank_3dgs_sample_contact_sheet.jpg") center / cover;
+    }
+
+    h1 {
+      max-width: 1040px;
+      margin: 0;
+      font-size: clamp(2.7rem, 6vw, 6.8rem);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 780px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: 1.06rem;
+      line-height: 1.7;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 28px;
+    }
+
+    .button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px 14px;
+      text-decoration: none;
+      color: var(--text);
+      background: rgba(7, 22, 24, 0.78);
+    }
+
+    .button.primary {
+      border-color: var(--cyan);
+      background: var(--cyan);
+      color: #061315;
+      font-weight: 760;
+    }
+
+    main {
+      background: var(--band);
+    }
+
+    section {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 56px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: clamp(1.8rem, 3.8vw, 3.2rem);
+      line-height: 1.04;
+      letter-spacing: 0;
+    }
+
+    p {
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .metric {
+      background: #081b1e;
+      padding: 24px clamp(18px, 3vw, 42px);
+      min-height: 112px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: clamp(1.7rem, 3vw, 2.4rem);
+      line-height: 1;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.45;
+    }
+
+    .inspector {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .stage,
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .stage {
+      min-height: 460px;
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 460px;
+      background: #092528;
+    }
+
+    .stage-foot {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 14px 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+    }
+
+    .panel {
+      padding: 18px;
+    }
+
+    .panel h3 {
+      margin: 0 0 10px;
+      font-size: 1.04rem;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+    }
+
+    .kv strong {
+      color: var(--text);
+      font-weight: 650;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      text-align: right;
+    }
+
+    .kv span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .contact-sheet {
+      width: 100%;
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #041012;
+    }
+
+    .frame-list {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .frame-button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(10, 34, 38, 0.84);
+      color: var(--muted);
+      padding: 9px 6px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .frame-button.active {
+      border-color: var(--cyan);
+      background: rgba(78, 217, 197, 0.18);
+      color: var(--text);
+    }
+
+    pre {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #041012;
+      color: #d7fff7;
+      padding: 16px;
+      line-height: 1.52;
+      font-size: 0.92rem;
+    }
+
+    footer {
+      padding: 28px clamp(18px, 4vw, 56px);
+      color: var(--muted);
+      background: var(--bg);
+    }
+
+    @media (max-width: 900px) {
+      .metrics,
+      .inspector {
+        grid-template-columns: 1fr;
+      }
+
+      canvas {
+        height: 360px;
+      }
+
+      .frame-list {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 520px) {
+      .kv {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+
+      .kv strong {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="../index.html">aqua_localization</a>
+    <div class="nav-links">
+      <a href="underwater_3dgs_demo.html">3DGS Demo</a>
+      <a href="underwater_3dgs_sample_pack.html">Workflow</a>
+      <a href="https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3">Release v0.3</a>
+    </div>
+  </nav>
+
+  <header>
+    <h1>3DGS Sample Pack Inspector</h1>
+    <p class="lead">
+      A static inspection page for the v0.3 Tank Dataset 3DGS input artifact:
+      real underwater frames, matched camera poses, manual stereo intrinsics,
+      and the exact Release download.
+    </p>
+    <div class="actions">
+      <a class="button primary" id="downloadTop" href="https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip">Download sample pack</a>
+      <a class="button" href="../data/tank_3dgs_sample_pack_viewer.json">Open viewer JSON</a>
+    </div>
+  </header>
+
+  <div class="metrics" aria-label="Sample pack metrics">
+    <div class="metric"><strong id="metricFrames">20</strong><span>camera frames</span></div>
+    <div class="metric"><strong id="metricTransforms">20</strong><span>matched transforms</span></div>
+    <div class="metric"><strong id="metricSkipped">0</strong><span>skipped transforms</span></div>
+    <div class="metric"><strong id="metricFormat">nerfstudio</strong><span>export format</span></div>
+  </div>
+
+  <main>
+    <section>
+      <h2>Trajectory Inspector</h2>
+      <p>
+        The plot is drawn from the published pack metadata. Select a frame to
+        inspect its matched pose and timestamp delta without downloading the
+        12MB zip first.
+      </p>
+      <div class="inspector">
+        <div class="stage">
+          <canvas id="trajectory" width="900" height="460" aria-label="Camera trajectory plot"></canvas>
+          <div class="stage-foot">
+            <span id="selectedFrame">frame 00</span>
+            <span id="selectedPose">pose loading</span>
+          </div>
+        </div>
+        <aside class="panel">
+          <h3>Pack Metadata</h3>
+          <div class="kv"><span>Dataset</span><strong id="dataset">Tank Dataset</strong></div>
+          <div class="kv"><span>Sequence</span><strong id="sequence">short_test</strong></div>
+          <div class="kv"><span>Image topic</span><strong id="imageTopic">loading</strong></div>
+          <div class="kv"><span>Trajectory topic</span><strong id="trajectoryTopic">loading</strong></div>
+          <div class="kv"><span>Intrinsics</span><strong id="intrinsics">loading</strong></div>
+          <div class="kv"><span>Camera model</span><strong id="cameraModel">loading</strong></div>
+          <div class="kv"><span>Artifact</span><strong id="artifactName">loading</strong></div>
+          <a class="button primary" id="downloadPanel" href="https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip">Download zip</a>
+        </aside>
+      </div>
+    </section>
+
+    <section>
+      <h2>Frame Contact Sheet</h2>
+      <p>
+        These are lightweight previews generated from the same 20 PNG frames
+        in the Release artifact.
+      </p>
+      <img class="contact-sheet" src="../media/tank_3dgs_sample_contact_sheet.jpg" alt="Contact sheet of 20 Tank Dataset underwater camera frames from the 3DGS sample pack">
+      <div class="frame-list" id="frameList" aria-label="Frame selector"></div>
+    </section>
+
+    <section>
+      <h2>Rebuild Command</h2>
+      <pre>ros2 run aqua_localization export_3dgs_pack_pipeline.py \
+  --bag datasets/public/tank_dataset/short_test_ros2_with_cameras \
+  --dataset "Tank Dataset" \
+  --sequence short_test \
+  --out /tmp/tank_short_test_3dgs_pack_20frames \
+  --force \
+  --max-frames 20 \
+  --stride 5 \
+  --max-time-diff 0.05 \
+  --base-from-camera -0.25 -0.45 0.0 0.0 0.0 0.0 1.0 \
+  --camera-intrinsics 612 512 655.0 655.0 306.0 256.0 \
+  --trajectory-topic /apriltag_slam/GT \
+  --format nerfstudio</pre>
+    </section>
+  </main>
+
+  <footer>
+    <span>This is an input-pack inspector, not a trained Gaussian Splatting result.</span>
+  </footer>
+
+  <script>
+    const canvas = document.getElementById("trajectory");
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const frameList = document.getElementById("frameList");
+    const selectedFrame = document.getElementById("selectedFrame");
+    const selectedPose = document.getElementById("selectedPose");
+    let pack = null;
+    let activeIndex = 0;
+
+    function fitCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function project(point, bounds, width, height) {
+      const xRange = Math.max(0.001, bounds.x[1] - bounds.x[0]);
+      const zRange = Math.max(0.001, bounds.z[1] - bounds.z[0]);
+      const x = 42 + ((point[0] - bounds.x[0]) / xRange) * (width - 84);
+      const y = height - 42 - ((point[2] - bounds.z[0]) / zRange) * (height - 84);
+      return { x, y };
+    }
+
+    function drawTrajectory() {
+      if (!pack) return;
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      ctx.fillStyle = "#092528";
+      ctx.fillRect(0, 0, width, height);
+
+      const gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, "#0a3033");
+      gradient.addColorStop(0.55, "#0b4544");
+      gradient.addColorStop(1, "#10241f");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.globalAlpha = 0.18;
+      ctx.strokeStyle = "#d7fff7";
+      ctx.lineWidth = 1;
+      for (let x = 42; x < width - 20; x += 54) {
+        ctx.beginPath();
+        ctx.moveTo(x, 28);
+        ctx.lineTo(x, height - 28);
+        ctx.stroke();
+      }
+      for (let y = 42; y < height - 20; y += 54) {
+        ctx.beginPath();
+        ctx.moveTo(28, y);
+        ctx.lineTo(width - 28, y);
+        ctx.stroke();
+      }
+
+      const points = pack.frames.map((frame) => project(frame.position, pack.bounds, width, height));
+      ctx.globalAlpha = 0.92;
+      ctx.strokeStyle = "#f5c25a";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.stroke();
+
+      points.forEach((point, index) => {
+        const active = index === activeIndex;
+        ctx.globalAlpha = active ? 1 : 0.78;
+        ctx.fillStyle = active ? "#ff796d" : "#4ed9c5";
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, active ? 7 : 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#effbf8";
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.fillText("x/z camera path from transforms.json", 18, 24);
+    }
+
+    function selectFrame(index) {
+      activeIndex = index;
+      const frame = pack.frames[index];
+      selectedFrame.textContent = `frame ${String(index).padStart(2, "0")}  ${frame.file_path}`;
+      selectedPose.textContent = `x ${frame.position[0].toFixed(3)}  y ${frame.position[1].toFixed(3)}  z ${frame.position[2].toFixed(3)}  dt ${frame.time_diff_ns} ns`;
+      document.querySelectorAll(".frame-button").forEach((button) => {
+        button.classList.toggle("active", Number(button.dataset.index) === index);
+      });
+      drawTrajectory();
+    }
+
+    function populate(data) {
+      pack = data;
+      document.getElementById("metricFrames").textContent = data.counts.frames;
+      document.getElementById("metricTransforms").textContent = data.counts.transforms;
+      document.getElementById("metricSkipped").textContent = data.counts.skipped_transforms;
+      document.getElementById("metricFormat").textContent = data.formats.transforms_format;
+      document.getElementById("dataset").textContent = data.dataset;
+      document.getElementById("sequence").textContent = data.sequence;
+      document.getElementById("imageTopic").textContent = data.inputs.image_topic;
+      document.getElementById("trajectoryTopic").textContent = data.inputs.trajectory_topic;
+      document.getElementById("intrinsics").textContent = `${data.intrinsics_source} ${data.camera.w}x${data.camera.h}`;
+      document.getElementById("cameraModel").textContent = `${data.camera.model} fx=${data.camera.fl_x}`;
+      document.getElementById("artifactName").textContent = data.artifact_name;
+      document.getElementById("downloadTop").href = data.download_url;
+      document.getElementById("downloadPanel").href = data.download_url;
+
+      frameList.innerHTML = "";
+      data.frames.forEach((frame) => {
+        const button = document.createElement("button");
+        button.className = "frame-button";
+        button.type = "button";
+        button.dataset.index = frame.index;
+        button.textContent = `frame ${String(frame.index).padStart(2, "0")}`;
+        button.addEventListener("click", () => selectFrame(frame.index));
+        frameList.appendChild(button);
+      });
+
+      selectFrame(0);
+    }
+
+    window.addEventListener("resize", () => {
+      fitCanvas();
+      drawTrajectory();
+    });
+
+    fitCanvas();
+    fetch("../data/tank_3dgs_sample_pack_viewer.json")
+      .then((response) => response.json())
+      .then(populate)
+      .catch((error) => {
+        selectedFrame.textContent = "viewer JSON failed to load";
+        selectedPose.textContent = String(error);
+      });
+  </script>
+</body>
+</html>
