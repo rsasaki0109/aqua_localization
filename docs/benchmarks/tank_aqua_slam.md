@@ -151,6 +151,38 @@ ros2 run aqua_localization run_tank_visual_benchmark.py \
   --sequence tank_sequence
 ```
 
+To compare against the direct replay path, run the ROS replay benchmark on the
+same time window. `--start-offset-s` is passed to `ros2 bag play --start-offset`,
+and `--duration-s` stops replay after that many bag-time seconds:
+
+```bash
+ros2 run aqua_localization run_tank_visual_benchmark.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_ros_1125_sync_check \
+  --sequence short_test_visual_ros_1125_sync_check \
+  --start-offset-s 0.0 \
+  --duration-s 11.25 \
+  --translation-scale 0.105024091 \
+  --base-from-camera-x-m -0.25 \
+  --base-from-camera-y-m -0.45 \
+  --max-stereo-descriptor-distance 64 \
+  --max-temporal-descriptor-distance 64 \
+  --orb-n-features 700 \
+  --orb-fast-threshold 16 \
+  --opencv-threads 2
+```
+
+On 2026-05-22 this ROS replay window produced `220` matched samples over
+`10.95` seconds with `0.1132 m` SE(3) RMSE at
+`tracking.translation_scale=0.105024091`. Comparing that trajectory against the
+direct `11.25` second replay with `compare_visual_trajectories.py` gave
+`0.0000 m` SE(3) RMSE over the shared `219` samples, and
+`compare_visual_status_timing.py` showed median timestamp delta `0.000 ms`,
+median stereo sync delta difference `0.000 ms`, and only the final five direct
+frames outside the ROS replay window. This means the earlier ROS/direct gap was
+primarily a window mismatch, not a different visual frontend trajectory.
+
 When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
 The bag replay mode also saves `*_visual_frontend_status.csv`, which contains

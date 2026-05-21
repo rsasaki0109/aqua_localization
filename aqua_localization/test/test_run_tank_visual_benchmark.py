@@ -1,8 +1,10 @@
 """Pure tests for run_tank_visual_benchmark.py."""
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -68,6 +70,8 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
         "--base-from-camera-x-m", "-0.25",
         "--base-from-camera-y-m", "-0.45",
         "--play-rate", "0.5",
+        "--start-offset-s", "1.25",
+        "--duration-s", "11.25",
         "--bag-read-ahead-queue-size", "1000",
         "--bag-disable-loan-message",
     ])
@@ -97,12 +101,15 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
         "play",
         "/tmp/tank_bag",
         "--clock",
+        "--start-offset",
+        "1.25",
         "--rate",
         "0.5",
         "--read-ahead-queue-size",
         "1000",
         "--disable-loan-message",
     ]
+    assert args.duration_s == 11.25
 
 
 def test_build_visual_command_can_enable_status_csv(tmp_path):
@@ -129,6 +136,27 @@ def test_write_replay_script_quotes_paths(tmp_path):
     assert text.startswith("#!/usr/bin/env bash\nset -euo pipefail\n")
     assert "'/tmp/with space/bag'" in text
     assert path.stat().st_mode & 0o111
+
+
+def test_run_bag_play_command_stops_after_duration(monkeypatch):
+    module = load_module()
+    terminated = []
+
+    class FakeProcess:
+        returncode = None
+
+        def wait(self, timeout=None):
+            assert timeout == pytest.approx(2.0)
+            raise subprocess.TimeoutExpired(["ros2", "bag", "play"], timeout)
+
+    fake_process = FakeProcess()
+    monkeypatch.setattr(module, "start_process", lambda command: fake_process)
+    monkeypatch.setattr(module, "terminate_process", lambda process, timeout: terminated.append((process, timeout)))
+    args = SimpleNamespace(duration_s=4.0, play_rate=2.0, stop_timeout=3.0)
+
+    module.run_bag_play_command(args, ["ros2", "bag", "play", "/tmp/bag"])
+
+    assert terminated == [(fake_process, 3.0)]
 
 
 def test_evaluate_writes_scale_report_and_markdown_row(tmp_path):
