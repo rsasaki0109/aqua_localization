@@ -72,9 +72,10 @@ The strongest paper path is not "beats every OSS package." It is:
    Map pressure to Z pose, DVL to twist, and IMU to angular velocity /
    orientation where valid. Export `/odometry/filtered` to TUM and compare
    against the AprilTag reference.
-2. **Create a generic benchmark runner wrapper.**
-   Extend the current NTNU-specific harness into a script that accepts bag,
-   launch file, odometry topic, reference TUM, output directory, and note.
+2. **Keep the real-bag evaluation manifest current.**
+   Use `real_bag_evaluation_manifest.json` plus `benchmark_manifest_report.py`
+   to track which dataset cases are measured, scaffolded, or still planned
+   before converting any result into README or paper claims.
 3. **Add a comparison table generator.**
    Convert benchmark markdown rows into a compact table for README and paper
    drafts.

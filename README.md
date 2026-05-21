@@ -264,6 +264,7 @@ Planning and validation references:
 | Overall plan | [`PLAN.md`](PLAN.md) |
 | Verified features | [`docs/mvp_checklist.md`](docs/mvp_checklist.md) |
 | Benchmarks | [`docs/benchmarks/`](docs/benchmarks) |
+| Real-bag evaluation sheet | [`real_bag_evaluation.md`](docs/benchmarks/real_bag_evaluation.md) |
 | OSS comparison | [`oss_comparison.md`](docs/benchmarks/oss_comparison.md) |
 | AQUA-SLAM comparison | [`aqua_slam_comparison.md`](docs/benchmarks/aqua_slam_comparison.md) and [`tank_aqua_slam.md`](docs/benchmarks/tank_aqua_slam.md) |
 | MBES loop closure | [`docs/mbes_loop_closure.md`](docs/mbes_loop_closure.md) |

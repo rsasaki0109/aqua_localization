@@ -17,6 +17,7 @@ install(PROGRAMS
   scripts/record_status.py
   scripts/compare_trajectories.py
   scripts/trajectory_benchmark_row.py
+  scripts/benchmark_manifest_report.py
   scripts/ingest_external_tum_result.py
   scripts/check_3dgs_bag_ready.py
   scripts/check_3dgs_training_ready.py
@@ -68,6 +69,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_record_odometry_format test/test_record_odometry_format.py)
   ament_add_pytest_test(test_compare_trajectories test/test_compare_trajectories.py)
   ament_add_pytest_test(test_trajectory_benchmark_row test/test_trajectory_benchmark_row.py)
+  ament_add_pytest_test(test_benchmark_manifest_report test/test_benchmark_manifest_report.py)
   ament_add_pytest_test(test_ingest_external_tum_result test/test_ingest_external_tum_result.py)
   ament_add_pytest_test(test_check_3dgs_bag_ready test/test_check_3dgs_bag_ready.py)
   ament_add_pytest_test(test_check_3dgs_training_ready test/test_check_3dgs_training_ready.py)
