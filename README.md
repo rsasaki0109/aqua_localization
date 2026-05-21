@@ -30,7 +30,7 @@ four [rerun.io](https://rerun.io) renderings, no synthetic bag or
 simulator-only demo as the headline result. Targets BlueROV2-class ROVs,
 custom AUVs, and `uuv_simulator`. ROS 2 Humble and Jazzy are supported.
 
-Latest release: **[v0.2](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.2)**.
+Latest release: **[v0.3](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3)**.
 
 <p align="center">
   <img src="docs/media/aqua_pipeline.svg" alt="aqua_localization pipeline from underwater sensors to filtering, sonar registration, pose graph loop closure, and visualization" width="92%">
@@ -42,6 +42,7 @@ Latest release: **[v0.2](https://github.com/rsasaki0109/aqua_localization/releas
 |------|-------------|
 | Open the visual project page | [GitHub Pages](https://rsasaki0109.github.io/aqua_localization/) |
 | Preview the underwater 3DGS research track | [3DGS demo track](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_demo.html) |
+| Download the first 3DGS sample artifact | [Tank 20-frame nerfstudio pack](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
 | Build a small 3DGS sample pack artifact | [3DGS sample pack workflow](docs/experiments/underwater_3dgs_sample_pack.md) |
 | See real underwater outputs | [Public-data results](#public-data-results) |
 | Build and launch the stack | [Run it](#run-it) |
@@ -86,6 +87,17 @@ instead of hand-captured screenshots.
   <img src="docs/media/ntnu_fjord_1_rerun.png" alt="aqua_localization on NTNU fjord_1 in rerun.io" width="49%">
   <img src="docs/media/aqualoc_harbor_07_rerun.png" alt="aqua_localization on AQUALOC harbor_07 in rerun.io" width="49%">
 </p>
+
+## Underwater 3DGS Sample Pack
+
+The first public 3DGS input artifact is attached to
+[v0.3](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3):
+[download `tank_short_test_3dgs_pack_20frames.zip`](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip).
+
+It is a small Tank Dataset `short_test` pack for quick inspection and external
+reconstruction experiments: 20 PNG frames, 20 matched `/apriltag_slam/GT`
+poses, manual Tank stereo intrinsics, and a nerfstudio-style `transforms.json`.
+This is an input-pack artifact, not a trained Gaussian Splatting result.
 
 ## Run It
 

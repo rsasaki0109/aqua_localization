@@ -273,7 +273,7 @@
         <span class="badge">GitHub Pages ready</span>
         <span class="badge">static HTML</span>
         <span class="badge">ROS bag inputs</span>
-        <span class="badge">future splat export</span>
+        <span class="badge">v0.3 sample pack</span>
       </div>
 
       <section class="panel controls" aria-label="Demo controls">
@@ -294,14 +294,24 @@
       </section>
 
       <section class="panel">
-        <h2>Implementation PR Target</h2>
+        <h2>Current Artifact</h2>
         <ul>
           <li>Generate a JSON manifest for camera frames, trajectory, depth priors, and optional MBES/submap inputs.</li>
-          <li>Create a scaffolded dataset pack with `images/`, `depth/`, `mbes/`, and `transforms_stub.json`.</li>
-          <li>Extract real ROS bag image frames into `images/` and index them in `frames.json`.</li>
-          <li>Match extracted frames to nearest odometry and write `transforms.json` with CameraInfo intrinsics in aqua or nerfstudio format.</li>
+          <li>Create a scaffolded dataset pack with <code>images/</code>, <code>depth/</code>, <code>mbes/</code>, and <code>transforms_stub.json</code>.</li>
+          <li>Extract real ROS bag image frames into <code>images/</code> and index them in <code>frames.json</code>.</li>
+          <li>Match extracted frames to nearest odometry and write <code>transforms.json</code> with CameraInfo or manual intrinsics in aqua or nerfstudio format.</li>
           <li>Keep localization metrics separate from reconstruction quality claims.</li>
         </ul>
+      </section>
+
+      <section class="panel">
+        <h2>Download Pack</h2>
+        <p>
+          The v0.3 Release includes a 20-frame Tank Dataset nerfstudio input pack:
+          images, matched <code>/apriltag_slam/GT</code> poses, manual stereo intrinsics, and
+          zero skipped transforms.
+        </p>
+        <a class="cta" href="https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip">Download sample pack</a>
       </section>
 
       <section class="panel">
@@ -319,6 +329,8 @@
   --stride 2 \
   --max-time-diff 0.05 \
   --base-from-camera -0.25 -0.45 0.0 0.0 0.0 0.0 1.0 \
+  --camera-intrinsics 612 512 655.0 655.0 306.0 256.0 \
+  --trajectory-topic /apriltag_slam/GT \
   --format nerfstudio</pre>
         </div>
         <a class="cta" href="underwater_3dgs_sample_pack.html">Open sample pack workflow</a>

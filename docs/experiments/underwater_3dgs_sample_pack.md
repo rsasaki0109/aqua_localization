@@ -1,7 +1,8 @@
 # Underwater 3DGS Sample Pack Workflow
 
-This guide describes the small artifact that should be attached to a GitHub
-Release once a camera-enabled Tank/AQUALOC bag is available locally.
+This guide describes the small artifact published with
+[v0.3](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3) and
+the workflow used to rebuild it from a camera-enabled Tank/AQUALOC bag.
 
 The current checked-in Tank `short_test_ros2` bag is intentionally small and
 does not include camera image or CameraInfo topics. Use a Tank conversion made
@@ -18,6 +19,17 @@ Tank-specific conversion and readiness checks are documented in
 - Frame count: 20 images
 - Transform format: `nerfstudio`
 - Pose convention: `world_from_camera = world_from_base @ base_from_camera`
+
+## Published Artifact
+
+- Release: [`v0.3`](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3)
+- Download: [`tank_short_test_3dgs_pack_20frames.zip`](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip)
+- Generated summary: 20 frames, 20 transforms, 0 skipped transforms
+- Intrinsics source: manual Tank stereo intrinsics
+- Trajectory topic: `/apriltag_slam/GT`
+
+This is a reproducible input pack for 3DGS tooling, not a trained splat or a
+reconstruction-quality benchmark.
 
 ## Build
 
