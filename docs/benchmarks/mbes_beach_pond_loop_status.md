@@ -19,8 +19,22 @@ measured loop counts yet.
 First acquire and convert the source bag using
 [`datasets/mbes_slam_beach_pond_acquisition.md`](../../datasets/mbes_slam_beach_pond_acquisition.md).
 
-Check that the local `beach_pond` bag has the required MBES, reference odometry,
-and IMU topics before launching a benchmark run:
+Run the full artifact pipeline:
+
+```bash
+WORKSPACE=$PWD \
+MBES_SRC=$PWD/datasets/public/mbes_slam/beach_pond_ros2 \
+MBES_OUT=/tmp/aqua_mbes_beach_pond_with_loop_status \
+OUT_DIR=/tmp/aqua_mbes_loop_benchmark \
+MBES_DURATION=120 \
+ros2 run aqua_localization run_mbes_loop_benchmark.sh
+```
+
+The runner executes the readiness check, records a results-included replay bag,
+exports `/mbes_loop_closure/status`, and writes the benchmark row.
+
+To run the steps manually, first check that the local `beach_pond` bag has the
+required MBES, reference odometry, and IMU topics:
 
 ```bash
 ros2 run aqua_localization check_mbes_benchmark_ready.py \
@@ -65,6 +79,7 @@ Expected generated files:
 | Artifact | Purpose |
 |----------|---------|
 | `/tmp/mbes_beach_pond_readiness.md` | Preflight report for required topics, message counts, and bag duration. |
+| `/tmp/aqua_mbes_beach_pond_with_loop_status` | Results-included replay bag with MBES loop diagnostics. |
 | `/tmp/mbes_beach_pond_loop_status.csv` | Raw `/mbes_loop_closure/status` samples for every tested candidate. |
 | `/tmp/mbes_beach_pond_loop_status.md` | Accepted/rejected/no-candidate counts, status reasons, fitness, correction, and descriptor quantiles. |
 | `/tmp/mbes_beach_pond_descriptor_sweep.md` | Candidate descriptor threshold grid for pre-registration gating. |

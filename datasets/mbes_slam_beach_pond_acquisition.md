@@ -105,8 +105,9 @@ Once the readiness report passes, continue with:
 WORKSPACE=$PWD \
 MBES_SRC=$PWD/datasets/public/mbes_slam/beach_pond_ros2 \
 MBES_OUT=/tmp/aqua_mbes_beach_pond_with_loop_status \
+OUT_DIR=/tmp/aqua_mbes_loop_benchmark \
 MBES_DURATION=120 \
-./aqua_localization/scripts/record_mbes_demo.sh
+ros2 run aqua_localization run_mbes_loop_benchmark.sh
 ```
 
 Then follow
