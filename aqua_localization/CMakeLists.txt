@@ -53,6 +53,7 @@ install(PROGRAMS
   scripts/visual_calibration_profile.py
   scripts/run_tank_visual_benchmark.py
   scripts/run_tank_visual_direct_benchmark.py
+  scripts/run_tank_visual_calibration_sweep.py
   scripts/run_tank_visual_matching_sweep.py
   scripts/run_tank_visual_fusion_benchmark.py
   scripts/run_tank_visual_fusion_sweep.py
@@ -104,6 +105,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_visual_calibration_profile test/test_visual_calibration_profile.py)
   ament_add_pytest_test(test_run_tank_visual_benchmark test/test_run_tank_visual_benchmark.py)
   ament_add_pytest_test(test_run_tank_visual_direct_benchmark test/test_run_tank_visual_direct_benchmark.py)
+  ament_add_pytest_test(test_run_tank_visual_calibration_sweep test/test_run_tank_visual_calibration_sweep.py)
   ament_add_pytest_test(test_run_tank_visual_matching_sweep test/test_run_tank_visual_matching_sweep.py)
   ament_add_pytest_test(test_run_tank_visual_fusion_benchmark test/test_run_tank_visual_fusion_benchmark.py)
   ament_add_pytest_test(test_run_tank_visual_fusion_sweep test/test_run_tank_visual_fusion_sweep.py)
