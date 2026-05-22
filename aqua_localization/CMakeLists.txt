@@ -67,6 +67,7 @@ install(PROGRAMS
   scripts/analyze_visual_step_errors.py
   scripts/simulate_visual_motion_prior.py
   scripts/analyze_tank_dvl_motion_prior.py
+  scripts/apply_tank_dvl_motion_prior.py
   scripts/check_mbes_benchmark_ready.py
   scripts/prepare_rosbag2_humble_metadata.py
   scripts/export_mbes_loop_status.py
@@ -131,6 +132,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_tank_dvl_prior_core test/test_tank_dvl_prior_core.py)
   ament_add_pytest_test(test_tank_rosbag_motion_inputs test/test_tank_rosbag_motion_inputs.py)
   ament_add_pytest_test(test_analyze_tank_dvl_motion_prior test/test_analyze_tank_dvl_motion_prior.py)
+  ament_add_pytest_test(test_apply_tank_dvl_motion_prior test/test_apply_tank_dvl_motion_prior.py)
   ament_add_pytest_test(test_check_mbes_benchmark_ready test/test_check_mbes_benchmark_ready.py)
   ament_add_pytest_test(test_prepare_rosbag2_humble_metadata test/test_prepare_rosbag2_humble_metadata.py)
   ament_add_pytest_test(test_convert_scalar_pressure_bag test/test_convert_scalar_pressure_bag.py)

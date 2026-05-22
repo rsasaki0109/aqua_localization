@@ -397,6 +397,38 @@ offset is calibrated. The `115 deg` offset above is same-sequence diagnostic
 tuning, not a paper-safe calibration. For a benchmark claim, calibrate that
 constant on one Tank sequence and validate the DVL-prior fusion on another.
 
+The next diagnostic applies that real DVL/IMU prior to the visual trajectory
+instead of only comparing per-step direction:
+
+```bash
+ros2 run aqua_localization apply_tank_dvl_motion_prior.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --visual /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99/short_test_visual_pnp_1125_strict_ratio_repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99_visual_frontend.tum \
+  --mode replace-outliers \
+  --dvl-frame-yaw-offset-deg -90 \
+  --imu-yaw-offset-deg 115 \
+  --prior-scale 1.25375 \
+  --out-dir /tmp/aqua_tank_dvl_motion_prior_apply_replace_scale125
+```
+
+On 2026-05-23 this real-prior application reduced the best strict PnP visual
+row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction, while using
+the DVL/IMU prior on `127/217` visual steps. That is close to the oracle-prior
+upper-bound result of `0.0280 m`, but it still uses same-sequence calibration
+for the IMU yaw offset and DVL scale. Without the DVL scale correction
+(`--prior-scale 1.0`), `replace-outliers` still improved the row to `0.0597 m`.
+
+| Application | Prior scale | Blend alpha | Corrected RMSE m | Improvement | Prior-applied steps | Readout |
+|-------------|------------:|------------:|-----------------:|------------:|--------------------:|---------|
+| `replace-outliers` | 1.00000 | n/a | 0.0597 | 47.1% | 128/217 | real prior helps without scale calibration |
+| `replace-outliers` | 1.25375 | n/a | 0.0323 | 71.4% | 127/217 | near oracle, same-sequence scale diagnostic |
+| `blend-outliers` | 1.25375 | 0.75 | 0.0486 | 56.9% | 127/217 | softer but less accurate on this sequence |
+
+The practical next step is to move these calibrated constants out of ad hoc CLI
+arguments and into a Tank DVL prior profile, then validate the profile on a
+held-out Tank sequence before treating the result as a benchmark claim.
+
 When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
 The bag replay mode also saves `*_visual_frontend_status.csv`, which contains

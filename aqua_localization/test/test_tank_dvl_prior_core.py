@@ -222,6 +222,42 @@ def test_build_dvl_prior_steps_accepts_imu_yaw_records():
     np.testing.assert_allclose([step.direction_cosine for step in steps], [1.0, 1.0])
 
 
+def test_build_dvl_prior_deltas_applies_prior_scale():
+    module = load_module()
+    records = [
+        module.DvlRecord(0.0, np.asarray([1.0, 0.0, 0.0], dtype=np.float64)),
+        module.DvlRecord(1.0, np.asarray([1.0, 0.0, 0.0], dtype=np.float64)),
+        module.DvlRecord(2.0, np.asarray([1.0, 0.0, 0.0], dtype=np.float64)),
+    ]
+    visual_times = np.asarray([0.0, 1.0, 2.0], dtype=np.float64)
+    reference_tum = np.asarray([tum_row(0.0), tum_row(2.0)], dtype=np.float64)
+
+    deltas = module.build_dvl_prior_deltas(
+        visual_times,
+        records,
+        reference_tum,
+        "body_raw",
+        prior_scale=2.0,
+    )
+
+    assert len(deltas) == 2
+    assert all(delta.covered for delta in deltas)
+    np.testing.assert_allclose([delta.delta_xyz for delta in deltas], [[2.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+
+
+def test_positions_from_deltas_accumulates_scaled_steps():
+    module = load_module()
+    times = np.asarray([0.0, 1.0, 2.0], dtype=np.float64)
+    deltas = [
+        module.DvlPriorDelta(0.0, 1.0, np.asarray([1.0, 0.0, 0.0]), 2, True),
+        module.DvlPriorDelta(1.0, 2.0, np.asarray([0.0, 2.0, 0.0]), 2, True),
+    ]
+
+    xyz = module.positions_from_deltas(times, np.asarray([10.0, 20.0, 0.0]), deltas)
+
+    np.testing.assert_allclose(xyz, [[10.0, 20.0, 0.0], [11.0, 20.0, 0.0], [11.0, 22.0, 0.0]])
+
+
 def test_stats_handles_empty_and_interpolated_percentiles():
     module = load_module()
 
