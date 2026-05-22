@@ -238,6 +238,25 @@ errors, reports raw and aligned path-length ratios, and marks the first
 timestamp where the aligned error stays above the drift threshold. Use it to
 decide whether the gap comes from timestamp pairing/replay behavior, stale ROS
 publishers, or true visual motion-estimation differences.
+
+For a lower-level replay check, compare the visual frontend status CSVs. New
+status logs include the left timestamp, right timestamp, and stereo sync delta,
+while older status logs still compare by left timestamp and frame index:
+
+```bash
+ros2 run aqua_localization compare_visual_status_timing.py \
+  --baseline-status /tmp/aqua_tank_visual_base_extrinsic_benchmark/short_test_visual_base_extrinsic_visual_frontend_status.csv \
+  --target-status /tmp/aqua_tank_visual_direct_1125_scale0105_check/short_test_visual_direct_1125_scale0105_check_visual_frontend_status.csv \
+  --out /tmp/aqua_tank_visual_direct_1125_scale0105_check/ros_vs_direct_status_timing.md \
+  --csv /tmp/aqua_tank_visual_direct_1125_scale0105_check/ros_vs_direct_status_timing.csv \
+  --timestamp-slop-ms 1.0
+```
+
+This writes a correspondence table with frame-index deltas, left timestamp
+deltas, stereo sync delta differences, acceptance/status mismatches, and feature
+or PnP count deltas. Use it before changing ORB/PnP logic: if the first
+timestamp or frame-index mismatch appears early, the benchmark path still needs
+replay/pairing cleanup.
 It also emits `*_visual_frontend_status.md` via
 `summarize_visual_frontend_status.py`, so each visual benchmark run carries a
 short tuning report next to the trajectory metrics. The same run writes

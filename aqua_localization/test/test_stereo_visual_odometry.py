@@ -9,6 +9,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pytest
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "stereo_visual_odometry.py"
@@ -156,9 +157,11 @@ def test_make_status_reports_tracking_diagnostics():
         total_time_ms=16.75,
     )
 
-    status = module.make_status(12.5, 3, 2, 1, frame, estimate, times)
+    status = module.make_status(12.5, 12.503, 3, 2, 1, frame, estimate, times)
     payload = json.loads(module.status_to_json(status))
 
+    assert payload["right_timestamp"] == 12.503
+    assert payload["stereo_sync_delta_ms"] == pytest.approx(3.0)
     assert payload["left_features"] == 40
     assert payload["stereo_points"] == 11
     assert payload["disparity_median_px"] == 4.0
@@ -178,6 +181,8 @@ def test_status_csv_writer_emits_stable_columns():
     module = load_module()
     status = module.VisualFrontendStatus(
         stamp_s=1.25,
+        right_stamp_s=1.2515,
+        stereo_sync_delta_ms=1.5,
         frame_index=2,
         accepted_count=1,
         rejected_count=1,
@@ -209,6 +214,8 @@ def test_status_csv_writer_emits_stable_columns():
 
     rows = list(csv.DictReader(io.StringIO(fp.getvalue())))
     assert rows[0]["timestamp"] == "1.250000000"
+    assert rows[0]["right_timestamp"] == "1.251500000"
+    assert rows[0]["stereo_sync_delta_ms"] == "1.500000"
     assert rows[0]["disparity_median_px"] == "4.000000000"
     assert rows[0]["depth_p95_m"] == "3.000000000"
     assert rows[0]["decode_time_ms"] == "1.250"

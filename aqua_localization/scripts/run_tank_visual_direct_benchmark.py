@@ -268,6 +268,7 @@ def process_stereo_pairs_direct(
 
             status = svo.make_status(
                 frame.stamp_s,
+                right_record.stamp_s,
                 processed,
                 accepted,
                 rejected,

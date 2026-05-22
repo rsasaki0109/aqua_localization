@@ -106,6 +106,8 @@ class MotionEstimate:
 @dataclass(frozen=True)
 class VisualFrontendStatus:
     stamp_s: float
+    right_stamp_s: float
+    stereo_sync_delta_ms: float
     frame_index: int
     accepted_count: int
     rejected_count: int
@@ -133,6 +135,8 @@ class VisualFrontendStatus:
 
 STATUS_CSV_FIELDS = [
     "timestamp",
+    "right_timestamp",
+    "stereo_sync_delta_ms",
     "frame_index",
     "accepted_count",
     "rejected_count",
@@ -455,6 +459,7 @@ def finite_percentile(values: np.ndarray, q: float) -> float:
 
 def make_status(
     stamp_s: float,
+    right_stamp_s: float,
     frame_index: int,
     accepted_count: int,
     rejected_count: int,
@@ -467,6 +472,8 @@ def make_status(
     depths = frame.points3d[:, 2] if frame.points3d.size else np.asarray([], dtype=np.float32)
     return VisualFrontendStatus(
         stamp_s=stamp_s,
+        right_stamp_s=right_stamp_s,
+        stereo_sync_delta_ms=abs(right_stamp_s - stamp_s) * 1000.0,
         frame_index=frame_index,
         accepted_count=accepted_count,
         rejected_count=rejected_count,
@@ -496,6 +503,8 @@ def make_status(
 def status_to_dict(status: VisualFrontendStatus) -> dict:
     return {
         "timestamp": status.stamp_s,
+        "right_timestamp": status.right_stamp_s,
+        "stereo_sync_delta_ms": status.stereo_sync_delta_ms,
         "frame_index": status.frame_index,
         "accepted_count": status.accepted_count,
         "rejected_count": status.rejected_count,
@@ -534,6 +543,8 @@ def write_status_csv_header(fp):
 def write_status_csv_row(fp, status: VisualFrontendStatus):
     row = status_to_dict(status)
     row["timestamp"] = f"{status.stamp_s:.9f}"
+    row["right_timestamp"] = f"{status.right_stamp_s:.9f}"
+    row["stereo_sync_delta_ms"] = f"{status.stereo_sync_delta_ms:.6f}"
     row["inlier_ratio"] = f"{status.inlier_ratio:.9f}"
     row["step_translation_m"] = f"{status.step_translation_m:.9f}"
     for field in (
@@ -771,7 +782,12 @@ def run_ros_node(argv=None) -> int:
                     0,
                     "initialized",
                 )
-                self.publish_status(frame, init_estimate, processing_times)
+                self.publish_status(
+                    frame,
+                    init_estimate,
+                    processing_times,
+                    stamp_to_seconds(right_msg.header.stamp),
+                )
                 return
 
             tracking_start = time.perf_counter()
@@ -805,6 +821,7 @@ def run_ros_node(argv=None) -> int:
                     tracking_time_ms=tracking_time_ms,
                     total_time_ms=total_time_ms,
                 ),
+                stamp_to_seconds(right_msg.header.stamp),
             )
 
         def publish_odometry(self, stamp, inliers: int, matches: int):
@@ -839,9 +856,11 @@ def run_ros_node(argv=None) -> int:
             frame: VisualFrame,
             estimate: MotionEstimate,
             processing_times: ProcessingTimes,
+            right_stamp_s: float,
         ):
             status = make_status(
                 frame.stamp_s,
+                right_stamp_s,
                 self.frames,
                 self.accepted,
                 self.rejected,
