@@ -40,6 +40,53 @@ def test_parse_args_sets_deployable_prior_defaults(tmp_path):
     assert args.corrected_out == args.out_dir / "tank_dvl_motion_prior_corrected.tum"
 
 
+def test_parse_args_loads_profile_defaults_and_allows_override(tmp_path):
+    module = load_module()
+    profile = tmp_path / "profile.yaml"
+    profile.write_text(
+        "\n".join([
+            "format_version: 1",
+            "name: profiled_prior",
+            "metadata:",
+            "  calibration_sequence: short_test",
+            "  validation_sequence: Medium",
+            "prior:",
+            "  dvl_yaw_mode: imu_yaw",
+            "  dvl_frame_yaw_offset_deg: -90.0",
+            "  imu_yaw_offset_deg: 115.0",
+            "  prior_scale: 1.25375",
+            "application:",
+            "  mode: replace-outliers",
+            "  blend_alpha: 0.5",
+            "  min_prior_step_m: 0.0001",
+            "  min_length_ratio: 0.5",
+            "  max_length_ratio: 1.5",
+            "  min_direction_cosine: 0.5",
+        ]),
+        encoding="utf-8",
+    )
+
+    args = module.parse_args([
+        "--profile",
+        str(profile),
+        "--bag",
+        str(tmp_path / "bag"),
+        "--reference",
+        str(tmp_path / "ref.tum"),
+        "--visual",
+        str(tmp_path / "visual.tum"),
+        "--prior-scale",
+        "1.1",
+    ])
+
+    assert args.profile_label == "profiled_prior"
+    assert args.profile_calibration_sequence == "short_test"
+    assert args.profile_validation_sequence == "Medium"
+    assert args.mode == "replace-outliers"
+    assert args.prior_scale == 1.1
+    assert args.imu_yaw_offset_deg == 115.0
+
+
 def test_prior_step_quality_rows_merges_dvl_coverage_and_gate_rows():
     module = load_module()
     from simulate_visual_motion_prior import PriorStep

@@ -14,6 +14,7 @@ import sys
 import numpy as np
 
 import simulate_visual_motion_prior as prior_sim
+import tank_dvl_prior_profile
 from tank_dvl_prior_core import DvlPriorDelta, build_dvl_prior_deltas, positions_from_deltas
 from tank_rosbag_motion_inputs import (
     DEFAULT_DVL_TOPIC,
@@ -36,6 +37,20 @@ class TankDvlPriorApplicationResult:
     corrected_tum: Path
     aligned_visual_tum: Path
     dvl_prior_tum: Path
+
+
+PROFILE_DEFAULTS = {
+    "dvl_yaw_mode": "imu_yaw",
+    "dvl_frame_yaw_offset_deg": -90.0,
+    "imu_yaw_offset_deg": 115.0,
+    "prior_scale": 1.0,
+    "mode": "blend-outliers",
+    "blend_alpha": 0.5,
+    "min_prior_step_m": 1.0e-4,
+    "min_length_ratio": 0.5,
+    "max_length_ratio": 1.5,
+    "min_direction_cosine": 0.5,
+}
 
 
 def load_compare_module():
@@ -140,6 +155,10 @@ def format_markdown(args, result: TankDvlPriorApplicationResult, sim_rows: list[
         f"- Bag: `{args.bag}`",
         f"- Reference: `{args.reference}`",
         f"- Visual estimate: `{args.visual}`",
+        f"- Profile: `{args.profile}`",
+        f"- Profile label: `{args.profile_label}`",
+        f"- Calibration sequence: `{args.profile_calibration_sequence}`",
+        f"- Validation sequence: `{args.profile_validation_sequence}`",
         f"- DVL topic: `{args.dvl_topic}`",
         f"- IMU topic: `{args.imu_topic}`",
         f"- DVL yaw mode: `{args.dvl_yaw_mode}`",
@@ -237,35 +256,55 @@ def run_application(args) -> tuple[TankDvlPriorApplicationResult, list[prior_sim
 
 
 def parse_args(argv):
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--profile", type=Path)
+    pre_args, _ = pre_parser.parse_known_args(argv)
+    defaults = dict(PROFILE_DEFAULTS)
+    profile = {}
+    if pre_args.profile is not None:
+        profile = tank_dvl_prior_profile.load_profile(pre_args.profile)
+        defaults.update(tank_dvl_prior_profile.profile_arg_defaults(pre_args.profile))
+
     parser = argparse.ArgumentParser(
         description="Apply a Tank DVL/IMU motion prior to a visual trajectory."
     )
+    parser.add_argument("--profile", type=Path, default=pre_args.profile)
     parser.add_argument("--bag", required=True, type=Path)
     parser.add_argument("--reference", required=True, type=Path)
     parser.add_argument("--visual", required=True, type=Path)
     parser.add_argument("--dvl-topic", default=DEFAULT_DVL_TOPIC)
     parser.add_argument("--imu-topic", default=DEFAULT_IMU_TOPIC)
-    parser.add_argument("--dvl-yaw-mode", choices=["body_raw", "gt_yaw", "imu_yaw"], default="imu_yaw")
-    parser.add_argument("--dvl-frame-yaw-offset-deg", type=float, default=-90.0)
-    parser.add_argument("--imu-yaw-offset-deg", type=float, default=115.0)
-    parser.add_argument("--prior-scale", type=float, default=1.0)
+    parser.add_argument("--dvl-yaw-mode", choices=["body_raw", "gt_yaw", "imu_yaw"], default=defaults["dvl_yaw_mode"])
+    parser.add_argument("--dvl-frame-yaw-offset-deg", type=float, default=defaults["dvl_frame_yaw_offset_deg"])
+    parser.add_argument("--imu-yaw-offset-deg", type=float, default=defaults["imu_yaw_offset_deg"])
+    parser.add_argument("--prior-scale", type=float, default=defaults["prior_scale"])
     parser.add_argument(
         "--mode",
         choices=["replace-outliers", "blend-outliers", "blend-all"],
-        default="blend-outliers",
+        default=defaults["mode"],
     )
-    parser.add_argument("--blend-alpha", type=float, default=0.5)
-    parser.add_argument("--min-prior-step-m", type=float, default=1.0e-4)
-    parser.add_argument("--min-length-ratio", type=float, default=0.5)
-    parser.add_argument("--max-length-ratio", type=float, default=1.5)
-    parser.add_argument("--min-direction-cosine", type=float, default=0.5)
+    parser.add_argument("--blend-alpha", type=float, default=defaults["blend_alpha"])
+    parser.add_argument("--min-prior-step-m", type=float, default=defaults["min_prior_step_m"])
+    parser.add_argument("--min-length-ratio", type=float, default=defaults["min_length_ratio"])
+    parser.add_argument("--max-length-ratio", type=float, default=defaults["max_length_ratio"])
+    parser.add_argument("--min-direction-cosine", type=float, default=defaults["min_direction_cosine"])
     parser.add_argument("--out-dir", type=Path, default=Path("/tmp/aqua_tank_dvl_motion_prior_apply"))
     parser.add_argument("--summary-out", type=Path, default=None)
     parser.add_argument("--csv-out", type=Path, default=None)
     parser.add_argument("--corrected-out", type=Path, default=None)
     parser.add_argument("--aligned-visual-out", type=Path, default=None)
     parser.add_argument("--dvl-prior-out", type=Path, default=None)
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    args.profile_data = profile
+    args.profile_label = (
+        tank_dvl_prior_profile.profile_label(args.profile, profile)
+        if args.profile is not None
+        else ""
+    )
+    metadata = profile.get("metadata", {}) if isinstance(profile, dict) else {}
+    args.profile_calibration_sequence = metadata.get("calibration_sequence", "") if isinstance(metadata, dict) else ""
+    args.profile_validation_sequence = metadata.get("validation_sequence", "") if isinstance(metadata, dict) else ""
+    return args
 
 
 def fill_default_outputs(args) -> None:
