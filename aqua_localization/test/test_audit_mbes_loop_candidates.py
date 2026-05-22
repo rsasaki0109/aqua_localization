@@ -141,6 +141,8 @@ def test_report_contains_summary_tables(tmp_path):
     assert "No-candidate statuses: 1" in text
     assert "42 -> 64" in text
     assert "TODO: inspect accepted marker geometry" in text
+    assert "Decision | Reviewer note | Action" in text
+    assert "`tighten translation`" in text
     assert "fitness score exceeds gate" in text
 
 
