@@ -177,6 +177,15 @@ def accepted_audit_rows(rows: Iterable[LoopStatusRow], args) -> list[AuditRow]:
     )
 
 
+def filter_audit_rows(
+    audit_rows: Iterable[AuditRow],
+    priority: str = "all",
+) -> list[AuditRow]:
+    if priority == "all":
+        return list(audit_rows)
+    return [row for row in audit_rows if row.priority == priority]
+
+
 def status_counts(rows: Iterable[LoopStatusRow]) -> Counter[str]:
     return Counter(row.status for row in rows)
 
@@ -232,11 +241,12 @@ def format_status_table(rows: list[LoopStatusRow], max_reasons: int) -> list[str
 
 
 def format_report(rows: list[LoopStatusRow], args) -> str:
-    audit_rows = accepted_audit_rows(rows, args)
+    audit_rows = filter_audit_rows(accepted_audit_rows(rows, args), args.priority)
     lines = [
         "# MBES Loop Candidate Visual Audit",
         "",
         f"- Source CSV: `{args.csv}`",
+        f"- Priority filter: {args.priority}",
         f"- Gate assumptions: fitness <= {args.max_fitness:g}, "
         f"translation <= {args.max_translation_m:g} m, "
         f"rotation <= {args.max_rotation_rad:g} rad",
@@ -271,6 +281,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--out", type=Path, help="Optional Markdown output path")
     parser.add_argument("--max-accepted", type=int, default=100)
     parser.add_argument("--max-reasons", type=int, default=12)
+    parser.add_argument(
+        "--priority",
+        choices=("all", "high", "medium", "low"),
+        default="all",
+        help="Only include accepted loops with this audit priority",
+    )
     parser.add_argument("--max-fitness", type=float, default=2.0)
     parser.add_argument("--max-translation-m", type=float, default=5.0)
     parser.add_argument("--max-rotation-rad", type=float, default=0.5)

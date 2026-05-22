@@ -144,6 +144,24 @@ def test_report_contains_summary_tables(tmp_path):
     assert "fitness score exceeds gate" in text
 
 
+def test_report_can_filter_to_high_priority_rows(tmp_path):
+    module = load_module()
+    path = tmp_path / "status.csv"
+    write_status_csv(path)
+
+    args = module.parse_args([
+        "--csv",
+        str(path),
+        "--priority",
+        "high",
+    ])
+    text = module.format_report(module.read_loop_status_csv(path), args)
+
+    assert "Priority filter: high" in text
+    assert "42 -> 64" in text
+    assert "10 -> 70" not in text
+
+
 def test_cli_writes_audit_report(tmp_path):
     csv_path = tmp_path / "status.csv"
     out = tmp_path / "audit.md"
