@@ -22,6 +22,8 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "MBES_LOOP_MIN_POINTS": "120",
             "MBES_LOOP_VOXEL_LEAF_M": "0.25",
             "POSE_GRAPH_KEYFRAME_TRANSLATION_M": "1.0",
+            "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD": "0.4",
+            "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO": "5.0",
         }
     )
 
@@ -44,6 +46,10 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "MBES_LOOP_MIN_POINTS=120" in proc.stdout
     assert "MBES_LOOP_VOXEL_LEAF_M=0.25" in proc.stdout
     assert "POSE_GRAPH_KEYFRAME_TRANSLATION_M=1.0" in proc.stdout
+    assert "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4" in proc.stdout
+    assert "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0" in proc.stdout
+    assert "--max-rotation-rad 0.4" in proc.stdout
+    assert "--descriptor-extent-warn 5.0" in proc.stdout
     assert "MBES loop benchmark artifacts:" in proc.stdout
 
 

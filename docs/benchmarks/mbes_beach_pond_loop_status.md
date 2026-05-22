@@ -23,6 +23,8 @@ The generated audit priority list for the current run is
 [`mbes_beach_pond_loop_audit.md`](mbes_beach_pond_loop_audit.md).
 The stricter keyframe-separation run is tracked in
 [`mbes_beach_pond_loop_audit_gap40.md`](mbes_beach_pond_loop_audit_gap40.md).
+The stricter rotation/descriptor gate run is tracked in
+[`mbes_beach_pond_loop_audit_gap40_gate.md`](mbes_beach_pond_loop_audit_gap40_gate.md).
 
 ## Reproducible Run
 
@@ -66,6 +68,13 @@ To suppress near-neighbor accepted loops during audit, add:
 
 ```bash
 MBES_LOOP_MIN_KEYFRAME_SEPARATION=40
+```
+
+To also suppress high-rotation and large-extent accepted candidates, add:
+
+```bash
+MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4 \
+MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0
 ```
 
 To run the steps manually, first check that the local `beach_pond` bag has the
@@ -154,6 +163,7 @@ completed.
 |---------|----------|-----------:|---------------:|---------:|---------:|-------------:|----------:|---------------:|-----------------:|-------|
 | MBES-SLAM | `beach_pond` | 120 | 277 | 35 | 178 | 64 | 163 | 0.1930 | 3.7891 | unaudited tuning run, `min_points=120`, `voxel=0.25`, Humble sqlite |
 | MBES-SLAM | `beach_pond` | 120 | 338 | 35 | 194 | 109 | 133 | 0.9520 | 2.9900 | unaudited stricter candidate run, `min_points=120`, `voxel=0.25`, `min_keyframe_separation=40`, Humble sqlite |
+| MBES-SLAM | `beach_pond` | 120 | 462 | 17 | 261 | 184 | 110 | 25.4749 | 4.7003 | unaudited strict gate run, `min_points=120`, `voxel=0.25`, `min_keyframe_separation=40`, `max_rotation=0.4`, `descriptor_extent=5.0`, Humble sqlite |
 
 ## Tuning Summary
 
@@ -172,9 +182,8 @@ reasons were:
 
 The descriptor sweep suggests useful first-pass descriptor gates around
 `centroid <= 1.29 m`, `extent ratio <= 5.69`, and
-`point-count ratio >= 0.42` if the next replay needs to reduce registration
-load without removing most plausible candidates. Keep descriptor gates disabled
-until the accepted-loop audit is complete.
+`point-count ratio >= 0.42` if a replay needs to reduce registration load
+without removing most plausible candidates.
 
 ### Candidate-Separation Sweep
 
@@ -192,6 +201,24 @@ loop fitness/correction tails.
 This does not validate the loops by itself; it only removes a clear near-neighbor
 risk class before RViz/rerun inspection.
 
+### Rotation And Descriptor Gate Sweep
+
+The next sweep kept `min_keyframe_separation=40` and added
+`gates.max_correction_rotation_rad=0.4` plus
+`descriptor.max_extent_ratio=5.0`. It removes the obvious rotation-near-gate and
+large-extent accepted candidates, but it is aggressive: accepted loops drop from
+35 to 17 and no-candidate statuses rise from 109 to 184.
+
+| Setting | Accepted | High-risk accepted | Accepted fitness median | Accepted fitness P95 | Accepted correction P95 m | Accepted rotation P95 rad |
+|---------|---------:|-------------------:|------------------------:|---------------------:|--------------------------:|--------------------------:|
+| separation 40 | 35 | 5 | 0.0506 | 0.4520 | 2.4376 | 0.4259 |
+| separation 40 + rotation/extent gates | 17 | 2 | 0.0198 | 0.8012 | 4.1239 | 0.3793 |
+
+Use the strict gate run as an audit candidate set, not as the default profile
+yet. The two remaining high-priority accepted loops are translation-near-gate
+cases (`396 -> 1108` and `48 -> 709`) and need visual inspection before
+tightening the translation gate.
+
 ## False-Positive Audit
 
 Before marking this case `measured` in
@@ -200,10 +227,10 @@ accepted loop candidates against the RViz markers or rerun overlay.
 
 | Check | Required evidence | Result |
 |-------|-------------------|--------|
-| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | Pending for both 35-loop rows; use the gap40 audit first because short-gap accepted loops are removed. |
+| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | Pending; use the 17-loop strict gate audit first, then compare against gap40 if it removes plausible loops. |
 | Pose-graph effect | `/aqua_pose_graph/path` changes in the expected direction after loop insertion. | TBD |
-| Registration gate | Accepted candidates have finite fitness and correction below the configured gate. | PASS for exported status: accepted fitness P95 `0.891069`, configured max `2.0`. |
-| Descriptor gate | Descriptor sweep keeps enough plausible candidates while reducing obvious misses. | Candidate starting point: centroid `1.29 m`, extent ratio `5.69`, point-count ratio `0.42`; not enabled yet. |
+| Registration gate | Accepted candidates have finite fitness and correction below the configured gate. | PASS mechanically for the strict gate row, but the two translation-near-gate accepted loops still need visual audit. |
+| Descriptor gate | Descriptor sweep keeps enough plausible candidates while reducing obvious misses. | `descriptor.max_extent_ratio=5.0` is active in the strict gate row; centroid and point-count gates remain disabled. |
 | Duplicate suppression | Near-repeat accepted loops are suppressed by keyframe gap / cooldown settings. | PASS mechanically: 103 `duplicate loop suppressed` statuses. Visual audit still pending. |
 
 ## Promotion Rule
