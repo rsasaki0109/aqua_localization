@@ -295,6 +295,33 @@ meaningful direction jitter. A useful motion prior should therefore constrain
 both step magnitude and direction, and should bridge rejected/noisy steps rather
 than only tightening PnP gates.
 
+Before implementing a production IMU/DVL prior, use the reference as an oracle
+motion prior to estimate the possible upside:
+
+```bash
+ros2 run aqua_localization simulate_visual_motion_prior.py \
+  /tmp/tank_short_test_gt.tum \
+  /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99/short_test_visual_pnp_1125_strict_ratio_repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99_visual_frontend.tum \
+  --out-dir /tmp/aqua_tank_visual_motion_prior_oracle \
+  --mode replace-outliers \
+  --min-length-ratio 0.5 \
+  --max-length-ratio 1.5 \
+  --min-direction-cosine 0.5
+```
+
+This is not a benchmark claim because it uses the reference trajectory as the
+prior. It answers a narrower engineering question: if an IMU/DVL prior could
+detect and replace visual steps with bad magnitude or direction, how much of
+the current visual error could it remove?
+
+The first oracle-prior simulation on 2026-05-23 used the best strict PnP row
+(`0.1128 m` RMSE). Replacing visual steps outside the length-ratio window
+`[0.5, 1.5]` or below direction cosine `0.5` replaced `140/217` steps and
+reduced RMSE to `0.0280 m` (`75.2%` reduction). A softer `blend-all` run with
+`alpha=0.5` reduced RMSE to `0.0564 m`. This is still oracle-only, but it is
+strong evidence that motion-prior work can plausibly close most of the
+AQUA-SLAM gap if the prior supplies useful step magnitude and direction.
+
 When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
 The bag replay mode also saves `*_visual_frontend_status.csv`, which contains
