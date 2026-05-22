@@ -259,6 +259,11 @@ def build_imu_command(args) -> list[str]:
             "imu.visual.position_variance_floor", args.visual_position_variance_floor
         )
     )
+    command.extend(
+        run_tank_visual_benchmark.ros_param(
+            "imu.visual.max_age_s", args.visual_max_age_s
+        )
+    )
     return command
 
 
@@ -308,6 +313,7 @@ def make_benchmark_row(args, paths: FusionBenchmarkPaths, coverage: VisualCovera
         f"base_from_camera=({args.base_from_camera_x_m:g},{args.base_from_camera_y_m:g},"
         f"{args.base_from_camera_z_m:g}) m; "
         f"visual variance floor={args.visual_position_variance_floor:g}; "
+        f"visual max age={args.visual_max_age_s:g}; "
         f"orb_n_features={args.orb_n_features}; "
         f"orb_fast_threshold={args.orb_fast_threshold}; "
         f"opencv_threads={args.opencv_threads}; "
@@ -379,6 +385,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fused-odom-topic", default=DEFAULT_FUSED_TOPIC)
     parser.add_argument("--translation-scale", type=float, default=1.0)
     parser.add_argument("--visual-position-variance-floor", type=float, default=0.04)
+    parser.add_argument("--visual-max-age-s", type=float, default=1.0)
     parser.add_argument("--camera-fx", type=float, default=run_tank_visual_benchmark.DEFAULT_FX)
     parser.add_argument("--camera-fy", type=float, default=run_tank_visual_benchmark.DEFAULT_FY)
     parser.add_argument("--camera-cx", type=float, default=run_tank_visual_benchmark.DEFAULT_CX)
@@ -434,6 +441,8 @@ def main(argv=None) -> int:
         raise ValueError("--translation-scale must be positive")
     if args.visual_position_variance_floor <= 0.0:
         raise ValueError("--visual-position-variance-floor must be positive")
+    if args.visual_max_age_s <= 0.0:
+        raise ValueError("--visual-max-age-s must be positive")
     if args.play_rate <= 0.0:
         raise ValueError("--play-rate must be positive")
     if args.orb_n_features <= 0:

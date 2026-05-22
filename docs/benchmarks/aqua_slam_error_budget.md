@@ -18,3 +18,29 @@
 - Standalone visual is currently the accuracy leader; fused visual+DVL is still a regression relative to that row.
 - Add `--drift-report` and `--motion-report` from the best visual run to split scale, extrinsic, and drift terms.
 
+## Next Sweep
+
+Use `run_tank_visual_fusion_sweep.py` to attack the `0.1228 m` fusion
+regression directly. The first sweep should vary
+`imu.visual.position_variance_floor` and `imu.visual.max_age_s` while keeping
+the current best visual frontend settings fixed:
+
+```bash
+ros2 run aqua_localization run_tank_visual_fusion_sweep.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_fusion_covariance_sweep \
+  --sequence short_test_visual_fusion_covariance \
+  --translation-scale 0.169623465 \
+  --base-from-camera-x-m -0.25 \
+  --base-from-camera-y-m -0.45 \
+  --max-stereo-descriptor-distance 64 \
+  --max-temporal-descriptor-distance 64 \
+  --orb-n-features 700 \
+  --orb-fast-threshold 16 \
+  --opencv-threads 2 \
+  --expected-visual-frames 300 \
+  --baseline-rmse-m 0.0194 \
+  --standalone-visual-rmse-m 0.0947 \
+  --pairs 0.005:0.1,0.01:0.25,0.02:0.5,0.04:1.0
+```
