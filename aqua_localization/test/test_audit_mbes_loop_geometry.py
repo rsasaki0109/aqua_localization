@@ -94,7 +94,19 @@ def test_missing_geometry_rows_reports_absent_keyframes():
 
     missing = module.missing_geometry_rows([audit_row], keyframes, max_rows=10)
 
-    assert missing == [audit_row]
+    assert missing == [module.MissingGeometryRow(audit_row, "current")]
+
+
+def test_keyframe_id_range_reports_loaded_coverage():
+    module = load_module()
+    marker_helpers = module.marker_helpers
+    keyframes = {
+        4: marker_helpers.KeyframePose(4, 0.0, 0.0, -5.0),
+        12: marker_helpers.KeyframePose(12, 3.0, 4.0, -7.0),
+    }
+
+    assert module.keyframe_id_range(keyframes) == (4, 12)
+    assert module.keyframe_id_range({}) is None
 
 
 def test_format_report_contains_geometry_table(tmp_path):
@@ -140,12 +152,14 @@ def test_format_report_contains_geometry_table(tmp_path):
         args=args,
         total_accepted=1,
         keyframe_count=20,
+        keyframe_range=(4, 12),
         missing_rows=[],
     )
 
     assert "# MBES Accepted Loop Geometry Review" in text
     assert "Accepted loops with keyframe geometry: 1" in text
     assert "Accepted loops missing keyframe geometry: 0" in text
+    assert "Loaded keyframe ID range: 4 -> 12" in text
     assert "4 -> 12" in text
     assert "5 | 2 | 4.5 | 0.45" in text
     assert "high-risk gate margin; translation near gate" in text

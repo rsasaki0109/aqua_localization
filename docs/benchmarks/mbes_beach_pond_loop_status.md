@@ -230,7 +230,7 @@ accepted loop candidates against the RViz markers or rerun overlay.
 
 | Check | Required evidence | Result |
 |-------|-------------------|--------|
-| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | In progress; the strict gate geometry worksheet resolves keyframe positions for 16/17 accepted loops. One high-priority row (`1105 -> 1231`) is missing keyframe geometry and must be checked in the replay bag before promotion. |
+| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | In progress; the strict gate geometry worksheet resolves keyframe positions for 16/17 accepted loops. The missing high-priority row is `1105 -> 1231`; the candidate side exists, but current keyframe `1231` is outside the loaded keyframe range `0 -> 1171`, so the replay capture must be extended or the keyframe recording path fixed before promotion. |
 | Pose-graph effect | `/aqua_pose_graph/path` changes in the expected direction after loop insertion. | TBD |
 | Registration gate | Accepted candidates have finite fitness and correction below the configured gate. | PASS mechanically for the strict gate row, but the two translation-near-gate accepted loops still need visual audit. |
 | Descriptor gate | Descriptor sweep keeps enough plausible candidates while reducing obvious misses. | `descriptor.max_extent_ratio=5.0` is active in the strict gate row; centroid and point-count gates remain disabled. |

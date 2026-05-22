@@ -73,7 +73,7 @@
         "accepted-loop geometry review"
       ],
       "command": "MBES_LOOP_MIN_POINTS=120 MBES_LOOP_VOXEL_LEAF_M=0.25 MBES_LOOP_MIN_KEYFRAME_SEPARATION=40 MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4 MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0 ros2 run aqua_localization run_mbes_loop_benchmark.sh",
-      "next_step": "Use the strict gap40 geometry worksheet to finish RViz/rerun review: 16/17 accepted loops have keyframe positions, and the missing 1105 -> 1231 row must be resolved before using the row as accuracy evidence.",
+      "next_step": "Use the strict gap40 geometry worksheet to finish RViz/rerun review: 16/17 accepted loops have keyframe positions. The remaining 1105 -> 1231 row is missing the current-side keyframe because 1231 is outside the loaded keyframe range 0 -> 1171, so extend the replay capture or fix keyframe recording before using the row as accuracy evidence.",
       "fairness_notes": [
         "Do not compare this as a full visual SLAM task.",
         "Keep MBES loop closure claims separate from generic fusion baselines.",
