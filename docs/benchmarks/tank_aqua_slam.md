@@ -322,6 +322,49 @@ reduced RMSE to `0.0280 m` (`75.2%` reduction). A softer `blend-all` run with
 strong evidence that motion-prior work can plausibly close most of the
 AQUA-SLAM gap if the prior supplies useful step magnitude and direction.
 
+The next check uses real Tank DVL velocity instead of the oracle reference.
+This diagnostic integrates `/dvl/twist` over each visual frontend step and
+compares the DVL step against the same-timestamp reference displacement:
+
+```bash
+ros2 run aqua_localization analyze_tank_dvl_motion_prior.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --visual /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99/short_test_visual_pnp_1125_strict_ratio_repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99_visual_frontend.tum \
+  --mode gt_yaw \
+  --out /tmp/aqua_tank_dvl_prior_gt_yaw/dvl_prior.md \
+  --csv /tmp/aqua_tank_dvl_prior_gt_yaw/dvl_prior.csv
+```
+
+`--mode gt_yaw` rotates body-frame DVL velocity with reference yaw, so it is
+still a diagnostic rather than a deployable prior. It answers whether the DVL
+velocity magnitude and frame convention are plausible before replacing GT yaw
+with IMU yaw. `--mode body_raw` intentionally skips that rotation and should be
+used as a frame sanity check; if raw body velocity looks better than yaw-rotated
+velocity, the DVL frame or yaw convention is probably wrong. Use
+`--dvl-frame-yaw-offset-deg` to test whether the DVL horizontal axes need a
+fixed yaw rotation before they can serve as a visual motion prior.
+
+The first real-DVL diagnostic on 2026-05-23 used the same best strict PnP row
+as the oracle simulation. `/dvl/twist` covered `216/217` visual steps. The DVL
+cumulative distance was `0.919 m` against `1.152 m` reference distance, a
+cumulative ratio of `0.798`. That magnitude is close to the visual frontend's
+`0.818` cumulative ratio, but still needs scale/bias calibration before it is
+used as a hard step-length prior. Direction only became useful after applying a
+`-90 deg` DVL frame yaw offset:
+
+| Mode | DVL yaw offset deg | Covered | Cumulative ratio | Median length ratio | Median direction cosine | Median abs heading error deg | Readout |
+|------|-------------------:|--------:|-----------------:|--------------------:|------------------------:|-----------------------------:|---------|
+| `gt_yaw` | 0 | 216/217 | 0.798 | 0.791 | 0.023 | 88.9 | nearly perpendicular; frame axes are wrong |
+| `gt_yaw` | -90 | 216/217 | 0.798 | 0.791 | 0.878 | 18.7 | plausible DVL direction prior |
+| `gt_yaw` | +90 | 216/217 | 0.798 | 0.791 | -0.861 | 161.3 | mostly reversed |
+| `body_raw` | 0 | 216/217 | 0.798 | 0.791 | -0.033 | 92.3 | raw body-frame velocity is not directly comparable |
+
+The next deployable check is therefore not another visual threshold sweep. It
+is replacing the diagnostic `gt_yaw` rotation with IMU yaw, keeping the `-90 deg`
+DVL frame yaw offset, and testing whether a calibrated DVL step prior can bridge
+the rejected/noisy visual steps that the oracle simulation identified.
+
 When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
 The bag replay mode also saves `*_visual_frontend_status.csv`, which contains
