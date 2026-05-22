@@ -43,6 +43,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "mbes_loop_benchmark_row.py" in proc.stdout
     assert "audit_mbes_loop_candidates.py" in proc.stdout
     assert "plot_mbes_loop_audit.py" in proc.stdout
+    assert "audit_mbes_loop_geometry.py" in proc.stdout
     assert "--duration 42" in proc.stdout
     assert "--note dry\\ run" in proc.stdout
     assert "MBES_LOOP_MIN_POINTS=120" in proc.stdout
@@ -82,5 +83,6 @@ def test_dry_run_uses_default_artifact_names(tmp_path):
     assert str(tmp_path / "out/mbes_beach_pond_benchmark_row.md") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_loop_audit.md") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_loop_audit.png") in proc.stdout
+    assert str(tmp_path / "out/mbes_beach_pond_loop_geometry.md") in proc.stdout
     assert "--max-accepted 100" in proc.stdout
     assert "--max-markers 100" in proc.stdout

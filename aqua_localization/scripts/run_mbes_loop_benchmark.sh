@@ -32,6 +32,7 @@ DESCRIPTOR_SWEEP_OUT="$OUT_DIR/mbes_beach_pond_descriptor_sweep.md"
 ROW_OUT="$OUT_DIR/mbes_beach_pond_benchmark_row.md"
 AUDIT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.md"
 AUDIT_PLOT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.png"
+GEOMETRY_AUDIT_OUT="$OUT_DIR/mbes_beach_pond_loop_geometry.md"
 AUDIT_MAX_ACCEPTED="${AUDIT_MAX_ACCEPTED:-100}"
 AUDIT_MAX_MARKERS="${AUDIT_MAX_MARKERS:-100}"
 RECORD_ENV_ARGS=(
@@ -152,6 +153,13 @@ run_cmd ros2 run aqua_localization plot_mbes_loop_audit.py \
   --max-markers "$AUDIT_MAX_MARKERS" \
   "${AUDIT_ARGS[@]}"
 
+run_cmd ros2 run aqua_localization audit_mbes_loop_geometry.py \
+  --bag "$MBES_OUT" \
+  --csv "$STATUS_CSV" \
+  --out "$GEOMETRY_AUDIT_OUT" \
+  --max-accepted "$AUDIT_MAX_ACCEPTED" \
+  "${AUDIT_ARGS[@]}"
+
 cat <<EOF
 
 MBES loop benchmark artifacts:
@@ -163,4 +171,5 @@ MBES loop benchmark artifacts:
   benchmark row:    $ROW_OUT
   audit report:      $AUDIT_OUT
   audit plot:        $AUDIT_PLOT_OUT
+  geometry review:   $GEOMETRY_AUDIT_OUT
 EOF
