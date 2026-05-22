@@ -60,6 +60,7 @@ install(PROGRAMS
   scripts/export_mbes_loop_status.py
   scripts/mbes_loop_benchmark_row.py
   scripts/audit_mbes_loop_candidates.py
+  scripts/publish_mbes_loop_audit_markers.py
   scripts/run_mbes_loop_benchmark.sh
   scripts/pose_graph_loop_demo.py
   scripts/pose_graph_loop_smoke.sh
@@ -106,6 +107,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_export_mbes_loop_status test/test_export_mbes_loop_status.py)
   ament_add_pytest_test(test_mbes_loop_benchmark_row test/test_mbes_loop_benchmark_row.py)
   ament_add_pytest_test(test_audit_mbes_loop_candidates test/test_audit_mbes_loop_candidates.py)
+  ament_add_pytest_test(test_publish_mbes_loop_audit_markers test/test_publish_mbes_loop_audit_markers.py)
   ament_add_pytest_test(test_run_mbes_loop_benchmark test/test_run_mbes_loop_benchmark.py)
 endif()
 
