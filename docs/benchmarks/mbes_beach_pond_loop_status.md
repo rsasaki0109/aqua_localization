@@ -19,6 +19,8 @@ registration statistics and accepted loop candidates.
 
 Do not treat the accepted loops as validated accuracy evidence yet. The next
 step is a visual false-positive audit in RViz/rerun and a longer replay window.
+The generated audit priority list for the current run is
+[`mbes_beach_pond_loop_audit.md`](mbes_beach_pond_loop_audit.md).
 
 ## Reproducible Run
 
@@ -109,6 +111,7 @@ Expected generated files:
 | `/tmp/mbes_beach_pond_loop_status.md` | Accepted/rejected/no-candidate counts, status reasons, fitness, correction, and descriptor quantiles. |
 | `/tmp/mbes_beach_pond_descriptor_sweep.md` | Candidate descriptor threshold grid for pre-registration gating. |
 | `mbes_loop_benchmark_row.py` output | One Markdown row for the measurement table below. |
+| `audit_mbes_loop_candidates.py` output | Accepted-loop visual audit priority list. |
 
 ## Measurement Table
 

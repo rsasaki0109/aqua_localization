@@ -68,7 +68,8 @@
         "rerun export",
         "RViz loop markers",
         "mbes_loop_status.csv",
-        "descriptor sweep report"
+        "descriptor sweep report",
+        "accepted-loop audit report"
       ],
       "command": "MBES_LOOP_MIN_POINTS=120 MBES_LOOP_VOXEL_LEAF_M=0.25 ros2 run aqua_localization run_mbes_loop_benchmark.sh",
       "next_step": "Audit the 35 accepted loops from the 120 s tuned beach_pond replay in RViz/rerun before using the row as accuracy evidence.",
