@@ -13,8 +13,8 @@ datasets and baseline comparisons.
   on Tank Dataset `short_test`, current `aqua_localization` rows, and the RMSE
   gap to the baseline.
 - [`mbes_beach_pond_loop_status.md`](mbes_beach_pond_loop_status.md):
-  scaffolded real-bag artifact for MBES loop-status counts, descriptor sweep
-  output, and false-positive audit notes.
+  first MBES-SLAM `beach_pond` tuning measurement with loop-status counts,
+  descriptor sweep output, and false-positive audit notes.
 
 ## Real-Bag Evaluation Manifest
 

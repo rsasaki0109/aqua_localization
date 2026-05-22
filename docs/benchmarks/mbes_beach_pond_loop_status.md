@@ -7,12 +7,18 @@ registration, loop diagnostics, and false-positive control.
 
 ## Current Status
 
-Status: `scaffolded`
+Status: `tuning measured, false-positive audit pending`
 
-The repository has the replay command, RViz/rerun visualization paths, loop
-status exporter, and descriptor sweep report shape. The local workspace does not
-currently include the MBES-SLAM `beach_pond` rosbag, so this page does not claim
-measured loop counts yet.
+The first real `beach_pond` loop-status replay now reaches registration and
+accepted loop candidates when the MBES submap density is tuned for this bag. The
+default loop-closure profile is still conservative: with `submaps.min_points=300`
+and `submaps.voxel_leaf_m=0.5`, the 120 s Humble/sqlite replay mostly reports
+`too few downsampled points`. The measured tuning run below uses
+`submaps.min_points=120` and `submaps.voxel_leaf_m=0.25`, which produces finite
+registration statistics and accepted loop candidates.
+
+Do not treat the accepted loops as validated accuracy evidence yet. The next
+step is a visual false-positive audit in RViz/rerun and a longer replay window.
 
 ## Reproducible Run
 
@@ -32,6 +38,25 @@ ros2 run aqua_localization run_mbes_loop_benchmark.sh
 
 The runner executes the readiness check, records a results-included replay bag,
 exports `/mbes_loop_closure/status`, and writes the benchmark row.
+
+For a ROS 2 Humble workspace converted to sqlite3, use the explicit storage and
+tuning overrides used for the measured row:
+
+```bash
+WORKSPACE=$PWD \
+ROS_SETUP=/opt/ros/humble/setup.bash \
+RECORD_STORAGE=sqlite3 \
+RECORD_TOPIC_FLAG= \
+PLAY_DURATION_ARG= \
+MBES_SRC=$PWD/datasets/public/mbes_slam/beach_pond_ros2_sqlite \
+MBES_OUT=/tmp/aqua_mbes_beach_pond_tuned_120 \
+OUT_DIR=/tmp/aqua_mbes_loop_benchmark_tuned_120 \
+MBES_DURATION=120 \
+MBES_LOOP_MIN_POINTS=120 \
+MBES_LOOP_VOXEL_LEAF_M=0.25 \
+NOTE="real replay, duration 120s, min_points=120, voxel=0.25, Humble sqlite" \
+ros2 run aqua_localization run_mbes_loop_benchmark.sh
+```
 
 To run the steps manually, first check that the local `beach_pond` bag has the
 required MBES, reference odometry, and IMU topics:
@@ -87,12 +112,34 @@ Expected generated files:
 
 ## Measurement Table
 
-Fill this table only from the exported summary. Leave cells as `TBD` until the
-same replay/export command above has been run.
+Fill this table only from exported summaries. Rows marked `unaudited` must not
+be used as loop-closure accuracy claims until the false-positive audit below is
+completed.
 
 | Dataset | Sequence | Duration s | Status samples | Accepted | Rejected | No candidate | Converged | Median fitness | P95 correction m | Notes |
 |---------|----------|-----------:|---------------:|---------:|---------:|-------------:|----------:|---------------:|-----------------:|-------|
-| MBES-SLAM | `beach_pond` | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | awaiting local real-bag replay |
+| MBES-SLAM | `beach_pond` | 120 | 277 | 35 | 178 | 64 | 163 | 0.1930 | 3.7891 | unaudited tuning run, `min_points=120`, `voxel=0.25`, Humble sqlite |
+
+## Tuning Summary
+
+The tuned 120 s run produced 213 registration attempts. The accepted loops had
+median fitness `0.110679` and P95 accepted fitness `0.891069`. The main rejection
+reasons were:
+
+| Reason | Count |
+|--------|------:|
+| duplicate loop suppressed | 103 |
+| no candidate submaps | 64 |
+| registration did not converge | 50 |
+| fitness score exceeds gate | 21 |
+| rotation correction exceeds gate | 2 |
+| translation correction exceeds gate | 2 |
+
+The descriptor sweep suggests useful first-pass descriptor gates around
+`centroid <= 1.29 m`, `extent ratio <= 5.69`, and
+`point-count ratio >= 0.42` if the next replay needs to reduce registration
+load without removing most plausible candidates. Keep descriptor gates disabled
+until the accepted-loop audit is complete.
 
 ## False-Positive Audit
 
@@ -102,11 +149,11 @@ accepted loop candidates against the RViz markers or rerun overlay.
 
 | Check | Required evidence | Result |
 |-------|-------------------|--------|
-| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | TBD |
+| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | Pending for the 35 accepted loops in the tuned 120 s run. |
 | Pose-graph effect | `/aqua_pose_graph/path` changes in the expected direction after loop insertion. | TBD |
-| Registration gate | Accepted candidates have finite fitness and correction below the configured gate. | TBD |
-| Descriptor gate | Descriptor sweep keeps enough plausible candidates while reducing obvious misses. | TBD |
-| Duplicate suppression | Near-repeat accepted loops are suppressed by keyframe gap / cooldown settings. | TBD |
+| Registration gate | Accepted candidates have finite fitness and correction below the configured gate. | PASS for exported status: accepted fitness P95 `0.891069`, configured max `2.0`. |
+| Descriptor gate | Descriptor sweep keeps enough plausible candidates while reducing obvious misses. | Candidate starting point: centroid `1.29 m`, extent ratio `5.69`, point-count ratio `0.42`; not enabled yet. |
+| Duplicate suppression | Near-repeat accepted loops are suppressed by keyframe gap / cooldown settings. | PASS mechanically: 103 `duplicate loop suppressed` statuses. Visual audit still pending. |
 
 ## Promotion Rule
 
