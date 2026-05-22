@@ -19,6 +19,7 @@ install(PROGRAMS
   scripts/trajectory_benchmark_row.py
   scripts/benchmark_manifest_report.py
   scripts/ingest_external_tum_result.py
+  scripts/aqua_slam_progress_report.py
   scripts/check_3dgs_bag_ready.py
   scripts/check_3dgs_training_ready.py
   scripts/export_3dgs_manifest.py
@@ -80,6 +81,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_trajectory_benchmark_row test/test_trajectory_benchmark_row.py)
   ament_add_pytest_test(test_benchmark_manifest_report test/test_benchmark_manifest_report.py)
   ament_add_pytest_test(test_ingest_external_tum_result test/test_ingest_external_tum_result.py)
+  ament_add_pytest_test(test_aqua_slam_progress_report test/test_aqua_slam_progress_report.py)
   ament_add_pytest_test(test_check_3dgs_bag_ready test/test_check_3dgs_bag_ready.py)
   ament_add_pytest_test(test_check_3dgs_training_ready test/test_check_3dgs_training_ready.py)
   ament_add_pytest_test(test_export_3dgs_manifest test/test_export_3dgs_manifest.py)

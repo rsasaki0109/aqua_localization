@@ -74,6 +74,13 @@ sequences. The fair development path is to either add a visual frontend for a
 sensor-equivalent Tank comparison or scope the paper claim toward permissive
 ROS 2 localization and MBES-specific replay strengths.
 
+Current progress against that target is tracked in
+[`aqua_slam_progress.md`](aqua_slam_progress.md). The best measured
+`aqua_*` row is currently `aqua_visual_frontend` at `0.0947 m` SE(3) RMSE on
+`short_test`, which is `4.88x` AQUA-SLAM's `0.0194 m` row. That is a real
+`77.9%` RMSE reduction from the IMU+pressure+DVL `aqua_localization` anchor,
+but it is not a win yet.
+
 ## Fair Head-to-Head Tasks
 
 ### 1. Tank Dataset Full SLAM
