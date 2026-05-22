@@ -180,12 +180,45 @@ ros2 run aqua_localization run_tank_visual_direct_benchmark.py \
   --opencv-threads 2
 ```
 
+Use a direct replay time window when comparing against an AQUA-SLAM row that
+only overlaps part of the sequence. The window is applied before stereo pairing,
+using `[start, end)` bounds, so the reported pair count, status CSV, TUM file,
+and metric table all describe the same slice:
+
+```bash
+ros2 run aqua_localization run_tank_visual_direct_benchmark.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --out-dir /tmp/aqua_tank_visual_direct_11s_check \
+  --sequence short_test_visual_direct_11s_check \
+  --start-offset-s 0.0 \
+  --duration-s 11.65 \
+  --translation-scale 0.151788798 \
+  --base-from-camera-x-m -0.25 \
+  --base-from-camera-y-m -0.45 \
+  --max-stereo-descriptor-distance 64 \
+  --max-temporal-descriptor-distance 64 \
+  --orb-n-features 700 \
+  --orb-fast-threshold 16 \
+  --opencv-threads 2
+```
+
 On 2026-05-22 this direct replay path read `300` stereo pairs, processed
 `300/300` frames, accepted `299` frame-to-frame updates, and had `0` decode
 failures on `short_test`. The resulting SE(3) RMSE was `0.1907 m`, so it is not
 an accuracy win over the best visual row; it is a replay-isolation baseline that
 proves the bag's camera messages are decodable and keeps visual frontend tuning
-independent from ROS bag playback delivery issues.
+independent from ROS bag playback delivery issues. Windowed direct replay is
+now the preferred way to decide whether a full-sequence RMSE increase is caused
+by later visual drift or by comparing against a shorter AQUA-SLAM overlap.
+The first windowed check on 2026-05-22 used the first `11.25` seconds of
+`short_test` and processed `224/224` stereo pairs. With the previous
+same-sequence scale `0.169623465`, direct replay reported `0.1594 m` SE(3)
+RMSE; retuning the same window to `tracking.translation_scale=0.105024091`
+improved it to `0.1182 m`. That narrows the replay-isolation gap but still does
+not reproduce the older `0.0947 m` ROS replay visual row, so the next accuracy
+work should compare the direct and ROS visual trajectories on the same window
+before adding new frontend logic.
 It also emits `*_visual_frontend_status.md` via
 `summarize_visual_frontend_status.py`, so each visual benchmark run carries a
 short tuning report next to the trajectory metrics. The same run writes
