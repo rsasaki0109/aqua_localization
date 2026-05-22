@@ -424,6 +424,41 @@ ros2 run aqua_localization apply_tank_dvl_motion_prior.py \
   --out-dir /tmp/aqua_tank_dvl_motion_prior_apply_profile_check
 ```
 
+For benchmark claims, run the profile through the validation wrapper instead
+of calling the application tool directly. The wrapper records the declared
+calibration/validation split, writes a markdown summary, and refuses to run on
+the calibration sequence unless the diagnostic override is explicit:
+
+```bash
+ros2 run aqua_localization run_tank_dvl_prior_validation.py \
+  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium.yaml \
+  --sequence Medium \
+  --bag /tmp/medium_ros2_visual \
+  --reference /tmp/tank_medium_gt.tum \
+  --visual /tmp/tank_medium_visual_frontend.tum \
+  --max-corrected-rmse-m 0.04 \
+  --min-improvement-percent 70 \
+  --fail-on-gate-failure \
+  --out-dir /tmp/aqua_tank_dvl_prior_validation_medium
+```
+
+The same-sequence smoke check remains useful while wiring the prior into the
+pipeline, but it must stay labeled as diagnostic:
+
+```bash
+ros2 run aqua_localization run_tank_dvl_prior_validation.py \
+  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium.yaml \
+  --sequence short_test \
+  --allow-same-sequence \
+  --allow-profile-sequence-mismatch \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --visual /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99/short_test_visual_pnp_1125_strict_ratio_repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99_visual_frontend.tum \
+  --max-corrected-rmse-m 0.04 \
+  --min-improvement-percent 70 \
+  --out-dir /tmp/aqua_tank_dvl_prior_validation_smoke_check
+```
+
 On 2026-05-23 this profile-based real-prior application reduced the best strict
 PnP visual row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction,
 while using the DVL/IMU prior on `127/217` visual steps. That is close to the
@@ -437,9 +472,9 @@ oracle-prior upper-bound result of `0.0280 m`, but the profile still records
 | `replace-outliers` | 1.25375 | n/a | 0.0323 | 71.4% | 127/217 | near oracle, same-sequence scale diagnostic |
 | `blend-outliers` | 1.25375 | 0.75 | 0.0486 | 56.9% | 127/217 | softer but less accurate on this sequence |
 
-The practical next step is to move these calibrated constants out of ad hoc CLI
-arguments and into a Tank DVL prior profile, then validate the profile on a
-held-out Tank sequence before treating the result as a benchmark claim.
+The practical next step is to run the wrapper on the declared held-out sequence.
+Only a validation row that passes without `--allow-same-sequence` or
+`--allow-profile-sequence-mismatch` should be treated as a benchmark candidate.
 
 When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
