@@ -121,6 +121,8 @@ def build_bag_play_command(args) -> list[str]:
     command = ["ros2", "bag", "play", str(args.bag)]
     if args.use_sim_time:
         command.append("--clock")
+    if args.start_offset_s is not None:
+        command.extend(["--start-offset", str(args.start_offset_s)])
     if args.play_rate != 1.0:
         command.extend(["--rate", str(args.play_rate)])
     read_ahead = int(getattr(args, "bag_read_ahead_queue_size", 0))
@@ -129,6 +131,21 @@ def build_bag_play_command(args) -> list[str]:
     if bool(getattr(args, "bag_disable_loan_message", False)):
         command.append("--disable-loan-message")
     return command
+
+
+def run_bag_play_command(args, command: list[str]):
+    if args.duration_s is None:
+        subprocess.run(command, check=True)
+        return
+
+    process = start_process(command)
+    try:
+        process.wait(timeout=args.duration_s / args.play_rate)
+    except subprocess.TimeoutExpired:
+        terminate_process(process, args.stop_timeout)
+        return
+    if process.returncode != 0:
+        raise subprocess.CalledProcessError(process.returncode, command)
 
 
 def write_replay_script(path: Path, commands: list[list[str]]):
@@ -184,7 +201,7 @@ def run_recording(args, paths: BenchmarkPaths):
     recorder = start_process(commands[1])
     time.sleep(args.startup_delay)
     try:
-        subprocess.run(commands[2], check=True)
+        run_bag_play_command(args, commands[2])
     finally:
         terminate_process(recorder, args.stop_timeout)
         terminate_process(visual, args.stop_timeout)
@@ -301,6 +318,18 @@ def parse_args(argv):
     parser.add_argument("--orb-fast-threshold", type=int, default=12)
     parser.add_argument("--opencv-threads", type=int, default=0)
     parser.add_argument("--play-rate", type=float, default=1.0)
+    parser.add_argument(
+        "--start-offset-s",
+        type=float,
+        default=None,
+        help="Start ROS bag replay this many seconds into the bag.",
+    )
+    parser.add_argument(
+        "--duration-s",
+        type=float,
+        default=None,
+        help="Stop ROS bag replay after this many bag-time seconds.",
+    )
     parser.add_argument("--bag-read-ahead-queue-size", type=int, default=0)
     parser.add_argument("--bag-disable-loan-message", action="store_true")
     parser.add_argument("--startup-delay", type=float, default=1.0)
@@ -316,6 +345,10 @@ def main(argv=None) -> int:
         raise ValueError("--translation-scale must be positive")
     if args.play_rate <= 0.0:
         raise ValueError("--play-rate must be positive")
+    if args.start_offset_s is not None and args.start_offset_s < 0.0:
+        raise ValueError("--start-offset-s must be non-negative")
+    if args.duration_s is not None and args.duration_s <= 0.0:
+        raise ValueError("--duration-s must be positive")
     if args.bag_read_ahead_queue_size < 0:
         raise ValueError("--bag-read-ahead-queue-size must be non-negative")
     if args.orb_n_features <= 0:
