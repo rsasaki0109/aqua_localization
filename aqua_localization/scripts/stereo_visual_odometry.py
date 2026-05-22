@@ -53,7 +53,9 @@ class VisualFrontendConfig:
     min_temporal_matches: int = 20
     min_pnp_inliers: int = 12
     min_inlier_ratio: float = 0.25
+    ransac_iterations: int = 100
     ransac_reprojection_error_px: float = 3.0
+    ransac_confidence: float = 0.99
     max_step_translation_m: float = 2.0
     translation_scale: float = 1.0
     position_variance_floor_m2: float = 0.04
@@ -283,9 +285,9 @@ def estimate_motion_pnp(
         image_points,
         camera.matrix,
         np.zeros((4, 1), dtype=np.float64),
-        iterationsCount=100,
+        iterationsCount=config.ransac_iterations,
         reprojectionError=config.ransac_reprojection_error_px,
-        confidence=0.99,
+        confidence=config.ransac_confidence,
         flags=cv2.SOLVEPNP_ITERATIVE,
     )
     if not ok or inliers is None:
@@ -657,8 +659,14 @@ def run_ros_node(argv=None) -> int:
                 min_inlier_ratio=float(
                     self.declare_parameter("tracking.min_inlier_ratio", 0.25).value
                 ),
+                ransac_iterations=int(
+                    self.declare_parameter("tracking.ransac_iterations", 100).value
+                ),
                 ransac_reprojection_error_px=float(
                     self.declare_parameter("tracking.ransac_reprojection_error_px", 3.0).value
+                ),
+                ransac_confidence=float(
+                    self.declare_parameter("tracking.ransac_confidence", 0.99).value
                 ),
                 max_step_translation_m=float(
                     self.declare_parameter("tracking.max_step_translation_m", 2.0).value

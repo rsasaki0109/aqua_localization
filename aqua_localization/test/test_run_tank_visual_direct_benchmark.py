@@ -125,3 +125,9 @@ def test_parse_args_defaults_to_direct_system():
     assert args.duration_s is None
     assert args.start_stamp_s is None
     assert args.end_stamp_s is None
+    assert args.min_pnp_inliers == 12
+    assert args.min_inlier_ratio == 0.25
+    assert args.ransac_iterations == 100
+    assert args.ransac_reprojection_error_px == 3.0
+    assert args.ransac_confidence == 0.99
+    assert args.max_step_translation_m == 2.0
