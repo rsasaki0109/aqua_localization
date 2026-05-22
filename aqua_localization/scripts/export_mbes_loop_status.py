@@ -152,7 +152,10 @@ def candidate_thresholds(values: list[float], quantiles: list[float]) -> list[fl
 
 
 def is_no_candidate(sample: LoopStatusSample) -> bool:
-    return sample.candidate_id == NO_CANDIDATE_ID or "no candidate" in sample.status.lower()
+    status = sample.status.lower()
+    return "no candidate" in status or (
+        sample.candidate_id == NO_CANDIDATE_ID and not status
+    )
 
 
 def summarize(samples: list[LoopStatusSample]) -> dict:
@@ -368,6 +371,53 @@ def write_csv(path: Path, samples: list[LoopStatusSample]) -> None:
             })
 
 
+def default_ros2_typestore():
+    try:
+        from rosbags.typesys import Stores, get_typestore
+    except ImportError as e:
+        raise RuntimeError(
+            "missing dependency: install rosbags type stores to read rosbag2 files"
+        ) from e
+
+    for store_name in ("ROS2_HUMBLE", "ROS2_JAZZY", "ROS2_IRON"):
+        store = getattr(Stores, store_name, None)
+        if store is not None:
+            return get_typestore(store)
+    raise RuntimeError("rosbags does not provide a supported ROS 2 typestore")
+
+
+def open_reader_with_typestore_fallback(any_reader, bag_dir: Path):
+    reader = any_reader([bag_dir])
+    try:
+        reader.open()
+        return reader
+    except Exception as e:
+        if "no type definitions" not in str(e).lower():
+            raise
+
+    reader = any_reader([bag_dir], default_typestore=default_ros2_typestore())
+    reader.open()
+    return reader
+
+
+def deserialize_status_message(reader, raw, msgtype: str):
+    try:
+        return reader.deserialize(raw, msgtype)
+    except Exception:
+        if msgtype != "aqua_msgs/msg/LoopClosureStatus":
+            raise
+
+    try:
+        from aqua_msgs.msg import LoopClosureStatus
+        from rclpy.serialization import deserialize_message
+    except ImportError as e:
+        raise RuntimeError(
+            "cannot deserialize aqua_msgs/msg/LoopClosureStatus; source the ROS 2 "
+            "workspace or record bags with embedded type definitions"
+        ) from e
+    return deserialize_message(raw, LoopClosureStatus)
+
+
 def read_bag_samples(bag: Path, topic: str) -> list[LoopStatusSample]:
     try:
         from rosbags.highlevel import AnyReader
@@ -379,17 +429,22 @@ def read_bag_samples(bag: Path, topic: str) -> list[LoopStatusSample]:
         raise RuntimeError(f"not a rosbag2 directory: {bag_dir}")
 
     samples: list[LoopStatusSample] = []
-    with AnyReader([bag_dir]) as reader:
+    reader = open_reader_with_typestore_fallback(AnyReader, bag_dir)
+    try:
         wanted = [connection for connection in reader.connections if connection.topic == topic]
         if not wanted:
             available = ", ".join(sorted({connection.topic for connection in reader.connections}))
             raise RuntimeError(f"topic {topic!r} not found. Available topics: {available}")
         for connection, t_ns, raw in reader.messages(connections=wanted):
             try:
-                msg = reader.deserialize(raw, connection.msgtype)
+                msg = deserialize_status_message(reader, raw, connection.msgtype)
+            except RuntimeError:
+                raise
             except Exception:
                 continue
             samples.append(sample_from_msg(msg, t_ns * 1.0e-9))
+    finally:
+        reader.close()
     return samples
 
 

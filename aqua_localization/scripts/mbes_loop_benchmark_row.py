@@ -64,9 +64,9 @@ def read_loop_status_csv(path: Path) -> list[LoopStatusRow]:
 
 
 def is_no_candidate(row: LoopStatusRow) -> bool:
-    return (
-        row.candidate_id == NO_CANDIDATE_ID
-        or "no candidate" in row.status.lower()
+    status = row.status.lower()
+    return "no candidate" in status or (
+        row.candidate_id == NO_CANDIDATE_ID and not status
     )
 
 

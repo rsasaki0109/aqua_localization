@@ -13,6 +13,7 @@
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/media/sasaki/aiueo/ai_coding_ws/aqua_loc_ws}"
+ROS_SETUP="${ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
 MBES_SRC="${MBES_SRC:-$WORKSPACE/aqua_localization/datasets/public/mbes_slam/beach_pond_ros2}"
 MBES_OUT="${MBES_OUT:-$WORKSPACE/aqua_localization/datasets/public/mbes_slam/demo_with_estimate}"
 IMU_PROFILE="${IMU_PROFILE:-$WORKSPACE/install/aqua_imu_loc/share/aqua_imu_loc/config/mbes_slam.yaml}"
@@ -20,12 +21,17 @@ SONAR_PROFILE="${SONAR_PROFILE:-$WORKSPACE/install/aqua_sonar_loc/share/aqua_son
 POSE_GRAPH_PROFILE="${POSE_GRAPH_PROFILE:-$WORKSPACE/install/aqua_pose_graph/share/aqua_pose_graph/config/params.yaml}"
 MBES_LOOP_PROFILE="${MBES_LOOP_PROFILE:-$WORKSPACE/install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml}"
 MBES_DURATION="${MBES_DURATION:-60}"
+RECORD_STORAGE="${RECORD_STORAGE:-mcap}"
+RECORD_TOPIC_FLAG="${RECORD_TOPIC_FLAG---topics}"
+PLAY_DURATION_ARG="${PLAY_DURATION_ARG---playback-duration}"
 
 cd "$WORKSPACE"
 # shellcheck disable=SC1091
-source /opt/ros/jazzy/setup.bash
+set +u
+source "$ROS_SETUP"
 # shellcheck disable=SC1091
 source install/setup.bash
+set -u
 
 rm -rf "$MBES_OUT"
 
@@ -55,8 +61,8 @@ LOOP_PID=$!
 
 sleep 3
 
-ros2 bag record -s mcap -o "$MBES_OUT" \
-  --topics /norbit/detections /nav/processed/odometry \
+ros2 bag record -s "$RECORD_STORAGE" -o "$MBES_OUT" \
+  ${RECORD_TOPIC_FLAG:+$RECORD_TOPIC_FLAG} /norbit/detections /nav/processed/odometry \
            /nav/processed/microstrain/imu/madgwick /nav/sensors/microstrain/imu/raw \
            /aqua_imu_loc/odometry /aqua_imu_loc/status \
            /aqua_sonar_loc/odometry /aqua_sonar_loc/status \
@@ -72,8 +78,13 @@ REC_PID=$!
 
 sleep 2
 
-ros2 bag play "$MBES_SRC" --clock --playback-duration "$MBES_DURATION" \
-  > /tmp/aqua_record_mbes_play.log 2>&1
+if [[ -n "$PLAY_DURATION_ARG" ]]; then
+  ros2 bag play "$MBES_SRC" --clock "$PLAY_DURATION_ARG" "$MBES_DURATION" \
+    > /tmp/aqua_record_mbes_play.log 2>&1
+else
+  timeout "${MBES_DURATION}s" ros2 bag play "$MBES_SRC" --clock \
+    > /tmp/aqua_record_mbes_play.log 2>&1 || true
+fi
 
 sleep 3
 

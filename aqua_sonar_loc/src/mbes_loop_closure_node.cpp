@@ -154,12 +154,20 @@ private:
   {
     const auto result = submap_manager_.finalize_current();
     if (result.status == FinalizeSubmapStatus::TooFewPoints) {
+      publish_submap_status(
+        result.submap,
+        "too few raw points: " + std::to_string(result.raw_points) + " < " +
+        std::to_string(submap_options_.min_points_per_submap));
       RCLCPP_DEBUG(
         get_logger(), "drop submap %u: only %zu points",
         result.submap.id, result.raw_points);
       return;
     }
     if (result.status == FinalizeSubmapStatus::TooFewPointsAfterDownsample) {
+      publish_submap_status(
+        result.submap,
+        "too few downsampled points: " + std::to_string(result.final_points) + " < " +
+        std::to_string(submap_options_.min_points_per_submap));
       RCLCPP_DEBUG(
         get_logger(), "drop submap %u after voxel filter: only %zu points",
         result.submap.id, result.final_points);
@@ -231,7 +239,7 @@ private:
       return;
     }
     if (tested == 0) {
-      publish_no_candidate_status(current);
+      publish_submap_status(current, "no candidate submaps");
     }
   }
 
@@ -304,7 +312,7 @@ private:
     marker_pub_->publish(markers);
   }
 
-  void publish_no_candidate_status(const Submap & current)
+  void publish_submap_status(const Submap & current, const std::string & status)
   {
     aqua_msgs::msg::LoopClosureStatus msg;
     msg.header.stamp = current.stamp;
@@ -319,7 +327,7 @@ private:
     msg.descriptor_centroid_distance_m = std::numeric_limits<double>::quiet_NaN();
     msg.descriptor_extent_ratio = std::numeric_limits<double>::quiet_NaN();
     msg.descriptor_point_count_ratio = std::numeric_limits<double>::quiet_NaN();
-    msg.status = "no candidate submaps";
+    msg.status = status;
     status_pub_->publish(msg);
   }
 
