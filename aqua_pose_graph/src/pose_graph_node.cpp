@@ -166,8 +166,11 @@ public:
       path_topic_, rclcpp::QoS(1).transient_local());
     keyframe_count_pub_ = create_publisher<std_msgs::msg::UInt32>(
       keyframe_count_topic_, rclcpp::QoS(1).transient_local());
+    // Keep enough history for rosbag recording and late-starting loop-audit tools;
+    // depth=1 only preserves the latest keyframe and can leave accepted loop IDs
+    // without recorded geometry.
     keyframe_pub_ = create_publisher<aqua_msgs::msg::PoseGraphKeyframe>(
-      keyframe_topic_, rclcpp::QoS(1).transient_local());
+      keyframe_topic_, rclcpp::QoS(2000).transient_local());
     loop_constraint_count_pub_ = create_publisher<std_msgs::msg::UInt32>(
       loop_constraint_count_topic_, rclcpp::QoS(1).transient_local());
 

@@ -126,7 +126,13 @@ def parse_metadata(metadata_path: Path) -> BagMetadata:
             in_topic_metadata = False
             continue
 
+        if stripped.startswith("message_count:") and current:
+            current["count"] = parse_int_value(stripped, "message_count") or 0
+            continue
+
         if "topic_metadata:" in stripped:
+            if stripped.startswith("- topic_metadata:"):
+                flush_current()
             in_topic_metadata = True
             inline_name = extract_inline_value(stripped, "name")
             inline_type = extract_inline_value(stripped, "type")

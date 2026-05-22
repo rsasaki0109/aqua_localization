@@ -178,3 +178,4 @@ def test_parse_args_defaults(tmp_path):
     assert args.keyframe_topic == "/aqua_pose_graph/keyframe"
     assert args.max_accepted == 100
     assert args.min_plan_distance_m == 2.0
+    assert not args.require_complete

@@ -22,8 +22,9 @@ POSE_GRAPH_PROFILE="${POSE_GRAPH_PROFILE:-$WORKSPACE/install/aqua_pose_graph/sha
 MBES_LOOP_PROFILE="${MBES_LOOP_PROFILE:-$WORKSPACE/install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml}"
 MBES_DURATION="${MBES_DURATION:-60}"
 RECORD_STORAGE="${RECORD_STORAGE:-mcap}"
-RECORD_TOPIC_FLAG="${RECORD_TOPIC_FLAG---topics}"
-PLAY_DURATION_ARG="${PLAY_DURATION_ARG---playback-duration}"
+RECORD_TOPIC_FLAG="${RECORD_TOPIC_FLAG:-}"
+PLAY_DURATION_ARG="${PLAY_DURATION_ARG:-}"
+PLAY_TOPIC_ARGS="${PLAY_TOPIC_ARGS:-}"
 POSE_GRAPH_KEYFRAME_TRANSLATION_M="${POSE_GRAPH_KEYFRAME_TRANSLATION_M:-}"
 POSE_GRAPH_KEYFRAME_ROTATION_RAD="${POSE_GRAPH_KEYFRAME_ROTATION_RAD:-}"
 MBES_LOOP_MIN_POINTS="${MBES_LOOP_MIN_POINTS:-}"
@@ -134,9 +135,11 @@ sleep 2
 
 if [[ -n "$PLAY_DURATION_ARG" ]]; then
   ros2 bag play "$MBES_SRC" --clock "$PLAY_DURATION_ARG" "$MBES_DURATION" \
+    ${PLAY_TOPIC_ARGS:+$PLAY_TOPIC_ARGS} \
     > /tmp/aqua_record_mbes_play.log 2>&1
 else
   timeout "${MBES_DURATION}s" ros2 bag play "$MBES_SRC" --clock \
+    ${PLAY_TOPIC_ARGS:+$PLAY_TOPIC_ARGS} \
     > /tmp/aqua_record_mbes_play.log 2>&1 || true
 fi
 
