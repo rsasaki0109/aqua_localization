@@ -13,9 +13,13 @@ set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$(pwd)}"
 MBES_SRC="${MBES_SRC:-$WORKSPACE/datasets/public/mbes_slam/beach_pond_ros2}"
+MBES_SRC_PLAY="${MBES_SRC_PLAY:-$MBES_SRC}"
+MBES_PREPARE_HUMBLE_METADATA="${MBES_PREPARE_HUMBLE_METADATA:-0}"
 MBES_OUT="${MBES_OUT:-/tmp/aqua_mbes_beach_pond_with_loop_status}"
 MBES_DURATION="${MBES_DURATION:-120}"
 OUT_DIR="${OUT_DIR:-/tmp/aqua_mbes_loop_benchmark}"
+MBES_HUMBLE_METADATA_SRC="${MBES_HUMBLE_METADATA_SRC:-$OUT_DIR/mbes_source_humble_metadata}"
+MBES_HUMBLE_SRC="${MBES_HUMBLE_SRC:-$OUT_DIR/mbes_source_humble_sqlite}"
 DATASET="${DATASET:-MBES-SLAM}"
 SEQUENCE="${SEQUENCE:-beach_pond}"
 NOTE="${NOTE:-real replay, duration ${MBES_DURATION}s}"
@@ -38,12 +42,20 @@ AUDIT_MAX_MARKERS="${AUDIT_MAX_MARKERS:-100}"
 GEOMETRY_AUDIT_REQUIRE_COMPLETE="${GEOMETRY_AUDIT_REQUIRE_COMPLETE:-1}"
 RECORD_ENV_ARGS=(
   "WORKSPACE=$WORKSPACE"
-  "MBES_SRC=$MBES_SRC"
+  "MBES_SRC=$MBES_SRC_PLAY"
   "MBES_OUT=$MBES_OUT"
   "MBES_DURATION=$MBES_DURATION"
 )
 AUDIT_ARGS=()
 GEOMETRY_AUDIT_ARGS=()
+MBES_SOURCE_TOPICS=(
+  /norbit/detections
+  /nav/processed/odometry
+  /nav/processed/microstrain/imu/madgwick
+  /nav/sensors/microstrain/imu/raw
+  /tf
+  /tf_static
+)
 
 for optional_name in \
   ROS_SETUP RECORD_STORAGE RECORD_TOPIC_FLAG PLAY_DURATION_ARG PLAY_TOPIC_ARGS \
@@ -121,6 +133,29 @@ run_env_cmd() {
 }
 
 mkdir -p "$OUT_DIR"
+
+if [[ "$MBES_PREPARE_HUMBLE_METADATA" == "1" ]]; then
+  if [[ "$MBES_SRC_PLAY" == "$MBES_SRC" ]]; then
+    if [[ "$DRY_RUN" != "1" ]]; then
+      rm -rf "$MBES_HUMBLE_METADATA_SRC"
+      rm -rf "$MBES_HUMBLE_SRC"
+    fi
+    run_cmd ros2 run aqua_localization prepare_rosbag2_humble_metadata.py \
+      --src "$MBES_SRC" \
+      --dst "$MBES_HUMBLE_METADATA_SRC"
+    run_cmd rosbags-convert \
+      --src "$MBES_HUMBLE_METADATA_SRC" \
+      --dst "$MBES_HUMBLE_SRC" \
+      --dst-storage sqlite3 \
+      --dst-version 5 \
+      --include-topic "${MBES_SOURCE_TOPICS[@]}"
+    run_cmd ros2 run aqua_localization prepare_rosbag2_humble_metadata.py \
+      --src "$MBES_HUMBLE_SRC" \
+      --in-place
+    MBES_SRC_PLAY="$MBES_HUMBLE_SRC"
+    RECORD_ENV_ARGS[1]="MBES_SRC=$MBES_SRC_PLAY"
+  fi
+fi
 
 run_cmd ros2 run aqua_localization check_mbes_benchmark_ready.py \
   --bag "$MBES_SRC" \
