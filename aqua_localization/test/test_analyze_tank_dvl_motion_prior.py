@@ -110,6 +110,56 @@ def test_integrate_dvl_step_applies_dvl_frame_yaw_offset():
     np.testing.assert_allclose(delta, [0.0, 1.0, 0.0], atol=1.0e-12)
 
 
+def test_integrate_dvl_step_uses_imu_yaw_records():
+    module = load_module()
+    dvl_times = np.asarray([0.0, 1.0, 2.0], dtype=np.float64)
+    dvl_velocities = np.asarray([[1.0, 0.0, 0.0]] * 3, dtype=np.float64)
+    reference_tum = np.asarray([tum_row(0.0), tum_row(2.0)], dtype=np.float64)
+    imu_times = np.asarray([0.0, 2.0], dtype=np.float64)
+    imu_yaw = np.asarray([math.pi / 2.0, math.pi / 2.0], dtype=np.float64)
+
+    delta, covered, samples = module.integrate_dvl_step(
+        0.5,
+        1.5,
+        dvl_times,
+        dvl_velocities,
+        reference_tum,
+        "imu_yaw",
+        yaw_times=imu_times,
+        yaw_rad=imu_yaw,
+    )
+
+    assert covered is True
+    assert samples == 3
+    np.testing.assert_allclose(delta, [0.0, 1.0, 0.0], atol=1.0e-12)
+
+
+def test_integrate_dvl_step_combines_imu_and_dvl_yaw_offsets():
+    module = load_module()
+    dvl_times = np.asarray([0.0, 1.0, 2.0], dtype=np.float64)
+    dvl_velocities = np.asarray([[1.0, 0.0, 0.0]] * 3, dtype=np.float64)
+    reference_tum = np.asarray([tum_row(0.0), tum_row(2.0)], dtype=np.float64)
+    imu_times = np.asarray([0.0, 2.0], dtype=np.float64)
+    imu_yaw = np.asarray([0.0, 0.0], dtype=np.float64)
+
+    delta, covered, samples = module.integrate_dvl_step(
+        0.5,
+        1.5,
+        dvl_times,
+        dvl_velocities,
+        reference_tum,
+        "imu_yaw",
+        dvl_frame_yaw_offset_rad=-math.pi / 2.0,
+        yaw_times=imu_times,
+        yaw_rad=imu_yaw,
+        imu_yaw_offset_rad=math.pi,
+    )
+
+    assert covered is True
+    assert samples == 3
+    np.testing.assert_allclose(delta, [0.0, 1.0, 0.0], atol=1.0e-12)
+
+
 def test_build_dvl_prior_steps_matches_reference_motion():
     module = load_module()
     records = [
@@ -139,6 +189,39 @@ def test_build_dvl_prior_steps_matches_reference_motion():
     np.testing.assert_allclose([step.direction_cosine for step in steps], [1.0, 1.0])
     np.testing.assert_allclose(steps[-1].dvl_cumulative_m, 2.0)
     np.testing.assert_allclose(steps[-1].reference_cumulative_m, 2.0)
+
+
+def test_build_dvl_prior_steps_accepts_imu_yaw_records():
+    module = load_module()
+    records = [
+        module.DvlRecord(0.0, np.asarray([1.0, 0.0, 0.0], dtype=np.float64)),
+        module.DvlRecord(1.0, np.asarray([1.0, 0.0, 0.0], dtype=np.float64)),
+        module.DvlRecord(2.0, np.asarray([1.0, 0.0, 0.0], dtype=np.float64)),
+    ]
+    imu_records = [
+        module.ImuYawRecord(0.0, math.pi / 2.0),
+        module.ImuYawRecord(2.0, math.pi / 2.0),
+    ]
+    visual_times = np.asarray([0.0, 1.0, 2.0], dtype=np.float64)
+    reference_xyz = np.asarray(
+        [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 2.0, 0.0]],
+        dtype=np.float64,
+    )
+    reference_tum = np.asarray([tum_row(0.0), tum_row(2.0)], dtype=np.float64)
+
+    steps = module.build_dvl_prior_steps(
+        visual_times,
+        reference_xyz,
+        records,
+        reference_tum,
+        "imu_yaw",
+        0.0,
+        imu_yaw_records=imu_records,
+    )
+
+    assert len(steps) == 2
+    np.testing.assert_allclose([step.length_ratio for step in steps], [1.0, 1.0])
+    np.testing.assert_allclose([step.direction_cosine for step in steps], [1.0, 1.0])
 
 
 def test_format_markdown_reports_dvl_summary(tmp_path):

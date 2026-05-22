@@ -16,6 +16,7 @@ import numpy as np
 
 
 DEFAULT_DVL_TOPIC = "/dvl/twist"
+DEFAULT_IMU_TOPIC = "/imu/data"
 
 
 def load_compare_module():
@@ -31,6 +32,12 @@ def load_compare_module():
 class DvlRecord:
     stamp_s: float
     velocity_mps: np.ndarray
+
+
+@dataclass(frozen=True)
+class ImuYawRecord:
+    stamp_s: float
+    yaw_rad: float
 
 
 @dataclass(frozen=True)
@@ -95,14 +102,49 @@ def read_dvl_records(bag: Path, topic: str) -> list[DvlRecord]:
     return records
 
 
-def yaw_from_quaternion_rows(traj: np.ndarray) -> np.ndarray:
-    qx = traj[:, 4]
-    qy = traj[:, 5]
-    qz = traj[:, 6]
-    qw = traj[:, 7]
+def quaternion_to_yaw(qx: float, qy: float, qz: float, qw: float) -> float:
     siny_cosp = 2.0 * (qw * qz + qx * qy)
     cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
-    return np.unwrap(np.arctan2(siny_cosp, cosy_cosp))
+    return math.atan2(siny_cosp, cosy_cosp)
+
+
+def read_imu_yaw_records(bag: Path, topic: str) -> list[ImuYawRecord]:
+    from rclpy.serialization import deserialize_message
+    from sensor_msgs.msg import Imu
+
+    db_path = resolve_sqlite_db(bag)
+    with sqlite3.connect(str(db_path)) as con:
+        row = con.execute("select id, type from topics where name = ?", (topic,)).fetchone()
+        if row is None:
+            raise ValueError(f"topic not found in {db_path}: {topic}")
+        topic_id = int(row[0])
+        msg_type = str(row[1])
+        if msg_type != "sensor_msgs/msg/Imu":
+            raise ValueError(f"{topic}: expected sensor_msgs/msg/Imu, got {msg_type}")
+        records = []
+        for (raw,) in con.execute(
+            "select data from messages where topic_id = ? order by timestamp",
+            (topic_id,),
+        ):
+            msg = deserialize_message(raw, Imu)
+            q = msg.orientation
+            norm = math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)
+            if norm <= 1.0e-12:
+                continue
+            records.append(ImuYawRecord(
+                stamp_s=stamp_to_seconds(msg.header.stamp),
+                yaw_rad=quaternion_to_yaw(q.x / norm, q.y / norm, q.z / norm, q.w / norm),
+            ))
+    if not records:
+        raise ValueError(f"no usable IMU yaw records found on {topic}")
+    return records
+
+
+def yaw_from_quaternion_rows(traj: np.ndarray) -> np.ndarray:
+    return np.unwrap(np.asarray([
+        quaternion_to_yaw(float(row[4]), float(row[5]), float(row[6]), float(row[7]))
+        for row in traj
+    ], dtype=np.float64))
 
 
 def interpolate_series(times: np.ndarray, values: np.ndarray, query_times: np.ndarray) -> np.ndarray:
@@ -115,14 +157,16 @@ def interpolate_series(times: np.ndarray, values: np.ndarray, query_times: np.nd
     return out
 
 
-def interpolate_yaw(reference_tum: np.ndarray, query_times: np.ndarray) -> np.ndarray:
-    times = reference_tum[:, 0]
-    yaw = yaw_from_quaternion_rows(reference_tum)
+def interpolate_yaw_series(times: np.ndarray, yaw_rad: np.ndarray, query_times: np.ndarray) -> np.ndarray:
     out = np.full(query_times.shape[0], np.nan, dtype=np.float64)
     in_range = (query_times >= times[0]) & (query_times <= times[-1])
     if np.any(in_range):
-        out[in_range] = np.interp(query_times[in_range], times, yaw)
+        out[in_range] = np.interp(query_times[in_range], times, np.unwrap(yaw_rad))
     return out
+
+
+def interpolate_reference_yaw(reference_tum: np.ndarray, query_times: np.ndarray) -> np.ndarray:
+    return interpolate_yaw_series(reference_tum[:, 0], yaw_from_quaternion_rows(reference_tum), query_times)
 
 
 def heading(delta_xyz: np.ndarray) -> float:
@@ -167,6 +211,9 @@ def integrate_dvl_step(
     reference_tum: np.ndarray,
     mode: str,
     dvl_frame_yaw_offset_rad: float = 0.0,
+    yaw_times: np.ndarray | None = None,
+    yaw_rad: np.ndarray | None = None,
+    imu_yaw_offset_rad: float = 0.0,
 ) -> tuple[np.ndarray, bool, int]:
     if end_s <= start_s:
         return np.zeros(3, dtype=np.float64), False, 0
@@ -178,10 +225,20 @@ def integrate_dvl_step(
     if np.isnan(velocities).any():
         return np.zeros(3, dtype=np.float64), False, int(inside.shape[0])
     if mode == "gt_yaw":
-        yaw = interpolate_yaw(reference_tum, sample_times)
+        yaw = interpolate_reference_yaw(reference_tum, sample_times)
         if np.isnan(yaw).any():
             return np.zeros(3, dtype=np.float64), False, int(inside.shape[0])
         velocities = rotate_body_velocity_by_yaw(velocities, yaw + dvl_frame_yaw_offset_rad)
+    elif mode == "imu_yaw":
+        if yaw_times is None or yaw_rad is None:
+            raise ValueError("imu_yaw mode requires IMU yaw records")
+        yaw = interpolate_yaw_series(yaw_times, yaw_rad, sample_times)
+        if np.isnan(yaw).any():
+            return np.zeros(3, dtype=np.float64), False, int(inside.shape[0])
+        velocities = rotate_body_velocity_by_yaw(
+            velocities,
+            yaw + imu_yaw_offset_rad + dvl_frame_yaw_offset_rad,
+        )
     elif mode != "body_raw":
         raise ValueError(f"unsupported mode: {mode}")
     elif dvl_frame_yaw_offset_rad != 0.0:
@@ -201,11 +258,18 @@ def build_dvl_prior_steps(
     mode: str,
     min_reference_step_m: float,
     dvl_frame_yaw_offset_rad: float = 0.0,
+    imu_yaw_records: list[ImuYawRecord] | None = None,
+    imu_yaw_offset_rad: float = 0.0,
 ) -> list[DvlPriorStep]:
     if min_reference_step_m < 0.0:
         raise ValueError("min_reference_step_m must be non-negative")
     dvl_times = np.asarray([record.stamp_s for record in dvl_records], dtype=np.float64)
     dvl_velocities = np.asarray([record.velocity_mps for record in dvl_records], dtype=np.float64)
+    yaw_times = None
+    yaws = None
+    if imu_yaw_records is not None:
+        yaw_times = np.asarray([record.stamp_s for record in imu_yaw_records], dtype=np.float64)
+        yaws = np.asarray([record.yaw_rad for record in imu_yaw_records], dtype=np.float64)
     steps = []
     dvl_cumulative = 0.0
     reference_cumulative = 0.0
@@ -223,6 +287,9 @@ def build_dvl_prior_steps(
             reference_tum,
             mode,
             dvl_frame_yaw_offset_rad,
+            yaw_times,
+            yaws,
+            imu_yaw_offset_rad,
         )
         dvl_step = float(np.linalg.norm(dvl_delta))
         dvl_cumulative += dvl_step if covered else 0.0
@@ -366,7 +433,7 @@ def write_csv(path: Path, steps: list[DvlPriorStep]) -> None:
             writer.writerow({field: getattr(step, field) for field in fieldnames})
 
 
-def format_markdown(args, steps: list[DvlPriorStep], dvl_count: int) -> str:
+def format_markdown(args, steps: list[DvlPriorStep], dvl_count: int, imu_count: int = 0) -> str:
     covered = [step for step in steps if step.covered]
     coverage = len(covered) / len(steps) if steps else math.nan
     dvl_total = covered[-1].dvl_cumulative_m if covered else math.nan
@@ -380,11 +447,14 @@ def format_markdown(args, steps: list[DvlPriorStep], dvl_count: int) -> str:
         "",
         f"- Bag: `{args.bag}`",
         f"- DVL topic: `{args.dvl_topic}`",
+        f"- IMU topic: `{args.imu_topic}`",
         f"- Reference: `{args.reference}`",
         f"- Visual timestamps: `{args.visual}`",
         f"- Mode: `{args.mode}`",
         f"- DVL frame yaw offset: {format_float(float(args.dvl_frame_yaw_offset_deg), 4)} deg",
+        f"- IMU yaw offset: {format_float(float(args.imu_yaw_offset_deg), 4)} deg",
         f"- DVL samples: {dvl_count}",
+        f"- IMU yaw samples: {imu_count}",
         f"- Steps: {len(steps)}",
         f"- Covered steps: {len(covered)} ({format_fixed(100.0 * coverage, 1)}%)",
         f"- DVL cumulative distance: {format_float(dvl_total)} m",
@@ -421,7 +491,10 @@ def format_markdown(args, steps: list[DvlPriorStep], dvl_count: int) -> str:
             lines.append("- DVL cumulative magnitude is close enough to investigate as a visual step magnitude prior.")
     median_cosine = float(cosine_stats["median"])
     if math.isfinite(median_cosine) and median_cosine > 0.7:
-        lines.append("- DVL step direction is broadly aligned in this mode; replacing GT yaw with IMU yaw is a sensible next check.")
+        if args.mode == "gt_yaw":
+            lines.append("- DVL step direction is broadly aligned in this mode; replacing GT yaw with IMU yaw is a sensible next check.")
+        else:
+            lines.append("- DVL step direction is broadly aligned in this deployable-input mode; this is a candidate motion prior.")
     elif math.isfinite(median_cosine):
         lines.append("- DVL direction is weak in this mode; yaw/frame conventions or sensor quality need more work before fusion.")
     lines.append("")
@@ -433,6 +506,7 @@ def run_analysis(args) -> tuple[str, list[DvlPriorStep]]:
         args.reference, args.visual
     )
     dvl_records = read_dvl_records(args.bag, args.dvl_topic)
+    imu_records = read_imu_yaw_records(args.bag, args.imu_topic) if args.mode == "imu_yaw" else None
     steps = build_dvl_prior_steps(
         visual_times,
         reference_xyz,
@@ -441,9 +515,11 @@ def run_analysis(args) -> tuple[str, list[DvlPriorStep]]:
         args.mode,
         args.min_reference_step_m,
         math.radians(args.dvl_frame_yaw_offset_deg),
+        imu_records,
+        math.radians(args.imu_yaw_offset_deg),
     )
     write_csv(args.csv, steps)
-    text = format_markdown(args, steps, len(dvl_records))
+    text = format_markdown(args, steps, len(dvl_records), len(imu_records or []))
     return text, steps
 
 
@@ -455,12 +531,19 @@ def parse_args(argv):
     parser.add_argument("--reference", required=True, type=Path)
     parser.add_argument("--visual", required=True, type=Path, help="Visual TUM used only for timestamps.")
     parser.add_argument("--dvl-topic", default=DEFAULT_DVL_TOPIC)
-    parser.add_argument("--mode", choices=["body_raw", "gt_yaw"], default="gt_yaw")
+    parser.add_argument("--imu-topic", default=DEFAULT_IMU_TOPIC)
+    parser.add_argument("--mode", choices=["body_raw", "gt_yaw", "imu_yaw"], default="gt_yaw")
     parser.add_argument(
         "--dvl-frame-yaw-offset-deg",
         type=float,
         default=0.0,
         help="Yaw rotation from the DVL horizontal velocity axes into the body frame.",
+    )
+    parser.add_argument(
+        "--imu-yaw-offset-deg",
+        type=float,
+        default=0.0,
+        help="Fixed yaw offset added to IMU orientation yaw before rotating DVL velocity.",
     )
     parser.add_argument("--min-reference-step-m", type=float, default=0.0)
     parser.add_argument("--top-k", type=int, default=12)
