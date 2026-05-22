@@ -1,5 +1,7 @@
 # MBES Loop Candidate Visual Audit
 
+![MBES beach_pond accepted loop audit plan view](../media/mbes_beach_pond_loop_audit.png)
+
 - Source CSV: `/tmp/aqua_mbes_loop_benchmark_tuned_120/mbes_beach_pond_loop_status.csv`
 - Gate assumptions: fitness <= 2, translation <= 5 m, rotation <= 0.5 rad
 - Keyframe gap warning: <= 40
@@ -67,4 +69,3 @@
 ## Audit Rule
 
 Mark an accepted loop as usable evidence only after its accepted RViz/rerun edge connects a plausible revisit, not an adjacent duplicate or an obvious registration jump. Keep the benchmark row labelled unaudited until every accepted loop above has a note.
-
