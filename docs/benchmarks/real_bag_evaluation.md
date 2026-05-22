@@ -9,7 +9,7 @@ Manifest: `docs/benchmarks/real_bag_evaluation_manifest.json`
 | Case | Status | Target | Baselines | Metrics | Next step |
 |------|--------|--------|-----------|---------|-----------|
 | Tank Dataset `short_test` | measured | aqua_localization+visual | AQUA-SLAM | translation APE RMSE, matched seconds, visual coverage, replay rate | Beat or narrow the AQUA-SLAM SE(3) RMSE gap on the same short_test window before claiming accuracy superiority. |
-| MBES-SLAM `beach_pond` | measured | aqua_localization MBES frontend | dataset reference odometry, no-sonar fusion | translation APE RMSE, registration residual, loop accepted/rejected/no-candidate counts, descriptor gate pass rate | Use the strict gap40 geometry worksheet to finish RViz/rerun review: 16/17 accepted loops have keyframe positions. The remaining 1105 -> 1231 row is missing the current-side keyframe because 1231 is outside the loaded keyframe range 0 -> 1171, so extend the replay capture or fix keyframe recording before using the row as accuracy evidence. |
+| MBES-SLAM `beach_pond` | measured | aqua_localization MBES frontend | dataset reference odometry, no-sonar fusion | translation APE RMSE, registration residual, loop accepted/rejected/no-candidate counts, descriptor gate pass rate | Use the prepared-source strict gate geometry worksheet to finish RViz/rerun review: 44/44 accepted loops have keyframe positions with no missing geometry, and 14 high-priority review rows need visual plausibility notes before using the row as accuracy evidence. |
 | NTNU `subset-fjord/fjord_1` | measured | aqua_imu_loc | dataset baseline trajectory, future robot_localization IMU-only config | translation APE RMSE, depth RMSE, yaw-frame diagnostic | Add robot_localization as a generic fusion baseline for the same inputs. |
 | AQUALOC `harbor_07` | planned | aqua_localization visual frontend | RTAB-Map, dataset reference trajectory if usable | visual odometry availability, translation APE RMSE, depth RMSE, tracking dropout count | Confirm camera calibration and reference trajectory before adding a visual SLAM baseline. |
 
@@ -44,7 +44,7 @@ Fairness notes:
 - Artifacts: `datasets/mbes_slam_beach_pond_acquisition.md`, `docs/benchmarks/mbes_beach_pond_loop_status.md`, `run_mbes_loop_benchmark.sh`, `readiness report`, `rerun export`, `RViz loop markers`, `mbes_loop_status.csv`, `descriptor sweep report`, `accepted-loop audit report`, `accepted-loop geometry review`
 
 ```bash
-MBES_LOOP_MIN_POINTS=120 MBES_LOOP_VOXEL_LEAF_M=0.25 MBES_LOOP_MIN_KEYFRAME_SEPARATION=40 MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4 MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0 ros2 run aqua_localization run_mbes_loop_benchmark.sh
+MBES_PREPARE_HUMBLE_METADATA=1 MBES_LOOP_MIN_POINTS=120 MBES_LOOP_VOXEL_LEAF_M=0.25 MBES_LOOP_MIN_KEYFRAME_SEPARATION=40 MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4 MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0 ros2 run aqua_localization run_mbes_loop_benchmark.sh
 ```
 
 Fairness notes:

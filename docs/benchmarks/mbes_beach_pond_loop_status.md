@@ -168,7 +168,7 @@ completed.
 |---------|----------|-----------:|---------------:|---------:|---------:|-------------:|----------:|---------------:|-----------------:|-------|
 | MBES-SLAM | `beach_pond` | 120 | 277 | 35 | 178 | 64 | 163 | 0.1930 | 3.7891 | unaudited tuning run, `min_points=120`, `voxel=0.25`, Humble sqlite |
 | MBES-SLAM | `beach_pond` | 120 | 338 | 35 | 194 | 109 | 133 | 0.9520 | 2.9900 | unaudited stricter candidate run, `min_points=120`, `voxel=0.25`, `min_keyframe_separation=40`, Humble sqlite |
-| MBES-SLAM | `beach_pond` | 120 | 462 | 17 | 261 | 184 | 110 | 25.4749 | 4.7003 | unaudited strict gate run, `min_points=120`, `voxel=0.25`, `min_keyframe_separation=40`, `max_rotation=0.4`, `descriptor_extent=5.0`, Humble sqlite |
+| MBES-SLAM | `beach_pond` | 120 | 405 | 44 | 233 | 128 | 155 | 1.4038 | 4.0682 | unaudited prepared-source strict gate run, `min_points=120`, `voxel=0.25`, `min_keyframe_separation=40`, `max_rotation=0.4`, `descriptor_extent=5.0`, complete geometry required |
 
 ## Tuning Summary
 
@@ -210,19 +210,21 @@ risk class before RViz/rerun inspection.
 
 The next sweep kept `min_keyframe_separation=40` and added
 `gates.max_correction_rotation_rad=0.4` plus
-`descriptor.max_extent_ratio=5.0`. It removes the obvious rotation-near-gate and
-large-extent accepted candidates, but it is aggressive: accepted loops drop from
-35 to 17 and no-candidate statuses rise from 109 to 184.
+`descriptor.max_extent_ratio=5.0`. The current prepared-source run uses the
+Humble metadata/sqlite preparation path and requires complete accepted-loop
+geometry, so it supersedes the older incomplete geometry capture for audit
+planning. It should still be treated as an audit candidate set, not a validated
+accuracy claim.
 
-| Setting | Accepted | High-risk accepted | Accepted fitness median | Accepted fitness P95 | Accepted correction P95 m | Accepted rotation P95 rad |
-|---------|---------:|-------------------:|------------------------:|---------------------:|--------------------------:|--------------------------:|
+| Setting | Accepted | High-priority review rows | Accepted fitness median | Accepted fitness P95 | Accepted correction P95 m | Accepted rotation P95 rad |
+|---------|---------:|--------------------------:|------------------------:|---------------------:|--------------------------:|--------------------------:|
 | separation 40 | 35 | 5 | 0.0506 | 0.4520 | 2.4376 | 0.4259 |
-| separation 40 + rotation/extent gates | 17 | 2 | 0.0198 | 0.8012 | 4.1239 | 0.3793 |
+| prepared source + separation 40 + rotation/extent gates | 44 | 14 | 0.0554 | 1.3778 | 4.0184 | 0.3716 |
 
 Use the strict gate run as an audit candidate set, not as the default profile
-yet. The two remaining high-priority accepted loops are translation-near-gate
-cases (`396 -> 1108` and `48 -> 709`) and need visual inspection before
-tightening the translation gate.
+yet. The prepared-source geometry worksheet resolves all accepted-loop keyframe
+positions (`44/44`) and identifies 14 high-priority review rows for RViz/rerun
+inspection before tightening the translation or descriptor gates further.
 
 ## False-Positive Audit
 
@@ -232,11 +234,11 @@ accepted loop candidates against the RViz markers or rerun overlay.
 
 | Check | Required evidence | Result |
 |-------|-------------------|--------|
-| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | In progress; the strict gate geometry worksheet resolves keyframe positions for 16/17 accepted loops. The missing high-priority row is `1105 -> 1231`; the candidate side exists, but current keyframe `1231` is outside the loaded keyframe range `0 -> 1171`, so the replay capture must be extended or the keyframe recording path fixed before promotion. |
+| Accepted edge geometry | Accepted marker connects visually plausible revisits, not adjacent duplicate submaps. | In progress; the prepared-source strict gate worksheet resolves keyframe positions for 44/44 accepted loops with no missing geometry. RViz/rerun plausibility notes are still required before promotion. |
 | Pose-graph effect | `/aqua_pose_graph/path` changes in the expected direction after loop insertion. | TBD |
-| Registration gate | Accepted candidates have finite fitness and correction below the configured gate. | PASS mechanically for the strict gate row, but the two translation-near-gate accepted loops still need visual audit. |
+| Registration gate | Accepted candidates have finite fitness and correction below the configured gate. | PASS mechanically for the prepared-source strict gate row; accepted fitness P95 is `1.3778`, correction P95 is `4.0184 m`, and rotation P95 is `0.3716 rad`. High-priority rows still need visual audit. |
 | Descriptor gate | Descriptor sweep keeps enough plausible candidates while reducing obvious misses. | `descriptor.max_extent_ratio=5.0` is active in the strict gate row; centroid and point-count gates remain disabled. |
-| Duplicate suppression | Near-repeat accepted loops are suppressed by keyframe gap / cooldown settings. | PASS mechanically: 103 `duplicate loop suppressed` statuses. Visual audit still pending. |
+| Duplicate suppression | Near-repeat accepted loops are suppressed by keyframe gap / cooldown settings. | PASS mechanically: 66 `duplicate loop suppressed` statuses in the prepared-source strict gate row. Visual audit still pending. |
 
 ## Promotion Rule
 
