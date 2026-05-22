@@ -20,6 +20,10 @@ and APE measurement details.
 Second track (sonar, **wired**): MBES-SLAM `beach_pond` (Norbit iWBMSh multibeam from
 a real surface vessel). See [mbes_slam_demo.md](mbes_slam_demo.md) for the full
 workflow including GICP backend, quality gates, and rigid/Sim(3) APE numbers.
+For benchmark setup, use
+[mbes_slam_beach_pond_acquisition.md](mbes_slam_beach_pond_acquisition.md) to
+download, place, convert, and readiness-check the bag before recording loop
+status artifacts.
 
 See `../docs/public_demo_plan.md` for the recording checklist.
 See `../docs/public_dataset_candidates.md` for the maintained shortlist and decisions.

@@ -174,6 +174,7 @@ dataset-specific calibration, and replay commands:
 
 - [`datasets/tank_dataset_demo.md`](datasets/tank_dataset_demo.md)
 - [`datasets/mbes_slam_demo.md`](datasets/mbes_slam_demo.md)
+- [`datasets/mbes_slam_beach_pond_acquisition.md`](datasets/mbes_slam_beach_pond_acquisition.md)
 - [`datasets/ntnu_demo.md`](datasets/ntnu_demo.md)
 - [`datasets/aqualoc_demo.md`](datasets/aqualoc_demo.md)
 
