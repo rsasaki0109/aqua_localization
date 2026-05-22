@@ -99,6 +99,7 @@ def test_format_markdown_marks_benchmark_candidate(tmp_path):
         visual=tmp_path / "visual.tum",
         max_corrected_rmse_m=0.05,
         min_improvement_percent=20.0,
+        benchmark_row_out=tmp_path / "benchmark_row.md",
     )
     metadata = module.ValidationMetadata(
         profile_label="tank_profile",
@@ -136,12 +137,62 @@ def test_fill_default_outputs(tmp_path):
         corrected_out=None,
         aligned_visual_out=None,
         dvl_prior_out=None,
+        benchmark_row_out=None,
     )
 
     module.fill_default_outputs(validation_args)
 
     assert validation_args.summary_out == validation_args.out_dir / "tank_dvl_prior_validation.md"
     assert validation_args.csv_out == validation_args.out_dir / "tank_dvl_prior_validation_steps.csv"
+    assert validation_args.benchmark_row_out == validation_args.out_dir / "tank_dvl_prior_benchmark_row.md"
+
+
+def write_tum(path: Path, rows):
+    with path.open("w", encoding="utf-8") as fp:
+        for row in rows:
+            fp.write(" ".join(f"{value:.9f}" for value in row) + "\n")
+
+
+def test_write_benchmark_row_marks_diagnostic_override(tmp_path):
+    module = load_module()
+    rows = [
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        [2.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+    ]
+    reference = tmp_path / "reference.tum"
+    corrected = tmp_path / "corrected.tum"
+    write_tum(reference, rows)
+    write_tum(corrected, rows)
+    validation_args = SimpleNamespace(
+        reference=reference,
+        dataset="Tank Dataset",
+        system="aqua_dvl_prior_visual",
+        note="",
+        benchmark_row_out=tmp_path / "benchmark_row.md",
+        benchmark_row_append=False,
+        no_benchmark_row_header=False,
+    )
+    metadata = module.ValidationMetadata(
+        profile_label="tank_profile",
+        calibration_sequence="short_test",
+        profile_validation_sequence="Medium",
+        sequence="short_test",
+        same_sequence_allowed=True,
+        profile_sequence_mismatch_allowed=True,
+    )
+    result = SimpleNamespace(
+        corrected_tum=corrected,
+        prior_steps=2,
+        steps=2,
+    )
+
+    text = module.write_benchmark_row(validation_args, metadata, result, [])
+
+    assert "| Dataset | Sequence | System |" in text
+    assert "| Tank Dataset | short_test | aqua_dvl_prior_visual | SE(3) | 3 | 2.00 | 0.0000" in text
+    assert "diagnostic override" in text
+    assert text == validation_args.benchmark_row_out.read_text(encoding="utf-8").strip()
 
 
 def test_main_reports_sequence_errors_without_traceback(tmp_path, capsys):

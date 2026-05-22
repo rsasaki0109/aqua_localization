@@ -8,9 +8,11 @@ from dataclasses import dataclass
 import math
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import apply_tank_dvl_motion_prior
 import tank_dvl_prior_profile
+import trajectory_benchmark_row
 
 
 @dataclass(frozen=True)
@@ -128,6 +130,7 @@ def format_markdown(args, metadata: ValidationMetadata, result, failures: list[s
         f"- Aligned visual TUM: `{result.aligned_visual_tum}`",
         f"- DVL prior TUM: `{result.dvl_prior_tum}`",
         f"- Step CSV: `{app_args.csv_out}`",
+        f"- Benchmark row: `{args.benchmark_row_out}`",
     ]
     lines.extend(["", "## Gates", ""])
     lines.append(f"- Max corrected RMSE m: `{args.max_corrected_rmse_m}`")
@@ -149,6 +152,39 @@ def format_markdown(args, metadata: ValidationMetadata, result, failures: list[s
     return "\n".join(lines)
 
 
+def benchmark_note(args, metadata: ValidationMetadata, result, failures: list[str]) -> str:
+    if args.note:
+        return args.note
+    parts = [
+        f"profile={metadata.profile_label}",
+        f"prior={result.prior_steps}/{result.steps}",
+        f"status={'FAIL' if failures else 'PASS'}",
+    ]
+    if metadata.same_sequence_allowed or metadata.profile_sequence_mismatch_allowed:
+        parts.append("diagnostic override")
+    else:
+        parts.append("held-out validation")
+    return "; ".join(parts)
+
+
+def write_benchmark_row(args, metadata: ValidationMetadata, result, failures: list[str]) -> str:
+    compare = trajectory_benchmark_row.load_compare_module()
+    stats, _errors = compare.compare(args.reference, result.corrected_tum, with_scale=False, no_align=False)
+    row_args = SimpleNamespace(
+        dataset=args.dataset,
+        sequence=metadata.sequence,
+        system=args.system,
+        note=benchmark_note(args, metadata, result, failures),
+    )
+    parts = []
+    if not args.no_benchmark_row_header:
+        parts.append(trajectory_benchmark_row.table_header())
+    parts.append(trajectory_benchmark_row.format_row(row_args, stats))
+    text = "\n".join(parts)
+    trajectory_benchmark_row.write_output(args.benchmark_row_out, text, args.benchmark_row_append)
+    return text
+
+
 def run_validation(args):
     profile = tank_dvl_prior_profile.load_profile(args.profile)
     metadata = validate_sequence_split(args, profile)
@@ -156,6 +192,7 @@ def run_validation(args):
     result, _sim_rows, quality_rows = apply_tank_dvl_motion_prior.run_application(app_args)
     apply_tank_dvl_motion_prior.write_application_csv(app_args.csv_out, quality_rows)
     _status, failures = validation_status(args, result)
+    write_benchmark_row(args, metadata, result, failures)
     summary = format_markdown(args, metadata, result, failures, app_args)
     args.summary_out.parent.mkdir(parents=True, exist_ok=True)
     args.summary_out.write_text(summary, encoding="utf-8")
@@ -177,6 +214,12 @@ def parse_args(argv):
     parser.add_argument("--corrected-out", type=Path)
     parser.add_argument("--aligned-visual-out", type=Path)
     parser.add_argument("--dvl-prior-out", type=Path)
+    parser.add_argument("--benchmark-row-out", type=Path)
+    parser.add_argument("--benchmark-row-append", action="store_true")
+    parser.add_argument("--no-benchmark-row-header", action="store_true")
+    parser.add_argument("--dataset", default="Tank Dataset")
+    parser.add_argument("--system", default="aqua_dvl_prior_visual")
+    parser.add_argument("--note", default="")
     parser.add_argument("--allow-same-sequence", action="store_true")
     parser.add_argument("--allow-profile-sequence-mismatch", action="store_true")
     parser.add_argument("--max-corrected-rmse-m", type=float)
@@ -196,6 +239,8 @@ def fill_default_outputs(args) -> None:
         args.aligned_visual_out = args.out_dir / "aligned_visual_input.tum"
     if args.dvl_prior_out is None:
         args.dvl_prior_out = args.out_dir / "dvl_motion_prior.tum"
+    if args.benchmark_row_out is None:
+        args.benchmark_row_out = args.out_dir / "tank_dvl_prior_benchmark_row.md"
 
 
 def validate_args(args) -> None:
