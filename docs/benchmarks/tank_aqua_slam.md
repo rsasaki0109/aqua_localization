@@ -393,15 +393,19 @@ ros2 run aqua_localization run_tank_visual_fusion_sweep.py \
   --orb-fast-threshold 16 \
   --opencv-threads 2 \
   --expected-visual-frames 300 \
+  --visual-ready-timeout 20 \
   --baseline-rmse-m 0.0194 \
   --standalone-visual-rmse-m 0.0947 \
   --pairs 0.005:0.1,0.01:0.25,0.02:0.5,0.04:1.0
 ```
 
 The sweep assigns unique visual and fused odometry topics per case, so repeated
-bag replays do not mix stale publishers into the recorder. Use the
-`Delta vs standalone` column as the regression target: the fused result should
-move toward `0.0000 m` before claiming visual+DVL progress toward AQUA-SLAM.
+bag replays do not mix stale publishers into the recorder. The fusion runner
+also waits for the visual frontend status CSV/header before starting bag replay,
+which avoids zero-frame runs caused by OpenCV/ORB warmup racing the bag start.
+Use the `Delta vs standalone` column as the regression target: the fused result
+should move toward `0.0000 m` before claiming visual+DVL progress toward
+AQUA-SLAM.
 
 Before updating the head-to-head table after a matching change, run the visual
 matching sweep so the selected ORB descriptor-distance gates are evidence-based:

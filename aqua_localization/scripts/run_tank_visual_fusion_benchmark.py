@@ -30,6 +30,8 @@ import visual_calibration_profile
 DEFAULT_VISUAL_TOPIC = "/aqua_visual_frontend/fusion_visual/odometry"
 DEFAULT_FUSED_TOPIC = "/aqua_imu_loc/odometry"
 DEFAULT_IMU_PARAMS = Path("install/aqua_imu_loc/share/aqua_imu_loc/config/tank_dataset.yaml")
+VISUAL_READY_LOG_MARKER = "stereo visual odometry started:"
+VISUAL_STATUS_HEADER_PREFIX = "timestamp,frame_index,"
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,72 @@ class VisualCoverage:
     def below_gate(self) -> bool:
         ratio = self.ratio
         return ratio is not None and ratio < self.min_coverage
+
+
+@dataclass(frozen=True)
+class VisualReadiness:
+    source: str
+    elapsed_s: float
+
+
+def visual_status_csv_ready(path: Path) -> bool:
+    if not path.exists():
+        return False
+    try:
+        with path.open(encoding="utf-8") as fp:
+            return fp.readline().startswith(VISUAL_STATUS_HEADER_PREFIX)
+    except OSError:
+        return False
+
+
+def visual_log_ready(path: Path) -> bool:
+    if not path.exists():
+        return False
+    try:
+        return VISUAL_READY_LOG_MARKER in path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+
+
+def wait_for_visual_frontend_ready(
+        paths: FusionBenchmarkPaths,
+        process,
+        timeout_s: float,
+        poll_s: float) -> VisualReadiness:
+    if timeout_s <= 0.0:
+        return VisualReadiness(source="disabled", elapsed_s=0.0)
+    start = time.monotonic()
+    deadline = start + timeout_s
+    while True:
+        if visual_status_csv_ready(paths.visual_status_csv):
+            return VisualReadiness(
+                source=f"status csv {paths.visual_status_csv}",
+                elapsed_s=time.monotonic() - start,
+            )
+        if visual_log_ready(paths.visual_log):
+            return VisualReadiness(
+                source=f"log marker {VISUAL_READY_LOG_MARKER!r}",
+                elapsed_s=time.monotonic() - start,
+            )
+        returncode = process.poll()
+        if returncode is not None:
+            raise RuntimeError(
+                "visual frontend exited before readiness gate passed "
+                f"(returncode={returncode}); see {paths.visual_log}"
+            )
+        now = time.monotonic()
+        if now >= deadline:
+            raise TimeoutError(
+                "visual frontend did not become ready before bag replay "
+                f"within {timeout_s:g}s; see {paths.visual_log}"
+            )
+        time.sleep(min(poll_s, max(0.0, deadline - now)))
+
+
+def clear_stale_run_outputs(paths: FusionBenchmarkPaths) -> None:
+    for path in (paths.visual_status_csv, paths.fused_tum):
+        if path.exists():
+            path.unlink()
 
 
 def count_visual_status_rows(path: Path) -> int:
@@ -280,6 +348,7 @@ def build_commands(args, paths: FusionBenchmarkPaths) -> list[list[str]]:
 def run_recording(args, paths: FusionBenchmarkPaths):
     commands = build_commands(args, paths)
     run_tank_visual_benchmark.write_replay_script(paths.replay_script, commands)
+    clear_stale_run_outputs(paths)
 
     with paths.visual_log.open("w", encoding="utf-8") as visual_log, \
             paths.imu_log.open("w", encoding="utf-8") as imu_log, \
@@ -288,6 +357,17 @@ def run_recording(args, paths: FusionBenchmarkPaths):
         visual = subprocess.Popen(
             commands[0], stdout=visual_log, stderr=subprocess.STDOUT, start_new_session=True
         )
+        readiness = wait_for_visual_frontend_ready(
+            paths,
+            visual,
+            timeout_s=args.visual_ready_timeout,
+            poll_s=args.visual_ready_poll_s,
+        )
+        visual_log.write(
+            f"[runner] visual readiness source={readiness.source} "
+            f"elapsed_s={readiness.elapsed_s:.3f}\n"
+        )
+        visual_log.flush()
         time.sleep(args.startup_delay)
         imu = subprocess.Popen(
             commands[1], stdout=imu_log, stderr=subprocess.STDOUT, start_new_session=True
@@ -417,6 +497,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Warn when processed/expected visual frames falls below this ratio.",
     )
     parser.add_argument("--startup-delay", type=float, default=1.0)
+    parser.add_argument(
+        "--visual-ready-timeout",
+        type=float,
+        default=10.0,
+        help=(
+            "Wait this many seconds for the visual frontend status CSV/header or "
+            "startup log before replaying the bag. Use 0 to disable."
+        ),
+    )
+    parser.add_argument(
+        "--visual-ready-poll-s",
+        type=float,
+        default=0.1,
+        help="Polling interval for --visual-ready-timeout.",
+    )
     parser.add_argument("--post-play-delay", type=float, default=2.0)
     parser.add_argument("--stop-timeout", type=float, default=5.0)
     parser.add_argument("--no-sim-time", dest="use_sim_time", action="store_false")
@@ -456,6 +551,10 @@ def main(argv=None) -> int:
         raise ValueError("--expected-visual-frames must be non-negative")
     if not 0.0 < args.min_visual_coverage <= 1.0:
         raise ValueError("--min-visual-coverage must be in (0, 1]")
+    if args.visual_ready_timeout < 0.0:
+        raise ValueError("--visual-ready-timeout must be non-negative")
+    if args.visual_ready_poll_s <= 0.0:
+        raise ValueError("--visual-ready-poll-s must be positive")
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     paths = default_paths(args.out_dir, args.sequence)

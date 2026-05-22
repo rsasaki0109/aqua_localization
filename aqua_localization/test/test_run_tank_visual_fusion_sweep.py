@@ -70,6 +70,8 @@ def test_benchmark_command_wires_fusion_knobs(tmp_path):
         expected_visual_frames=300,
         min_visual_coverage=0.98,
         startup_delay=0.1,
+        visual_ready_timeout=3.0,
+        visual_ready_poll_s=0.05,
         post_play_delay=0.2,
         stop_timeout=1.0,
         use_sim_time=True,
@@ -93,6 +95,10 @@ def test_benchmark_command_wires_fusion_knobs(tmp_path):
     assert "/aqua_imu_loc/fusion_sweep/var_0p01__age_0p25/odometry" in command
     assert "--expected-visual-frames" in command
     assert "300" in command
+    assert "--visual-ready-timeout" in command
+    assert "3.0" in command
+    assert "--visual-ready-poll-s" in command
+    assert "0.05" in command
 
 
 def test_format_markdown_reports_baseline_and_standalone_delta(tmp_path):
