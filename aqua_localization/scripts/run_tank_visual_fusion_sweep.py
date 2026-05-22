@@ -228,11 +228,15 @@ def evaluate_result(args, case: SweepCase, sequence: str, out_dir: Path, command
     rmse_m = math.nan
     matched_seconds = math.nan
     if paths.fused_tum.exists():
-        stats, _ = compare_trajectories.compare(
-            args.reference, paths.fused_tum, with_scale=False, no_align=False
-        )
-        rmse_m = float(stats["rmse"])
-        matched_seconds = float(stats["matched_seconds"])
+        try:
+            stats, _ = compare_trajectories.compare(
+                args.reference, paths.fused_tum, with_scale=False, no_align=False
+            )
+            rmse_m = float(stats["rmse"])
+            matched_seconds = float(stats["matched_seconds"])
+        except (OSError, ValueError):
+            rmse_m = math.nan
+            matched_seconds = math.nan
     status_exists = paths.visual_status_csv.exists()
     coverage = run_tank_visual_fusion_benchmark.VisualCoverage(
         processed_frames=(
