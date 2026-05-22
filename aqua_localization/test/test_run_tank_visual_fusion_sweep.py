@@ -67,6 +67,8 @@ def test_benchmark_command_wires_fusion_knobs(tmp_path):
         orb_fast_threshold=16,
         opencv_threads=2,
         play_rate=1.0,
+        bag_read_ahead_queue_size=1000,
+        bag_disable_loan_message=True,
         expected_visual_frames=300,
         min_visual_coverage=0.98,
         startup_delay=0.1,
@@ -95,6 +97,9 @@ def test_benchmark_command_wires_fusion_knobs(tmp_path):
     assert "/aqua_imu_loc/fusion_sweep/var_0p01__age_0p25/odometry" in command
     assert "--expected-visual-frames" in command
     assert "300" in command
+    assert "--bag-read-ahead-queue-size" in command
+    assert "1000" in command
+    assert "--bag-disable-loan-message" in command
     assert "--visual-ready-timeout" in command
     assert "3.0" in command
     assert "--visual-ready-poll-s" in command

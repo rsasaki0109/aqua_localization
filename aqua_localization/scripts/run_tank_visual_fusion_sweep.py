@@ -205,6 +205,8 @@ def benchmark_command(args, case: SweepCase, sequence: str, out_dir: Path) -> li
         str(args.opencv_threads),
         "--play-rate",
         str(args.play_rate),
+        "--bag-read-ahead-queue-size",
+        str(args.bag_read_ahead_queue_size),
         "--expected-visual-frames",
         str(args.expected_visual_frames),
         "--min-visual-coverage",
@@ -222,6 +224,8 @@ def benchmark_command(args, case: SweepCase, sequence: str, out_dir: Path) -> li
     ]
     if args.visual_calibration_profile is not None:
         command.extend(["--visual-calibration-profile", str(args.visual_calibration_profile)])
+    if args.bag_disable_loan_message:
+        command.append("--bag-disable-loan-message")
     if not args.use_sim_time:
         command.append("--no-sim-time")
     return command
@@ -403,6 +407,8 @@ def parse_args(argv):
     parser.add_argument("--orb-fast-threshold", type=int, default=16)
     parser.add_argument("--opencv-threads", type=int, default=2)
     parser.add_argument("--play-rate", type=float, default=1.0)
+    parser.add_argument("--bag-read-ahead-queue-size", type=int, default=0)
+    parser.add_argument("--bag-disable-loan-message", action="store_true")
     parser.add_argument("--expected-visual-frames", type=int, default=0)
     parser.add_argument("--min-visual-coverage", type=float, default=0.98)
     parser.add_argument("--baseline-rmse-m", type=float, default=math.nan)
@@ -439,6 +445,8 @@ def main(argv=None) -> int:
         raise ValueError("--opencv-threads must be non-negative")
     if args.play_rate <= 0.0:
         raise ValueError("--play-rate must be positive")
+    if args.bag_read_ahead_queue_size < 0:
+        raise ValueError("--bag-read-ahead-queue-size must be non-negative")
     if args.expected_visual_frames < 0:
         raise ValueError("--expected-visual-frames must be non-negative")
     if not 0.0 < args.min_visual_coverage <= 1.0:

@@ -68,6 +68,8 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
         "--base-from-camera-x-m", "-0.25",
         "--base-from-camera-y-m", "-0.45",
         "--play-rate", "0.5",
+        "--bag-read-ahead-queue-size", "1000",
+        "--bag-disable-loan-message",
     ])
     paths = module.default_paths(tmp_path, args.sequence)
 
@@ -89,7 +91,18 @@ def test_build_commands_include_camera_scale_and_clock(tmp_path):
     assert "/visual_sweep/case_80/odometry" in record_command
     assert record_command[-2:] == ["--format", "tum"]
     assert str(paths.estimate_tum) in record_command
-    assert bag_command == ["ros2", "bag", "play", "/tmp/tank_bag", "--clock", "--rate", "0.5"]
+    assert bag_command == [
+        "ros2",
+        "bag",
+        "play",
+        "/tmp/tank_bag",
+        "--clock",
+        "--rate",
+        "0.5",
+        "--read-ahead-queue-size",
+        "1000",
+        "--disable-loan-message",
+    ]
 
 
 def test_build_visual_command_can_enable_status_csv(tmp_path):

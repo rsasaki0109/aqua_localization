@@ -123,6 +123,11 @@ def build_bag_play_command(args) -> list[str]:
         command.append("--clock")
     if args.play_rate != 1.0:
         command.extend(["--rate", str(args.play_rate)])
+    read_ahead = int(getattr(args, "bag_read_ahead_queue_size", 0))
+    if read_ahead > 0:
+        command.extend(["--read-ahead-queue-size", str(read_ahead)])
+    if bool(getattr(args, "bag_disable_loan_message", False)):
+        command.append("--disable-loan-message")
     return command
 
 
@@ -296,6 +301,8 @@ def parse_args(argv):
     parser.add_argument("--orb-fast-threshold", type=int, default=12)
     parser.add_argument("--opencv-threads", type=int, default=0)
     parser.add_argument("--play-rate", type=float, default=1.0)
+    parser.add_argument("--bag-read-ahead-queue-size", type=int, default=0)
+    parser.add_argument("--bag-disable-loan-message", action="store_true")
     parser.add_argument("--startup-delay", type=float, default=1.0)
     parser.add_argument("--stop-timeout", type=float, default=5.0)
     parser.add_argument("--no-sim-time", dest="use_sim_time", action="store_false")
@@ -309,6 +316,8 @@ def main(argv=None) -> int:
         raise ValueError("--translation-scale must be positive")
     if args.play_rate <= 0.0:
         raise ValueError("--play-rate must be positive")
+    if args.bag_read_ahead_queue_size < 0:
+        raise ValueError("--bag-read-ahead-queue-size must be non-negative")
     if args.orb_n_features <= 0:
         raise ValueError("--orb-n-features must be positive")
     if args.orb_fast_threshold < 0:
