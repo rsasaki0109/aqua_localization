@@ -36,6 +36,19 @@ def audit_report(rows: list[str]) -> str:
     )
 
 
+def full_audit_report(rows: list[str]) -> str:
+    return "\n".join(
+        [
+            "# MBES Loop Candidate Visual Audit",
+            "",
+            "| Rank | Priority | Candidate -> Current | Gap | Fitness | Correction m | Rotation rad | Descriptor c/e/r | Flags | Decision | Reviewer note | Action |",
+            "|-----:|----------|----------------------|----:|--------:|-------------:|-------------:|------------------|-------|----------|---------------|--------|",
+            *rows,
+            "",
+        ]
+    )
+
+
 def test_parse_and_validate_complete_decision_rows():
     module = load_module()
     rows = module.parse_decision_rows(
@@ -95,6 +108,50 @@ def test_format_summary_counts_decisions_and_actions(tmp_path):
     assert "| keep | 1 |" in summary
     assert "| TODO | 1 |" in summary
     assert "decision TODO" in summary
+
+
+def test_format_summary_blocks_gate_recommendations_until_complete(tmp_path):
+    module = load_module()
+    report = tmp_path / "audit.md"
+    report.write_text(
+        full_audit_report(
+            [
+                "| 1 | high | 10 -> 70 | 60 | 0.2 | 1.0 | 0.05 | 0.1/1.0/0.9 | none | keep | Plausible revisit | keep |",
+                "| 2 | high | 42 -> 64 | 22 | 0.3 | 4.0 | 0.30 | 0.5/1.2/0.8 | translation near gate | TODO | TODO: inspect | TODO |",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    rows = module.read_decision_rows(report)
+    summary = module.format_summary(rows, module.validate_rows(rows), report)
+
+    assert "Actionable reviewed rows: 1 / 2" in summary
+    assert "Recommendation status: blocked" in summary
+
+
+def test_format_summary_reports_gate_recommendation_hints(tmp_path):
+    module = load_module()
+    report = tmp_path / "audit.md"
+    report.write_text(
+        full_audit_report(
+            [
+                "| 1 | high | 10 -> 70 | 60 | 0.2 | 1.0 | 0.05 | 0.1/1.0/0.9 | none | keep | Plausible revisit | keep |",
+                "| 2 | high | 42 -> 64 | 22 | 0.3 | 4.0 | 0.30 | 0.5/1.2/0.8 | translation near gate | reject | Translation jump | tighten translation |",
+                "| 3 | high | 50 -> 90 | 40 | 0.4 | 1.2 | 0.34 | 0.2/1.1/0.7 | rotation near gate | reject | Rotation jump | tighten rotation |",
+                "| 4 | high | 80 -> 120 | 40 | 0.6 | 1.3 | 0.10 | 3.0/6.0/0.4 | large extent ratio | reject | Descriptor mismatch | descriptor reject |",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    rows = module.read_decision_rows(report)
+    summary = module.format_summary(rows, module.validate_rows(rows), report)
+
+    assert "Actionable reviewed rows: 4 / 4" in summary
+    assert "Reviewed reject rows: 3" in summary
+    assert "Translation gate: lowest rejected `tighten translation` value 4" in summary
+    assert "highest kept value 1" in summary
+    assert "Rotation gate: lowest rejected `tighten rotation` value 0.34" in summary
+    assert "Descriptor gate rejected-row ranges: centroid 3-3 m" in summary
 
 
 def test_cli_require_complete_fails_on_todo(tmp_path):

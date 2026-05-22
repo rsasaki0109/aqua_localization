@@ -35,7 +35,9 @@ and the plan-view PNG
 [`mbes_beach_pond_loop_audit_high_priority.png`](../media/mbes_beach_pond_loop_audit_high_priority.png).
 Use `check_mbes_loop_audit_decisions.py --require-complete` before promoting
 that row from `unaudited`; it must fail while any high-priority decision,
-reviewer note, or action remains `TODO`.
+reviewer note, or action remains `TODO`. The same report also summarizes
+reviewed `keep`/`reject`/`unclear` decisions and prints action-specific gate
+recommendation hints for translation, rotation, and descriptor rejects.
 
 ## Reproducible Run
 
@@ -188,6 +190,11 @@ ros2 run aqua_localization check_mbes_loop_audit_decisions.py \
   --out /tmp/mbes_beach_pond_loop_audit_decision_summary.md \
   --require-complete
 ```
+
+The generated summary is the handoff point from visual audit to gate tuning:
+use `tighten translation`, `tighten rotation`, and `descriptor reject` action
+counts to choose the next conservative threshold sweep, then rerun the strict
+source benchmark before changing the measurement row status.
 
 ## Measurement Table
 
