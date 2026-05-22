@@ -354,6 +354,27 @@ IMU+pressure+DVL `aqua_localization` anchor. The fused
 `aqua_localization+visual` row improves that anchor by `49.3%`, but still needs
 a `91.1%` RMSE reduction to tie AQUA-SLAM.
 
+Use [`aqua_slam_error_budget.md`](aqua_slam_error_budget.md) to turn that gap
+into the next development budget:
+
+```bash
+ros2 run aqua_localization aqua_slam_error_budget.py \
+  docs/benchmarks/tank_aqua_slam.md \
+  --out docs/benchmarks/aqua_slam_error_budget.md
+```
+
+When the best visual run's diagnostics are available, add:
+
+```bash
+  --drift-report /tmp/.../short_test_visual_drift.md \
+  --motion-report /tmp/.../short_test_visual_motion_segments.md
+```
+
+Current readout: the standalone visual row is the accuracy leader, while the
+best fused `aqua_localization+visual` row is `0.1228 m` worse than standalone
+visual. The next accuracy PR should therefore attack visual covariance, timing,
+or coupling rather than another descriptor-only sweep.
+
 Before updating the head-to-head table after a matching change, run the visual
 matching sweep so the selected ORB descriptor-distance gates are evidence-based:
 

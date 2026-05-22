@@ -80,6 +80,10 @@ Current progress against that target is tracked in
 `short_test`, which is `4.88x` AQUA-SLAM's `0.0194 m` row. That is a real
 `77.9%` RMSE reduction from the IMU+pressure+DVL `aqua_localization` anchor,
 but it is not a win yet.
+The follow-up error budget is in
+[`aqua_slam_error_budget.md`](aqua_slam_error_budget.md): it currently shows
+`0.0753 m` RMSE left to tie AQUA-SLAM and a `0.1228 m` regression in the fused
+visual+DVL row relative to standalone visual.
 
 ## Fair Head-to-Head Tasks
 
