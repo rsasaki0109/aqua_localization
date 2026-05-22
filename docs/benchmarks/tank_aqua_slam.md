@@ -265,6 +265,36 @@ and make the trajectory worse. The next likely win is adding a motion prior or
 multi-sensor coupling so rejected visual steps can be bridged instead of simply
 dropped.
 
+Use per-step diagnostics to identify whether the remaining error is caused by a
+few bad visual updates or by broad per-frame motion bias:
+
+```bash
+ros2 run aqua_localization analyze_visual_step_errors.py \
+  /tmp/tank_short_test_gt.tum \
+  /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99/short_test_visual_pnp_1125_strict_ratio_repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99_visual_frontend.tum \
+  --out /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/visual_step_errors.md \
+  --csv /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/visual_step_errors.csv \
+  --top-k 12
+```
+
+This aligns the visual trajectory to the reference, compares each consecutive
+visual update with the reference update over the same timestamps, and reports
+visual/reference step-length ratio, direction cosine, heading error, cumulative
+distance ratio, and the worst local motion updates. Use the worst-step CSV as
+the input for a future IMU/DVL motion-prior gate.
+
+The first step-error run on 2026-05-23 used the best strict PnP row
+(`0.1128 m` RMSE). It found `217` valid steps with visual cumulative distance
+`0.942 m` against `1.152 m` reference distance, a cumulative visual/reference
+ratio of `0.818`, median step-length ratio `0.817`, median direction cosine
+`0.670`, and median absolute heading error `24.1 deg`. The worst local updates
+clustered near the end of the window and around offsets `5.65`, `1.35`,
+`7.75`, and `8.45` seconds. This suggests the remaining error is not a single
+gross PnP outlier; the visual frontend is often under-estimating motion and has
+meaningful direction jitter. A useful motion prior should therefore constrain
+both step magnitude and direction, and should bridge rejected/noisy steps rather
+than only tightening PnP gates.
+
 When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
 The bag replay mode also saves `*_visual_frontend_status.csv`, which contains
