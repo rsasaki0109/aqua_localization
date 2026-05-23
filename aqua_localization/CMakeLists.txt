@@ -22,6 +22,7 @@ install(PROGRAMS
   scripts/ingest_tank_aqua_slam_baseline.py
   scripts/check_tank_aqua_slam_baseline_ready.py
   scripts/summarize_tank_aqua_slam_baseline_todos.py
+  scripts/run_tank_aqua_slam_baseline_workflow.py
   scripts/aqua_slam_error_budget.py
   scripts/aqua_slam_progress_report.py
   scripts/check_3dgs_bag_ready.py
@@ -111,6 +112,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_ingest_tank_aqua_slam_baseline test/test_ingest_tank_aqua_slam_baseline.py)
   ament_add_pytest_test(test_check_tank_aqua_slam_baseline_ready test/test_check_tank_aqua_slam_baseline_ready.py)
   ament_add_pytest_test(test_summarize_tank_aqua_slam_baseline_todos test/test_summarize_tank_aqua_slam_baseline_todos.py)
+  ament_add_pytest_test(test_run_tank_aqua_slam_baseline_workflow test/test_run_tank_aqua_slam_baseline_workflow.py)
   ament_add_pytest_test(test_aqua_slam_error_budget test/test_aqua_slam_error_budget.py)
   ament_add_pytest_test(test_aqua_slam_progress_report test/test_aqua_slam_progress_report.py)
   ament_add_pytest_test(test_check_3dgs_bag_ready test/test_check_3dgs_bag_ready.py)

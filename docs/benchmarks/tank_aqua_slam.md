@@ -634,6 +634,28 @@ The TODO summary marks ready inputs, blocked inputs, and the next command to
 run. It exits successfully only when the held-out validation bundle has all
 required inputs.
 
+To run the whole local side of the comparison workflow, use the workflow
+runner. It checks readiness, ingests the AQUA-SLAM baseline row when the
+CSV/TUM and reference are present, refreshes the readiness/TODO reports, and
+runs the held-out validation bundle once all validation inputs are available:
+
+```bash
+ros2 run aqua_localization run_tank_aqua_slam_baseline_workflow.py \
+  --sequence Medium \
+  --reference /tmp/tank_medium_gt.tum \
+  --csv /tmp/aqua_slam_medium_orb_odom.csv \
+  --baseline-dir /tmp/aqua_slam_medium_baseline \
+  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --bag /tmp/tank_medium_ros2_visual \
+  --visual /tmp/tank_medium_visual_frontend.tum \
+  --out-dir /tmp/aqua_slam_medium_baseline \
+  --validation-out-dir /tmp/aqua_tank_dvl_prior_medium_validation_bundle
+```
+
+The workflow writes `readiness.md`, `todos.md`, and `workflow_summary.md`.
+Its final status is `PASS` when validation and gap gates pass, `BLOCKED` when
+required inputs are still missing, and `FAIL` when an executed stage fails.
+
 ```bash
 # In the AQUA-SLAM ROS 1 Docker container while the Medium bag is playing.
 rostopic echo -p /AQUA_SLAM/orb_odom > /tmp/aqua_slam_medium_orb_odom.csv
