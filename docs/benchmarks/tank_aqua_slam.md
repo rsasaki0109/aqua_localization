@@ -530,6 +530,25 @@ AQUA-SLAM `0.0194 m` baseline. This is an important direction signal, but it is
 still same-sequence diagnostic tuning; run the same profile/gates on the
 held-out validation sequence before claiming a win.
 
+Promote the selected sweep row into a profile before running held-out
+validation. This avoids hand-copying tuned gates into the validation command:
+
+```bash
+ros2 run aqua_localization promote_tank_dvl_sweep_profile.py \
+  --base-profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium.yaml \
+  --sweep-csv /tmp/aqua_tank_dvl_prior_gate_sweep_short_diag/tank_dvl_prior_gate_sweep.csv \
+  --rank 1 \
+  --out /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --name tank_short_to_medium_sweep_rank1 \
+  --note "same-sequence gate sweep rank 1; validate on held-out Medium before benchmark use"
+```
+
+The promoted profile preserves the calibrated yaw settings and replaces only
+the prior scale and application gates from the selected sweep row. A
+same-sequence smoke run with the promoted profile reproduces `0.0154 m` RMSE and
+`169/217` prior-applied steps, but remains diagnostic because it uses
+`--allow-same-sequence`.
+
 On 2026-05-23 this profile-based real-prior application reduced the best strict
 PnP visual row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction,
 while using the DVL/IMU prior on `127/217` visual steps. That is close to the

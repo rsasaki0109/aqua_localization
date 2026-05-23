@@ -54,6 +54,7 @@ install(PROGRAMS
   scripts/tank_dvl_prior_profile.py
   scripts/run_tank_dvl_prior_validation.py
   scripts/sweep_tank_dvl_prior_gates.py
+  scripts/promote_tank_dvl_sweep_profile.py
   scripts/run_tank_visual_benchmark.py
   scripts/run_tank_visual_direct_benchmark.py
   scripts/run_tank_visual_calibration_sweep.py
@@ -121,6 +122,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_tank_dvl_prior_profile test/test_tank_dvl_prior_profile.py)
   ament_add_pytest_test(test_run_tank_dvl_prior_validation test/test_run_tank_dvl_prior_validation.py)
   ament_add_pytest_test(test_sweep_tank_dvl_prior_gates test/test_sweep_tank_dvl_prior_gates.py)
+  ament_add_pytest_test(test_promote_tank_dvl_sweep_profile test/test_promote_tank_dvl_sweep_profile.py)
   ament_add_pytest_test(test_run_tank_visual_benchmark test/test_run_tank_visual_benchmark.py)
   ament_add_pytest_test(test_run_tank_visual_direct_benchmark test/test_run_tank_visual_direct_benchmark.py)
   ament_add_pytest_test(test_run_tank_visual_calibration_sweep test/test_run_tank_visual_calibration_sweep.py)
