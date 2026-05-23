@@ -82,6 +82,12 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(FILES
+  scripts/tank_dvl_prior_core.py
+  scripts/tank_rosbag_motion_inputs.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
 
@@ -122,6 +128,8 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_analyze_visual_motion_segments test/test_analyze_visual_motion_segments.py)
   ament_add_pytest_test(test_analyze_visual_step_errors test/test_analyze_visual_step_errors.py)
   ament_add_pytest_test(test_simulate_visual_motion_prior test/test_simulate_visual_motion_prior.py)
+  ament_add_pytest_test(test_tank_dvl_prior_core test/test_tank_dvl_prior_core.py)
+  ament_add_pytest_test(test_tank_rosbag_motion_inputs test/test_tank_rosbag_motion_inputs.py)
   ament_add_pytest_test(test_analyze_tank_dvl_motion_prior test/test_analyze_tank_dvl_motion_prior.py)
   ament_add_pytest_test(test_check_mbes_benchmark_ready test/test_check_mbes_benchmark_ready.py)
   ament_add_pytest_test(test_prepare_rosbag2_humble_metadata test/test_prepare_rosbag2_humble_metadata.py)
