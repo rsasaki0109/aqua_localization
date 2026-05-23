@@ -52,6 +52,7 @@ install(PROGRAMS
   scripts/validate_visual_scale.py
   scripts/visual_calibration_profile.py
   scripts/tank_dvl_prior_profile.py
+  scripts/prepare_tank_dvl_heldout_inputs.py
   scripts/run_tank_dvl_prior_validation.py
   scripts/run_tank_dvl_validation_bundle.py
   scripts/sweep_tank_dvl_prior_gates.py
@@ -121,6 +122,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_validate_visual_scale test/test_validate_visual_scale.py)
   ament_add_pytest_test(test_visual_calibration_profile test/test_visual_calibration_profile.py)
   ament_add_pytest_test(test_tank_dvl_prior_profile test/test_tank_dvl_prior_profile.py)
+  ament_add_pytest_test(test_prepare_tank_dvl_heldout_inputs test/test_prepare_tank_dvl_heldout_inputs.py)
   ament_add_pytest_test(test_run_tank_dvl_prior_validation test/test_run_tank_dvl_prior_validation.py)
   ament_add_pytest_test(test_run_tank_dvl_validation_bundle test/test_run_tank_dvl_validation_bundle.py)
   ament_add_pytest_test(test_sweep_tank_dvl_prior_gates test/test_sweep_tank_dvl_prior_gates.py)

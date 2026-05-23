@@ -573,6 +573,26 @@ successfully with `--max-gap-x 1.0`, the generated benchmark row is the first
 candidate evidence that this DVL-prior visual trajectory beats the checked-in
 AQUA-SLAM baseline under the same table parser.
 
+If the held-out visual TUM has not been generated yet, use the preparation
+wrapper. It can either reuse an existing ROS 2 bag or convert a raw Tank ROS 1
+bag with cameras, run the direct visual frontend using the current strict PnP
+settings, then call the validation bundle:
+
+```bash
+ros2 run aqua_localization prepare_tank_dvl_heldout_inputs.py \
+  --sequence Medium \
+  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --ros1-bag /path/to/Medium.bag \
+  --reference /tmp/tank_medium_gt.tum \
+  --benchmark-markdown docs/benchmarks/tank_aqua_slam.md \
+  --out-dir /tmp/aqua_tank_dvl_medium_prepare
+```
+
+Use `--dry-run` first to write
+`/tmp/aqua_tank_dvl_medium_prepare/tank_dvl_heldout_inputs_manifest.md` without
+executing the commands. If a ROS 2 bag already exists, pass `--ros2-bag` instead
+of `--ros1-bag`.
+
 On 2026-05-23 this profile-based real-prior application reduced the best strict
 PnP visual row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction,
 while using the DVL/IMU prior on `127/217` visual steps. That is close to the
