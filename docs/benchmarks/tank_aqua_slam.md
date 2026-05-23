@@ -599,6 +599,23 @@ while replaying the Tank bag, export `/AQUA_SLAM/orb_odom`, then ingest that
 CSV with the same APE parser used by this document:
 
 ```bash
+ros2 run aqua_localization check_tank_aqua_slam_baseline_ready.py \
+  --sequence Medium \
+  --reference /tmp/tank_medium_gt.tum \
+  --csv /tmp/aqua_slam_medium_orb_odom.csv \
+  --baseline-row /tmp/aqua_slam_medium_baseline/Medium_aqua_slam_benchmark_row.md \
+  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --bag /tmp/tank_medium_ros2_visual \
+  --visual /tmp/tank_medium_visual_frontend.tum \
+  --out /tmp/aqua_slam_medium_baseline/readiness.md
+```
+
+The readiness report separates three questions: whether the AQUA-SLAM CSV/TUM
+and reference are sufficient to ingest a baseline, whether a parseable `Medium`
+AQUA-SLAM benchmark row is available for gap checks, and whether the held-out
+validation bundle has all inputs needed to use `--max-gap-x 1.0`.
+
+```bash
 # In the AQUA-SLAM ROS 1 Docker container while the Medium bag is playing.
 rostopic echo -p /AQUA_SLAM/orb_odom > /tmp/aqua_slam_medium_orb_odom.csv
 
