@@ -119,11 +119,18 @@ def benchmark_row_detail(path: Path) -> str:
     if not rows:
         return "AQUA-SLAM benchmark row; no parseable rows"
     row = rows[0]
-    detail = f"AQUA-SLAM benchmark row; samples={row.samples}, rmse={row.rmse_m:.4f} m"
+    detail = (
+        f"AQUA-SLAM benchmark row; samples={row.samples}, "
+        f"matched_s={row.matched_seconds}, rmse={row.rmse_m:.4f} m"
+    )
     if row.samples is None:
         detail += "; not baseline-ready: missing sample count"
     elif row.samples < readiness.DEFAULT_MIN_BASELINE_SAMPLES:
         detail += "; smoke-sized candidate"
+    elif row.matched_seconds is None:
+        detail += "; not baseline-ready: missing matched duration"
+    elif row.matched_seconds < readiness.DEFAULT_MIN_BASELINE_MATCHED_S:
+        detail += "; not baseline-ready: short matched duration"
     return detail
 
 
