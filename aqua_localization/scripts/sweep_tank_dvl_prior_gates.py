@@ -5,14 +5,16 @@ from __future__ import annotations
 
 import argparse
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 
 import apply_tank_dvl_motion_prior as dvl_apply
+import promote_tank_dvl_sweep_profile
 import simulate_visual_motion_prior as prior_sim
 import tank_dvl_prior_profile
 
@@ -44,6 +46,12 @@ class SweepRow:
     gap_to_baseline_x: float
     prior_steps: int
     steps: int
+    dvl_covered_steps: int
+    prior_match_accepted_steps: int
+    mean_prior_match_confidence: float
+    mean_applied_prior_confidence: float
+    mean_effective_blend_alpha: float
+    dominant_prior_reject_reason: str
     samples: int
     matched_s: float
 
@@ -135,6 +143,50 @@ def format_float(value: float, precision: int = 4) -> str:
     return f"{value:.{precision}f}"
 
 
+def finite_mean(values: list[float]) -> float:
+    finite = [float(value) for value in values if math.isfinite(float(value))]
+    if not finite:
+        return math.nan
+    return sum(finite) / len(finite)
+
+
+def dominant_reason(reasons: list[str]) -> str:
+    counts: dict[str, int] = {}
+    for reason in reasons:
+        if not reason or reason == "accepted":
+            continue
+        counts[reason] = counts.get(reason, 0) + 1
+    if not counts:
+        return "none"
+    return max(counts.items(), key=lambda item: (item[1], item[0]))[0]
+
+
+def summarize_quality_rows(quality_rows: list[dict]) -> dict:
+    applied_rows = [row for row in quality_rows if bool(row["used_prior"])]
+    return {
+        "dvl_covered_steps": sum(1 for row in quality_rows if bool(row["dvl_covered"])),
+        "prior_match_accepted_steps": sum(
+            1 for row in quality_rows if bool(row["prior_confidence_accepted"])
+        ),
+        "mean_prior_match_confidence": finite_mean([
+            float(row["prior_match_confidence"]) for row in quality_rows
+        ]),
+        "mean_applied_prior_confidence": finite_mean([
+            float(row["prior_confidence"]) for row in applied_rows
+        ]),
+        "mean_effective_blend_alpha": finite_mean([
+            float(row["effective_blend_alpha"]) for row in quality_rows
+        ]),
+        "dominant_prior_reject_reason": dominant_reason([
+            str(row["prior_reject_reason"]) for row in quality_rows
+        ]),
+    }
+
+
+def attach_quality_summary(row: SweepRow, quality_rows: list[dict]) -> SweepRow:
+    return replace(row, **summarize_quality_rows(quality_rows))
+
+
 def make_sweep_row(
     *,
     rank: int,
@@ -169,6 +221,12 @@ def make_sweep_row(
         gap_to_baseline_x=gap,
         prior_steps=prior_steps,
         steps=steps,
+        dvl_covered_steps=0,
+        prior_match_accepted_steps=0,
+        mean_prior_match_confidence=math.nan,
+        mean_applied_prior_confidence=math.nan,
+        mean_effective_blend_alpha=math.nan,
+        dominant_prior_reject_reason="",
         samples=int(corrected_stats["samples"]),
         matched_s=float(corrected_stats["matched_s"]),
     )
@@ -240,6 +298,12 @@ def rank_rows(rows: list[SweepRow]) -> list[SweepRow]:
             gap_to_baseline_x=row.gap_to_baseline_x,
             prior_steps=row.prior_steps,
             steps=row.steps,
+            dvl_covered_steps=row.dvl_covered_steps,
+            prior_match_accepted_steps=row.prior_match_accepted_steps,
+            mean_prior_match_confidence=row.mean_prior_match_confidence,
+            mean_applied_prior_confidence=row.mean_applied_prior_confidence,
+            mean_effective_blend_alpha=row.mean_effective_blend_alpha,
+            dominant_prior_reject_reason=row.dominant_prior_reject_reason,
             samples=row.samples,
             matched_s=row.matched_s,
         )
@@ -311,7 +375,6 @@ def sweep_candidates(args, metadata: SweepMetadata) -> tuple[list[SweepRow], Can
                                 original_rmse_m=original_rmse,
                                 baseline_rmse_m=args.baseline_rmse_m,
                             )
-                            rows.append(row)
                             quality_rows = dvl_apply.prior_step_quality_rows(
                                 times,
                                 aligned_visual_xyz,
@@ -323,6 +386,8 @@ def sweep_candidates(args, metadata: SweepMetadata) -> tuple[list[SweepRow], Can
                                 max_length_ratio=max_length_ratio,
                                 min_direction_cosine=min_direction_cosine,
                             )
+                            row = attach_quality_summary(row, quality_rows)
+                            rows.append(row)
                             outputs.append(CandidateOutput(row, corrected_xyz, prior_xyz, sim_rows, quality_rows))
 
     ranked = rank_rows(rows)
@@ -370,7 +435,34 @@ def write_csv(path: Path, rows: list[SweepRow]) -> None:
         writer = csv.DictWriter(fp, fieldnames=fieldnames)
         writer.writeheader()
         for row in rows:
-            writer.writerow({field: getattr(row, field) for field in fieldnames})
+            writer.writerow(sweep_row_dict(row))
+
+
+def sweep_row_dict(row: SweepRow) -> dict:
+    return {
+        field.name: getattr(row, field.name)
+        for field in SweepRow.__dataclass_fields__.values()
+    }
+
+
+def write_best_profile(args, best: CandidateOutput) -> dict | None:
+    if args.best_profile_out is None:
+        return None
+    promote_args = SimpleNamespace(
+        base_profile=args.profile,
+        sweep_csv=args.csv_out,
+        rank=best.row.rank,
+        name=args.best_profile_name,
+        validation_sequence=args.best_profile_validation_sequence,
+        note=args.best_profile_note,
+    )
+    profile = promote_tank_dvl_sweep_profile.promote_profile(
+        args.profile_data,
+        sweep_row_dict(best.row),
+        promote_args,
+    )
+    tank_dvl_prior_profile.write_profile(args.best_profile_out, profile)
+    return profile
 
 
 def format_markdown(args, metadata: SweepMetadata, rows: list[SweepRow], best: CandidateOutput) -> str:
@@ -388,20 +480,34 @@ def format_markdown(args, metadata: SweepMetadata, rows: list[SweepRow], best: C
         f"- Candidates evaluated: {len(rows)}",
         f"- Best corrected RMSE: {best.row.corrected_rmse_m:.4f} m",
         f"- Best improvement: {format_float(best.row.improvement_percent, 1)}%",
+        f"- Best DVL coverage: {best.row.dvl_covered_steps}/{best.row.steps}",
         f"- Best prior steps: {best.row.prior_steps}/{best.row.steps}",
+        f"- Best accepted prior matches: {best.row.prior_match_accepted_steps}/{best.row.steps}",
+        f"- Best mean prior match confidence: {format_float(best.row.mean_prior_match_confidence, 3)}",
+        f"- Best mean applied prior confidence: {format_float(best.row.mean_applied_prior_confidence, 3)}",
+        f"- Best mean effective alpha: {format_float(best.row.mean_effective_blend_alpha, 3)}",
+        f"- Best dominant reject reason: `{best.row.dominant_prior_reject_reason}`",
         f"- Sweep CSV: `{args.csv_out}`",
         f"- Best corrected TUM: `{args.best_corrected_out}`",
         f"- Best DVL prior TUM: `{args.best_dvl_prior_out}`",
         f"- Best step CSV: `{args.best_step_csv_out}`",
     ]
+    if args.best_profile_out is not None:
+        lines.append(f"- Best promoted profile: `{args.best_profile_out}`")
     if args.baseline_rmse_m is not None:
         lines.append(f"- Best baseline gap: {format_float(best.row.gap_to_baseline_x, 2)}x")
     lines.extend([
         "",
         "## Top Candidates",
         "",
-        "| Rank | Mode | Alpha | Scale | Min ratio | Max ratio | Min cosine | RMSE m | Improvement | Gap x | Prior steps |",
-        "|-----:|------|------:|------:|----------:|----------:|-----------:|-------:|------------:|------:|------------:|",
+        (
+            "| Rank | Mode | Alpha | Scale | Min ratio | Max ratio | Min cosine | RMSE m | "
+            "Improvement | Gap x | Covered | Prior | Match ok | Match conf | Eff alpha | Dominant reject |"
+        ),
+        (
+            "|-----:|------|------:|------:|----------:|----------:|-----------:|-------:|"
+            "------------:|------:|--------:|------:|---------:|-----------:|----------:|----------------|"
+        ),
     ])
     for row in shown:
         lines.append(
@@ -409,7 +515,11 @@ def format_markdown(args, metadata: SweepMetadata, rows: list[SweepRow], best: C
             f"{format_float(row.prior_scale, 5)} | {format_float(row.min_length_ratio, 3)} | "
             f"{format_float(row.max_length_ratio, 3)} | {format_float(row.min_direction_cosine, 3)} | "
             f"{row.corrected_rmse_m:.4f} | {format_float(row.improvement_percent, 1)}% | "
-            f"{format_float(row.gap_to_baseline_x, 2)} | {row.prior_steps}/{row.steps} |"
+            f"{format_float(row.gap_to_baseline_x, 2)} | {row.dvl_covered_steps}/{row.steps} | "
+            f"{row.prior_steps}/{row.steps} | {row.prior_match_accepted_steps}/{row.steps} | "
+            f"{format_float(row.mean_prior_match_confidence, 3)} | "
+            f"{format_float(row.mean_effective_blend_alpha, 3)} | "
+            f"{row.dominant_prior_reject_reason} |"
         )
     lines.extend(["", "## Interpretation", ""])
     if metadata.same_sequence_allowed or metadata.profile_sequence_mismatch_allowed:
@@ -465,6 +575,14 @@ def parse_args(argv):
     parser.add_argument("--best-dvl-prior-out", type=Path)
     parser.add_argument("--aligned-visual-out", type=Path)
     parser.add_argument("--best-step-csv-out", type=Path)
+    parser.add_argument(
+        "--best-profile-out",
+        type=Path,
+        help="Optional YAML profile promoted from the best sweep row.",
+    )
+    parser.add_argument("--best-profile-name", default="")
+    parser.add_argument("--best-profile-validation-sequence", default="")
+    parser.add_argument("--best-profile-note", default="")
     args = parser.parse_args(argv)
     args.profile_data = profile
     return args
@@ -515,6 +633,7 @@ def main(argv=None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     write_csv(args.csv_out, rows)
+    write_best_profile(args, best)
     summary = format_markdown(args, metadata, rows, best)
     args.summary_out.parent.mkdir(parents=True, exist_ok=True)
     args.summary_out.write_text(summary, encoding="utf-8")

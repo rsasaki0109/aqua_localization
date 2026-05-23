@@ -517,30 +517,54 @@ ros2 run aqua_localization sweep_tank_dvl_prior_gates.py \
   --min-length-ratios 0.25,0.35,0.5,0.65 \
   --max-length-ratios 1.25,1.5,1.75,2.0 \
   --min-direction-cosines 0.0,0.25,0.5,0.7 \
-  --modes replace-outliers \
+  --modes replace-outliers,confidence-blend-outliers,confidence-replace-outliers \
+  --blend-alphas 0.25,0.5,0.75,1.0 \
   --baseline-rmse-m 0.0194 \
-  --out-dir /tmp/aqua_tank_dvl_prior_gate_sweep_short_diag
+  --best-profile-out /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml \
+  --best-profile-name tank_short_to_medium_confidence_sweep_rank1 \
+  --best-profile-validation-sequence Medium \
+  --best-profile-note "same-sequence confidence gate sweep rank 1; validate on held-out Medium before benchmark use" \
+  --out-dir /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag
 ```
 
-On the same diagnostic `short_test` setup, the best sweep row is
-`scale=1.15`, length ratio gate `[0.65, 1.25]`, and min direction cosine
-`0.7`. It improves the strict visual row from `0.1128 m` to `0.0154 m` RMSE,
-uses the prior on `169/217` steps, and lands at `0.80x` of the checked-in
-AQUA-SLAM `0.0194 m` baseline. This is an important direction signal, but it is
-still same-sequence diagnostic tuning; run the same profile/gates on the
-held-out validation sequence before claiming a win.
+The sweep CSV reports RMSE, mean/median/max aligned error, DVL coverage,
+prior-applied steps, accepted prior-match count, mean prior-match confidence,
+mean applied-prior confidence, mean effective alpha, and the dominant prior
+reject reason. Use those columns to separate "accurate because the prior is
+helping" from "accurate because the gate happened to hard-replace many visual
+steps."
+
+On the same diagnostic `short_test` setup, the expanded confidence sweep on
+2026-05-24 evaluated `1920` candidates. The best row is still the hard
+`replace-outliers` setting: `scale=1.15`, length ratio gate `[0.65, 1.25]`,
+and min direction cosine `0.7`. It improves the strict visual row from
+`0.1128 m` to `0.0154 m` RMSE, covers `216/217` DVL intervals, uses the prior
+on `169/217` steps, has only `47/217` prior-match accepted steps, and lands at
+`0.80x` of the checked-in AQUA-SLAM `0.0194 m` baseline. The best adaptive
+confidence row is softer but worse on this diagnostic window: rank `133`,
+`confidence-blend-outliers`, `scale=1.35`, gate `[0.65, 1.25]`,
+min cosine `0.0`, `0.0492 m` RMSE, and `2.54x` the AQUA-SLAM baseline.
+This means confidence weighting is not the current accuracy winner; the next
+held-out check should validate whether the hard-replace row generalizes or is
+overfit to same-sequence visual/DVL disagreement.
+
+This is an important direction signal, but it is still same-sequence diagnostic
+tuning; run the same profile/gates on the held-out validation sequence before
+claiming a win.
 
 Promote the selected sweep row into a profile before running held-out
-validation. This avoids hand-copying tuned gates into the validation command:
+validation. The sweep can now write the rank-1 profile directly with
+`--best-profile-out`. If you need to promote a different rank from an existing
+CSV, use the standalone promotion command:
 
 ```bash
 ros2 run aqua_localization promote_tank_dvl_sweep_profile.py \
   --base-profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium.yaml \
-  --sweep-csv /tmp/aqua_tank_dvl_prior_gate_sweep_short_diag/tank_dvl_prior_gate_sweep.csv \
+  --sweep-csv /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/tank_dvl_prior_gate_sweep.csv \
   --rank 1 \
-  --out /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
-  --name tank_short_to_medium_sweep_rank1 \
-  --note "same-sequence gate sweep rank 1; validate on held-out Medium before benchmark use"
+  --out /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml \
+  --name tank_short_to_medium_confidence_sweep_rank1 \
+  --note "same-sequence confidence gate sweep rank 1; validate on held-out Medium before benchmark use"
 ```
 
 The promoted profile preserves the calibrated yaw settings and replaces only
@@ -564,7 +588,7 @@ generates the residual report in one output directory:
 
 ```bash
 ros2 run aqua_localization run_tank_dvl_validation_bundle.py \
-  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml \
   --sequence Medium \
   --bag /tmp/tank_medium_ros2_visual \
   --reference /tmp/tank_medium_gt.tum \
@@ -589,7 +613,7 @@ settings, then call the validation bundle:
 ```bash
 ros2 run aqua_localization prepare_tank_dvl_heldout_inputs.py \
   --sequence Medium \
-  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml \
   --ros1-bag /path/to/Medium.bag \
   --reference /tmp/tank_medium_gt.tum \
   --benchmark-markdown docs/benchmarks/tank_aqua_slam.md \
@@ -612,7 +636,7 @@ ros2 run aqua_localization check_tank_aqua_slam_baseline_ready.py \
   --reference /tmp/tank_medium_gt.tum \
   --csv /tmp/aqua_slam_medium_orb_odom.csv \
   --baseline-row /tmp/aqua_slam_medium_baseline/Medium_aqua_slam_benchmark_row.md \
-  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml \
   --bag /tmp/tank_medium_ros2_visual \
   --visual /tmp/tank_medium_visual_frontend.tum \
   --out /tmp/aqua_slam_medium_baseline/readiness.md
@@ -632,7 +656,7 @@ ros2 run aqua_localization summarize_tank_aqua_slam_baseline_todos.py \
   --reference /tmp/tank_medium_gt.tum \
   --csv /tmp/aqua_slam_medium_orb_odom.csv \
   --baseline-row /tmp/aqua_slam_medium_baseline/Medium_aqua_slam_benchmark_row.md \
-  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml \
   --bag /tmp/tank_medium_ros2_visual \
   --visual /tmp/tank_medium_visual_frontend.tum \
   --out /tmp/aqua_slam_medium_baseline/todos.md
@@ -653,7 +677,7 @@ ros2 run aqua_localization run_tank_aqua_slam_baseline_workflow.py \
   --reference /tmp/tank_medium_gt.tum \
   --csv /tmp/aqua_slam_medium_orb_odom.csv \
   --baseline-dir /tmp/aqua_slam_medium_baseline \
-  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml \
   --bag /tmp/tank_medium_ros2_visual \
   --visual /tmp/tank_medium_visual_frontend.tum \
   --out-dir /tmp/aqua_slam_medium_baseline \
@@ -686,7 +710,7 @@ the held-out validation bundle:
 
 ```bash
 ros2 run aqua_localization run_tank_dvl_validation_bundle.py \
-  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml \
   --sequence Medium \
   --bag /tmp/tank_medium_ros2_visual \
   --reference /tmp/tank_medium_gt.tum \
