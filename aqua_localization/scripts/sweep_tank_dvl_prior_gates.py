@@ -314,6 +314,10 @@ def sweep_candidates(args, metadata: SweepMetadata) -> tuple[list[SweepRow], Can
                                 prior_xyz,
                                 deltas,
                                 sim_rows,
+                                min_prior_step_m=args.min_prior_step_m,
+                                min_length_ratio=min_length_ratio,
+                                max_length_ratio=max_length_ratio,
+                                min_direction_cosine=min_direction_cosine,
                             )
                             outputs.append(CandidateOutput(row, corrected_xyz, prior_xyz, sim_rows, quality_rows))
 

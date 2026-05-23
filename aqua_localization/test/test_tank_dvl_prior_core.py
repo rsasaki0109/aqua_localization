@@ -245,6 +245,68 @@ def test_build_dvl_prior_deltas_applies_prior_scale():
     np.testing.assert_allclose([delta.delta_xyz for delta in deltas], [[2.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
 
 
+def test_score_prior_confidence_accepts_consistent_steps():
+    module = load_module()
+
+    score = module.score_prior_confidence(
+        np.asarray([1.0, 0.0, 0.0], dtype=np.float64),
+        np.asarray([1.0, 0.0, 0.0], dtype=np.float64),
+        min_visual_step_m=0.01,
+        min_prior_step_m=0.01,
+        min_length_ratio=0.7,
+        max_length_ratio=1.3,
+        min_direction_cosine=0.6,
+    )
+
+    assert score.accepted is True
+    assert score.reject_reason == "accepted"
+    assert score.confidence == 1.0
+    assert score.residual_m == 0.0
+    assert score.length_ratio == 1.0
+
+
+def test_score_prior_confidence_rejects_reverse_direction():
+    module = load_module()
+
+    score = module.score_prior_confidence(
+        np.asarray([1.0, 0.0, 0.0], dtype=np.float64),
+        np.asarray([-1.0, 0.0, 0.0], dtype=np.float64),
+        min_direction_cosine=0.5,
+    )
+
+    assert score.accepted is False
+    assert score.confidence == 0.0
+    assert "direction mismatch" in score.reject_reason
+    assert score.direction_cosine == -1.0
+
+
+def test_score_prior_confidence_rejects_length_ratio_outside_gate():
+    module = load_module()
+
+    score = module.score_prior_confidence(
+        np.asarray([2.0, 0.0, 0.0], dtype=np.float64),
+        np.asarray([1.0, 0.0, 0.0], dtype=np.float64),
+        max_length_ratio=1.5,
+    )
+
+    assert score.accepted is False
+    assert "long visual step" in score.reject_reason
+    assert score.length_ratio == 2.0
+
+
+def test_score_prior_confidence_rejects_small_visual_step():
+    module = load_module()
+
+    score = module.score_prior_confidence(
+        np.asarray([0.001, 0.0, 0.0], dtype=np.float64),
+        np.asarray([0.001, 0.0, 0.0], dtype=np.float64),
+        min_visual_step_m=0.01,
+    )
+
+    assert score.accepted is False
+    assert "small visual step" in score.reject_reason
+
+
 def test_positions_from_deltas_accumulates_scaled_steps():
     module = load_module()
     times = np.asarray([0.0, 1.0, 2.0], dtype=np.float64)
