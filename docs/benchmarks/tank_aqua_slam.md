@@ -593,6 +593,45 @@ Use `--dry-run` first to write
 executing the commands. If a ROS 2 bag already exists, pass `--ros2-bag` instead
 of `--ros1-bag`.
 
+Before using `--max-gap-x 1.0` on `Medium`, record the matching AQUA-SLAM
+baseline row for the same sequence. Run AQUA-SLAM in its ROS 1 Docker workflow
+while replaying the Tank bag, export `/AQUA_SLAM/orb_odom`, then ingest that
+CSV with the same APE parser used by this document:
+
+```bash
+# In the AQUA-SLAM ROS 1 Docker container while the Medium bag is playing.
+rostopic echo -p /AQUA_SLAM/orb_odom > /tmp/aqua_slam_medium_orb_odom.csv
+
+# In this ROS 2 workspace after making the CSV visible on the host.
+ros2 run aqua_localization ingest_tank_aqua_slam_baseline.py \
+  --csv /tmp/aqua_slam_medium_orb_odom.csv \
+  --reference /tmp/tank_medium_gt.tum \
+  --sequence Medium \
+  --config underwater_orbslam3_blue_gx5_medium.yaml \
+  --runtime "AQUA-SLAM Docker image orb_dvl2_ros_noetic" \
+  --out-dir /tmp/aqua_slam_medium_baseline
+```
+
+The wrapper writes `Medium_aqua_slam.tum`,
+`Medium_aqua_slam_benchmark_row.md`, and
+`Medium_aqua_slam_baseline.md`. Review the row before copying it into the
+Head-to-Head Table, or pass it as an additional benchmark source when running
+the held-out validation bundle:
+
+```bash
+ros2 run aqua_localization run_tank_dvl_validation_bundle.py \
+  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --sequence Medium \
+  --bag /tmp/tank_medium_ros2_visual \
+  --reference /tmp/tank_medium_gt.tum \
+  --visual /tmp/tank_medium_visual_frontend.tum \
+  --benchmark-markdown docs/benchmarks/tank_aqua_slam.md \
+  --benchmark-markdown /tmp/aqua_slam_medium_baseline/Medium_aqua_slam_benchmark_row.md \
+  --max-gap-x 1.0 \
+  --fail-on-gate-failure \
+  --out-dir /tmp/aqua_tank_dvl_prior_medium_validation_bundle
+```
+
 On 2026-05-23 this profile-based real-prior application reduced the best strict
 PnP visual row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction,
 while using the DVL/IMU prior on `127/217` visual steps. That is close to the
