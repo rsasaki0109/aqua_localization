@@ -59,6 +59,7 @@ def test_parse_args_loads_profile_defaults_and_allows_override(tmp_path):
             "  mode: replace-outliers",
             "  blend_alpha: 0.5",
             "  min_prior_step_m: 0.0001",
+            "  min_visual_step_m: 0.02",
             "  min_length_ratio: 0.5",
             "  max_length_ratio: 1.5",
             "  min_direction_cosine: 0.5",
@@ -85,6 +86,7 @@ def test_parse_args_loads_profile_defaults_and_allows_override(tmp_path):
     assert args.mode == "replace-outliers"
     assert args.prior_scale == 1.1
     assert args.imu_yaw_offset_deg == 115.0
+    assert args.min_visual_step_m == 0.02
 
 
 def test_prior_step_quality_rows_merges_dvl_coverage_and_gate_rows():
@@ -119,6 +121,51 @@ def test_prior_step_quality_rows_merges_dvl_coverage_and_gate_rows():
     assert rows[0]["dvl_samples"] == 3
     assert rows[0]["used_prior"] is True
     assert rows[0]["reason"] == "direction mismatch"
+    assert rows[0]["visual_prior_residual_m"] > 0.0
+    assert rows[0]["prior_confidence"] == 0.0
+    assert rows[0]["prior_confidence_accepted"] is False
+    assert rows[0]["prior_reject_reason"] == "direction mismatch"
+
+
+def test_prior_step_quality_rows_reports_high_confidence_for_consistent_prior():
+    module = load_module()
+    from simulate_visual_motion_prior import PriorStep
+    from tank_dvl_prior_core import DvlPriorDelta
+
+    times = np.asarray([0.0, 1.0], dtype=np.float64)
+    visual_xyz = np.asarray([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=np.float64)
+    prior_xyz = np.asarray([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=np.float64)
+    deltas = [DvlPriorDelta(0.0, 1.0, np.asarray([1.0, 0.0, 0.0]), 3, True)]
+    sim_rows = [
+        PriorStep(
+            start_stamp_s=0.0,
+            end_stamp_s=1.0,
+            offset_s=1.0,
+            dt_s=1.0,
+            visual_step_m=1.0,
+            prior_step_m=1.0,
+            corrected_step_m=1.0,
+            length_ratio=1.0,
+            direction_cosine=1.0,
+            heading_error_deg=0.0,
+            used_prior=False,
+            reason="visual",
+        )
+    ]
+
+    rows = module.prior_step_quality_rows(
+        times,
+        visual_xyz,
+        prior_xyz,
+        deltas,
+        sim_rows,
+        min_visual_step_m=0.01,
+        min_prior_step_m=0.01,
+    )
+
+    assert rows[0]["prior_confidence"] == 1.0
+    assert rows[0]["prior_confidence_accepted"] is True
+    assert rows[0]["prior_reject_reason"] == "accepted"
 
 
 def test_validate_args_rejects_bad_scale(tmp_path):

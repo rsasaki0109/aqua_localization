@@ -52,6 +52,19 @@ class DvlPriorDelta:
     covered: bool
 
 
+@dataclass(frozen=True)
+class DvlPriorConfidence:
+    visual_step_m: float
+    prior_step_m: float
+    residual_m: float
+    length_ratio: float
+    direction_cosine: float
+    heading_error_deg: float
+    confidence: float
+    accepted: bool
+    reject_reason: str
+
+
 def quaternion_to_yaw(qx: float, qy: float, qz: float, qw: float) -> float:
     siny_cosp = 2.0 * (qw * qz + qx * qy)
     cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
@@ -108,6 +121,103 @@ def direction_cosine(a: np.ndarray, b: np.ndarray) -> float:
     if norm_a <= 1.0e-12 or norm_b <= 1.0e-12:
         return math.nan
     return float(np.dot(a, b) / (norm_a * norm_b))
+
+
+def clamp01(value: float) -> float:
+    if not math.isfinite(value):
+        return 0.0
+    return min(1.0, max(0.0, value))
+
+
+def interval_confidence(value: float, lower: float, upper: float, ideal: float = 1.0) -> float:
+    if not math.isfinite(value):
+        return 0.0
+    if value <= ideal:
+        if ideal <= lower:
+            return 1.0
+        return clamp01((value - lower) / (ideal - lower))
+    if upper <= ideal:
+        return 1.0
+    return clamp01((upper - value) / (upper - ideal))
+
+
+def score_prior_confidence(
+    visual_delta: np.ndarray,
+    prior_delta: np.ndarray,
+    *,
+    min_visual_step_m: float = 0.0,
+    min_prior_step_m: float = 0.0,
+    min_length_ratio: float = 0.5,
+    max_length_ratio: float = 1.5,
+    min_direction_cosine: float = 0.5,
+) -> DvlPriorConfidence:
+    if min_visual_step_m < 0.0:
+        raise ValueError("min_visual_step_m must be non-negative")
+    if min_prior_step_m < 0.0:
+        raise ValueError("min_prior_step_m must be non-negative")
+    if min_length_ratio < 0.0:
+        raise ValueError("min_length_ratio must be non-negative")
+    if max_length_ratio <= 0.0 or max_length_ratio < min_length_ratio:
+        raise ValueError("max_length_ratio must be positive and >= min_length_ratio")
+    if not -1.0 <= min_direction_cosine <= 1.0:
+        raise ValueError("min_direction_cosine must be in [-1, 1]")
+
+    visual_delta = np.asarray(visual_delta, dtype=np.float64)
+    prior_delta = np.asarray(prior_delta, dtype=np.float64)
+    visual_step = float(np.linalg.norm(visual_delta))
+    prior_step = float(np.linalg.norm(prior_delta))
+    residual = float(np.linalg.norm(visual_delta - prior_delta))
+    length_ratio = visual_step / prior_step if prior_step > 1.0e-12 else math.nan
+    cosine = direction_cosine(visual_delta, prior_delta)
+    h_error = heading_error_deg(visual_delta, prior_delta)
+
+    reasons = []
+    if visual_step < min_visual_step_m:
+        reasons.append("small visual step")
+    if prior_step < min_prior_step_m:
+        reasons.append("small prior step")
+    if not math.isfinite(length_ratio):
+        reasons.append("undefined length ratio")
+    elif length_ratio < min_length_ratio:
+        reasons.append("short visual step")
+    elif length_ratio > max_length_ratio:
+        reasons.append("long visual step")
+    if not math.isfinite(cosine):
+        reasons.append("undefined direction")
+    elif cosine < min_direction_cosine:
+        reasons.append("direction mismatch")
+
+    if reasons:
+        return DvlPriorConfidence(
+            visual_step_m=visual_step,
+            prior_step_m=prior_step,
+            residual_m=residual,
+            length_ratio=length_ratio,
+            direction_cosine=cosine,
+            heading_error_deg=h_error,
+            confidence=0.0,
+            accepted=False,
+            reject_reason="; ".join(reasons),
+        )
+
+    length_score = interval_confidence(length_ratio, min_length_ratio, max_length_ratio)
+    direction_score = 1.0 if min_direction_cosine >= 1.0 else clamp01(
+        (cosine - min_direction_cosine) / (1.0 - min_direction_cosine)
+    )
+    residual_scale = max(visual_step, prior_step, 1.0e-12)
+    residual_score = clamp01(1.0 - residual / residual_scale)
+    confidence = min(length_score, direction_score, residual_score)
+    return DvlPriorConfidence(
+        visual_step_m=visual_step,
+        prior_step_m=prior_step,
+        residual_m=residual,
+        length_ratio=length_ratio,
+        direction_cosine=cosine,
+        heading_error_deg=h_error,
+        confidence=confidence,
+        accepted=True,
+        reject_reason="accepted",
+    )
 
 
 def rotate_body_velocity_by_yaw(velocity_body: np.ndarray, yaw_rad: np.ndarray) -> np.ndarray:

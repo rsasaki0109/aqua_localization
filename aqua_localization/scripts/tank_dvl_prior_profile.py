@@ -18,6 +18,7 @@ PROFILE_KEYS = {
     "mode": ("application", "mode"),
     "blend_alpha": ("application", "blend_alpha"),
     "min_prior_step_m": ("application", "min_prior_step_m"),
+    "min_visual_step_m": ("application", "min_visual_step_m"),
     "min_length_ratio": ("application", "min_length_ratio"),
     "max_length_ratio": ("application", "max_length_ratio"),
     "min_direction_cosine": ("application", "min_direction_cosine"),
@@ -88,6 +89,7 @@ def build_profile(args) -> dict:
             "mode": args.mode,
             "blend_alpha": float(args.blend_alpha),
             "min_prior_step_m": float(args.min_prior_step_m),
+            "min_visual_step_m": float(args.min_visual_step_m),
             "min_length_ratio": float(args.min_length_ratio),
             "max_length_ratio": float(args.max_length_ratio),
             "min_direction_cosine": float(args.min_direction_cosine),
@@ -121,6 +123,7 @@ def format_summary(path: Path, profile: dict) -> str:
             "application: "
             f"mode={application['mode']}, "
             f"blend_alpha={application['blend_alpha']:g}, "
+            f"min_visual_step_m={application.get('min_visual_step_m', 0.0):g}, "
             f"length_ratio=[{application['min_length_ratio']:g},"
             f"{application['max_length_ratio']:g}], "
             f"min_direction_cosine={application['min_direction_cosine']:g}"
@@ -152,6 +155,7 @@ def parse_args(argv):
     )
     parser.add_argument("--blend-alpha", type=float, default=0.5)
     parser.add_argument("--min-prior-step-m", type=float, default=1.0e-4)
+    parser.add_argument("--min-visual-step-m", type=float, default=0.0)
     parser.add_argument("--min-length-ratio", type=float, default=0.5)
     parser.add_argument("--max-length-ratio", type=float, default=1.5)
     parser.add_argument("--min-direction-cosine", type=float, default=0.5)
@@ -165,6 +169,8 @@ def validate_args(args) -> None:
         raise ValueError("--blend-alpha must be in [0, 1]")
     if args.min_prior_step_m < 0.0:
         raise ValueError("--min-prior-step-m must be non-negative")
+    if args.min_visual_step_m < 0.0:
+        raise ValueError("--min-visual-step-m must be non-negative")
     if args.min_length_ratio < 0.0:
         raise ValueError("--min-length-ratio must be non-negative")
     if args.max_length_ratio < args.min_length_ratio:

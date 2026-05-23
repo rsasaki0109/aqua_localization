@@ -15,7 +15,12 @@ import numpy as np
 
 import simulate_visual_motion_prior as prior_sim
 import tank_dvl_prior_profile
-from tank_dvl_prior_core import DvlPriorDelta, build_dvl_prior_deltas, positions_from_deltas
+from tank_dvl_prior_core import (
+    DvlPriorDelta,
+    build_dvl_prior_deltas,
+    positions_from_deltas,
+    score_prior_confidence,
+)
 from tank_rosbag_motion_inputs import (
     DEFAULT_DVL_TOPIC,
     DEFAULT_IMU_TOPIC,
@@ -47,6 +52,7 @@ PROFILE_DEFAULTS = {
     "mode": "blend-outliers",
     "blend_alpha": 0.5,
     "min_prior_step_m": 1.0e-4,
+    "min_visual_step_m": 0.0,
     "min_length_ratio": 0.5,
     "max_length_ratio": 1.5,
     "min_direction_cosine": 0.5,
@@ -88,12 +94,27 @@ def prior_step_quality_rows(
     prior_xyz: np.ndarray,
     deltas: list[DvlPriorDelta],
     sim_rows: list[prior_sim.PriorStep],
+    *,
+    min_visual_step_m: float = 0.0,
+    min_prior_step_m: float = 0.0,
+    min_length_ratio: float = 0.5,
+    max_length_ratio: float = 1.5,
+    min_direction_cosine: float = 0.5,
 ) -> list[dict]:
     rows = []
     t0 = float(times[0])
     for index, (delta, sim_row) in enumerate(zip(deltas, sim_rows), start=1):
         visual_delta = visual_xyz[index] - visual_xyz[index - 1]
         prior_delta = prior_xyz[index] - prior_xyz[index - 1]
+        confidence = score_prior_confidence(
+            visual_delta,
+            prior_delta,
+            min_visual_step_m=min_visual_step_m,
+            min_prior_step_m=min_prior_step_m,
+            min_length_ratio=min_length_ratio,
+            max_length_ratio=max_length_ratio,
+            min_direction_cosine=min_direction_cosine,
+        )
         rows.append({
             "start_stamp_s": float(times[index - 1]),
             "end_stamp_s": float(times[index]),
@@ -105,6 +126,10 @@ def prior_step_quality_rows(
             "visual_prior_length_ratio": sim_row.length_ratio,
             "visual_prior_direction_cosine": sim_row.direction_cosine,
             "visual_prior_heading_error_deg": sim_row.heading_error_deg,
+            "visual_prior_residual_m": confidence.residual_m,
+            "prior_confidence": confidence.confidence,
+            "prior_confidence_accepted": confidence.accepted,
+            "prior_reject_reason": confidence.reject_reason,
             "dvl_covered": delta.covered,
             "dvl_samples": delta.dvl_samples,
             "used_prior": sim_row.used_prior,
@@ -126,6 +151,10 @@ def write_application_csv(path: Path, rows: list[dict]) -> None:
         "visual_prior_length_ratio",
         "visual_prior_direction_cosine",
         "visual_prior_heading_error_deg",
+        "visual_prior_residual_m",
+        "prior_confidence",
+        "prior_confidence_accepted",
+        "prior_reject_reason",
         "dvl_covered",
         "dvl_samples",
         "used_prior",
@@ -167,6 +196,7 @@ def format_markdown(args, result: TankDvlPriorApplicationResult, sim_rows: list[
         f"- Prior scale: {format_float(args.prior_scale, 4)}",
         f"- Application mode: `{args.mode}`",
         f"- Blend alpha: {format_float(args.blend_alpha, 3)}",
+        f"- Min visual step for confidence: {format_float(args.min_visual_step_m, 4)} m",
         f"- Length-ratio gate: [{format_float(args.min_length_ratio, 3)}, {format_float(args.max_length_ratio, 3)}]",
         f"- Min direction cosine: {format_float(args.min_direction_cosine, 3)}",
         f"- Original RMSE: {result.original_rmse_m:.4f} m",
@@ -251,7 +281,18 @@ def run_application(args) -> tuple[TankDvlPriorApplicationResult, list[prior_sim
         aligned_visual_tum=args.aligned_visual_out,
         dvl_prior_tum=args.dvl_prior_out,
     )
-    quality_rows = prior_step_quality_rows(times, aligned_visual_xyz, prior_xyz, deltas, sim_rows)
+    quality_rows = prior_step_quality_rows(
+        times,
+        aligned_visual_xyz,
+        prior_xyz,
+        deltas,
+        sim_rows,
+        min_visual_step_m=args.min_visual_step_m,
+        min_prior_step_m=args.min_prior_step_m,
+        min_length_ratio=args.min_length_ratio,
+        max_length_ratio=args.max_length_ratio,
+        min_direction_cosine=args.min_direction_cosine,
+    )
     return result, sim_rows, quality_rows
 
 
@@ -285,6 +326,7 @@ def parse_args(argv):
     )
     parser.add_argument("--blend-alpha", type=float, default=defaults["blend_alpha"])
     parser.add_argument("--min-prior-step-m", type=float, default=defaults["min_prior_step_m"])
+    parser.add_argument("--min-visual-step-m", type=float, default=defaults["min_visual_step_m"])
     parser.add_argument("--min-length-ratio", type=float, default=defaults["min_length_ratio"])
     parser.add_argument("--max-length-ratio", type=float, default=defaults["max_length_ratio"])
     parser.add_argument("--min-direction-cosine", type=float, default=defaults["min_direction_cosine"])
@@ -327,6 +369,8 @@ def validate_args(args) -> None:
         raise ValueError("--prior-scale must be positive")
     if args.min_prior_step_m < 0.0:
         raise ValueError("--min-prior-step-m must be non-negative")
+    if args.min_visual_step_m < 0.0:
+        raise ValueError("--min-visual-step-m must be non-negative")
     if args.max_length_ratio < args.min_length_ratio:
         raise ValueError("--max-length-ratio must be >= --min-length-ratio")
 

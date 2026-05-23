@@ -48,6 +48,7 @@ def test_build_write_and_load_profile(tmp_path):
     assert loaded["prior"]["imu_yaw_offset_deg"] == 115.0
     assert loaded["prior"]["prior_scale"] == 1.25375
     assert loaded["application"]["mode"] == "replace-outliers"
+    assert loaded["application"]["min_visual_step_m"] == 0.0
 
 
 def test_profile_arg_defaults_reads_application_and_prior(tmp_path):
@@ -67,6 +68,7 @@ def test_profile_arg_defaults_reads_application_and_prior(tmp_path):
             "mode": "replace-outliers",
             "blend_alpha": 0.75,
             "min_prior_step_m": 0.01,
+            "min_visual_step_m": 0.02,
             "min_length_ratio": 0.6,
             "max_length_ratio": 1.4,
             "min_direction_cosine": 0.7,
@@ -79,6 +81,7 @@ def test_profile_arg_defaults_reads_application_and_prior(tmp_path):
     assert defaults["imu_yaw_offset_deg"] == 116.0
     assert defaults["prior_scale"] == 1.25
     assert defaults["mode"] == "replace-outliers"
+    assert defaults["min_visual_step_m"] == 0.02
     assert defaults["min_direction_cosine"] == 0.7
 
 

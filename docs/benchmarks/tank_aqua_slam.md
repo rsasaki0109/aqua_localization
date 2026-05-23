@@ -549,6 +549,12 @@ same-sequence smoke run with the promoted profile reproduces `0.0154 m` RMSE and
 `169/217` prior-applied steps, but remains diagnostic because it uses
 `--allow-same-sequence`.
 
+The DVL prior application CSV also reports `visual_prior_residual_m`,
+`prior_confidence`, `prior_confidence_accepted`, and `prior_reject_reason` for
+each visual step. Those columns are diagnostic only in this pass; use them to
+identify steps that pass the current outlier gate but are weak prior matches
+before enabling adaptive blending or replacement.
+
 Once the held-out sequence bag, visual TUM, and reference TUM are available,
 run the complete validation bundle. It runs the prior validation, writes the
 benchmark row, compares it against the AQUA-SLAM rows in this document, and
