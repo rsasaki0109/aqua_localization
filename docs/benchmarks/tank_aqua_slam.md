@@ -365,6 +365,38 @@ is replacing the diagnostic `gt_yaw` rotation with IMU yaw, keeping the `-90 deg
 DVL frame yaw offset, and testing whether a calibrated DVL step prior can bridge
 the rejected/noisy visual steps that the oracle simulation identified.
 
+The deployable-input version uses `/imu/data` orientation yaw instead of
+reference yaw:
+
+```bash
+ros2 run aqua_localization analyze_tank_dvl_motion_prior.py \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --visual /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99/short_test_visual_pnp_1125_strict_ratio_repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99_visual_frontend.tum \
+  --mode imu_yaw \
+  --dvl-frame-yaw-offset-deg -90 \
+  --imu-yaw-offset-deg 115 \
+  --out /tmp/aqua_tank_dvl_prior_imu_yaw_m90_imu115/dvl_prior.md \
+  --csv /tmp/aqua_tank_dvl_prior_imu_yaw_m90_imu115/dvl_prior.csv
+```
+
+On 2026-05-23 the same `short_test` diagnostic read `4991` IMU yaw samples and
+kept DVL coverage at `216/217` visual steps. With DVL frame yaw fixed at
+`-90 deg`, sweeping a constant IMU yaw offset gave:
+
+| Mode | DVL yaw offset deg | IMU yaw offset deg | Covered | Cumulative ratio | Median length ratio | Median direction cosine | Median abs heading error deg | Readout |
+|------|-------------------:|-------------------:|--------:|-----------------:|--------------------:|------------------------:|-----------------------------:|---------|
+| `imu_yaw` | -90 | 0 | 216/217 | 0.798 | 0.791 | -0.383 | 115.5 | wrong global yaw convention |
+| `imu_yaw` | -90 | 90 | 216/217 | 0.798 | 0.791 | 0.795 | 32.6 | usable, but worse than GT-yaw diagnostic |
+| `imu_yaw` | -90 | 115 | 216/217 | 0.798 | 0.791 | 0.881 | 20.3 | closest to GT-yaw diagnostic |
+| `imu_yaw` | -90 | 120 | 216/217 | 0.798 | 0.791 | 0.873 | 21.2 | similar plateau |
+
+This makes the DVL prior path more concrete: real IMU yaw can recover almost
+the same DVL direction quality as the GT-yaw diagnostic once a constant yaw
+offset is calibrated. The `115 deg` offset above is same-sequence diagnostic
+tuning, not a paper-safe calibration. For a benchmark claim, calibrate that
+constant on one Tank sequence and validate the DVL-prior fusion on another.
+
 When a visual TUM file has already been recorded, pass `--estimate` instead of
 `--bag` to regenerate the scale report and benchmark row without replaying ROS.
 The bag replay mode also saves `*_visual_frontend_status.csv`, which contains
