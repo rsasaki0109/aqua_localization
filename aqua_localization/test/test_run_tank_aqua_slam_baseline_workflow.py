@@ -50,17 +50,26 @@ def write_ros1_odom_csv(path: Path):
     )
 
 
-def write_benchmark_row(path: Path):
+def write_benchmark_row(path: Path, samples: int = 3, matched_s: float = 2.0):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "\n".join([
             "| Dataset | Sequence | System | Alignment | Samples | Matched s | Mean m | Median m | RMSE m | Max m | Note |",
             "|---------|----------|--------|-----------|--------:|----------:|-------:|---------:|-------:|------:|------|",
-            "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | 3 | 2.00 | 0.0000 | 0.0000 | 0.0200 | 0.0200 | baseline |",
+            (
+                "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | "
+                f"{samples} | {matched_s:.2f} | 0.0000 | 0.0000 | 0.0200 | 0.0200 | baseline |"
+            ),
         ])
         + "\n",
         encoding="utf-8",
     )
+
+
+def write_ros2_bag_dir(path: Path):
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "metadata.yaml").write_text("rosbag2_bagfile_information:\n", encoding="utf-8")
+    (path / "Medium.db3").write_bytes(b"db")
 
 
 def base_args(module, tmp_path, extra=None):
@@ -113,6 +122,73 @@ def test_workflow_auto_ingests_baseline_row_when_source_ready(tmp_path):
     assert any(step.name == "Baseline ingest" and step.status == module.STATUS_PASS for step in result.steps)
     todos = (tmp_path / "workflow/todos.md").read_text(encoding="utf-8")
     assert "AQUA-SLAM baseline row ready" in todos
+
+
+def test_workflow_auto_locates_ready_inputs(tmp_path):
+    module = load_module()
+    data = tmp_path / "downloaded"
+    write_tum(data / "HalfTankMedium_gt.tum")
+    write_tum(data / "Medium_visual_frontend.tum")
+    write_ros1_odom_csv(data / "aqua_slam_medium_orb_odom.csv")
+    write_ros2_bag_dir(data / "HalfTankMedium_ros2")
+    write_benchmark_row(data / "Medium_aqua_slam_benchmark_row.md", samples=20, matched_s=19.0)
+    (tmp_path / "profile.yaml").write_text("name: profile\n", encoding="utf-8")
+
+    args = module.parse_args([
+        "--sequence",
+        "Medium",
+        "--profile",
+        str(tmp_path / "profile.yaml"),
+        "--baseline-dir",
+        str(tmp_path / "baseline"),
+        "--out-dir",
+        str(tmp_path / "workflow"),
+        "--auto-locate-inputs",
+        "--locator-root",
+        str(data),
+        "--dry-run",
+    ])
+    result = module.run_workflow(args)
+
+    assert result.status == module.STATUS_BLOCKED
+    assert args.reference == data / "HalfTankMedium_gt.tum"
+    assert args.bag == data / "HalfTankMedium_ros2"
+    assert args.visual == data / "Medium_visual_frontend.tum"
+    assert args.csv == data / "aqua_slam_medium_orb_odom.csv"
+    assert data / "Medium_aqua_slam_benchmark_row.md" in args.benchmark_markdown
+    assert any(step.name == "Input locator" and step.status == module.STATUS_PASS for step in result.steps)
+    assert any(
+        step.name == "Validation bundle" and step.status == module.STATUS_SKIPPED
+        for step in result.steps
+    )
+    assert (tmp_path / "workflow/heldout_locator.md").exists()
+    summary = (tmp_path / "workflow/workflow_summary.md").read_text(encoding="utf-8")
+    assert "Input locator report" in summary
+    assert "Held-out validation bundle inputs: `PASS`" in summary
+
+
+def test_workflow_auto_locator_does_not_adopt_smoke_sized_baseline(tmp_path):
+    module = load_module()
+    data = tmp_path / "downloaded"
+    write_benchmark_row(data / "Medium_aqua_slam_benchmark_row.md")
+
+    args = module.parse_args([
+        "--sequence",
+        "Medium",
+        "--baseline-dir",
+        str(tmp_path / "baseline"),
+        "--out-dir",
+        str(tmp_path / "workflow"),
+        "--auto-locate-inputs",
+        "--locator-root",
+        str(data),
+        "--dry-run",
+    ])
+    result = module.run_workflow(args)
+
+    assert result.status == module.STATUS_BLOCKED
+    assert data / "Medium_aqua_slam_benchmark_row.md" not in args.benchmark_markdown
+    assert any(step.name == "Input locator" and step.status == module.STATUS_BLOCKED for step in result.steps)
 
 
 def test_workflow_dry_run_skips_validation_when_ready(tmp_path):
