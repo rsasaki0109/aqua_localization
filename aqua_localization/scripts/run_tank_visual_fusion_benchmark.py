@@ -297,6 +297,12 @@ def build_visual_command(args, paths: FusionBenchmarkPaths) -> list[str]:
         orb_fast_threshold=args.orb_fast_threshold,
         opencv_threads=args.opencv_threads,
         translation_scale=args.translation_scale,
+        min_pnp_inliers=args.min_pnp_inliers,
+        min_inlier_ratio=args.min_inlier_ratio,
+        ransac_iterations=args.ransac_iterations,
+        ransac_reprojection_error_px=args.ransac_reprojection_error_px,
+        ransac_confidence=args.ransac_confidence,
+        max_step_translation_m=args.max_step_translation_m,
         odom_topic=args.visual_odom_topic,
         base_from_camera_x_m=args.base_from_camera_x_m,
         base_from_camera_y_m=args.base_from_camera_y_m,
@@ -465,6 +471,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--visual-odom-topic", default=DEFAULT_VISUAL_TOPIC)
     parser.add_argument("--fused-odom-topic", default=DEFAULT_FUSED_TOPIC)
     parser.add_argument("--translation-scale", type=float, default=1.0)
+    parser.add_argument("--min-pnp-inliers", type=int, default=12)
+    parser.add_argument("--min-inlier-ratio", type=float, default=0.25)
+    parser.add_argument("--ransac-iterations", type=int, default=100)
+    parser.add_argument("--ransac-reprojection-error-px", type=float, default=3.0)
+    parser.add_argument("--ransac-confidence", type=float, default=0.99)
+    parser.add_argument("--max-step-translation-m", type=float, default=2.0)
     parser.add_argument("--visual-position-variance-floor", type=float, default=0.04)
     parser.add_argument("--visual-max-age-s", type=float, default=1.0)
     parser.add_argument("--camera-fx", type=float, default=run_tank_visual_benchmark.DEFAULT_FX)
@@ -484,6 +496,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--orb-fast-threshold", type=int, default=12)
     parser.add_argument("--opencv-threads", type=int, default=0)
     parser.add_argument("--play-rate", type=float, default=1.0)
+    parser.add_argument("--start-offset-s", type=float, default=None)
     parser.add_argument("--bag-read-ahead-queue-size", type=int, default=0)
     parser.add_argument("--bag-disable-loan-message", action="store_true")
     parser.add_argument(
@@ -537,12 +550,26 @@ def main(argv=None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     if args.translation_scale <= 0.0:
         raise ValueError("--translation-scale must be positive")
+    if args.min_pnp_inliers < 0:
+        raise ValueError("--min-pnp-inliers must be non-negative")
+    if not 0.0 <= args.min_inlier_ratio <= 1.0:
+        raise ValueError("--min-inlier-ratio must be in [0, 1]")
+    if args.ransac_iterations <= 0:
+        raise ValueError("--ransac-iterations must be positive")
+    if args.ransac_reprojection_error_px <= 0.0:
+        raise ValueError("--ransac-reprojection-error-px must be positive")
+    if not 0.0 < args.ransac_confidence < 1.0:
+        raise ValueError("--ransac-confidence must be in (0, 1)")
+    if args.max_step_translation_m <= 0.0:
+        raise ValueError("--max-step-translation-m must be positive")
     if args.visual_position_variance_floor <= 0.0:
         raise ValueError("--visual-position-variance-floor must be positive")
     if args.visual_max_age_s <= 0.0:
         raise ValueError("--visual-max-age-s must be positive")
     if args.play_rate <= 0.0:
         raise ValueError("--play-rate must be positive")
+    if args.start_offset_s is not None and args.start_offset_s < 0.0:
+        raise ValueError("--start-offset-s must be non-negative")
     if args.bag_read_ahead_queue_size < 0:
         raise ValueError("--bag-read-ahead-queue-size must be non-negative")
     if args.orb_n_features <= 0:
