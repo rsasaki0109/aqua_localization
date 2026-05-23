@@ -549,6 +549,30 @@ same-sequence smoke run with the promoted profile reproduces `0.0154 m` RMSE and
 `169/217` prior-applied steps, but remains diagnostic because it uses
 `--allow-same-sequence`.
 
+Once the held-out sequence bag, visual TUM, and reference TUM are available,
+run the complete validation bundle. It runs the prior validation, writes the
+benchmark row, compares it against the AQUA-SLAM rows in this document, and
+generates the residual report in one output directory:
+
+```bash
+ros2 run aqua_localization run_tank_dvl_validation_bundle.py \
+  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --sequence Medium \
+  --bag /tmp/tank_medium_ros2_visual \
+  --reference /tmp/tank_medium_gt.tum \
+  --visual /tmp/tank_medium_visual_frontend.tum \
+  --benchmark-markdown docs/benchmarks/tank_aqua_slam.md \
+  --max-corrected-rmse-m 0.0194 \
+  --max-gap-x 1.0 \
+  --fail-on-gate-failure \
+  --out-dir /tmp/aqua_tank_dvl_prior_medium_validation_bundle
+```
+
+Do not pass `--allow-same-sequence` for this held-out run. If the bundle exits
+successfully with `--max-gap-x 1.0`, the generated benchmark row is the first
+candidate evidence that this DVL-prior visual trajectory beats the checked-in
+AQUA-SLAM baseline under the same table parser.
+
 On 2026-05-23 this profile-based real-prior application reduced the best strict
 PnP visual row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction,
 while using the DVL/IMU prior on `127/217` visual steps. That is close to the
