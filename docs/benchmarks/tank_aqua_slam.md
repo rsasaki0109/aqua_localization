@@ -427,7 +427,8 @@ ros2 run aqua_localization apply_tank_dvl_motion_prior.py \
 For benchmark claims, run the profile through the validation wrapper instead
 of calling the application tool directly. The wrapper records the declared
 calibration/validation split, writes a markdown summary, and refuses to run on
-the calibration sequence unless the diagnostic override is explicit:
+the calibration sequence unless the diagnostic override is explicit. It also
+writes a benchmark table row that can be fed directly to the gap report:
 
 ```bash
 ros2 run aqua_localization run_tank_dvl_prior_validation.py \
@@ -440,6 +441,16 @@ ros2 run aqua_localization run_tank_dvl_prior_validation.py \
   --min-improvement-percent 70 \
   --fail-on-gate-failure \
   --out-dir /tmp/aqua_tank_dvl_prior_validation_medium
+```
+
+Compare the generated row against the checked-in AQUA-SLAM baseline rows:
+
+```bash
+python3 aqua_localization/scripts/benchmark_gap_report.py \
+  docs/benchmarks/tank_aqua_slam.md \
+  /tmp/aqua_tank_dvl_prior_validation_medium/tank_dvl_prior_benchmark_row.md \
+  --target-system aqua_dvl_prior_visual \
+  --baseline-system AQUA-SLAM
 ```
 
 The same-sequence smoke check remains useful while wiring the prior into the
@@ -458,6 +469,17 @@ ros2 run aqua_localization run_tank_dvl_prior_validation.py \
   --min-improvement-percent 70 \
   --out-dir /tmp/aqua_tank_dvl_prior_validation_smoke_check
 ```
+
+That diagnostic smoke currently produces this row on `short_test`:
+
+| Dataset | Sequence | System | Alignment | Samples | Matched s | Mean m | Median m | RMSE m | Max m | Note |
+|---------|----------|--------|-----------|--------:|----------:|-------:|---------:|-------:|------:|------|
+| Tank Dataset | short_test | aqua_dvl_prior_visual | SE(3) | 218 | 11.10 | 0.0297 | 0.0268 | 0.0323 | 0.0675 | profile=tank_short_dvl_prior_diag; prior=127/217; status=PASS; diagnostic override |
+
+Against the checked-in AQUA-SLAM `short_test` row (`0.0194 m` SE(3) RMSE), that
+is a `1.66x` gap and still needs a `39.9%` RMSE reduction to tie. Because the
+row uses same-sequence overrides, it is evidence that the prior path can help,
+not a benchmark claim.
 
 On 2026-05-23 this profile-based real-prior application reduced the best strict
 PnP visual row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction,
