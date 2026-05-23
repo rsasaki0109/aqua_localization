@@ -157,6 +157,37 @@ def test_main_dry_run_writes_manifest(tmp_path, capsys):
     assert "run_tank_dvl_validation_bundle.py" in output
 
 
+def test_main_dry_run_writes_manifest_with_missing_inputs(tmp_path, capsys):
+    module = load_module()
+    out_dir = tmp_path / "out"
+
+    rc = module.main([
+        "--sequence",
+        "Medium",
+        "--profile",
+        str(tmp_path / "missing_profile.yaml"),
+        "--ros2-bag",
+        str(tmp_path / "missing_bag"),
+        "--reference",
+        str(tmp_path / "missing_ref.tum"),
+        "--benchmark-markdown",
+        str(tmp_path / "missing_bench.md"),
+        "--out-dir",
+        str(out_dir),
+        "--dry-run",
+    ])
+
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    manifest = out_dir / "tank_dvl_heldout_inputs_manifest.md"
+    assert manifest.exists()
+    text = manifest.read_text(encoding="utf-8")
+    assert "## Missing Inputs" in text
+    assert "missing_profile.yaml" in text
+    assert "missing_ref.tum" in text
+
+
 def test_main_reports_missing_inputs_without_traceback(tmp_path, capsys):
     module = load_module()
 

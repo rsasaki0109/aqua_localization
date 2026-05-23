@@ -207,7 +207,7 @@ def validate_args(args, paths: PrepPaths) -> None:
         # destination-exists guard.
         pass
     missing = missing_inputs(args, paths)
-    if missing:
+    if missing and not args.dry_run:
         raise ValueError("missing required input(s): " + "; ".join(missing))
 
 
@@ -217,7 +217,13 @@ def run_command(command: list[str], dry_run: bool) -> None:
         subprocess.run(command, check=True)
 
 
-def format_manifest(args, paths: PrepPaths, commands: list[tuple[str, list[str]]]) -> str:
+def format_manifest(
+    args,
+    paths: PrepPaths,
+    commands: list[tuple[str, list[str]]],
+    missing: list[str] | None = None,
+) -> str:
+    missing = missing or []
     lines = [
         "# Tank DVL Held-Out Input Preparation",
         "",
@@ -229,6 +235,7 @@ def format_manifest(args, paths: PrepPaths, commands: list[tuple[str, list[str]]
         f"- Visual TUM: `{paths.visual_tum}`",
         f"- Bundle output: `{paths.bundle_out_dir}`",
         f"- Dry run: `{args.dry_run}`",
+        f"- Missing required inputs: `{len(missing)}`",
         "",
         "## Commands",
         "",
@@ -239,10 +246,18 @@ def format_manifest(args, paths: PrepPaths, commands: list[tuple[str, list[str]]
     else:
         lines.append("- none")
         lines.append("")
+    lines.extend(["## Missing Inputs", ""])
+    if missing:
+        for item in missing:
+            lines.append(f"- {item}")
+    else:
+        lines.append("- none")
+    lines.append("")
     lines.extend([
         "## Readout",
         "",
         "- Use this manifest to reproduce the held-out validation inputs.",
+        "- In dry-run mode, this manifest is still written when inputs are missing so operators can see the exact blockers.",
         "- The validation bundle is paper-safe only when no same-sequence override is used.",
         "",
     ])
@@ -302,7 +317,7 @@ def main(argv=None) -> int:
         return 2
     args.out_dir.mkdir(parents=True, exist_ok=True)
     commands = planned_commands(args, paths)
-    manifest = format_manifest(args, paths, commands)
+    manifest = format_manifest(args, paths, commands, missing_inputs(args, paths))
     paths.manifest.write_text(manifest, encoding="utf-8")
     print(manifest)
     for _label, command in commands:
