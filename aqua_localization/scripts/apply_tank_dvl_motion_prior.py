@@ -127,9 +127,16 @@ def prior_step_quality_rows(
             "visual_prior_direction_cosine": sim_row.direction_cosine,
             "visual_prior_heading_error_deg": sim_row.heading_error_deg,
             "visual_prior_residual_m": confidence.residual_m,
-            "prior_confidence": confidence.confidence,
+            "prior_match_confidence": confidence.confidence,
+            "prior_confidence": (
+                sim_row.prior_confidence
+                if math.isfinite(sim_row.prior_confidence)
+                else confidence.confidence
+            ),
             "prior_confidence_accepted": confidence.accepted,
             "prior_reject_reason": confidence.reject_reason,
+            "effective_blend_alpha": sim_row.effective_blend_alpha,
+            "confidence_mode": sim_row.confidence_mode,
             "dvl_covered": delta.covered,
             "dvl_samples": delta.dvl_samples,
             "used_prior": sim_row.used_prior,
@@ -152,9 +159,12 @@ def write_application_csv(path: Path, rows: list[dict]) -> None:
         "visual_prior_direction_cosine",
         "visual_prior_heading_error_deg",
         "visual_prior_residual_m",
+        "prior_match_confidence",
         "prior_confidence",
         "prior_confidence_accepted",
         "prior_reject_reason",
+        "effective_blend_alpha",
+        "confidence_mode",
         "dvl_covered",
         "dvl_samples",
         "used_prior",
@@ -321,7 +331,7 @@ def parse_args(argv):
     parser.add_argument("--prior-scale", type=float, default=defaults["prior_scale"])
     parser.add_argument(
         "--mode",
-        choices=["replace-outliers", "blend-outliers", "blend-all"],
+        choices=prior_sim.APPLICATION_MODES,
         default=defaults["mode"],
     )
     parser.add_argument("--blend-alpha", type=float, default=defaults["blend_alpha"])

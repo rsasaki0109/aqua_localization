@@ -9,6 +9,13 @@ import sys
 
 import yaml
 
+APPLICATION_MODES = (
+    "replace-outliers",
+    "blend-outliers",
+    "blend-all",
+    "confidence-blend-outliers",
+    "confidence-replace-outliers",
+)
 
 PROFILE_KEYS = {
     "dvl_yaw_mode": ("prior", "dvl_yaw_mode"),
@@ -150,7 +157,7 @@ def parse_args(argv):
     parser.add_argument("--prior-scale", type=float, default=1.25375)
     parser.add_argument(
         "--mode",
-        choices=["replace-outliers", "blend-outliers", "blend-all"],
+        choices=APPLICATION_MODES,
         default="replace-outliers",
     )
     parser.add_argument("--blend-alpha", type=float, default=0.5)

@@ -71,7 +71,7 @@ def parse_float_list(text: str) -> list[float]:
 
 def parse_mode_list(text: str) -> list[str]:
     modes = [item.strip() for item in str(text).split(",") if item.strip()]
-    valid = {"replace-outliers", "blend-outliers", "blend-all"}
+    valid = set(prior_sim.APPLICATION_MODES)
     invalid = [mode for mode in modes if mode not in valid]
     if invalid:
         raise ValueError(f"unsupported mode(s): {', '.join(invalid)}")
@@ -284,7 +284,11 @@ def sweep_candidates(args, metadata: SweepMetadata) -> tuple[list[SweepRow], Can
         )
         prior_xyz = dvl_apply.positions_from_deltas(times, aligned_visual_xyz[0], deltas)
         for mode in modes:
-            alphas = blend_alphas if mode != "replace-outliers" else [blend_alphas[0]]
+            alphas = (
+                [blend_alphas[0]]
+                if mode in {"replace-outliers", "confidence-replace-outliers"}
+                else blend_alphas
+            )
             for blend_alpha in alphas:
                 for min_length_ratio in min_length_ratios:
                     for max_length_ratio in max_length_ratios:

@@ -32,6 +32,15 @@ def test_parse_float_list_rejects_empty_values():
         module.parse_float_list(" , ")
 
 
+def test_parse_mode_list_accepts_confidence_modes():
+    module = load_module()
+
+    assert module.parse_mode_list("confidence-blend-outliers,confidence-replace-outliers") == [
+        "confidence-blend-outliers",
+        "confidence-replace-outliers",
+    ]
+
+
 def test_validate_sequence_split_rejects_calibration_sequence():
     module = load_module()
     args = SimpleNamespace(
