@@ -398,26 +398,38 @@ tuning, not a paper-safe calibration. For a benchmark claim, calibrate that
 constant on one Tank sequence and validate the DVL-prior fusion on another.
 
 The next diagnostic applies that real DVL/IMU prior to the visual trajectory
-instead of only comparing per-step direction:
+instead of only comparing per-step direction. Store the calibrated constants in
+a profile so calibration and validation sequences are explicit:
 
 ```bash
-ros2 run aqua_localization apply_tank_dvl_motion_prior.py \
-  --bag /tmp/short_test_ros2_visual \
-  --reference /tmp/tank_short_test_gt.tum \
-  --visual /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99/short_test_visual_pnp_1125_strict_ratio_repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99_visual_frontend.tum \
-  --mode replace-outliers \
+ros2 run aqua_localization tank_dvl_prior_profile.py \
+  --out /tmp/aqua_tank_dvl_prior_profile_short_to_medium.yaml \
+  --name tank_short_dvl_prior_diag \
+  --calibration-sequence short_test \
+  --validation-sequence Medium \
+  --calibration-bag /tmp/short_test_ros2_visual \
+  --calibration-reference /tmp/tank_short_test_gt.tum \
+  --calibration-visual /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99/short_test_visual_pnp_1125_strict_ratio_repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99_visual_frontend.tum \
   --dvl-frame-yaw-offset-deg -90 \
   --imu-yaw-offset-deg 115 \
   --prior-scale 1.25375 \
-  --out-dir /tmp/aqua_tank_dvl_motion_prior_apply_replace_scale125
+  --mode replace-outliers \
+  --note "same-sequence diagnostic profile; validate on held-out Tank sequence"
+
+ros2 run aqua_localization apply_tank_dvl_motion_prior.py \
+  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium.yaml \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --visual /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99/short_test_visual_pnp_1125_strict_ratio_repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99_visual_frontend.tum \
+  --out-dir /tmp/aqua_tank_dvl_motion_prior_apply_profile_check
 ```
 
-On 2026-05-23 this real-prior application reduced the best strict PnP visual
-row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction, while using
-the DVL/IMU prior on `127/217` visual steps. That is close to the oracle-prior
-upper-bound result of `0.0280 m`, but it still uses same-sequence calibration
-for the IMU yaw offset and DVL scale. Without the DVL scale correction
-(`--prior-scale 1.0`), `replace-outliers` still improved the row to `0.0597 m`.
+On 2026-05-23 this profile-based real-prior application reduced the best strict
+PnP visual row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction,
+while using the DVL/IMU prior on `127/217` visual steps. That is close to the
+oracle-prior upper-bound result of `0.0280 m`, but the profile still records
+`short_test` as the calibration sequence. Without the DVL scale correction
+(`--prior-scale 1.0`), `replace-outliers` improved the row to `0.0597 m`.
 
 | Application | Prior scale | Blend alpha | Corrected RMSE m | Improvement | Prior-applied steps | Readout |
 |-------------|------------:|------------:|-----------------:|------------:|--------------------:|---------|
