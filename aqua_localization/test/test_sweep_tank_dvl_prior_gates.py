@@ -118,6 +118,48 @@ def test_evaluate_candidate_replaces_bad_direction_step():
     assert row.prior_steps == 1
 
 
+def test_summarize_quality_rows_reports_confidence_and_rejects():
+    module = load_module()
+    rows = [
+        {
+            "dvl_covered": True,
+            "prior_confidence_accepted": True,
+            "prior_match_confidence": 0.8,
+            "prior_confidence": 0.7,
+            "effective_blend_alpha": 0.35,
+            "prior_reject_reason": "accepted",
+            "used_prior": True,
+        },
+        {
+            "dvl_covered": True,
+            "prior_confidence_accepted": False,
+            "prior_match_confidence": 0.0,
+            "prior_confidence": 0.0,
+            "effective_blend_alpha": 0.0,
+            "prior_reject_reason": "direction mismatch",
+            "used_prior": False,
+        },
+        {
+            "dvl_covered": False,
+            "prior_confidence_accepted": False,
+            "prior_match_confidence": 0.0,
+            "prior_confidence": 0.0,
+            "effective_blend_alpha": 0.0,
+            "prior_reject_reason": "direction mismatch",
+            "used_prior": False,
+        },
+    ]
+
+    summary = module.summarize_quality_rows(rows)
+
+    assert summary["dvl_covered_steps"] == 2
+    assert summary["prior_match_accepted_steps"] == 1
+    assert summary["mean_prior_match_confidence"] == pytest.approx(0.8 / 3.0)
+    assert summary["mean_applied_prior_confidence"] == pytest.approx(0.7)
+    assert summary["mean_effective_blend_alpha"] == pytest.approx(0.35 / 3.0)
+    assert summary["dominant_prior_reject_reason"] == "direction mismatch"
+
+
 def test_format_markdown_flags_diagnostic_override(tmp_path):
     module = load_module()
     args = SimpleNamespace(
@@ -126,6 +168,7 @@ def test_format_markdown_flags_diagnostic_override(tmp_path):
         best_corrected_out=tmp_path / "best.tum",
         best_dvl_prior_out=tmp_path / "prior.tum",
         best_step_csv_out=tmp_path / "steps.csv",
+        best_profile_out=tmp_path / "best_profile.yaml",
         baseline_rmse_m=0.0194,
         top_k=1,
     )
@@ -153,6 +196,12 @@ def test_format_markdown_flags_diagnostic_override(tmp_path):
         gap_to_baseline_x=0.79,
         prior_steps=169,
         steps=217,
+        dvl_covered_steps=217,
+        prior_match_accepted_steps=160,
+        mean_prior_match_confidence=0.74,
+        mean_applied_prior_confidence=0.83,
+        mean_effective_blend_alpha=0.62,
+        dominant_prior_reject_reason="direction mismatch",
         samples=218,
         matched_s=11.1,
     )
@@ -163,3 +212,77 @@ def test_format_markdown_flags_diagnostic_override(tmp_path):
     assert "diagnostic tuning evidence" in text
     assert "0.0154 m" in text
     assert "0.79x" in text
+    assert "160/217" in text
+    assert "direction mismatch" in text
+
+
+def test_write_best_profile_promotes_ranked_row(tmp_path):
+    module = load_module()
+    base_profile_path = tmp_path / "base.yaml"
+    out = tmp_path / "best.yaml"
+    base_profile = {
+        "format_version": 1,
+        "name": "base",
+        "metadata": {
+            "calibration_sequence": "short_test",
+            "validation_sequence": "Medium",
+        },
+        "prior": {
+            "dvl_yaw_mode": "imu_yaw",
+            "dvl_frame_yaw_offset_deg": -90.0,
+            "imu_yaw_offset_deg": 115.0,
+            "prior_scale": 1.0,
+        },
+        "application": {
+            "mode": "replace-outliers",
+            "blend_alpha": 0.5,
+            "min_prior_step_m": 1.0e-4,
+            "min_length_ratio": 0.5,
+            "max_length_ratio": 1.5,
+            "min_direction_cosine": 0.5,
+        },
+    }
+    args = SimpleNamespace(
+        profile=base_profile_path,
+        profile_data=base_profile,
+        csv_out=tmp_path / "sweep.csv",
+        best_profile_out=out,
+        best_profile_name="tank_best_confidence",
+        best_profile_validation_sequence="Medium",
+        best_profile_note="promoted in sweep test",
+    )
+    row = module.SweepRow(
+        rank=1,
+        mode="confidence-blend-outliers",
+        blend_alpha=0.4,
+        prior_scale=1.15,
+        min_length_ratio=0.65,
+        max_length_ratio=1.25,
+        min_direction_cosine=0.7,
+        corrected_rmse_m=0.0154,
+        mean_error_m=0.012,
+        median_error_m=0.01,
+        max_error_m=0.04,
+        improvement_percent=86.3,
+        gap_to_baseline_x=0.79,
+        prior_steps=120,
+        steps=217,
+        dvl_covered_steps=217,
+        prior_match_accepted_steps=160,
+        mean_prior_match_confidence=0.74,
+        mean_applied_prior_confidence=0.83,
+        mean_effective_blend_alpha=0.33,
+        dominant_prior_reject_reason="direction mismatch",
+        samples=218,
+        matched_s=11.1,
+    )
+
+    profile = module.write_best_profile(args, SimpleNamespace(row=row))
+
+    assert out.exists()
+    assert profile["name"] == "tank_best_confidence"
+    assert profile["prior"]["prior_scale"] == 1.15
+    assert profile["application"]["mode"] == "confidence-blend-outliers"
+    assert profile["application"]["blend_alpha"] == 0.4
+    assert profile["metadata"]["source_sweep_rank"] == 1
+    assert profile["metadata"]["validation_sequence"] == "Medium"
