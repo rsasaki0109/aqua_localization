@@ -67,6 +67,7 @@ install(PROGRAMS
   scripts/analyze_visual_drift.py
   scripts/analyze_visual_motion_segments.py
   scripts/analyze_visual_step_errors.py
+  scripts/analyze_tank_dvl_prior_residuals.py
   scripts/simulate_visual_motion_prior.py
   scripts/analyze_tank_dvl_motion_prior.py
   scripts/apply_tank_dvl_motion_prior.py
@@ -132,6 +133,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_analyze_visual_drift test/test_analyze_visual_drift.py)
   ament_add_pytest_test(test_analyze_visual_motion_segments test/test_analyze_visual_motion_segments.py)
   ament_add_pytest_test(test_analyze_visual_step_errors test/test_analyze_visual_step_errors.py)
+  ament_add_pytest_test(test_analyze_tank_dvl_prior_residuals test/test_analyze_tank_dvl_prior_residuals.py)
   ament_add_pytest_test(test_simulate_visual_motion_prior test/test_simulate_visual_motion_prior.py)
   ament_add_pytest_test(test_tank_dvl_prior_core test/test_tank_dvl_prior_core.py)
   ament_add_pytest_test(test_tank_rosbag_motion_inputs test/test_tank_rosbag_motion_inputs.py)
