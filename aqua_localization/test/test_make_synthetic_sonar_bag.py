@@ -60,8 +60,8 @@ def test_filter_by_range_drops_far_points():
 
 def test_encode_message_packs_three_floats_per_point():
     module = load_module()
-    from rosbags.typesys import Stores, get_typestore
-    typestore = get_typestore(Stores.ROS2_JAZZY)
+    from rosbags.typesys import get_typestore
+    typestore = get_typestore(module.default_ros2_store())
     pts = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float64)
     msg = module.encode_xyz_float32_message(
         typestore, pts, stamp_sec=10, stamp_nsec=250_000_000, frame_id="sonar_link",

@@ -31,13 +31,18 @@ ROS 2 Humble install.
 """
 
 import argparse
+import inspect
 import sys
 from pathlib import Path
 
 from rosbags.rosbag1 import Reader as Ros1Reader
-from rosbags.rosbag2 import StoragePlugin
 from rosbags.rosbag2 import Writer as Ros2Writer
 from rosbags.typesys import Stores, get_types_from_msg, get_typestore
+
+try:
+    from rosbags.rosbag2 import StoragePlugin
+except ImportError:  # Older rosbags exposes only the default sqlite3 writer.
+    StoragePlugin = None
 
 # Topic + type the destination bag will publish for the DVL track.
 DVL_OUT_TOPIC = "/dvl/twist"
@@ -53,10 +58,23 @@ PRESSURE_OUT_TYPE = "sensor_msgs/msg/FluidPressure"
 WATER_DENSITY_KGM3 = 1000.0
 GRAVITY_MPS2 = 9.80665
 ATMOSPHERIC_PA = 101325.0
-STORAGE_PLUGINS = {
-    "sqlite3": StoragePlugin.SQLITE3,
-    "mcap": StoragePlugin.MCAP,
-}
+if StoragePlugin is None:
+    STORAGE_PLUGINS = {"sqlite3": None}
+else:
+    STORAGE_PLUGINS = {
+        "sqlite3": StoragePlugin.SQLITE3,
+        "mcap": StoragePlugin.MCAP,
+    }
+
+
+def open_ros2_writer(dst: Path, storage: str):
+    writer_kwargs = {}
+    writer_params = inspect.signature(Ros2Writer).parameters
+    if "version" in writer_params and hasattr(Ros2Writer, "VERSION_LATEST"):
+        writer_kwargs["version"] = Ros2Writer.VERSION_LATEST
+    if "storage_plugin" in writer_params and STORAGE_PLUGINS[storage] is not None:
+        writer_kwargs["storage_plugin"] = STORAGE_PLUGINS[storage]
+    return Ros2Writer(dst, **writer_kwargs)
 
 
 def parse_args(argv):
@@ -130,11 +148,7 @@ def main(argv=None) -> int:
     dropped_dvl_invalid = 0
     skipped_camera = 0
 
-    with Ros1Reader(args.src) as reader, Ros2Writer(
-        args.dst,
-        version=Ros2Writer.VERSION_LATEST,
-        storage_plugin=STORAGE_PLUGINS[args.storage],
-    ) as writer:
+    with Ros1Reader(args.src) as reader, open_ros2_writer(args.dst, args.storage) as writer:
         # Register every connection's message definition into both typestores
         # (the source typestore needs the custom DVL definition to deserialize
         # input; the destination typestore sees only stock TwistStamped + the

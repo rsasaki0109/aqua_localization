@@ -20,6 +20,7 @@ robot pose (rotation = identity, so the transform is just `body = world - robot`
 """
 
 import argparse
+import inspect
 import shutil
 import struct
 import sys
@@ -29,6 +30,21 @@ import numpy as np
 
 from rosbags.rosbag2 import Writer
 from rosbags.typesys import Stores, get_typestore
+
+
+def default_ros2_store():
+    for store_name in ("ROS2_JAZZY", "ROS2_HUMBLE", "LATEST"):
+        store = getattr(Stores, store_name, None)
+        if store is not None:
+            return store
+    raise RuntimeError("rosbags does not expose a ROS 2 typestore")
+
+
+def open_rosbag2_writer(dst: Path):
+    writer_params = inspect.signature(Writer).parameters
+    if "version" in writer_params:
+        return Writer(dst, version=9)
+    return Writer(dst)
 
 
 def linear_trajectory(num_steps: int, dt: float, speed_m_s: float) -> np.ndarray:
@@ -132,12 +148,12 @@ def generate_bag(args) -> int:
             print(f"refusing to overwrite existing {dst}; pass --overwrite", file=sys.stderr)
             return 2
 
-    typestore = get_typestore(Stores.ROS2_JAZZY)
+    typestore = get_typestore(default_ros2_store())
 
     base_ns = int(args.start_time_s * 1_000_000_000)
     dt_ns = int(args.dt * 1_000_000_000)
 
-    with Writer(dst, version=9) as writer:
+    with open_rosbag2_writer(dst) as writer:
         conn = writer.add_connection(
             topic=args.topic,
             msgtype="sensor_msgs/msg/PointCloud2",
