@@ -87,6 +87,78 @@ def test_blend_all_mixes_every_step():
     assert rows[0].used_prior is True
 
 
+def test_confidence_blend_outliers_scales_alpha_by_direction_confidence():
+    module = load_module()
+    times = np.array([0.0, 1.0])
+    visual = np.array([[0.0, 0.0, 0.0], [0.2, 0.0, 0.0]])
+    prior = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+
+    corrected, rows = module.simulate_prior(
+        times,
+        visual,
+        prior,
+        mode="confidence-blend-outliers",
+        blend_alpha=0.5,
+        min_reference_step_m=0.0,
+        min_length_ratio=0.5,
+        max_length_ratio=1.5,
+        min_direction_cosine=0.5,
+    )
+
+    np.testing.assert_allclose(corrected[1], [0.6, 0.0, 0.0])
+    assert rows[0].used_prior is True
+    assert rows[0].prior_confidence == 1.0
+    assert rows[0].effective_blend_alpha == 0.5
+    assert rows[0].confidence_mode == "confidence-blend-outliers"
+
+
+def test_confidence_replace_outliers_keeps_visual_for_direction_mismatch():
+    module = load_module()
+    times = np.array([0.0, 1.0])
+    visual = np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    prior = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+
+    corrected, rows = module.simulate_prior(
+        times,
+        visual,
+        prior,
+        mode="confidence-replace-outliers",
+        blend_alpha=0.5,
+        min_reference_step_m=0.0,
+        min_length_ratio=0.5,
+        max_length_ratio=1.5,
+        min_direction_cosine=0.5,
+    )
+
+    np.testing.assert_allclose(corrected[1], visual[1])
+    assert rows[0].used_prior is False
+    assert rows[0].prior_confidence == 0.0
+    assert rows[0].effective_blend_alpha == 0.0
+
+
+def test_confidence_replace_outliers_replaces_length_outlier_when_direction_agrees():
+    module = load_module()
+    times = np.array([0.0, 1.0])
+    visual = np.array([[0.0, 0.0, 0.0], [0.2, 0.0, 0.0]])
+    prior = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+
+    corrected, rows = module.simulate_prior(
+        times,
+        visual,
+        prior,
+        mode="confidence-replace-outliers",
+        blend_alpha=0.5,
+        min_reference_step_m=0.0,
+        min_length_ratio=0.5,
+        max_length_ratio=1.5,
+        min_direction_cosine=0.5,
+    )
+
+    np.testing.assert_allclose(corrected[1], prior[1])
+    assert rows[0].prior_confidence == 1.0
+    assert rows[0].effective_blend_alpha == 1.0
+
+
 def test_run_simulation_writes_corrected_trajectory(tmp_path):
     module = load_module()
     ref = tmp_path / "ref.tum"

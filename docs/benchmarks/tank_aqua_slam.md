@@ -550,10 +550,12 @@ same-sequence smoke run with the promoted profile reproduces `0.0154 m` RMSE and
 `--allow-same-sequence`.
 
 The DVL prior application CSV also reports `visual_prior_residual_m`,
-`prior_confidence`, `prior_confidence_accepted`, and `prior_reject_reason` for
-each visual step. Those columns are diagnostic only in this pass; use them to
-identify steps that pass the current outlier gate but are weak prior matches
-before enabling adaptive blending or replacement.
+`prior_match_confidence`, `prior_confidence`, `effective_blend_alpha`,
+`confidence_mode`, `prior_confidence_accepted`, and `prior_reject_reason` for
+each visual step. The `confidence-blend-outliers` and
+`confidence-replace-outliers` modes use direction confidence to down-weight
+outlier corrections when the visual step and DVL prior disagree, while still
+allowing strong length-only corrections when direction agrees.
 
 Once the held-out sequence bag, visual TUM, and reference TUM are available,
 run the complete validation bundle. It runs the prior validation, writes the

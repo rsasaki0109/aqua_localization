@@ -112,6 +112,8 @@ def test_prior_step_quality_rows_merges_dvl_coverage_and_gate_rows():
             heading_error_deg=-90.0,
             used_prior=True,
             reason="direction mismatch",
+            effective_blend_alpha=1.0,
+            confidence_mode="fixed",
         )
     ]
 
@@ -122,9 +124,12 @@ def test_prior_step_quality_rows_merges_dvl_coverage_and_gate_rows():
     assert rows[0]["used_prior"] is True
     assert rows[0]["reason"] == "direction mismatch"
     assert rows[0]["visual_prior_residual_m"] > 0.0
+    assert rows[0]["prior_match_confidence"] == 0.0
     assert rows[0]["prior_confidence"] == 0.0
     assert rows[0]["prior_confidence_accepted"] is False
     assert rows[0]["prior_reject_reason"] == "direction mismatch"
+    assert rows[0]["effective_blend_alpha"] == 1.0
+    assert rows[0]["confidence_mode"] == "fixed"
 
 
 def test_prior_step_quality_rows_reports_high_confidence_for_consistent_prior():
@@ -166,6 +171,43 @@ def test_prior_step_quality_rows_reports_high_confidence_for_consistent_prior():
     assert rows[0]["prior_confidence"] == 1.0
     assert rows[0]["prior_confidence_accepted"] is True
     assert rows[0]["prior_reject_reason"] == "accepted"
+
+
+def test_prior_step_quality_rows_reports_confidence_mode_alpha():
+    module = load_module()
+    from simulate_visual_motion_prior import PriorStep
+    from tank_dvl_prior_core import DvlPriorDelta
+
+    times = np.asarray([0.0, 1.0], dtype=np.float64)
+    visual_xyz = np.asarray([[0.0, 0.0, 0.0], [0.2, 0.0, 0.0]], dtype=np.float64)
+    prior_xyz = np.asarray([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=np.float64)
+    deltas = [DvlPriorDelta(0.0, 1.0, np.asarray([1.0, 0.0, 0.0]), 3, True)]
+    sim_rows = [
+        PriorStep(
+            start_stamp_s=0.0,
+            end_stamp_s=1.0,
+            offset_s=1.0,
+            dt_s=1.0,
+            visual_step_m=0.2,
+            prior_step_m=1.0,
+            corrected_step_m=0.6,
+            length_ratio=0.2,
+            direction_cosine=1.0,
+            heading_error_deg=0.0,
+            used_prior=True,
+            reason="short step",
+            prior_confidence=1.0,
+            effective_blend_alpha=0.5,
+            confidence_mode="confidence-blend-outliers",
+        )
+    ]
+
+    rows = module.prior_step_quality_rows(times, visual_xyz, prior_xyz, deltas, sim_rows)
+
+    assert rows[0]["prior_match_confidence"] == 0.0
+    assert rows[0]["prior_confidence"] == 1.0
+    assert rows[0]["effective_blend_alpha"] == 0.5
+    assert rows[0]["confidence_mode"] == "confidence-blend-outliers"
 
 
 def test_validate_args_rejects_bad_scale(tmp_path):

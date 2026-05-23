@@ -23,6 +23,15 @@ import numpy as np
 import analyze_visual_step_errors as step_errors
 
 
+APPLICATION_MODES = (
+    "replace-outliers",
+    "blend-outliers",
+    "blend-all",
+    "confidence-blend-outliers",
+    "confidence-replace-outliers",
+)
+
+
 def load_compare_module():
     script_path = Path(__file__).resolve().parent / "compare_trajectories.py"
     spec = importlib.util.spec_from_file_location("compare_trajectories", script_path)
@@ -46,6 +55,9 @@ class PriorStep:
     heading_error_deg: float
     used_prior: bool
     reason: str
+    prior_confidence: float = math.nan
+    effective_blend_alpha: float = math.nan
+    confidence_mode: str = "fixed"
 
 
 @dataclass(frozen=True)
@@ -124,7 +136,80 @@ def corrected_delta_for_mode(
         return visual_delta
     if mode == "blend-all":
         return (1.0 - blend_alpha) * visual_delta + blend_alpha * prior_delta
+    if mode in {"confidence-blend-outliers", "confidence-replace-outliers"}:
+        raise ValueError("confidence modes require corrected_delta_with_confidence")
     raise ValueError(f"unsupported mode: {mode}")
+
+
+def clamp01(value: float) -> float:
+    if not math.isfinite(value):
+        return 0.0
+    return min(1.0, max(0.0, value))
+
+
+def confidence_for_outlier_step(
+    *,
+    use_prior: bool,
+    reason: str,
+    prior_step: float,
+    cosine: float,
+    min_reference_step_m: float,
+    min_direction_cosine: float,
+) -> float:
+    if not use_prior:
+        return 0.0
+    if prior_step < min_reference_step_m:
+        return 0.0
+    if not math.isfinite(cosine):
+        return 0.0
+    if cosine < min_direction_cosine:
+        return 0.0
+    if "direction mismatch" in reason:
+        return 0.0
+    if min_direction_cosine >= 1.0:
+        return 1.0
+    return clamp01((cosine - min_direction_cosine) / (1.0 - min_direction_cosine))
+
+
+def corrected_delta_with_confidence(
+    visual_delta: np.ndarray,
+    prior_delta: np.ndarray,
+    *,
+    mode: str,
+    blend_alpha: float,
+    use_prior: bool,
+    reason: str,
+    prior_step: float,
+    cosine: float,
+    min_reference_step_m: float,
+    min_direction_cosine: float,
+) -> tuple[np.ndarray, float, float, str]:
+    confidence = confidence_for_outlier_step(
+        use_prior=use_prior,
+        reason=reason,
+        prior_step=prior_step,
+        cosine=cosine,
+        min_reference_step_m=min_reference_step_m,
+        min_direction_cosine=min_direction_cosine,
+    )
+    if mode == "confidence-blend-outliers":
+        effective_alpha = blend_alpha * confidence
+    elif mode == "confidence-replace-outliers":
+        effective_alpha = confidence
+    else:
+        raise ValueError(f"unsupported confidence mode: {mode}")
+    corrected_delta = (1.0 - effective_alpha) * visual_delta + effective_alpha * prior_delta
+    return corrected_delta, confidence, effective_alpha, mode
+
+
+def fixed_effective_alpha(mode: str, blend_alpha: float, use_prior: bool) -> float:
+    if mode == "replace-outliers":
+        return 1.0 if use_prior else 0.0
+    if mode == "blend-outliers":
+        return blend_alpha if use_prior else 0.0
+    if mode == "blend-all":
+        return blend_alpha
+    return math.nan
 
 
 def simulate_prior(
@@ -147,6 +232,8 @@ def simulate_prior(
         raise ValueError("max_length_ratio must be positive and >= min_length_ratio")
     if not -1.0 <= min_direction_cosine <= 1.0:
         raise ValueError("min_direction_cosine must be in [-1, 1]")
+    if mode not in APPLICATION_MODES:
+        raise ValueError(f"unsupported mode: {mode}")
 
     corrected = np.zeros_like(visual_xyz)
     corrected[0] = visual_xyz[0]
@@ -167,13 +254,31 @@ def simulate_prior(
             use_prior = True
             if reason == "visual":
                 reason = "blend all"
-        corrected_delta = corrected_delta_for_mode(
-            visual_delta,
-            prior_delta,
-            mode=mode,
-            blend_alpha=blend_alpha,
-            use_prior=use_prior,
-        )
+        if mode in {"confidence-blend-outliers", "confidence-replace-outliers"}:
+            corrected_delta, prior_confidence, effective_alpha, confidence_mode = corrected_delta_with_confidence(
+                visual_delta,
+                prior_delta,
+                mode=mode,
+                blend_alpha=blend_alpha,
+                use_prior=use_prior,
+                reason=reason,
+                prior_step=prior_step,
+                cosine=cosine,
+                min_reference_step_m=min_reference_step_m,
+                min_direction_cosine=min_direction_cosine,
+            )
+        else:
+            corrected_delta = corrected_delta_for_mode(
+                visual_delta,
+                prior_delta,
+                mode=mode,
+                blend_alpha=blend_alpha,
+                use_prior=use_prior,
+            )
+            prior_confidence = 1.0 if use_prior else 0.0
+            effective_alpha = fixed_effective_alpha(mode, blend_alpha, use_prior)
+            confidence_mode = "fixed"
+        applied_prior = effective_alpha > 0.0
         corrected[i] = corrected[i - 1] + corrected_delta
         heading_error = step_errors.angle_difference_deg(
             step_errors.yaw_from_delta(visual_delta),
@@ -190,8 +295,11 @@ def simulate_prior(
             length_ratio=length_ratio,
             direction_cosine=cosine,
             heading_error_deg=heading_error,
-            used_prior=use_prior,
+            used_prior=applied_prior,
             reason=reason,
+            prior_confidence=prior_confidence,
+            effective_blend_alpha=effective_alpha,
+            confidence_mode=confidence_mode,
         ))
     return corrected, rows
 
@@ -245,6 +353,9 @@ def write_step_csv(path: Path, rows: list[PriorStep]) -> None:
         "heading_error_deg",
         "used_prior",
         "reason",
+        "prior_confidence",
+        "effective_blend_alpha",
+        "confidence_mode",
     ]
     with path.open("w", newline="", encoding="utf-8") as fp:
         writer = csv.DictWriter(fp, fieldnames=fieldnames)
@@ -318,7 +429,7 @@ def parse_args(argv):
     parser.add_argument("--corrected-out", type=Path, default=None)
     parser.add_argument(
         "--mode",
-        choices=["replace-outliers", "blend-outliers", "blend-all"],
+        choices=APPLICATION_MODES,
         default="replace-outliers",
     )
     parser.add_argument("--blend-alpha", type=float, default=0.5)
