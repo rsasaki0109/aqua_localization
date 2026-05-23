@@ -500,6 +500,36 @@ residuals are concentrated near `10.8-11.1 s` plus the first DVL-covered step.
 That points the next engineering pass toward endpoint/local correction handling,
 not a broad relaxation of the prior gates.
 
+To search that next pass reproducibly, use the DVL prior gate sweep. It reads
+the bag and visual trajectory once, then evaluates prior scale and gate
+combinations without replaying ROS:
+
+```bash
+ros2 run aqua_localization sweep_tank_dvl_prior_gates.py \
+  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium.yaml \
+  --sequence short_test \
+  --allow-same-sequence \
+  --allow-profile-sequence-mismatch \
+  --bag /tmp/short_test_ros2_visual \
+  --reference /tmp/tank_short_test_gt.tum \
+  --visual /tmp/aqua_tank_visual_pnp_sweep_1125_strict_ratio/repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99/short_test_visual_pnp_1125_strict_ratio_repr_4__ratio_0p85__step_0p02__inl_12__iter_100__conf_0p99_visual_frontend.tum \
+  --prior-scales 1.05,1.15,1.25375,1.35,1.45 \
+  --min-length-ratios 0.25,0.35,0.5,0.65 \
+  --max-length-ratios 1.25,1.5,1.75,2.0 \
+  --min-direction-cosines 0.0,0.25,0.5,0.7 \
+  --modes replace-outliers \
+  --baseline-rmse-m 0.0194 \
+  --out-dir /tmp/aqua_tank_dvl_prior_gate_sweep_short_diag
+```
+
+On the same diagnostic `short_test` setup, the best sweep row is
+`scale=1.15`, length ratio gate `[0.65, 1.25]`, and min direction cosine
+`0.7`. It improves the strict visual row from `0.1128 m` to `0.0154 m` RMSE,
+uses the prior on `169/217` steps, and lands at `0.80x` of the checked-in
+AQUA-SLAM `0.0194 m` baseline. This is an important direction signal, but it is
+still same-sequence diagnostic tuning; run the same profile/gates on the
+held-out validation sequence before claiming a win.
+
 On 2026-05-23 this profile-based real-prior application reduced the best strict
 PnP visual row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction,
 while using the DVL/IMU prior on `127/217` visual steps. That is close to the
