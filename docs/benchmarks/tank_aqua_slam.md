@@ -481,6 +481,25 @@ is a `1.66x` gap and still needs a `39.9%` RMSE reduction to tie. Because the
 row uses same-sequence overrides, it is evidence that the prior path can help,
 not a benchmark claim.
 
+After a validation run, localize the remaining gap with the residual analyzer:
+
+```bash
+ros2 run aqua_localization analyze_tank_dvl_prior_residuals.py \
+  --reference /tmp/tank_short_test_gt.tum \
+  --visual-aligned /tmp/aqua_tank_dvl_prior_validation_smoke_check/aligned_visual_input.tum \
+  --corrected /tmp/aqua_tank_dvl_prior_validation_smoke_check/tank_dvl_prior_validation_corrected.tum \
+  --step-csv /tmp/aqua_tank_dvl_prior_validation_smoke_check/tank_dvl_prior_validation_steps.csv \
+  --out /tmp/aqua_tank_dvl_prior_validation_smoke_check/tank_dvl_prior_residuals.md \
+  --csv-out /tmp/aqua_tank_dvl_prior_validation_smoke_check/tank_dvl_prior_residuals.csv
+```
+
+On the same diagnostic `short_test` row, the residual readout shows no sample
+regressing by more than `5 mm`. Prior-applied steps improve by `0.0785 m` on
+average, non-prior steps still improve by `0.0611 m`, and the worst corrected
+residuals are concentrated near `10.8-11.1 s` plus the first DVL-covered step.
+That points the next engineering pass toward endpoint/local correction handling,
+not a broad relaxation of the prior gates.
+
 On 2026-05-23 this profile-based real-prior application reduced the best strict
 PnP visual row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction,
 while using the DVL/IMU prior on `127/217` visual steps. That is close to the
