@@ -50,13 +50,16 @@ def write_ros1_odom_csv(path: Path):
     )
 
 
-def write_benchmark_row(path: Path):
+def write_benchmark_row(path: Path, samples: int = 20, matched_s: float = 19.0):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "\n".join([
             "| Dataset | Sequence | System | Alignment | Samples | Matched s | Mean m | Median m | RMSE m | Max m | Note |",
             "|---------|----------|--------|-----------|--------:|----------:|-------:|---------:|-------:|------:|------|",
-            "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | 3 | 2.00 | 0.0000 | 0.0000 | 0.0200 | 0.0200 | baseline |",
+            (
+                "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | "
+                f"{samples} | {matched_s:.2f} | 0.0000 | 0.0000 | 0.0200 | 0.0200 | baseline |"
+            ),
         ])
         + "\n",
         encoding="utf-8",
@@ -153,6 +156,22 @@ def test_validation_ready_next_action_runs_bundle(tmp_path):
     assert module.next_action(todos).title == "Run held-out DVL prior validation bundle"
     assert "run_tank_dvl_validation_bundle.py" in text
     assert "Ready to run validation bundle: **PASS**" in text
+
+
+def test_smoke_sized_baseline_row_blocks_gap_check(tmp_path):
+    module = load_module()
+    write_tum(tmp_path / "ref.tum")
+    write_ros1_odom_csv(tmp_path / "aqua.csv")
+    write_benchmark_row(tmp_path / "row.md", samples=3, matched_s=2.0)
+
+    report = module.readiness.build_report(parse_args(module, tmp_path))
+    todos = module.build_todos(report)
+    text = module.format_todos(report, todos)
+
+    assert not report.baseline_row_ready
+    assert module.next_action(todos).title == "AQUA-SLAM baseline row has enough samples"
+    assert "require >= 10 samples" in text
+    assert "Ready to run validation bundle: **FAIL**" in text
 
 
 def test_cli_writes_todo_file_and_returns_nonzero_when_blocked(tmp_path):

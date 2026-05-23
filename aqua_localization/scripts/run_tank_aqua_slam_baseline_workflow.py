@@ -222,8 +222,11 @@ def locator_roots(args) -> tuple[Path, ...]:
 
 def first_non_smoke_candidate(report: input_locator.LocateReport, role: str) -> input_locator.Candidate | None:
     for candidate in report.by_role(role):
-        if "smoke-sized candidate" not in candidate.detail:
-            return candidate
+        if "smoke-sized candidate" in candidate.detail:
+            continue
+        if "not baseline-ready" in candidate.detail:
+            continue
+        return candidate
     return None
 
 
@@ -428,6 +431,7 @@ def parse_args(argv):
     parser.add_argument("--time-unit", choices=("auto", "seconds", "nanoseconds"), default="auto")
     parser.add_argument("--source-topic", default=baseline_ingest.DEFAULT_SOURCE)
     parser.add_argument("--config", default="underwater_orbslam3_blue_gx5_medium.yaml")
+    parser.add_argument("--min-baseline-samples", type=int, default=readiness.DEFAULT_MIN_BASELINE_SAMPLES)
     parser.add_argument("--out-dir", type=Path)
     parser.add_argument("--readiness-out", type=Path)
     parser.add_argument("--todos-out", type=Path)

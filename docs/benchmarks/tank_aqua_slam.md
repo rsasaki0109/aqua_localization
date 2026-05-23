@@ -705,7 +705,10 @@ ros2 run aqua_localization run_tank_aqua_slam_baseline_workflow.py \
 
 The workflow writes `readiness.md`, `todos.md`, and `workflow_summary.md`.
 Its final status is `PASS` when validation and gap gates pass, `BLOCKED` when
-required inputs are still missing, and `FAIL` when an executed stage fails.
+required inputs are still missing, and `FAIL` when an executed stage fails. By
+default, matching AQUA-SLAM rows must contain at least `10` samples before they
+are accepted for gap checks; shorter smoke rows are reported but do not unlock
+validation.
 After copying a downloaded Tank sequence into the workstation, the same runner
 can locate workflow-ready inputs directly and write the locator report beside
 the readiness artifacts:
