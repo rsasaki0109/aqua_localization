@@ -615,6 +615,25 @@ and reference are sufficient to ingest a baseline, whether a parseable `Medium`
 AQUA-SLAM benchmark row is available for gap checks, and whether the held-out
 validation bundle has all inputs needed to use `--max-gap-x 1.0`.
 
+For a shorter operator checklist, generate the TODO summary from the same
+readiness inputs:
+
+```bash
+ros2 run aqua_localization summarize_tank_aqua_slam_baseline_todos.py \
+  --sequence Medium \
+  --reference /tmp/tank_medium_gt.tum \
+  --csv /tmp/aqua_slam_medium_orb_odom.csv \
+  --baseline-row /tmp/aqua_slam_medium_baseline/Medium_aqua_slam_benchmark_row.md \
+  --profile /tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml \
+  --bag /tmp/tank_medium_ros2_visual \
+  --visual /tmp/tank_medium_visual_frontend.tum \
+  --out /tmp/aqua_slam_medium_baseline/todos.md
+```
+
+The TODO summary marks ready inputs, blocked inputs, and the next command to
+run. It exits successfully only when the held-out validation bundle has all
+required inputs.
+
 ```bash
 # In the AQUA-SLAM ROS 1 Docker container while the Medium bag is playing.
 rostopic echo -p /AQUA_SLAM/orb_odom > /tmp/aqua_slam_medium_orb_odom.csv
