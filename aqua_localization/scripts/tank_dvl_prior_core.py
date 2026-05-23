@@ -43,6 +43,15 @@ class DvlPriorStep:
     score: float
 
 
+@dataclass(frozen=True)
+class DvlPriorDelta:
+    start_stamp_s: float
+    end_stamp_s: float
+    delta_xyz: np.ndarray
+    dvl_samples: int
+    covered: bool
+
+
 def quaternion_to_yaw(qx: float, qy: float, qz: float, qw: float) -> float:
     siny_cosp = 2.0 * (qw * qz + qx * qy)
     cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
@@ -228,6 +237,65 @@ def build_dvl_prior_steps(
             score=score,
         ))
     return steps
+
+
+def build_dvl_prior_deltas(
+    visual_times: np.ndarray,
+    dvl_records: list[DvlRecord],
+    reference_tum: np.ndarray,
+    mode: str,
+    dvl_frame_yaw_offset_rad: float = 0.0,
+    imu_yaw_records: list[ImuYawRecord] | None = None,
+    imu_yaw_offset_rad: float = 0.0,
+    prior_scale: float = 1.0,
+) -> list[DvlPriorDelta]:
+    if prior_scale <= 0.0:
+        raise ValueError("prior_scale must be positive")
+    dvl_times = np.asarray([record.stamp_s for record in dvl_records], dtype=np.float64)
+    dvl_velocities = np.asarray([record.velocity_mps for record in dvl_records], dtype=np.float64)
+    yaw_times = None
+    yaws = None
+    if imu_yaw_records is not None:
+        yaw_times = np.asarray([record.stamp_s for record in imu_yaw_records], dtype=np.float64)
+        yaws = np.asarray([record.yaw_rad for record in imu_yaw_records], dtype=np.float64)
+    deltas = []
+    for index in range(1, visual_times.shape[0]):
+        start_s = float(visual_times[index - 1])
+        end_s = float(visual_times[index])
+        delta, covered, dvl_samples = integrate_dvl_step(
+            start_s,
+            end_s,
+            dvl_times,
+            dvl_velocities,
+            reference_tum,
+            mode,
+            dvl_frame_yaw_offset_rad,
+            yaw_times,
+            yaws,
+            imu_yaw_offset_rad,
+        )
+        deltas.append(DvlPriorDelta(
+            start_stamp_s=start_s,
+            end_stamp_s=end_s,
+            delta_xyz=prior_scale * delta if covered else np.zeros(3, dtype=np.float64),
+            dvl_samples=dvl_samples,
+            covered=covered,
+        ))
+    return deltas
+
+
+def positions_from_deltas(
+    times: np.ndarray,
+    start_xyz: np.ndarray,
+    deltas: list[DvlPriorDelta],
+) -> np.ndarray:
+    if len(deltas) != max(0, times.shape[0] - 1):
+        raise ValueError("deltas length must equal len(times) - 1")
+    xyz = np.zeros((times.shape[0], 3), dtype=np.float64)
+    xyz[0] = start_xyz
+    for index, delta in enumerate(deltas, start=1):
+        xyz[index] = xyz[index - 1] + delta.delta_xyz
+    return xyz
 
 
 def finite_values(steps: list[DvlPriorStep], attr: str, covered_only: bool = True) -> list[float]:
