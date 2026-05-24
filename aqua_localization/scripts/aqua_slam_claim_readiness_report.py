@@ -165,6 +165,27 @@ def claim_gate_command(args: argparse.Namespace) -> tuple[str, ...]:
     return tuple(command)
 
 
+def heldout_link_bootstrap_command(args: argparse.Namespace) -> tuple[str, ...]:
+    command = [
+        "ros2",
+        "run",
+        "aqua_localization",
+        "verify_tank_medium_heldout_ready.py",
+        "--sequence",
+        args.sequence,
+        "--profile",
+        str(args.profile),
+        "--locator-max-depth",
+        str(args.locator_max_depth),
+        "--apply-located-links",
+        "--out",
+        str(args.heldout_out_dir / "heldout_verify.md"),
+    ]
+    for root in args.locator_root:
+        command.extend(["--locator-root", str(root)])
+    return tuple(command)
+
+
 def comparison_summary(comparison: head_to_head.Comparison | None) -> list[str]:
     if comparison is None or comparison.target is None or comparison.baseline is None:
         return ["| TBD | TBD | TBD | TBD | TBD |"]
@@ -294,6 +315,10 @@ def format_report(state: ClaimReadiness) -> str:
             f"- Next action: `{state.heldout.next_action.title}`",
             "",
             *format_required_inputs(state),
+            "",
+            "## Candidate Link Bootstrap",
+            "",
+            *command_block(heldout_link_bootstrap_command(args)),
             "",
             "## Located Candidates",
             "",

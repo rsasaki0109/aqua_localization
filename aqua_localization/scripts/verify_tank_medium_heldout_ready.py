@@ -29,6 +29,7 @@ class VerifyReport:
     readiness_report: readiness.ReadinessReport
     locate_report: locator.LocateReport
     next_action: NextAction
+    applied_links: tuple[tuple[Path, Path], ...] = ()
 
     @property
     def ready(self) -> bool:
@@ -98,6 +99,22 @@ def locator_command(args) -> tuple[str, ...]:
 
 def link_command(candidate: Path, target: Path) -> tuple[str, ...]:
     return ("ln", "-sfn", str(candidate), str(target))
+
+
+def safe_symlink(candidate: Path, target: Path) -> bool:
+    candidate = candidate.resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_symlink():
+        try:
+            if target.resolve() == candidate:
+                return False
+        except FileNotFoundError:
+            pass
+        target.unlink()
+    elif target.exists():
+        raise ValueError(f"refusing to replace existing non-symlink path: {target}")
+    target.symlink_to(candidate, target_is_directory=candidate.is_dir())
+    return True
 
 
 def ingest_command(report: readiness.ReadinessReport) -> tuple[str, ...]:
@@ -214,6 +231,17 @@ def first_candidate_path(locate_report: locator.LocateReport, role: str) -> Path
     return path.resolve() if path is not None else None
 
 
+def first_usable_baseline_candidate(
+    locate_report: locator.LocateReport,
+    ready_args: argparse.Namespace,
+) -> Path | None:
+    for candidate in locate_report.by_role("baseline_row"):
+        summary = readiness.summarize_markdown_source(candidate.path, ready_args)
+        if summary.matching_rows:
+            return candidate.path.resolve()
+    return None
+
+
 def next_action(report: readiness.ReadinessReport, locate_report: locator.LocateReport, args) -> NextAction:
     ready_args = report.args
     if not report.reference.valid:
@@ -252,6 +280,20 @@ def next_action(report: readiness.ReadinessReport, locate_report: locator.Locate
         )
 
     if not report.source_ready:
+        csv_candidate = first_candidate_path(locate_report, "aqua_slam_csv")
+        if csv_candidate is not None and csv_candidate != ready_args.csv.resolve():
+            return NextAction(
+                "Link Medium AQUA-SLAM CSV",
+                f"Use the located AQUA-SLAM CSV for `{ready_args.csv}`.",
+                link_command(csv_candidate, ready_args.csv),
+            )
+        tum_candidate = first_candidate_path(locate_report, "aqua_slam_tum")
+        if tum_candidate is not None and tum_candidate != ready_args.tum.resolve():
+            return NextAction(
+                "Link Medium AQUA-SLAM TUM",
+                f"Use the located AQUA-SLAM TUM for `{ready_args.tum}`.",
+                link_command(tum_candidate, ready_args.tum),
+            )
         return NextAction(
             "Record AQUA-SLAM odometry CSV",
             "Run this inside the AQUA-SLAM ROS 1 environment while the Medium bag is playing.",
@@ -259,6 +301,13 @@ def next_action(report: readiness.ReadinessReport, locate_report: locator.Locate
         )
 
     if not report.baseline_row_ready:
+        candidate = first_usable_baseline_candidate(locate_report, ready_args)
+        if candidate is not None and candidate != ready_args.baseline_row.resolve():
+            return NextAction(
+                "Link Medium AQUA-SLAM baseline row",
+                f"Use the located usable benchmark row for `{ready_args.baseline_row}`.",
+                link_command(candidate, ready_args.baseline_row),
+            )
         return NextAction(
             "Ingest AQUA-SLAM baseline row",
             "Generate a usable Medium AQUA-SLAM row that passes sample and matched-duration gates.",
@@ -266,6 +315,13 @@ def next_action(report: readiness.ReadinessReport, locate_report: locator.Locate
         )
 
     if not report.visual.valid:
+        candidate = first_candidate_path(locate_report, "visual_tum")
+        if candidate is not None and candidate != ready_args.visual.resolve():
+            return NextAction(
+                "Link Medium visual TUM",
+                f"Use the located visual frontend trajectory for `{ready_args.visual}`.",
+                link_command(candidate, ready_args.visual),
+            )
         return NextAction(
             "Generate Medium visual TUM",
             "Prepare or regenerate the visual frontend trajectory before running the held-out bundle.",
@@ -287,6 +343,38 @@ def build_verify_report(args) -> VerifyReport:
         readiness_report=readiness_report,
         locate_report=locate_report,
         next_action=next_action(readiness_report, locate_report, args),
+    )
+
+
+def apply_located_links(args) -> VerifyReport:
+    applied: list[tuple[Path, Path]] = []
+    for _ in range(args.max_link_passes):
+        verify = build_verify_report(args)
+        command = verify.next_action.command
+        if len(command) != 4 or command[:2] != ("ln", "-sfn"):
+            return VerifyReport(
+                verify.readiness_report,
+                verify.locate_report,
+                verify.next_action,
+                tuple(applied),
+            )
+        candidate = Path(command[2])
+        target = Path(command[3])
+        if safe_symlink(candidate, target):
+            applied.append((candidate.resolve(), target))
+            continue
+        return VerifyReport(
+            verify.readiness_report,
+            verify.locate_report,
+            verify.next_action,
+            tuple(applied),
+        )
+    verify = build_verify_report(args)
+    return VerifyReport(
+        verify.readiness_report,
+        verify.locate_report,
+        verify.next_action,
+        tuple(applied),
     )
 
 
@@ -357,6 +445,11 @@ def format_report(verify: VerifyReport, args) -> str:
         *command_block(verify.next_action.command),
         "",
     ])
+    if verify.applied_links:
+        lines.extend(["## Applied Links", "", "| Source | Target |", "|--------|--------|"])
+        for source, target in verify.applied_links:
+            lines.append(f"| `{source}` | `{target}` |")
+        lines.append("")
     if verify.ready:
         lines.extend([
             "## Validation Command",
@@ -396,6 +489,12 @@ def parse_args(argv):
     parser.add_argument("--validation-out-dir", type=Path)
     parser.add_argument("--locator-root", action="append", type=Path, default=[])
     parser.add_argument("--locator-max-depth", type=int, default=7)
+    parser.add_argument(
+        "--apply-located-links",
+        action="store_true",
+        help="Safely symlink located candidates into the verifier's default paths.",
+    )
+    parser.add_argument("--max-link-passes", type=int, default=8)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)
@@ -409,7 +508,11 @@ def parse_args(argv):
 def main(argv=None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     try:
-        verify = build_verify_report(args)
+        verify = (
+            apply_located_links(args)
+            if args.apply_located_links
+            else build_verify_report(args)
+        )
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
