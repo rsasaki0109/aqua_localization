@@ -151,6 +151,26 @@ def test_smoke_sized_baseline_row_does_not_enable_gap_readiness(tmp_path):
     assert "3 samples below minimum 10" in text
 
 
+def test_short_matched_duration_baseline_row_does_not_enable_gap_readiness(tmp_path):
+    module = load_module()
+    row = tmp_path / "Medium_aqua_slam_benchmark_row.md"
+    write_benchmark_row(row, samples=20, matched_s=2.0)
+
+    args = module.parse_args([
+        "--baseline-row",
+        str(row),
+        "--benchmark-markdown",
+        str(tmp_path / "missing_docs.md"),
+    ])
+    report = module.build_report(args)
+    text = module.format_report(report)
+
+    assert report.baseline_row_ready is False
+    assert len(report.benchmark_sources[-1].matching_rows) == 0
+    assert len(report.benchmark_sources[-1].rejected_rows) == 1
+    assert "2.00 matched s below minimum 10.00" in text
+
+
 def test_next_ingest_command_uses_tum_when_csv_is_missing(tmp_path):
     module = load_module()
     reference = tmp_path / "ref.tum"

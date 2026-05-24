@@ -21,6 +21,7 @@ DEFAULT_TARGET_SYSTEM = "aqua_dvl_prior_visual"
 DEFAULT_ALIGNMENT = "SE(3)"
 DEFAULT_PROFILE = Path("/tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml")
 DEFAULT_MIN_BASELINE_SAMPLES = 10
+DEFAULT_MIN_BASELINE_MATCHED_S = 10.0
 
 
 @dataclass(frozen=True)
@@ -164,6 +165,10 @@ def min_baseline_samples(args) -> int:
     return getattr(args, "min_baseline_samples", DEFAULT_MIN_BASELINE_SAMPLES)
 
 
+def min_baseline_matched_s(args) -> float:
+    return getattr(args, "min_baseline_matched_s", DEFAULT_MIN_BASELINE_MATCHED_S)
+
+
 def row_matches_baseline_case(args, row: benchmark_gap_report.BenchmarkRow) -> bool:
     return (
         row.dataset == args.dataset
@@ -175,10 +180,15 @@ def row_matches_baseline_case(args, row: benchmark_gap_report.BenchmarkRow) -> b
 
 def baseline_row_rejection_reason(args, row: benchmark_gap_report.BenchmarkRow) -> str:
     min_samples = min_baseline_samples(args)
+    min_matched_s = min_baseline_matched_s(args)
     if row.samples is None:
         return f"missing sample count; require >= {min_samples}"
     if row.samples < min_samples:
         return f"{row.samples} samples below minimum {min_samples}"
+    if row.matched_seconds is None:
+        return f"missing matched duration; require >= {min_matched_s:.2f} s"
+    if row.matched_seconds < min_matched_s:
+        return f"{row.matched_seconds:.2f} matched s below minimum {min_matched_s:.2f}"
     return ""
 
 
@@ -218,6 +228,8 @@ def summarize_markdown_source(path: Path, args) -> MarkdownSourceSummary:
 def build_report(args) -> ReadinessReport:
     if min_baseline_samples(args) < 1:
         raise ValueError("--min-baseline-samples must be positive")
+    if min_baseline_matched_s(args) <= 0.0:
+        raise ValueError("--min-baseline-matched-s must be positive")
     resolve_defaults(args)
     markdown_paths = [*args.benchmark_markdown, args.baseline_row]
     deduped_markdown_paths = list(dict.fromkeys(markdown_paths))
@@ -297,7 +309,7 @@ def format_report(report: ReadinessReport) -> str:
         (
             f"| Baseline row for gap checks | {pass_fail(report.baseline_row_ready)} | "
             f"{sum(len(source.matching_rows) for source in report.benchmark_sources)} usable row(s), "
-            f"min samples={min_baseline_samples(args)} |"
+            f"min samples={min_baseline_samples(args)}, min matched s={min_baseline_matched_s(args):.2f} |"
         ),
         (
             f"| Held-out validation bundle | {pass_fail(report.validation_ready)} | "
@@ -414,6 +426,7 @@ def parse_args(argv):
     parser.add_argument("--source-topic", default=ingest_tank_aqua_slam_baseline.DEFAULT_SOURCE)
     parser.add_argument("--config", default="underwater_orbslam3_blue_gx5_medium.yaml")
     parser.add_argument("--min-baseline-samples", type=int, default=DEFAULT_MIN_BASELINE_SAMPLES)
+    parser.add_argument("--min-baseline-matched-s", type=float, default=DEFAULT_MIN_BASELINE_MATCHED_S)
     parser.add_argument("--out", type=Path, help="Optional Markdown report path.")
     return parser.parse_args(argv)
 

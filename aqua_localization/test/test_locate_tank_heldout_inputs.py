@@ -60,6 +60,25 @@ def test_locate_inputs_finds_reference_bag_and_baseline(tmp_path):
     assert "smoke-sized candidate" in report.by_role("baseline_row")[0].detail
 
 
+def test_locate_inputs_marks_short_matched_duration_baseline(tmp_path):
+    module = load_module()
+    root = tmp_path / "data"
+    root.mkdir()
+    (root / "Medium_aqua_slam_benchmark_row.md").write_text(
+        "\n".join([
+            "| Dataset | Sequence | System | Alignment | Samples | Matched s | Mean m | Median m | RMSE m | Max m | Note |",
+            "|---------|----------|--------|-----------|--------:|----------:|-------:|---------:|-------:|------:|------|",
+            "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | 20 | 2.00 | 0.0000 | 0.0000 | 0.0200 | 0.0200 | short |",
+        ])
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = module.locate_inputs("Medium", (root,), max_depth=2)
+
+    assert "short matched duration" in report.by_role("baseline_row")[0].detail
+
+
 def test_format_report_includes_blockers_and_link_commands(tmp_path):
     module = load_module()
     root = tmp_path / "data"

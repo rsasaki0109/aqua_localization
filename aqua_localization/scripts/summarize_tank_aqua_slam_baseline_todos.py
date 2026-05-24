@@ -110,7 +110,8 @@ def build_todos(report: readiness.ReadinessReport) -> list[TodoItem]:
                 done=True,
                 detail=(
                     f"{rows} usable {args.baseline_system} row(s) for {args.sequence} {args.alignment} "
-                    f"with >= {readiness.min_baseline_samples(args)} samples"
+                    f"with >= {readiness.min_baseline_samples(args)} samples and "
+                    f">= {readiness.min_baseline_matched_s(args):.2f} matched s"
                 ),
             )
         )
@@ -122,7 +123,8 @@ def build_todos(report: readiness.ReadinessReport) -> list[TodoItem]:
                 done=False,
                 detail=(
                     f"{rejected} matching row(s) rejected; require >= "
-                    f"{readiness.min_baseline_samples(args)} samples for gap checks."
+                    f"{readiness.min_baseline_samples(args)} samples and >= "
+                    f"{readiness.min_baseline_matched_s(args):.2f} matched s for gap checks."
                 ),
                 command=ingest_command(report) if report.ingest_ready else (),
                 blocked=not report.ingest_ready,

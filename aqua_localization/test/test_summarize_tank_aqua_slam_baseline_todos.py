@@ -174,6 +174,21 @@ def test_smoke_sized_baseline_row_blocks_gap_check(tmp_path):
     assert "Ready to run validation bundle: **FAIL**" in text
 
 
+def test_short_matched_duration_baseline_row_blocks_gap_check(tmp_path):
+    module = load_module()
+    write_tum(tmp_path / "ref.tum")
+    write_ros1_odom_csv(tmp_path / "aqua.csv")
+    write_benchmark_row(tmp_path / "row.md", samples=20, matched_s=2.0)
+
+    report = module.readiness.build_report(parse_args(module, tmp_path))
+    todos = module.build_todos(report)
+    text = module.format_todos(report, todos)
+
+    assert not report.baseline_row_ready
+    assert module.next_action(todos).title == "AQUA-SLAM baseline row has enough samples"
+    assert ">= 10.00 matched s" in text
+
+
 def test_cli_writes_todo_file_and_returns_nonzero_when_blocked(tmp_path):
     out = tmp_path / "todos.md"
 

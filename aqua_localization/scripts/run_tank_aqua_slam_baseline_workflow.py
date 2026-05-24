@@ -432,6 +432,7 @@ def parse_args(argv):
     parser.add_argument("--source-topic", default=baseline_ingest.DEFAULT_SOURCE)
     parser.add_argument("--config", default="underwater_orbslam3_blue_gx5_medium.yaml")
     parser.add_argument("--min-baseline-samples", type=int, default=readiness.DEFAULT_MIN_BASELINE_SAMPLES)
+    parser.add_argument("--min-baseline-matched-s", type=float, default=readiness.DEFAULT_MIN_BASELINE_MATCHED_S)
     parser.add_argument("--out-dir", type=Path)
     parser.add_argument("--readiness-out", type=Path)
     parser.add_argument("--todos-out", type=Path)
