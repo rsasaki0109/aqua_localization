@@ -1040,6 +1040,7 @@ same APE implementation.
 | Tank Dataset | short_test | AQUA-SLAM | SE(3) | 234 | 11.65 | 0.0173 | 0.0165 | 0.0194 | 0.0579 | AQUA-SLAM Docker, short_test, /AQUA_SLAM/orb_odom |
 | Tank Dataset | short_test | aqua_localization | SE(3) | 5399 | 14.94 | 0.3796 | 0.4014 | 0.4291 | 0.7652 | ROS 2 Humble, IMU+pressure+DVL, same AprilTag GT export |
 | Tank Dataset | short_test | aqua_visual_frontend | SE(3) | 200 | 11.25 | 0.0815 | 0.0792 | 0.0947 | 0.2416 | stereo ORB+PnP, same-sequence scale fit from calibrate_visual_scale.py |
+| Tank Dataset | short_test | aqua_dvl_prior_visual | SE(3) | 218 | 11.10 | 0.0141 | 0.0132 | 0.0154 | 0.0342 | profile=tank_short_to_medium_confidence_sweep_rank1; prior=169/217; status=PASS; diagnostic override |
 | Tank Dataset | short_test_visual_direct_scaled_check | aqua_visual_frontend_direct | SE(3) | 300 | 14.95 | 0.1710 | 0.1768 | 0.1907 | 0.3282 | direct rosbag2 sqlite image replay, 300/300 visual frames, scale 0.151788798 |
 | Tank Dataset | short_test | aqua_localization+visual | SE(3) | 5399 | 14.94 | 0.3384 | 0.2928 | 0.3726 | 0.7497 | visual position update, same-sequence scale fit |
 | Tank Dataset | short_test | aqua_localization+visual | SE(3) | 5424 | 14.95 | 0.2579 | 0.2220 | 0.3228 | 1.2305 | base-frame visual odometry, same-sequence scale/extrinsic diagnostics, replay rate 0.25, visual coverage 300/300 |
