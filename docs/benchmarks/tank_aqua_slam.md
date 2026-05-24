@@ -629,6 +629,21 @@ the same manifest command generates the Medium visual TUM and then runs the
 validation bundle. If a ROS 2 bag already exists, pass `--ros2-bag` instead of
 `--ros1-bag`.
 
+To re-scan local disks after downloading or copying held-out data, run:
+
+```bash
+ros2 run aqua_localization locate_tank_heldout_inputs.py \
+  --sequence Medium \
+  --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml \
+  --out /tmp/aqua_tank_medium_heldout_locator.md
+```
+
+The locator searches `/tmp`, the repo datasets directory, the workspace, the
+`/media/autoware/aa` data mount, and `~/Downloads`. It reports candidate
+reference TUMs, ROS 1/ROS 2 bags, visual TUMs, AQUA-SLAM CSV/TUM exports, and
+benchmark rows, including smoke-sized rows that should not be used as paper
+baselines.
+
 Before using `--max-gap-x 1.0` on `Medium`, record the matching AQUA-SLAM
 baseline row for the same sequence. Run AQUA-SLAM in its ROS 1 Docker workflow
 while replaying the Tank bag, export `/AQUA_SLAM/orb_odom`, then ingest that
