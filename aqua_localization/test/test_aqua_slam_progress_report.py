@@ -31,6 +31,7 @@ def sample_markdown() -> str:
 | Tank Dataset | short_test | aqua_localization | SE(3) | 5399 | 14.94 | 0.3796 | 0.4014 | 0.4291 | 0.7652 | DVL anchor |
 | Tank Dataset | short_test | aqua_visual_frontend | SE(3) | 200 | 11.25 | 0.0815 | 0.0792 | 0.0947 | 0.2416 | visual |
 | Tank Dataset | short_test | aqua_localization+visual | SE(3) | 5400 | 14.95 | 0.1793 | 0.1394 | 0.2175 | 0.8564 | fused |
+| Tank Dataset | short_test | aqua_dvl_prior_visual | SE(3) | 218 | 11.10 | 0.0141 | 0.0132 | 0.0154 | 0.0342 | diagnostic override |
 | Tank Dataset | Medium | aqua_visual_frontend | TBD | TBD | TBD | TBD | TBD | TBD | TBD | pending |
 """
 
@@ -47,12 +48,14 @@ def test_collect_progress_rows_reports_all_aqua_targets():
     )
 
     assert [row.target.system for row in progress] == [
+        "aqua_dvl_prior_visual",
         "aqua_visual_frontend",
         "aqua_localization+visual",
         "aqua_localization",
     ]
-    assert progress[0].gap_x == 0.0947 / 0.0194
-    assert progress[0].anchor_improvement_percent > 77.0
+    assert progress[0].gap_x == 0.0154 / 0.0194
+    assert progress[0].diagnostic is True
+    assert module.best_claimable_progress(progress).target.system == "aqua_visual_frontend"
 
 
 def test_format_report_includes_best_readout_and_anchor_improvement(tmp_path):
@@ -74,8 +77,11 @@ def test_format_report_includes_best_readout_and_anchor_improvement(tmp_path):
     )
 
     assert "# AQUA-SLAM Progress Report" in report
-    assert "| Tank Dataset | short_test | SE(3) | aqua_visual_frontend | 0.0947 | 4.88x" in report
-    assert "Best current row: `aqua_visual_frontend`" in report
+    assert "| Tank Dataset | short_test | SE(3) | aqua_dvl_prior_visual | 0.0154 | 0.79x" in report
+    assert "| diagnostic | diagnostic override |" in report
+    assert "Best current row: `aqua_dvl_prior_visual`" in report
+    assert "Best current row is diagnostic" in report
+    assert "Best non-diagnostic row: `aqua_visual_frontend`" in report
     assert "Improvement versus `aqua_localization` anchor" in report
 
 

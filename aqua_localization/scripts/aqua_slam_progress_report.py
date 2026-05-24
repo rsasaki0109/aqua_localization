@@ -42,10 +42,28 @@ class ProgressRow:
             return None
         return (1.0 - self.target.rmse_m / self.anchor.rmse_m) * 100.0
 
+    @property
+    def diagnostic(self) -> bool:
+        return diagnostic_note(self.target.note)
+
 
 def matching_target(row: gap_report.BenchmarkRow, prefixes: list[str]) -> bool:
     system = row.system.lower()
     return any(system.startswith(prefix.lower()) for prefix in prefixes)
+
+
+def diagnostic_note(note: str) -> bool:
+    text = note.lower()
+    return any(
+        marker in text
+        for marker in (
+            "diagnostic",
+            "same-sequence",
+            "same sequence",
+            "override",
+            "validate on held-out",
+        )
+    )
 
 
 def best_baselines(
@@ -123,6 +141,13 @@ def best_progress(progress: list[ProgressRow]) -> ProgressRow | None:
     return min(progress, key=lambda row: row.gap_x)
 
 
+def best_claimable_progress(progress: list[ProgressRow]) -> ProgressRow | None:
+    claimable = [row for row in progress if not row.diagnostic]
+    if not claimable:
+        return None
+    return best_progress(claimable)
+
+
 def format_report(
     progress: list[ProgressRow],
     *,
@@ -152,8 +177,8 @@ def format_report(
 
     lines.extend(
         [
-            "| Dataset | Sequence | Alignment | System | RMSE m | Gap to AQUA-SLAM | Improvement to tie | Improvement vs anchor | Samples | Note |",
-            "|---------|----------|-----------|--------|-------:|-----------------:|-------------------:|----------------------:|--------:|------|",
+            "| Dataset | Sequence | Alignment | System | RMSE m | Gap to AQUA-SLAM | Improvement to tie | Improvement vs anchor | Samples | Evidence status | Note |",
+            "|---------|----------|-----------|--------|-------:|-----------------:|-------------------:|----------------------:|--------:|--------------|------|",
         ]
     )
     for row in progress:
@@ -170,6 +195,7 @@ def format_report(
                     format_percent(row.improvement_to_tie_percent),
                     format_percent(row.anchor_improvement_percent),
                     str(row.target.samples) if row.target.samples is not None else "TBD",
+                    "diagnostic" if row.diagnostic else "non-diagnostic",
                     format_cell(row.target.note),
                 ]
             )
@@ -177,6 +203,7 @@ def format_report(
         )
 
     best = best_progress(progress)
+    best_claimable = best_claimable_progress(progress)
     assert best is not None
     lines.extend(
         [
@@ -197,6 +224,16 @@ def format_report(
             ),
         ]
     )
+    if best.diagnostic:
+        lines.append("- Best current row is diagnostic; do not use it as a superiority claim.")
+    if best_claimable is None:
+        lines.append("- No non-diagnostic target row is available yet.")
+    else:
+        lines.append(
+            f"- Best non-diagnostic row: `{best_claimable.target.system}` on "
+            f"`{best_claimable.target.sequence}` at {format_float(best_claimable.target.rmse_m)} m RMSE "
+            f"({format_float(best_claimable.gap_x, precision=2)}x `{baseline_system}`)."
+        )
     if best.anchor_improvement_percent is not None:
         lines.append(
             f"- Improvement versus `{anchor_system}` anchor: "
