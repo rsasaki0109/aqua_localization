@@ -187,6 +187,8 @@ def make_bundle_argv(args, paths: WorkflowPaths) -> list[str]:
         argv.extend(["--max-gap-x", str(args.max_gap_x)])
     if args.max_improvement_to_tie_percent is not None:
         argv.extend(["--max-improvement-to-tie-percent", str(args.max_improvement_to_tie_percent)])
+    argv.extend(["--min-target-samples", str(args.min_target_samples)])
+    argv.extend(["--min-target-matched-s", str(args.min_target_matched_s)])
     if args.residual_top_k is not None:
         argv.extend(["--residual-top-k", str(args.residual_top_k)])
     if args.validation_note:
@@ -458,6 +460,8 @@ def parse_args(argv):
     parser.add_argument("--fail-on-gate-failure", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--max-gap-x", type=float, default=1.0)
     parser.add_argument("--max-improvement-to-tie-percent", type=float)
+    parser.add_argument("--min-target-samples", type=int, default=validation_bundle.DEFAULT_MIN_TARGET_SAMPLES)
+    parser.add_argument("--min-target-matched-s", type=float, default=validation_bundle.DEFAULT_MIN_TARGET_MATCHED_S)
     parser.add_argument("--residual-top-k", type=int, default=10)
     parser.add_argument("--validation-note", default="")
     return parser.parse_args(argv)

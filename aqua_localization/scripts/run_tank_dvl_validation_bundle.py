@@ -13,6 +13,10 @@ import benchmark_gap_report
 import run_tank_dvl_prior_validation as validation
 
 
+DEFAULT_MIN_TARGET_SAMPLES = 10
+DEFAULT_MIN_TARGET_MATCHED_S = 10.0
+
+
 @dataclass(frozen=True)
 class BundlePaths:
     validation_summary: Path
@@ -155,6 +159,43 @@ def run_gap_report(args, paths: BundlePaths) -> tuple[str, list[str]]:
     return report, failures
 
 
+def target_row_matches(args, row: benchmark_gap_report.BenchmarkRow) -> bool:
+    return (
+        row.dataset == args.dataset
+        and row.sequence == args.sequence
+        and benchmark_gap_report.matching_system(row, args.target_system)
+    )
+
+
+def target_row_coverage_failures(args, paths: BundlePaths) -> list[str]:
+    rows = benchmark_gap_report.parse_markdown_benchmark_rows(
+        paths.benchmark_row.read_text(encoding="utf-8")
+    )
+    target_rows = [row for row in rows if target_row_matches(args, row)]
+    if not target_rows:
+        return [f"no target benchmark row found for {args.target_system} on {args.sequence}"]
+
+    failures = []
+    for row in target_rows:
+        label = f"{row.system} {row.sequence}"
+        if row.samples is None:
+            failures.append(f"{label}: missing sample count; require >= {args.min_target_samples}")
+        elif row.samples < args.min_target_samples:
+            failures.append(
+                f"{label}: {row.samples} samples below minimum {args.min_target_samples}"
+            )
+        if row.matched_seconds is None:
+            failures.append(
+                f"{label}: missing matched duration; require >= {args.min_target_matched_s:.2f} s"
+            )
+        elif row.matched_seconds < args.min_target_matched_s:
+            failures.append(
+                f"{label}: {row.matched_seconds:.2f} matched s below minimum "
+                f"{args.min_target_matched_s:.2f}"
+            )
+    return failures
+
+
 def run_residual_report(args, paths: BundlePaths) -> str:
     if args.skip_residual_analysis:
         return "Residual analysis skipped.\n"
@@ -207,10 +248,14 @@ def format_bundle_summary(args, paths: BundlePaths, result: BundleResult) -> str
 def run_bundle(args) -> tuple[BundlePaths, BundleResult, str]:
     paths = bundle_paths(args.out_dir)
     _validation_args, _app_result, validation_failures, validation_summary = run_validation(args, paths)
+    coverage_failures = target_row_coverage_failures(args, paths)
     gap_summary, gap_failures = run_gap_report(args, paths)
     residual_summary = run_residual_report(args, paths)
     result = BundleResult(
-        validation_failures=validation_failures if args.fail_on_gate_failure else [],
+        validation_failures=[
+            *(validation_failures if args.fail_on_gate_failure else []),
+            *coverage_failures,
+        ],
         gap_failures=gap_failures,
         validation_summary=validation_summary,
         gap_summary=gap_summary,
@@ -246,6 +291,8 @@ def parse_args(argv):
     parser.add_argument("--fail-on-gate-failure", action="store_true")
     parser.add_argument("--max-gap-x", type=float)
     parser.add_argument("--max-improvement-to-tie-percent", type=float)
+    parser.add_argument("--min-target-samples", type=int, default=DEFAULT_MIN_TARGET_SAMPLES)
+    parser.add_argument("--min-target-matched-s", type=float, default=DEFAULT_MIN_TARGET_MATCHED_S)
     parser.add_argument("--residual-top-k", type=int, default=10)
     parser.add_argument("--note", default="")
     args = parser.parse_args(argv)
@@ -263,6 +310,10 @@ def validate_args(args) -> None:
         raise ValueError("--max-gap-x must be positive")
     if args.max_improvement_to_tie_percent is not None and args.max_improvement_to_tie_percent < 0.0:
         raise ValueError("--max-improvement-to-tie-percent must be non-negative")
+    if args.min_target_samples < 1:
+        raise ValueError("--min-target-samples must be positive")
+    if args.min_target_matched_s <= 0.0:
+        raise ValueError("--min-target-matched-s must be positive")
     if args.residual_top_k < 0:
         raise ValueError("--residual-top-k must be non-negative")
     missing = missing_inputs(args)

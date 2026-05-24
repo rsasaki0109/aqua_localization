@@ -596,6 +596,8 @@ ros2 run aqua_localization run_tank_dvl_validation_bundle.py \
   --benchmark-markdown docs/benchmarks/tank_aqua_slam.md \
   --max-corrected-rmse-m 0.0194 \
   --max-gap-x 1.0 \
+  --min-target-samples 10 \
+  --min-target-matched-s 10.0 \
   --fail-on-gate-failure \
   --out-dir /tmp/aqua_tank_dvl_prior_medium_validation_bundle
 ```
@@ -604,6 +606,9 @@ Do not pass `--allow-same-sequence` for this held-out run. If the bundle exits
 successfully with `--max-gap-x 1.0`, the generated benchmark row is the first
 candidate evidence that this DVL-prior visual trajectory beats the checked-in
 AQUA-SLAM baseline under the same table parser.
+The target row also has to cover at least `10` samples and `10.0` matched
+seconds; otherwise the bundle fails before a short-window win can be treated as
+benchmark evidence.
 
 If the held-out visual TUM has not been generated yet, use the preparation
 wrapper. It can either reuse an existing ROS 2 bag or convert a raw Tank ROS 1
@@ -709,6 +714,8 @@ required inputs are still missing, and `FAIL` when an executed stage fails. By
 default, matching AQUA-SLAM rows must contain at least `10` samples and `10.0`
 matched seconds before they are accepted for gap checks; shorter smoke rows are
 reported but do not unlock validation.
+The generated target row is held to the same default coverage floor inside the
+validation bundle.
 After copying a downloaded Tank sequence into the workstation, the same runner
 can locate workflow-ready inputs directly and write the locator report beside
 the readiness artifacts:
@@ -758,6 +765,8 @@ ros2 run aqua_localization run_tank_dvl_validation_bundle.py \
   --benchmark-markdown docs/benchmarks/tank_aqua_slam.md \
   --benchmark-markdown /tmp/aqua_slam_medium_baseline/Medium_aqua_slam_benchmark_row.md \
   --max-gap-x 1.0 \
+  --min-target-samples 10 \
+  --min-target-matched-s 10.0 \
   --fail-on-gate-failure \
   --out-dir /tmp/aqua_tank_dvl_prior_medium_validation_bundle
 ```
