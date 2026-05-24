@@ -10,6 +10,7 @@ import sys
 
 import check_tank_aqua_slam_baseline_ready as readiness
 import ingest_tank_aqua_slam_baseline as baseline_ingest
+import locate_tank_heldout_inputs as input_locator
 import run_tank_dvl_validation_bundle as validation_bundle
 import summarize_tank_aqua_slam_baseline_todos as todo_summary
 
@@ -26,6 +27,7 @@ class WorkflowPaths:
     readiness: Path
     todos: Path
     summary: Path
+    locator: Path
     validation_out_dir: Path
 
 
@@ -61,6 +63,7 @@ def workflow_paths(args) -> WorkflowPaths:
         readiness=args.readiness_out or out_dir / "readiness.md",
         todos=args.todos_out or out_dir / "todos.md",
         summary=args.summary_out or out_dir / "workflow_summary.md",
+        locator=args.locator_out or out_dir / "heldout_locator.md",
         validation_out_dir=args.validation_out_dir
         or Path(f"/tmp/aqua_tank_dvl_prior_{readiness.sequence_slug(args.sequence)}_validation_bundle"),
     )
@@ -210,6 +213,82 @@ def run_validation_if_ready(args, paths: WorkflowPaths, report: readiness.Readin
     return StepResult("Validation bundle", status, detail), summary
 
 
+def locator_roots(args) -> tuple[Path, ...]:
+    if args.locator_root:
+        return tuple(args.locator_root)
+    repo_root = Path(__file__).resolve().parents[2]
+    return input_locator.default_roots(repo_root)
+
+
+def first_non_smoke_candidate(report: input_locator.LocateReport, role: str) -> input_locator.Candidate | None:
+    for candidate in report.by_role(role):
+        if "smoke-sized candidate" not in candidate.detail:
+            return candidate
+    return None
+
+
+def add_benchmark_source(args, path: Path) -> bool:
+    if not args.benchmark_markdown:
+        repo_markdown = readiness.repo_benchmark_markdown()
+        if repo_markdown.exists():
+            args.benchmark_markdown.append(repo_markdown)
+    if path in args.benchmark_markdown:
+        return False
+    args.benchmark_markdown.append(path)
+    return True
+
+
+def apply_located_inputs(args, report: input_locator.LocateReport) -> tuple[str, ...]:
+    filled = []
+    path_roles = (
+        ("reference", "reference_tum", "reference"),
+        ("bag", "ros2_bag", "ROS 2 bag"),
+        ("visual", "visual_tum", "visual TUM"),
+        ("csv", "aqua_slam_csv", "AQUA-SLAM CSV"),
+        ("tum", "aqua_slam_tum", "AQUA-SLAM TUM"),
+    )
+    for attr, role, label in path_roles:
+        if getattr(args, attr) is not None:
+            continue
+        candidate_path = input_locator.first_path(report, role)
+        if candidate_path is None:
+            continue
+        setattr(args, attr, candidate_path)
+        filled.append(f"{label}={candidate_path}")
+
+    baseline_candidate = first_non_smoke_candidate(report, "baseline_row")
+    if baseline_candidate is not None and add_benchmark_source(args, baseline_candidate.path):
+        filled.append(f"baseline row source={baseline_candidate.path}")
+    return tuple(filled)
+
+
+def run_input_locator(args, paths: WorkflowPaths) -> StepResult:
+    roots = locator_roots(args)
+    report = input_locator.locate_inputs(args.sequence, roots, args.locator_max_depth)
+    locator_args = argparse.Namespace(
+        sequence=args.sequence,
+        profile=args.profile,
+        benchmark_markdown=args.baseline_row
+        or readiness.baseline_paths(args).benchmark_row,
+        out=paths.locator,
+    )
+    write_text(paths.locator, input_locator.format_report(locator_args, report))
+    filled = apply_located_inputs(args, report)
+    if filled:
+        return StepResult(
+            "Input locator",
+            STATUS_PASS,
+            f"filled {len(filled)} input(s); report={paths.locator}",
+        )
+    if report.candidates:
+        return StepResult(
+            "Input locator",
+            STATUS_BLOCKED,
+            f"found {len(report.candidates)} candidate(s) but no workflow-ready inputs; report={paths.locator}",
+        )
+    return StepResult("Input locator", STATUS_BLOCKED, f"no candidates found; report={paths.locator}")
+
+
 def workflow_status(steps: list[StepResult]) -> str:
     if any(step.status == STATUS_FAIL for step in steps):
         return STATUS_FAIL
@@ -262,6 +341,9 @@ def format_workflow_summary(result: WorkflowResult) -> str:
         "## Next Action",
         "",
     ]
+    if any(step.name == "Input locator" for step in result.steps):
+        insert_at = lines.index(f"- Validation output dir: `{result.paths.validation_out_dir}`")
+        lines.insert(insert_at, f"- Input locator report: `{result.paths.locator}`")
     if result.status == STATUS_PASS:
         lines.append("Workflow completed and validation passed.")
     elif action is None:
@@ -284,9 +366,13 @@ def refresh_readiness_artifacts(args, paths: WorkflowPaths) -> tuple[readiness.R
 
 def run_workflow(args) -> WorkflowResult:
     # Fill readiness defaults before deriving workflow output paths.
-    initial_report = readiness.build_report(args)
     paths = workflow_paths(args)
-    steps: list[StepResult] = [
+    steps: list[StepResult] = []
+    if args.auto_locate_inputs:
+        steps.append(run_input_locator(args, paths))
+
+    initial_report = readiness.build_report(args)
+    steps.append(
         StepResult(
             "Initial readiness",
             STATUS_PASS if initial_report.ingest_ready or initial_report.baseline_row_ready else STATUS_BLOCKED,
@@ -296,7 +382,7 @@ def run_workflow(args) -> WorkflowResult:
                 else "waiting for reference and AQUA-SLAM trajectory source"
             ),
         )
-    ]
+    )
 
     steps.append(run_ingest_if_ready(args, initial_report))
     final_report, todos = refresh_readiness_artifacts(args, paths)
@@ -346,7 +432,11 @@ def parse_args(argv):
     parser.add_argument("--readiness-out", type=Path)
     parser.add_argument("--todos-out", type=Path)
     parser.add_argument("--summary-out", type=Path)
+    parser.add_argument("--locator-out", type=Path)
     parser.add_argument("--validation-out-dir", type=Path)
+    parser.add_argument("--auto-locate-inputs", action="store_true")
+    parser.add_argument("--locator-root", action="append", type=Path, default=[])
+    parser.add_argument("--locator-max-depth", type=int, default=7)
     parser.add_argument("--baseline-runtime", default=baseline_ingest.DEFAULT_RUNTIME)
     parser.add_argument("--baseline-commit", default="")
     parser.add_argument("--baseline-note", default="")

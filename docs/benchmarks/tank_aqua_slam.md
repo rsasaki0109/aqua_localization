@@ -706,6 +706,24 @@ ros2 run aqua_localization run_tank_aqua_slam_baseline_workflow.py \
 The workflow writes `readiness.md`, `todos.md`, and `workflow_summary.md`.
 Its final status is `PASS` when validation and gap gates pass, `BLOCKED` when
 required inputs are still missing, and `FAIL` when an executed stage fails.
+After copying a downloaded Tank sequence into the workstation, the same runner
+can locate workflow-ready inputs directly and write the locator report beside
+the readiness artifacts:
+
+```bash
+ros2 run aqua_localization run_tank_aqua_slam_baseline_workflow.py \
+  --sequence Medium \
+  --baseline-dir /tmp/aqua_slam_medium_baseline \
+  --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml \
+  --out-dir /tmp/aqua_slam_medium_baseline \
+  --validation-out-dir /tmp/aqua_tank_dvl_prior_medium_validation_bundle \
+  --auto-locate-inputs
+```
+
+The auto-locator fills missing reference, ROS 2 bag, visual TUM, and AQUA-SLAM
+CSV/TUM paths from local candidates. It can also add a non-smoke AQUA-SLAM
+benchmark row as an extra gap source, but rows marked as smoke-sized are not
+adopted for validation gates.
 
 ```bash
 # In the AQUA-SLAM ROS 1 Docker container while the Medium bag is playing.
