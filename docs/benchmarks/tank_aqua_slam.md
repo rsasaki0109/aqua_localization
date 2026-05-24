@@ -1084,11 +1084,22 @@ ros2 run aqua_localization aqua_slam_progress_report.py \
   --out docs/benchmarks/aqua_slam_progress.md
 ```
 
-The current best row is `aqua_visual_frontend` at `0.0947 m` RMSE, which is
-`4.88x` the AQUA-SLAM `short_test` RMSE and a `77.9%` improvement over the
-IMU+pressure+DVL `aqua_localization` anchor. The fused
-`aqua_localization+visual` row improves that anchor by `49.3%`, but still needs
-a `91.1%` RMSE reduction to tie AQUA-SLAM.
+The progress report labels rows with notes such as `diagnostic override`,
+`same-sequence`, or `validate on held-out` as diagnostic evidence. To include
+the current rank-1 same-sequence DVL-prior row without mixing it into a
+superiority claim, pass the generated row as an additional source:
+
+```bash
+ros2 run aqua_localization aqua_slam_progress_report.py \
+  docs/benchmarks/tank_aqua_slam.md \
+  /tmp/aqua_tank_dvl_rank1_current_bundle/validation/tank_dvl_prior_benchmark_row.md \
+  --out /tmp/aqua_slam_rank1_progress.md
+```
+
+That report shows the rank-1 diagnostic DVL-prior row at `0.0154 m` RMSE,
+`0.79x` the AQUA-SLAM `short_test` RMSE, while explicitly marking it
+`diagnostic`. A publishable win still requires the same gate on held-out
+Medium.
 
 Use [`aqua_slam_error_budget.md`](aqua_slam_error_budget.md) to turn that gap
 into the next development budget:
