@@ -20,6 +20,7 @@ DEFAULT_BASELINE_SYSTEM = "AQUA-SLAM"
 DEFAULT_TARGET_SYSTEM = "aqua_dvl_prior_visual"
 DEFAULT_ALIGNMENT = "SE(3)"
 DEFAULT_PROFILE = Path("/tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml")
+DEFAULT_MIN_BASELINE_SAMPLES = 10
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class MarkdownSourceSummary:
     exists: bool
     valid: bool
     matching_rows: tuple[benchmark_gap_report.BenchmarkRow, ...]
+    rejected_rows: tuple[benchmark_gap_report.BenchmarkRow, ...]
     detail: str
 
 
@@ -158,34 +160,64 @@ def summarize_csv(path: Path, time_unit: str) -> TrajectorySummary:
     return TrajectorySummary(path, True, True, len(rows), duration, "ok")
 
 
+def min_baseline_samples(args) -> int:
+    return getattr(args, "min_baseline_samples", DEFAULT_MIN_BASELINE_SAMPLES)
+
+
+def row_matches_baseline_case(args, row: benchmark_gap_report.BenchmarkRow) -> bool:
+    return (
+        row.dataset == args.dataset
+        and row.sequence == args.sequence
+        and row.alignment == args.alignment
+        and benchmark_gap_report.matching_system(row, args.baseline_system)
+    )
+
+
+def baseline_row_rejection_reason(args, row: benchmark_gap_report.BenchmarkRow) -> str:
+    min_samples = min_baseline_samples(args)
+    if row.samples is None:
+        return f"missing sample count; require >= {min_samples}"
+    if row.samples < min_samples:
+        return f"{row.samples} samples below minimum {min_samples}"
+    return ""
+
+
 def matching_baseline_rows(args, rows) -> tuple[benchmark_gap_report.BenchmarkRow, ...]:
-    matches = []
-    for row in rows:
-        if row.dataset != args.dataset:
-            continue
-        if row.sequence != args.sequence:
-            continue
-        if row.alignment != args.alignment:
-            continue
-        if not benchmark_gap_report.matching_system(row, args.baseline_system):
-            continue
-        matches.append(row)
-    return tuple(matches)
+    return tuple(
+        row for row in rows
+        if row_matches_baseline_case(args, row) and not baseline_row_rejection_reason(args, row)
+    )
+
+
+def rejected_baseline_rows(args, rows) -> tuple[benchmark_gap_report.BenchmarkRow, ...]:
+    return tuple(
+        row for row in rows
+        if row_matches_baseline_case(args, row) and baseline_row_rejection_reason(args, row)
+    )
 
 
 def summarize_markdown_source(path: Path, args) -> MarkdownSourceSummary:
     if not path.exists():
-        return MarkdownSourceSummary(path, False, False, (), "missing")
+        return MarkdownSourceSummary(path, False, False, (), (), "missing")
     try:
         rows = benchmark_gap_report.parse_markdown_benchmark_rows(path.read_text(encoding="utf-8"))
     except Exception as exc:
-        return MarkdownSourceSummary(path, True, False, (), f"invalid Markdown: {exc}")
+        return MarkdownSourceSummary(path, True, False, (), (), f"invalid Markdown: {exc}")
     matches = matching_baseline_rows(args, rows)
-    detail = f"{len(matches)} matching {args.baseline_system} row(s)" if matches else "no matching baseline row"
-    return MarkdownSourceSummary(path, True, True, matches, detail)
+    rejected = rejected_baseline_rows(args, rows)
+    if matches:
+        detail = f"{len(matches)} usable {args.baseline_system} row(s)"
+    elif rejected:
+        reasons = sorted({baseline_row_rejection_reason(args, row) for row in rejected})
+        detail = f"{len(rejected)} matching row(s) rejected: {', '.join(reasons)}"
+    else:
+        detail = "no matching baseline row"
+    return MarkdownSourceSummary(path, True, True, matches, rejected, detail)
 
 
 def build_report(args) -> ReadinessReport:
+    if min_baseline_samples(args) < 1:
+        raise ValueError("--min-baseline-samples must be positive")
     resolve_defaults(args)
     markdown_paths = [*args.benchmark_markdown, args.baseline_row]
     deduped_markdown_paths = list(dict.fromkeys(markdown_paths))
@@ -264,7 +296,8 @@ def format_report(report: ReadinessReport) -> str:
         ),
         (
             f"| Baseline row for gap checks | {pass_fail(report.baseline_row_ready)} | "
-            f"{sum(len(source.matching_rows) for source in report.benchmark_sources)} matching row(s) |"
+            f"{sum(len(source.matching_rows) for source in report.benchmark_sources)} usable row(s), "
+            f"min samples={min_baseline_samples(args)} |"
         ),
         (
             f"| Held-out validation bundle | {pass_fail(report.validation_ready)} | "
@@ -283,13 +316,13 @@ def format_report(report: ReadinessReport) -> str:
         "",
         "## Benchmark Sources",
         "",
-        "| Source | Status | Matching rows | Detail |",
-        "|--------|--------|--------------:|--------|",
+        "| Source | Status | Usable rows | Rejected rows | Detail |",
+        "|--------|--------|------------:|--------------:|--------|",
     ]
     for source in report.benchmark_sources:
         lines.append(
             f"| `{source.path}` | {pass_fail(source.valid and bool(source.matching_rows))} | "
-            f"{len(source.matching_rows)} | {source.detail} |"
+            f"{len(source.matching_rows)} | {len(source.rejected_rows)} | {source.detail} |"
         )
 
     lines.extend(
@@ -380,13 +413,18 @@ def parse_args(argv):
     parser.add_argument("--time-unit", choices=("auto", "seconds", "nanoseconds"), default="auto")
     parser.add_argument("--source-topic", default=ingest_tank_aqua_slam_baseline.DEFAULT_SOURCE)
     parser.add_argument("--config", default="underwater_orbslam3_blue_gx5_medium.yaml")
+    parser.add_argument("--min-baseline-samples", type=int, default=DEFAULT_MIN_BASELINE_SAMPLES)
     parser.add_argument("--out", type=Path, help="Optional Markdown report path.")
     return parser.parse_args(argv)
 
 
 def main(argv=None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
-    report = build_report(args)
+    try:
+        report = build_report(args)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     text = format_report(report)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

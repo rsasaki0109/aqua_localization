@@ -108,7 +108,24 @@ def build_todos(report: readiness.ReadinessReport) -> list[TodoItem]:
             TodoItem(
                 title="AQUA-SLAM baseline row ready",
                 done=True,
-                detail=f"{rows} matching {args.baseline_system} row(s) for {args.sequence} {args.alignment}",
+                detail=(
+                    f"{rows} usable {args.baseline_system} row(s) for {args.sequence} {args.alignment} "
+                    f"with >= {readiness.min_baseline_samples(args)} samples"
+                ),
+            )
+        )
+    elif any(source.rejected_rows for source in report.benchmark_sources):
+        rejected = sum(len(source.rejected_rows) for source in report.benchmark_sources)
+        todos.append(
+            TodoItem(
+                title="AQUA-SLAM baseline row has enough samples",
+                done=False,
+                detail=(
+                    f"{rejected} matching row(s) rejected; require >= "
+                    f"{readiness.min_baseline_samples(args)} samples for gap checks."
+                ),
+                command=ingest_command(report) if report.ingest_ready else (),
+                blocked=not report.ingest_ready,
             )
         )
     elif report.ingest_ready:
@@ -229,7 +246,11 @@ def format_todos(report: readiness.ReadinessReport, todos: list[TodoItem]) -> st
 
 def main(argv=None) -> int:
     args = readiness.parse_args(argv if argv is not None else sys.argv[1:])
-    report = readiness.build_report(args)
+    try:
+        report = readiness.build_report(args)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     text = format_todos(report, build_todos(report))
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

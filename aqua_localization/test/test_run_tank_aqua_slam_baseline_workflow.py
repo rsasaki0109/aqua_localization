@@ -23,34 +23,36 @@ def load_module():
     return module
 
 
-def write_tum(path: Path):
+def write_tum(path: Path, samples: int = 3):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        "\n".join([
-            "0.000000000 0.000000000 0.000000000 0.000000000 0.0 0.0 0.0 1.0",
-            "1.000000000 1.000000000 0.000000000 0.000000000 0.0 0.0 0.0 1.0",
-            "2.000000000 2.000000000 0.000000000 0.000000000 0.0 0.0 0.0 1.0",
-        ])
+        "\n".join(
+            f"{float(i):.9f} {float(i):.9f} 0.000000000 0.000000000 0.0 0.0 0.0 1.0"
+            for i in range(samples)
+        )
         + "\n",
         encoding="utf-8",
     )
 
 
-def write_ros1_odom_csv(path: Path):
+def write_ros1_odom_csv(path: Path, samples: int = 3):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        "\n".join([
-            "%time,field.pose.pose.position.x,field.pose.pose.position.y,field.pose.pose.position.z,field.pose.pose.orientation.x,field.pose.pose.orientation.y,field.pose.pose.orientation.z,field.pose.pose.orientation.w",
-            "0,0.0,0.0,0.0,0.0,0.0,0.0,1.0",
-            "1.0,1.0,0.0,0.0,0.0,0.0,0.0,1.0",
-            "2.0,2.0,0.0,0.0,0.0,0.0,0.0,1.0",
-        ])
+        "\n".join(
+            [
+                "%time,field.pose.pose.position.x,field.pose.pose.position.y,field.pose.pose.position.z,field.pose.pose.orientation.x,field.pose.pose.orientation.y,field.pose.pose.orientation.z,field.pose.pose.orientation.w",
+                *(
+                    f"{float(i):.1f},{float(i):.1f},0.0,0.0,0.0,0.0,0.0,1.0"
+                    for i in range(samples)
+                ),
+            ]
+        )
         + "\n",
         encoding="utf-8",
     )
 
 
-def write_benchmark_row(path: Path, samples: int = 3, matched_s: float = 2.0):
+def write_benchmark_row(path: Path, samples: int = 20, matched_s: float = 19.0):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "\n".join([
@@ -110,15 +112,15 @@ def test_workflow_blocks_and_writes_reports_when_inputs_missing(tmp_path):
 
 def test_workflow_auto_ingests_baseline_row_when_source_ready(tmp_path):
     module = load_module()
-    write_tum(tmp_path / "ref.tum")
-    write_ros1_odom_csv(tmp_path / "aqua.csv")
+    write_tum(tmp_path / "ref.tum", samples=20)
+    write_ros1_odom_csv(tmp_path / "aqua.csv", samples=20)
 
     result = module.run_workflow(base_args(module, tmp_path))
 
     assert result.status == module.STATUS_BLOCKED
     assert (tmp_path / "baseline/Medium_aqua_slam.tum").exists()
     row = (tmp_path / "baseline/Medium_aqua_slam_benchmark_row.md").read_text(encoding="utf-8")
-    assert "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | 3 | 2.00 | 0.0000" in row
+    assert "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | 20 | 19.00 | 0.0000" in row
     assert any(step.name == "Baseline ingest" and step.status == module.STATUS_PASS for step in result.steps)
     todos = (tmp_path / "workflow/todos.md").read_text(encoding="utf-8")
     assert "AQUA-SLAM baseline row ready" in todos
@@ -170,7 +172,7 @@ def test_workflow_auto_locates_ready_inputs(tmp_path):
 def test_workflow_auto_locator_does_not_adopt_smoke_sized_baseline(tmp_path):
     module = load_module()
     data = tmp_path / "downloaded"
-    write_benchmark_row(data / "Medium_aqua_slam_benchmark_row.md")
+    write_benchmark_row(data / "Medium_aqua_slam_benchmark_row.md", samples=3, matched_s=2.0)
 
     args = module.parse_args([
         "--sequence",

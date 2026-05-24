@@ -50,13 +50,16 @@ def write_ros1_odom_csv(path: Path):
     )
 
 
-def write_benchmark_row(path: Path, sequence="Medium"):
+def write_benchmark_row(path: Path, sequence="Medium", samples=20, matched_s=19.0):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "\n".join([
             "| Dataset | Sequence | System | Alignment | Samples | Matched s | Mean m | Median m | RMSE m | Max m | Note |",
             "|---------|----------|--------|-----------|--------:|----------:|-------:|---------:|-------:|------:|------|",
-            f"| Tank Dataset | {sequence} | AQUA-SLAM | SE(3) | 3 | 2.00 | 0.0000 | 0.0000 | 0.0200 | 0.0200 | baseline |",
+            (
+                f"| Tank Dataset | {sequence} | AQUA-SLAM | SE(3) | "
+                f"{samples} | {matched_s:.2f} | 0.0000 | 0.0000 | 0.0200 | 0.0200 | baseline |"
+            ),
         ])
         + "\n",
         encoding="utf-8",
@@ -126,6 +129,26 @@ def test_baseline_row_source_enables_gap_readiness(tmp_path):
 
     assert report.baseline_row_ready is True
     assert report.benchmark_sources[-1].matching_rows[0].sequence == "Medium"
+
+
+def test_smoke_sized_baseline_row_does_not_enable_gap_readiness(tmp_path):
+    module = load_module()
+    row = tmp_path / "Medium_aqua_slam_benchmark_row.md"
+    write_benchmark_row(row, samples=3, matched_s=2.0)
+
+    args = module.parse_args([
+        "--baseline-row",
+        str(row),
+        "--benchmark-markdown",
+        str(tmp_path / "missing_docs.md"),
+    ])
+    report = module.build_report(args)
+    text = module.format_report(report)
+
+    assert report.baseline_row_ready is False
+    assert len(report.benchmark_sources[-1].matching_rows) == 0
+    assert len(report.benchmark_sources[-1].rejected_rows) == 1
+    assert "3 samples below minimum 10" in text
 
 
 def test_next_ingest_command_uses_tum_when_csv_is_missing(tmp_path):

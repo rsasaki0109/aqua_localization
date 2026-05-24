@@ -120,7 +120,9 @@ def benchmark_row_detail(path: Path) -> str:
         return "AQUA-SLAM benchmark row; no parseable rows"
     row = rows[0]
     detail = f"AQUA-SLAM benchmark row; samples={row.samples}, rmse={row.rmse_m:.4f} m"
-    if row.samples < 10:
+    if row.samples is None:
+        detail += "; not baseline-ready: missing sample count"
+    elif row.samples < readiness.DEFAULT_MIN_BASELINE_SAMPLES:
         detail += "; smoke-sized candidate"
     return detail
 
