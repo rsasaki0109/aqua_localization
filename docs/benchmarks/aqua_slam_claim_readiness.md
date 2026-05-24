@@ -39,7 +39,7 @@ ros2 run aqua_localization aqua_slam_head_to_head_report.py docs/benchmarks/tank
 ## Candidate Link Bootstrap
 
 ```bash
-ros2 run aqua_localization verify_tank_medium_heldout_ready.py --sequence Medium --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml --locator-max-depth 5 --apply-located-links --out /tmp/aqua_slam_medium_heldout_verify/heldout_verify.md --locator-root /tmp
+ros2 run aqua_localization verify_tank_medium_heldout_ready.py --sequence Medium --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml --locator-max-depth 5 --apply-located-links --archive-out-dir /tmp/tank_medium_download --out /tmp/aqua_slam_medium_heldout_verify/heldout_verify.md --locator-root /tmp
 ```
 
 ## Located Candidates
@@ -53,6 +53,7 @@ ros2 run aqua_localization verify_tank_medium_heldout_ready.py --sequence Medium
 | AQUA-SLAM CSV | 0 | none |
 | AQUA-SLAM TUM | 0 | none |
 | AQUA-SLAM baseline row | 1 | `/tmp/aqua_ingest_aqua_slam_dQaPVa/out/Medium_aqua_slam_benchmark_row.md` |
+| Download archive | 0 | none |
 
 ## Next Action Command
 

@@ -101,6 +101,23 @@ def link_command(candidate: Path, target: Path) -> tuple[str, ...]:
     return ("ln", "-sfn", str(candidate), str(target))
 
 
+def extract_archive_command(archive: Path, out_dir: Path) -> tuple[str, ...]:
+    suffixes = [suffix.lower() for suffix in archive.suffixes]
+    if suffixes and suffixes[-1] == ".zip":
+        return (
+            "bash",
+            "-lc",
+            f"mkdir -p {shlex.quote(str(out_dir))} && "
+            f"python3 -m zipfile -e {shlex.quote(str(archive))} {shlex.quote(str(out_dir))}",
+        )
+    return (
+        "bash",
+        "-lc",
+        f"mkdir -p {shlex.quote(str(out_dir))} && "
+        f"tar -xf {shlex.quote(str(archive))} -C {shlex.quote(str(out_dir))}",
+    )
+
+
 def safe_symlink(candidate: Path, target: Path) -> bool:
     candidate = candidate.resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -303,6 +320,13 @@ def next_action(report: readiness.ReadinessReport, locate_report: locator.Locate
                 f"Convert the located ROS 1 bag into `{ready_args.bag}` with camera topics kept.",
                 convert_ros1_bag_command(report, ros1_candidate),
             )
+        archive_candidate = first_candidate_path(locate_report, "archive")
+        if archive_candidate is not None:
+            return NextAction(
+                "Extract Medium download archive",
+                f"Extract the located archive into `{args.archive_out_dir}`, then rescan.",
+                extract_archive_command(archive_candidate, args.archive_out_dir),
+            )
         return NextAction(
             "Find Medium reference TUM",
             f"Copy/download the Medium reference TUM, then rescan. {locator.OFFICIAL_DOWNLOAD_URL}",
@@ -323,6 +347,13 @@ def next_action(report: readiness.ReadinessReport, locate_report: locator.Locate
                 "Convert Medium ROS 1 bag to ROS 2",
                 f"Convert the located ROS 1 bag into `{ready_args.bag}` with camera topics kept.",
                 convert_ros1_bag_command(report, ros1_candidate),
+            )
+        archive_candidate = first_candidate_path(locate_report, "archive")
+        if archive_candidate is not None:
+            return NextAction(
+                "Extract Medium download archive",
+                f"Extract the located archive into `{args.archive_out_dir}`, then rescan.",
+                extract_archive_command(archive_candidate, args.archive_out_dir),
             )
         return NextAction(
             "Find Medium ROS 2 bag",
@@ -487,6 +518,7 @@ def format_report(verify: VerifyReport, args) -> str:
         ("aqua_slam_csv", "AQUA-SLAM CSV"),
         ("aqua_slam_tum", "AQUA-SLAM TUM"),
         ("baseline_row", "AQUA-SLAM baseline row"),
+        ("archive", "Download archive"),
     ):
         first = locator.first_path(locate_report, role)
         lines.append(
@@ -548,6 +580,7 @@ def parse_args(argv):
     parser.add_argument("--validation-out-dir", type=Path)
     parser.add_argument("--locator-root", action="append", type=Path, default=[])
     parser.add_argument("--locator-max-depth", type=int, default=7)
+    parser.add_argument("--archive-out-dir", type=Path, default=Path("/tmp/tank_medium_download"))
     parser.add_argument(
         "--apply-located-links",
         action="store_true",

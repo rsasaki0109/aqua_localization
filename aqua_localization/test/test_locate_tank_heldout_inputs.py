@@ -60,6 +60,24 @@ def test_locate_inputs_finds_reference_bag_and_baseline(tmp_path):
     assert "smoke-sized candidate" in report.by_role("baseline_row")[0].detail
 
 
+def test_locate_inputs_finds_medium_download_archives(tmp_path):
+    module = load_module()
+    root = tmp_path / "downloads"
+    root.mkdir()
+    archive = root / "HalfTankMedium.tar.gz"
+    archive.write_bytes(b"not really a tar")
+
+    report = module.locate_inputs("Medium", (root,), max_depth=2)
+    text = module.format_report(
+        module.parse_args(["--sequence", "Medium", "--root", str(root)]),
+        report,
+    )
+
+    assert module.first_path(report, "archive") == archive
+    assert "Download Archive" in text
+    assert "extract before locating inputs" in text
+
+
 def test_locate_inputs_marks_short_matched_duration_baseline(tmp_path):
     module = load_module()
     root = tmp_path / "data"
