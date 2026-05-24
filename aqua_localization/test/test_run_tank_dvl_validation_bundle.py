@@ -21,6 +21,33 @@ def load_module():
     return module
 
 
+def write_benchmark_row(path: Path, *, system="aqua_dvl_prior_visual", samples=20, matched_s=19.0):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join([
+            "| Dataset | Sequence | System | Alignment | Samples | Matched s | Mean m | Median m | RMSE m | Max m | Note |",
+            "|---------|----------|--------|-----------|--------:|----------:|-------:|---------:|-------:|------:|------|",
+            (
+                f"| Tank Dataset | Medium | {system} | SE(3) | {samples} | {matched_s:.2f} | "
+                "0.0000 | 0.0000 | 0.0200 | 0.0200 | validation |"
+            ),
+        ])
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def coverage_args(tmp_path):
+    return SimpleNamespace(
+        dataset="Tank Dataset",
+        sequence="Medium",
+        target_system="aqua_dvl_prior_visual",
+        min_target_samples=10,
+        min_target_matched_s=10.0,
+        out_dir=tmp_path / "bundle",
+    )
+
+
 def test_bundle_paths_are_scoped_under_output_dir(tmp_path):
     module = load_module()
 
@@ -79,6 +106,40 @@ def test_make_validation_args_forwards_guards_and_gates(tmp_path):
     assert validation_args.benchmark_row_out == paths.benchmark_row
     assert validation_args.system == "aqua_dvl_prior_visual"
     assert validation_args.note == "held-out candidate"
+
+
+def test_target_row_coverage_accepts_sufficient_benchmark_row(tmp_path):
+    module = load_module()
+    paths = module.bundle_paths(tmp_path / "bundle")
+    write_benchmark_row(paths.benchmark_row, samples=20, matched_s=19.0)
+
+    failures = module.target_row_coverage_failures(coverage_args(tmp_path), paths)
+
+    assert failures == []
+
+
+def test_target_row_coverage_rejects_short_benchmark_row(tmp_path):
+    module = load_module()
+    paths = module.bundle_paths(tmp_path / "bundle")
+    write_benchmark_row(paths.benchmark_row, samples=20, matched_s=2.0)
+
+    failures = module.target_row_coverage_failures(coverage_args(tmp_path), paths)
+
+    assert failures == [
+        "aqua_dvl_prior_visual Medium: 2.00 matched s below minimum 10.00"
+    ]
+
+
+def test_target_row_coverage_rejects_smoke_sized_benchmark_row(tmp_path):
+    module = load_module()
+    paths = module.bundle_paths(tmp_path / "bundle")
+    write_benchmark_row(paths.benchmark_row, samples=3, matched_s=19.0)
+
+    failures = module.target_row_coverage_failures(coverage_args(tmp_path), paths)
+
+    assert failures == [
+        "aqua_dvl_prior_visual Medium: 3 samples below minimum 10"
+    ]
 
 
 def test_format_bundle_summary_reports_failures(tmp_path):
