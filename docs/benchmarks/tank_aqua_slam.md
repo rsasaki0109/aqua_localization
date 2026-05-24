@@ -1144,6 +1144,21 @@ Today this fails because the best numeric row is `aqua_dvl_prior_visual` at
 check should also reject any diagnostic-only numeric win, even if another
 held-out row already passes.
 
+To see both the claim gate and the held-out input blockers on one page,
+regenerate [`aqua_slam_claim_readiness.md`](aqua_slam_claim_readiness.md):
+
+```bash
+ros2 run aqua_localization aqua_slam_claim_readiness_report.py \
+  docs/benchmarks/tank_aqua_slam.md \
+  --locator-root /tmp \
+  --locator-max-depth 5 \
+  --out docs/benchmarks/aqua_slam_claim_readiness.md
+```
+
+Current readiness is `BLOCKED`: the best numeric row is still the `0.79x`
+diagnostic short-test win, while the Medium held-out verifier is first blocked
+on `/tmp/tank_medium_gt.tum`.
+
 Use [`aqua_slam_error_budget.md`](aqua_slam_error_budget.md) to turn that gap
 into the next development budget:
 
