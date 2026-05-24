@@ -649,6 +649,18 @@ reference TUMs, ROS 1/ROS 2 bags, visual TUMs, AQUA-SLAM CSV/TUM exports, and
 benchmark rows, including smoke-sized rows that should not be used as paper
 baselines.
 
+For the shortest fail-fast checklist, use the Medium held-out verifier:
+
+```bash
+ros2 run aqua_localization verify_tank_medium_heldout_ready.py \
+  --out /tmp/aqua_slam_medium_heldout_verify.md
+```
+
+It checks the Medium reference, ROS 2 bag, rank-1 DVL profile, AQUA-SLAM
+CSV/TUM source, usable AQUA-SLAM benchmark row, and visual TUM. The report
+prints exactly one next command while blocked, or the coverage-gated validation
+bundle command once all inputs are ready.
+
 Before using `--max-gap-x 1.0` on `Medium`, record the matching AQUA-SLAM
 baseline row for the same sequence. Run AQUA-SLAM in its ROS 1 Docker workflow
 while replaying the Tank bag, export `/AQUA_SLAM/orb_odom`, then ingest that
