@@ -114,6 +114,41 @@ def test_format_report_includes_claim_table_and_github_summary(tmp_path):
     assert "not claimable yet" in report
 
 
+def test_gate_failure_messages_explain_blocked_numeric_win():
+    module = load_module()
+    rows = module.parse_metric_rows(sample_markdown())
+    args = module.parse_args(["bench.md", "--fail-without-claimable-win"])
+    comparisons = module.collect_comparisons(
+        rows,
+        baseline_system="AQUA-SLAM",
+        target_prefixes=["aqua_"],
+    )
+
+    failures = module.gate_failure_messages(comparisons, args)
+
+    assert len(failures) == 1
+    assert "no claimable AQUA-SLAM win" in failures[0]
+    assert "aqua_dvl_prior_visual" in failures[0]
+    assert "current row is diagnostic" in failures[0]
+
+
+def test_gate_failure_messages_detect_diagnostic_wins():
+    module = load_module()
+    rows = module.parse_metric_rows(sample_markdown())
+    args = module.parse_args(["bench.md", "--fail-on-diagnostic-win"])
+    comparisons = module.collect_comparisons(
+        rows,
+        baseline_system="AQUA-SLAM",
+        target_prefixes=["aqua_"],
+    )
+
+    failures = module.gate_failure_messages(comparisons, args)
+
+    assert failures == [
+        "diagnostic AQUA-SLAM win present: aqua_dvl_prior_visual on short_test at 0.79x"
+    ]
+
+
 def test_cli_writes_report(tmp_path):
     src = tmp_path / "benchmarks.md"
     out = tmp_path / "head_to_head.md"
@@ -134,3 +169,73 @@ def test_cli_writes_report(tmp_path):
 
     assert "wrote AQUA-SLAM head-to-head report" in proc.stdout
     assert "AQUA-SLAM Head-to-Head Diagnosis" in out.read_text(encoding="utf-8")
+
+
+def test_cli_fail_without_claimable_win_returns_nonzero(tmp_path):
+    src = tmp_path / "benchmarks.md"
+    out = tmp_path / "head_to_head.md"
+    src.write_text(sample_markdown(), encoding="utf-8")
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            str(src),
+            "--fail-without-claimable-win",
+            "--out",
+            str(out),
+        ],
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode == 1
+    assert "wrote AQUA-SLAM head-to-head report" in proc.stdout
+    assert "no claimable AQUA-SLAM win" in proc.stderr
+
+
+def test_cli_claimable_win_passes_claim_gate(tmp_path):
+    src = tmp_path / "benchmarks.md"
+    heldout_markdown = sample_markdown().replace(
+        "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | 3 | 2.00 |",
+        "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | 42 | 12.50 |",
+    ).replace("0.0210 | 0.0500 | smoke row", "0.0210 | 0.0500 | baseline")
+    src.write_text(heldout_markdown, encoding="utf-8")
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            str(src),
+            "--fail-without-claimable-win",
+        ],
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode == 0
+    assert "Best claimable win: `aqua_visual_frontend` on `Medium` at 0.88x." in proc.stdout
+
+
+def test_cli_diagnostic_win_gate_can_fail_even_with_claimable_win(tmp_path):
+    src = tmp_path / "benchmarks.md"
+    heldout_markdown = sample_markdown().replace(
+        "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | 3 | 2.00 |",
+        "| Tank Dataset | Medium | AQUA-SLAM | SE(3) | 42 | 12.50 |",
+    ).replace("0.0210 | 0.0500 | smoke row", "0.0210 | 0.0500 | baseline")
+    src.write_text(heldout_markdown, encoding="utf-8")
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            str(src),
+            "--fail-without-claimable-win",
+            "--fail-on-diagnostic-win",
+        ],
+        text=True,
+        capture_output=True,
+    )
+
+    assert proc.returncode == 1
+    assert "diagnostic AQUA-SLAM win present" in proc.stderr
