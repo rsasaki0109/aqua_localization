@@ -622,8 +622,12 @@ ros2 run aqua_localization prepare_tank_dvl_heldout_inputs.py \
 
 Use `--dry-run` first to write
 `/tmp/aqua_tank_dvl_medium_prepare/tank_dvl_heldout_inputs_manifest.md` without
-executing the commands. If a ROS 2 bag already exists, pass `--ros2-bag` instead
-of `--ros1-bag`.
+executing the commands. The dry-run manifest is written even when inputs are
+missing; on the current workstation state it reports the two hard blockers as
+`/tmp/tank_medium_gt.tum` and `/tmp/tank_medium_ros2_visual`. Once those exist,
+the same manifest command generates the Medium visual TUM and then runs the
+validation bundle. If a ROS 2 bag already exists, pass `--ros2-bag` instead of
+`--ros1-bag`.
 
 Before using `--max-gap-x 1.0` on `Medium`, record the matching AQUA-SLAM
 baseline row for the same sequence. Run AQUA-SLAM in its ROS 1 Docker workflow

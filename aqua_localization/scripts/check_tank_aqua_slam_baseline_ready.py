@@ -19,6 +19,7 @@ DEFAULT_DATASET = "Tank Dataset"
 DEFAULT_BASELINE_SYSTEM = "AQUA-SLAM"
 DEFAULT_TARGET_SYSTEM = "aqua_dvl_prior_visual"
 DEFAULT_ALIGNMENT = "SE(3)"
+DEFAULT_PROFILE = Path("/tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml")
 
 
 @dataclass(frozen=True)
@@ -372,7 +373,7 @@ def parse_args(argv):
     parser.add_argument(
         "--profile",
         type=Path,
-        default=Path("/tmp/aqua_tank_dvl_prior_profile_short_to_medium_sweep_rank1.yaml"),
+        default=DEFAULT_PROFILE,
     )
     parser.add_argument("--bag", type=Path)
     parser.add_argument("--visual", type=Path)
