@@ -20,6 +20,7 @@ install(PROGRAMS
   scripts/benchmark_manifest_report.py
   scripts/ingest_external_tum_result.py
   scripts/ingest_tank_aqua_slam_baseline.py
+  scripts/export_rosbag_odometry_tum.py
   scripts/check_tank_aqua_slam_baseline_ready.py
   scripts/summarize_tank_aqua_slam_baseline_todos.py
   scripts/run_tank_aqua_slam_baseline_workflow.py
@@ -114,6 +115,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_benchmark_manifest_report test/test_benchmark_manifest_report.py)
   ament_add_pytest_test(test_ingest_external_tum_result test/test_ingest_external_tum_result.py)
   ament_add_pytest_test(test_ingest_tank_aqua_slam_baseline test/test_ingest_tank_aqua_slam_baseline.py)
+  ament_add_pytest_test(test_export_rosbag_odometry_tum test/test_export_rosbag_odometry_tum.py)
   ament_add_pytest_test(test_check_tank_aqua_slam_baseline_ready test/test_check_tank_aqua_slam_baseline_ready.py)
   ament_add_pytest_test(test_summarize_tank_aqua_slam_baseline_todos test/test_summarize_tank_aqua_slam_baseline_todos.py)
   ament_add_pytest_test(test_run_tank_aqua_slam_baseline_workflow test/test_run_tank_aqua_slam_baseline_workflow.py)

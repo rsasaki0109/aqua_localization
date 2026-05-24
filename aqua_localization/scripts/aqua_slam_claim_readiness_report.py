@@ -106,6 +106,7 @@ def build_heldout_args(args: argparse.Namespace) -> argparse.Namespace:
     optional_path(argv, "--bag", args.bag)
     optional_path(argv, "--visual", args.visual)
     optional_path(argv, "--validation-out-dir", args.validation_out_dir)
+    argv.extend(["--reference-topic", args.reference_topic])
     for path in args.markdown:
         argv.extend(["--benchmark-markdown", str(path)])
     for root in args.locator_root:
@@ -371,6 +372,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--baseline-row", type=Path)
     parser.add_argument("--bag", type=Path)
     parser.add_argument("--visual", type=Path)
+    parser.add_argument("--reference-topic", default="/apriltag_slam/GT")
     parser.add_argument("--profile", type=Path, default=baseline_ready.DEFAULT_PROFILE)
     parser.add_argument("--min-baseline-samples", type=int, default=baseline_ready.DEFAULT_MIN_BASELINE_SAMPLES)
     parser.add_argument("--min-baseline-matched-s", type=float, default=baseline_ready.DEFAULT_MIN_BASELINE_MATCHED_S)
