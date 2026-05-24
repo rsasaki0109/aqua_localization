@@ -148,6 +148,21 @@ def record_aqua_slam_command(report: readiness.ReadinessReport) -> tuple[str, ..
     )
 
 
+def convert_ros1_bag_command(report: readiness.ReadinessReport, ros1_bag: Path) -> tuple[str, ...]:
+    args = report.args
+    return (
+        "ros2",
+        "run",
+        "aqua_localization",
+        "convert_tank_dataset_bag.py",
+        "--src",
+        str(ros1_bag),
+        "--dst",
+        str(args.bag),
+        "--include-cameras",
+    )
+
+
 def promote_profile_command(args) -> tuple[str, ...]:
     return (
         "ros2",
@@ -265,6 +280,13 @@ def next_action(report: readiness.ReadinessReport, locate_report: locator.Locate
                 "Link Medium ROS 2 bag",
                 f"Use the located rosbag2 directory for `{ready_args.bag}`.",
                 link_command(candidate, ready_args.bag),
+            )
+        ros1_candidate = first_candidate_path(locate_report, "ros1_bag")
+        if ros1_candidate is not None:
+            return NextAction(
+                "Convert Medium ROS 1 bag to ROS 2",
+                f"Convert the located ROS 1 bag into `{ready_args.bag}` with camera topics kept.",
+                convert_ros1_bag_command(report, ros1_candidate),
             )
         return NextAction(
             "Find Medium ROS 2 bag",
