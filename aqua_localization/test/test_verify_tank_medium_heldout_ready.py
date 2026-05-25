@@ -199,6 +199,41 @@ def test_ros1_bag_candidate_yields_convert_command(tmp_path):
     )
 
 
+def test_existing_ros2_bag_yields_reference_export_command(tmp_path):
+    module = load_module()
+    bag = tmp_path / "Medium_ros2"
+    bag.mkdir()
+    reference = tmp_path / "tank_medium_gt.tum"
+
+    args = module.parse_args([
+        "--reference",
+        str(reference),
+        "--bag",
+        str(bag),
+        "--reference-topic",
+        "/apriltag_slam/GT_full",
+        "--locator-root",
+        str(tmp_path / "scan"),
+        "--out-dir",
+        str(tmp_path / "verify"),
+    ])
+    verify = module.build_verify_report(args)
+
+    assert verify.next_action.title == "Export Medium reference TUM"
+    assert verify.next_action.command == (
+        "ros2",
+        "run",
+        "aqua_localization",
+        "export_rosbag_odometry_tum.py",
+        "--bag",
+        str(bag),
+        "--topic",
+        "/apriltag_slam/GT_full",
+        "--out",
+        str(reference),
+    )
+
+
 def test_source_candidate_yields_csv_link_command(tmp_path):
     module = load_module()
     args = ready_args(module, tmp_path)

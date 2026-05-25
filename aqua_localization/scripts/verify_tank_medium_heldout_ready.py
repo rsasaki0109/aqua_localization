@@ -163,6 +163,22 @@ def convert_ros1_bag_command(report: readiness.ReadinessReport, ros1_bag: Path) 
     )
 
 
+def export_reference_command(report: readiness.ReadinessReport, args) -> tuple[str, ...]:
+    ready_args = report.args
+    return (
+        "ros2",
+        "run",
+        "aqua_localization",
+        "export_rosbag_odometry_tum.py",
+        "--bag",
+        str(ready_args.bag),
+        "--topic",
+        args.reference_topic,
+        "--out",
+        str(ready_args.reference),
+    )
+
+
 def promote_profile_command(args) -> tuple[str, ...]:
     return (
         "ros2",
@@ -266,6 +282,26 @@ def next_action(report: readiness.ReadinessReport, locate_report: locator.Locate
                 "Link Medium reference TUM",
                 f"Use the located reference candidate for `{ready_args.reference}`.",
                 link_command(candidate, ready_args.reference),
+            )
+        if report.bag_exists:
+            return NextAction(
+                "Export Medium reference TUM",
+                f"Extract `{args.reference_topic}` from `{ready_args.bag}` into `{ready_args.reference}`.",
+                export_reference_command(report, args),
+            )
+        ros2_candidate = first_candidate_path(locate_report, "ros2_bag")
+        if ros2_candidate is not None and ros2_candidate != ready_args.bag.resolve():
+            return NextAction(
+                "Link Medium ROS 2 bag",
+                f"Use the located rosbag2 directory for `{ready_args.bag}`.",
+                link_command(ros2_candidate, ready_args.bag),
+            )
+        ros1_candidate = first_candidate_path(locate_report, "ros1_bag")
+        if ros1_candidate is not None:
+            return NextAction(
+                "Convert Medium ROS 1 bag to ROS 2",
+                f"Convert the located ROS 1 bag into `{ready_args.bag}` with camera topics kept.",
+                convert_ros1_bag_command(report, ros1_candidate),
             )
         return NextAction(
             "Find Medium reference TUM",
@@ -502,6 +538,7 @@ def parse_args(argv):
     parser.add_argument("--visual", type=Path)
     parser.add_argument("--time-unit", choices=("auto", "seconds", "nanoseconds"), default="auto")
     parser.add_argument("--source-topic", default="/AQUA_SLAM/orb_odom")
+    parser.add_argument("--reference-topic", default="/apriltag_slam/GT")
     parser.add_argument("--config", default="underwater_orbslam3_blue_gx5_medium.yaml")
     parser.add_argument("--min-baseline-samples", type=int, default=readiness.DEFAULT_MIN_BASELINE_SAMPLES)
     parser.add_argument("--min-baseline-matched-s", type=float, default=readiness.DEFAULT_MIN_BASELINE_MATCHED_S)

@@ -1174,7 +1174,15 @@ ros2 run aqua_localization verify_tank_medium_heldout_ready.py \
 
 If the downloaded Medium artifact is still a ROS 1 `.bag`, the verifier prints
 the exact `convert_tank_dataset_bag.py --include-cameras` command needed to
-produce `/tmp/tank_medium_ros2_visual`.
+produce `/tmp/tank_medium_ros2_visual`. Once that ROS 2 bag exists, the same
+verifier prints the offline reference export command for `/apriltag_slam/GT`:
+
+```bash
+ros2 run aqua_localization export_rosbag_odometry_tum.py \
+  --bag /tmp/tank_medium_ros2_visual \
+  --topic /apriltag_slam/GT \
+  --out /tmp/tank_medium_gt.tum
+```
 
 Use [`aqua_slam_error_budget.md`](aqua_slam_error_budget.md) to turn that gap
 into the next development budget:
