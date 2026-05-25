@@ -1128,6 +1128,22 @@ That report calls out the best current row, the RMSE gap to AQUA-SLAM, whether
 the row is diagnostic, whether the baseline/target windows are long enough, and
 whether held-out validation is explicit enough to make a public claim.
 
+Use the same report as a CI-style claim gate when deciding whether a new row can
+be advertised as "beats AQUA-SLAM":
+
+```bash
+ros2 run aqua_localization aqua_slam_head_to_head_report.py \
+  docs/benchmarks/tank_aqua_slam.md \
+  --fail-without-claimable-win \
+  --out /tmp/aqua_slam_head_to_head_claim_gate.md
+```
+
+Today this fails because the best numeric row is `aqua_dvl_prior_visual` at
+`0.79x`, but the evidence blockers are `current row is diagnostic` and
+`held-out validation not established`. Add `--fail-on-diagnostic-win` when the
+check should also reject any diagnostic-only numeric win, even if another
+held-out row already passes.
+
 Use [`aqua_slam_error_budget.md`](aqua_slam_error_budget.md) to turn that gap
 into the next development budget:
 

@@ -404,6 +404,39 @@ def best_claimable_comparison(
     return min(claimable, key=lambda item: item.gap_x)
 
 
+def claimable_wins(
+    comparisons: list[Comparison],
+    reasons_by_case: dict[tuple[str, str, str], list[str]],
+) -> list[Comparison]:
+    return [
+        item
+        for item in measured_comparisons(comparisons)
+        if item.gap_x < 1.0 and not reasons_by_case[item.case_key]
+    ]
+
+
+def unclaimable_wins(
+    comparisons: list[Comparison],
+    reasons_by_case: dict[tuple[str, str, str], list[str]],
+) -> list[Comparison]:
+    return [
+        item
+        for item in measured_comparisons(comparisons)
+        if item.gap_x < 1.0 and reasons_by_case[item.case_key]
+    ]
+
+
+def diagnostic_wins(
+    comparisons: list[Comparison],
+    reasons_by_case: dict[tuple[str, str, str], list[str]],
+) -> list[Comparison]:
+    return [
+        item
+        for item in unclaimable_wins(comparisons, reasons_by_case)
+        if item.target is not None and diagnostic_note(item.target.note)
+    ]
+
+
 def metric_pair(current: float | None, baseline: float | None, precision: int = 4) -> str:
     return f"{format_float(current, precision)} / {format_float(baseline, precision)}"
 
@@ -628,8 +661,57 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Do not block claims when the target note lacks explicit held-out wording.",
     )
     parser.set_defaults(require_held_out_note=True)
+    parser.add_argument(
+        "--fail-without-claimable-win",
+        action="store_true",
+        help=(
+            "Return exit code 1 unless at least one target beats AQUA-SLAM "
+            "and passes every configured evidence gate."
+        ),
+    )
+    parser.add_argument(
+        "--fail-on-diagnostic-win",
+        action="store_true",
+        help="Return exit code 1 when a numeric win is diagnostic.",
+    )
     parser.add_argument("--out", type=Path, help="Optional Markdown output path.")
     return parser.parse_args(argv)
+
+
+def gate_failure_messages(
+    comparisons: list[Comparison],
+    args: argparse.Namespace,
+) -> list[str]:
+    reasons_by_case = {
+        comparison.case_key: comparison_reasons(comparison, args)
+        for comparison in comparisons
+    }
+    failures: list[str] = []
+    wins = claimable_wins(comparisons, reasons_by_case)
+    blocked_wins = unclaimable_wins(comparisons, reasons_by_case)
+    diag_wins = diagnostic_wins(comparisons, reasons_by_case)
+
+    if args.fail_without_claimable_win and not wins:
+        if blocked_wins:
+            best = min(blocked_wins, key=lambda item: item.gap_x)
+            assert best.target is not None
+            blockers = "; ".join(reasons_by_case[best.case_key])
+            failures.append(
+                "no claimable AQUA-SLAM win; best numeric win is "
+                f"{best.target.system} on {best.sequence} at {format_ratio(best.gap_x)} "
+                f"but blocked by: {blockers}"
+            )
+        else:
+            failures.append("no claimable AQUA-SLAM win; no measured target beats the baseline")
+
+    if args.fail_on_diagnostic_win and diag_wins:
+        best = min(diag_wins, key=lambda item: item.gap_x)
+        assert best.target is not None
+        failures.append(
+            "diagnostic AQUA-SLAM win present: "
+            f"{best.target.system} on {best.sequence} at {format_ratio(best.gap_x)}"
+        )
+    return failures
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -660,7 +742,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote AQUA-SLAM head-to-head report to {args.out}")
     else:
         print(text)
-    return 0
+
+    failures = gate_failure_messages(comparisons, args)
+    for failure in failures:
+        print(f"AQUA-SLAM claim gate failed: {failure}", file=sys.stderr)
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
