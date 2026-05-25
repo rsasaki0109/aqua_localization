@@ -1113,6 +1113,20 @@ That report shows the rank-1 diagnostic DVL-prior row at `0.0154 m` RMSE,
 `diagnostic`. A publishable win still requires the same gate on held-out
 Medium.
 
+For a stricter claim check that keeps numeric comparisons separate from
+evidence blockers, generate
+[`aqua_slam_head_to_head.md`](aqua_slam_head_to_head.md):
+
+```bash
+ros2 run aqua_localization aqua_slam_head_to_head_report.py \
+  docs/benchmarks/tank_aqua_slam.md \
+  --out docs/benchmarks/aqua_slam_head_to_head.md
+```
+
+That report calls out the best current row, the RMSE gap to AQUA-SLAM, whether
+the row is diagnostic, whether the baseline/target windows are long enough, and
+whether held-out validation is explicit enough to make a public claim.
+
 Use [`aqua_slam_error_budget.md`](aqua_slam_error_budget.md) to turn that gap
 into the next development budget:
 
