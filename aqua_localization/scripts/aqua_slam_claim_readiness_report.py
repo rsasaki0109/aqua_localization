@@ -95,6 +95,8 @@ def build_heldout_args(args: argparse.Namespace) -> argparse.Namespace:
         str(args.max_gap_x),
         "--locator-max-depth",
         str(args.locator_max_depth),
+        "--archive-out-dir",
+        str(args.archive_out_dir),
         "--out-dir",
         str(args.heldout_out_dir),
     ]
@@ -179,6 +181,8 @@ def heldout_link_bootstrap_command(args: argparse.Namespace) -> tuple[str, ...]:
         "--locator-max-depth",
         str(args.locator_max_depth),
         "--apply-located-links",
+        "--archive-out-dir",
+        str(args.archive_out_dir),
         "--out",
         str(args.heldout_out_dir / "heldout_verify.md"),
     ]
@@ -262,6 +266,7 @@ def format_candidate_counts(state: ClaimReadiness) -> list[str]:
         ("aqua_slam_csv", "AQUA-SLAM CSV"),
         ("aqua_slam_tum", "AQUA-SLAM TUM"),
         ("baseline_row", "AQUA-SLAM baseline row"),
+        ("archive", "Download archive"),
     ):
         first = locator.first_path(report, role)
         lines.append(f"| {label} | {len(report.by_role(role))} | {format_optional_path(first)} |")
@@ -381,6 +386,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--max-gap-x", type=float, default=1.0)
     parser.add_argument("--locator-root", action="append", type=Path, default=[])
     parser.add_argument("--locator-max-depth", type=int, default=7)
+    parser.add_argument("--archive-out-dir", type=Path, default=Path("/tmp/tank_medium_download"))
     parser.add_argument("--heldout-out-dir", type=Path, default=heldout_ready.DEFAULT_OUT_DIR)
     parser.add_argument("--validation-out-dir", type=Path)
     parser.add_argument(

@@ -111,6 +111,14 @@ def is_ros2_bag_metadata(path: Path) -> bool:
     return any(child.suffix in {".db3", ".mcap"} for child in bag_dir.iterdir())
 
 
+def is_archive(path: Path) -> bool:
+    suffixes = [suffix.lower() for suffix in path.suffixes]
+    return bool(suffixes) and (
+        suffixes[-1] in {".zip", ".tar", ".tgz"}
+        or tuple(suffixes[-2:]) in {(".tar", ".gz"), (".tar", ".bz2"), (".tar", ".xz")}
+    )
+
+
 def benchmark_row_detail(path: Path) -> str:
     try:
         rows = benchmark_gap_report.parse_markdown_benchmark_rows(path.read_text(encoding="utf-8"))
@@ -160,6 +168,8 @@ def classify_path(path: Path, aliases: tuple[str, ...]) -> list[Candidate]:
         candidates.append(Candidate("aqua_slam_csv", path, "AQUA-SLAM CSV"))
     if path.name.endswith("_aqua_slam_benchmark_row.md"):
         candidates.append(Candidate("baseline_row", path, benchmark_row_detail(path)))
+    if is_archive(path):
+        candidates.append(Candidate("archive", path, "download archive; extract before locating inputs"))
     return candidates
 
 
@@ -299,6 +309,7 @@ def format_report(args, report: LocateReport) -> str:
     lines.extend(format_role_section(report, "aqua_slam_csv", "AQUA-SLAM CSV"))
     lines.extend(format_role_section(report, "aqua_slam_tum", "AQUA-SLAM TUM"))
     lines.extend(format_role_section(report, "baseline_row", "AQUA-SLAM Baseline Row"))
+    lines.extend(format_role_section(report, "archive", "Download Archive"))
     lines.extend(format_default_link_commands(report))
     lines.extend(format_next_commands(args, report))
     return "\n".join(lines)

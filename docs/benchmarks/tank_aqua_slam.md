@@ -1172,6 +1172,12 @@ ros2 run aqua_localization verify_tank_medium_heldout_ready.py \
   --out /tmp/aqua_slam_medium_heldout_verify/heldout_verify.md
 ```
 
+If the Medium download is still a `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`,
+or `.tar.xz` archive, the verifier now reports an extraction command first.
+By default it stages extracted files under `/tmp/tank_medium_download`; rerun
+the same verifier command after extraction so it can link the discovered bag,
+export `/apriltag_slam/GT`, and continue the held-out checklist.
+
 If the downloaded Medium artifact is still a ROS 1 `.bag`, the verifier prints
 the exact `convert_tank_dataset_bag.py --include-cameras` command needed to
 produce `/tmp/tank_medium_ros2_visual`. Once that ROS 2 bag exists, the same

@@ -199,6 +199,31 @@ def test_ros1_bag_candidate_yields_convert_command(tmp_path):
     )
 
 
+def test_archive_candidate_yields_extract_command_when_dataset_not_extracted(tmp_path):
+    module = load_module()
+    archive = tmp_path / "downloads/HalfTankMedium.zip"
+    archive.parent.mkdir(parents=True)
+    archive.write_bytes(b"zip")
+    out_dir = tmp_path / "extracted"
+
+    args = module.parse_args([
+        "--locator-root",
+        str(tmp_path / "downloads"),
+        "--archive-out-dir",
+        str(out_dir),
+        "--out-dir",
+        str(tmp_path / "verify"),
+    ])
+    verify = module.build_verify_report(args)
+
+    assert verify.next_action.title == "Extract Medium download archive"
+    assert verify.next_action.command == (
+        "bash",
+        "-lc",
+        f"mkdir -p {out_dir} && python3 -m zipfile -e {archive.resolve()} {out_dir}",
+    )
+
+
 def test_existing_ros2_bag_yields_reference_export_command(tmp_path):
     module = load_module()
     bag = tmp_path / "Medium_ros2"
