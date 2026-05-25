@@ -1159,6 +1159,19 @@ Current readiness is `BLOCKED`: the best numeric row is still the `0.79x`
 diagnostic short-test win, while the Medium held-out verifier is first blocked
 on `/tmp/tank_medium_gt.tum`.
 
+After placing downloaded Medium files under `/tmp`, `~/Downloads`, or the repo
+dataset tree, safely link any located candidates into the expected default
+paths:
+
+```bash
+ros2 run aqua_localization verify_tank_medium_heldout_ready.py \
+  --locator-root /tmp \
+  --locator-root /media/autoware/aa \
+  --locator-max-depth 7 \
+  --apply-located-links \
+  --out /tmp/aqua_slam_medium_heldout_verify/heldout_verify.md
+```
+
 Use [`aqua_slam_error_budget.md`](aqua_slam_error_budget.md) to turn that gap
 into the next development budget:
 

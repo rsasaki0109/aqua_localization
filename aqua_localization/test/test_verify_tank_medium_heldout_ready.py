@@ -139,6 +139,75 @@ def test_locator_candidate_yields_reference_link_command(tmp_path):
     assert verify.next_action.command == ("ln", "-sfn", str(candidate.resolve()), str(target))
 
 
+def test_apply_located_links_safely_links_reference_candidate(tmp_path):
+    module = load_module()
+    candidate = tmp_path / "data/HalfTankMedium_gt.tum"
+    write_tum(candidate)
+    target = tmp_path / "defaults/tank_medium_gt.tum"
+
+    args = module.parse_args([
+        "--reference",
+        str(target),
+        "--locator-root",
+        str(tmp_path / "data"),
+        "--out-dir",
+        str(tmp_path / "verify"),
+        "--apply-located-links",
+    ])
+    verify = module.apply_located_links(args)
+    text = module.format_report(verify, args)
+
+    assert target.is_symlink()
+    assert target.resolve() == candidate.resolve()
+    assert verify.applied_links == ((candidate.resolve(), target),)
+    assert verify.next_action.title == "Find Medium ROS 2 bag"
+    assert "## Applied Links" in text
+
+
+def test_source_candidate_yields_csv_link_command(tmp_path):
+    module = load_module()
+    args = ready_args(module, tmp_path)
+    args.csv.unlink()
+    candidate = tmp_path / "scan/Medium_aqua_slam_orb_odom.csv"
+    write_ros1_odom_csv(candidate)
+    args.locator_root = [tmp_path / "scan"]
+
+    verify = module.build_verify_report(args)
+
+    assert verify.next_action.title == "Link Medium AQUA-SLAM CSV"
+    assert verify.next_action.command == ("ln", "-sfn", str(candidate.resolve()), str(args.csv))
+
+
+def test_baseline_candidate_must_pass_gates_before_link(tmp_path):
+    module = load_module()
+    args = ready_args(module, tmp_path)
+    args.baseline_row.unlink()
+    bad = tmp_path / "scan/bad/Medium_aqua_slam_benchmark_row.md"
+    good = tmp_path / "scan/good/Medium_aqua_slam_benchmark_row.md"
+    write_benchmark_row(bad, samples=3, matched_s=2.0)
+    write_benchmark_row(good, samples=20, matched_s=19.0)
+    args.locator_root = [tmp_path / "scan"]
+
+    verify = module.build_verify_report(args)
+
+    assert verify.next_action.title == "Link Medium AQUA-SLAM baseline row"
+    assert verify.next_action.command == ("ln", "-sfn", str(good.resolve()), str(args.baseline_row))
+
+
+def test_visual_candidate_yields_link_command(tmp_path):
+    module = load_module()
+    args = ready_args(module, tmp_path)
+    args.visual.unlink()
+    candidate = tmp_path / "scan/Medium_visual_frontend.tum"
+    write_tum(candidate)
+    args.locator_root = [tmp_path / "scan"]
+
+    verify = module.build_verify_report(args)
+
+    assert verify.next_action.title == "Link Medium visual TUM"
+    assert verify.next_action.command == ("ln", "-sfn", str(candidate.resolve()), str(args.visual))
+
+
 def test_smoke_baseline_row_requests_reingest(tmp_path):
     module = load_module()
     args = ready_args(module, tmp_path)

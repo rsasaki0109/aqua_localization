@@ -36,6 +36,12 @@ ros2 run aqua_localization aqua_slam_head_to_head_report.py docs/benchmarks/tank
 | AQUA-SLAM baseline row | `/tmp/aqua_slam_medium_baseline/Medium_aqua_slam_benchmark_row.md` | FAIL | usable=0, rejected=0 |
 | Visual TUM | `/tmp/tank_medium_visual_frontend.tum` | FAIL | missing |
 
+## Candidate Link Bootstrap
+
+```bash
+ros2 run aqua_localization verify_tank_medium_heldout_ready.py --sequence Medium --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml --locator-max-depth 5 --apply-located-links --out /tmp/aqua_slam_medium_heldout_verify/heldout_verify.md --locator-root /tmp
+```
+
 ## Located Candidates
 
 | Role | Count | First candidate |
