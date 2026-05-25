@@ -164,6 +164,41 @@ def test_apply_located_links_safely_links_reference_candidate(tmp_path):
     assert "## Applied Links" in text
 
 
+def test_ros1_bag_candidate_yields_convert_command(tmp_path):
+    module = load_module()
+    reference = tmp_path / "Medium_gt.tum"
+    ros1_bag = tmp_path / "scan/HalfTankMedium.bag"
+    target_bag = tmp_path / "defaults/tank_medium_ros2_visual"
+    write_tum(reference)
+    ros1_bag.parent.mkdir(parents=True)
+    ros1_bag.write_bytes(b"bag")
+
+    args = module.parse_args([
+        "--reference",
+        str(reference),
+        "--bag",
+        str(target_bag),
+        "--locator-root",
+        str(tmp_path / "scan"),
+        "--out-dir",
+        str(tmp_path / "verify"),
+    ])
+    verify = module.build_verify_report(args)
+
+    assert verify.next_action.title == "Convert Medium ROS 1 bag to ROS 2"
+    assert verify.next_action.command == (
+        "ros2",
+        "run",
+        "aqua_localization",
+        "convert_tank_dataset_bag.py",
+        "--src",
+        str(ros1_bag.resolve()),
+        "--dst",
+        str(target_bag),
+        "--include-cameras",
+    )
+
+
 def test_source_candidate_yields_csv_link_command(tmp_path):
     module = load_module()
     args = ready_args(module, tmp_path)
