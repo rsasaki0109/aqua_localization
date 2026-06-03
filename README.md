@@ -11,6 +11,7 @@
   <a href="https://docs.ros.org/en/jazzy/"><img src="https://img.shields.io/badge/ROS%202-Jazzy-blue" alt="ROS 2 Jazzy"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-green.svg" alt="License: Apache-2.0"></a>
   <a href="https://github.com/rsasaki0109/aqua_localization/releases"><img src="https://img.shields.io/github/v/release/rsasaki0109/aqua_localization" alt="Latest release"></a>
+  <a href="https://github.com/rsasaki0109/aqua_localization/stargazers"><img src="https://img.shields.io/github/stars/rsasaki0109/aqua_localization?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
@@ -31,6 +32,23 @@ simulator-only demo as the headline result. Targets BlueROV2-class ROVs,
 custom AUVs, and `uuv_simulator`. ROS 2 Humble and Jazzy are supported.
 
 Latest release: **[v0.5](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.5)**.
+
+Public goal: make the project useful enough to earn **10 GitHub stars** through
+reproducible public-data demos, honest limitations, and small contribution
+paths.
+
+## First-Time Visitor Path
+
+| Time | Open this | What you get |
+|------|-----------|--------------|
+| **30 seconds** | [GitHub Pages overview](https://rsasaki0109.github.io/aqua_localization/) | A playable underwater 3DGS sample and visual entry point. |
+| **2 minutes** | [Public-data results](#public-data-results) | The current replayable Tank, MBES-SLAM, NTNU, and AQUALOC artifacts. |
+| **10 minutes** | [Tank Dataset demo](datasets/tank_dataset_demo.md) | The shortest real-bag localization path with DVL + pressure + GT. |
+| **Next contribution** | [Issue templates](.github/ISSUE_TEMPLATE) and [CONTRIBUTING.md](CONTRIBUTING.md) | A place to submit a dataset, bug, or benchmark result with enough context to reproduce it. |
+
+If this saves bring-up time or gives your AUV/ROV project a useful baseline,
+a GitHub star helps other ROS and underwater-robotics users find the repo and
+signals which demo track to push next.
 
 ## Results Snapshot
 

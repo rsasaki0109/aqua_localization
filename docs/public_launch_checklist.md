@@ -4,6 +4,19 @@ Use this after a README or release refresh to make the repository easier
 to discover. These are repository-administration and outreach steps, not
 runtime requirements.
 
+## 10-Star Sprint
+
+- Keep the README first viewport focused on one promise: ROS 2 underwater
+  localization on public AUV/ROV data.
+- Link one playable artifact before asking anyone to clone the workspace:
+  `https://rsasaki0109.github.io/aqua_localization/`.
+- Share one concrete metric in every post. Current strongest metric:
+  Tank Dataset `short_test`: 0.43 m APE RMSE vs AprilTag ground truth.
+- Ask for a GitHub star only after the useful artifact is visible: "If this
+  saves bring-up time for your ROS/AUV work, a star helps others find it."
+- Convert useful replies into issues: bugs, dataset requests, benchmark
+  results, or MBES loop-closure tuning cases.
+
 ## GitHub Repository Settings
 
 Set a concise repository description:
@@ -34,23 +47,29 @@ robotics
 Pin these links in the repository sidebar if useful:
 
 - Latest release: `https://github.com/rsasaki0109/aqua_localization/releases`
+- GitHub Pages demo: `https://rsasaki0109.github.io/aqua_localization/`
 - Demo media: `docs/media/`
 - Dataset notes: `datasets/`
 
 ## Release Post Template
 
 ```markdown
-aqua_localization v0.2 is a ROS 2 underwater localization stack built around
-real public AUV/ROV data:
+aqua_localization v0.5 is a ROS 2 underwater localization stack built around
+real public AUV/ROV data and replayable demo artifacts:
 
 - 15-state additive UKF for IMU + pressure + DVL + sonar updates
 - PCL ICP/GICP/NDT sonar point-cloud registration
 - g2o SE(3) pose graph backend
 - rerun.io exports for Tank Dataset, MBES-SLAM, NTNU, and AQUALOC
 - Tank Dataset short_test: 0.43 m APE RMSE vs AprilTag GT
+- underwater 3DGS Tank sample viewer and downloadable input pack
 
 Repo: https://github.com/rsasaki0109/aqua_localization
+Playable overview: https://rsasaki0109.github.io/aqua_localization/
 Demo notes: https://github.com/rsasaki0109/aqua_localization/tree/main/datasets
+
+If this saves bring-up time for ROS/AUV work, a GitHub star helps other
+underwater robotics users find it.
 ```
 
 ## Good Places To Share

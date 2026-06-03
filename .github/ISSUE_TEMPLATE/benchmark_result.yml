@@ -1,0 +1,51 @@
+name: Benchmark result
+description: Share a reproducible accuracy, replay, or comparison result.
+title: "[Benchmark]: "
+labels: ["benchmark"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What result should be recorded or compared?
+    validations:
+      required: true
+  - type: input
+    id: dataset
+    attributes:
+      label: Dataset and sequence
+      placeholder: Tank Dataset short_test, MBES-SLAM beach_pond, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Reproduction command
+      description: Include launch files, bag paths, topic remaps, and scripts.
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: metric
+    attributes:
+      label: Metric and result
+      description: Include APE/RPE, drift, runtime, acceptance counts, or other relevant metrics.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: ROS 2 distribution, OS, CPU/GPU if relevant, and dependency versions.
+    validations:
+      required: true
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Artifacts
+      description: Link logs, plots, rerun recordings, screenshots, or result files if available.
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes and limitations
+      description: Call out calibration assumptions, skipped steps, or known caveats.

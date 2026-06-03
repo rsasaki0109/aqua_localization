@@ -30,6 +30,17 @@ configuration file, and comparison command you used. If the change affects
 accuracy, include before/after numbers from `compare_trajectories.py` or
 the relevant benchmark script.
 
+## Useful Small Contributions
+
+- Reproduce one documented dataset demo and report whether the commands still
+  work on Humble or Jazzy.
+- Add a public dataset request with license, sensor topics, download size, and
+  the expected localization path.
+- Submit a benchmark result with exact bag, topic remaps, parameters, metric,
+  and before/after numbers.
+- Improve a README or dataset note where a new user would otherwise need local
+  knowledge to continue.
+
 ## Issue Quality
 
 Good issue reports include:
