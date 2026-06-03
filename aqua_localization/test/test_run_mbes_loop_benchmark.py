@@ -55,6 +55,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "--batch-consistency-out" in proc.stdout
     assert "--batch-consistency-selected-csv-out" in proc.stdout
     assert "mbes_loop_benchmark_row.py" in proc.stdout
+    assert "mbes_loop_trajectory_metrics.py" in proc.stdout
     assert "audit_mbes_loop_candidates.py" in proc.stdout
     assert "plot_mbes_loop_audit.py" in proc.stdout
     assert "audit_mbes_loop_geometry.py" in proc.stdout
@@ -77,6 +78,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "--batch-consistency-translation-threshold-m 1.3" in proc.stdout
     assert "--batch-consistency-rotation-threshold-rad 0.16" in proc.stdout
     assert "--batch-consistency-auto-quantile 0.9" in proc.stdout
+    assert "--pose-graph-path-topic" not in proc.stdout
     assert "--max-accepted 77" in proc.stdout
     assert "--max-markers 88" in proc.stdout
     assert "--require-complete" in proc.stdout
@@ -110,6 +112,8 @@ def test_dry_run_uses_default_artifact_names(tmp_path):
     assert str(tmp_path / "out/mbes_beach_pond_batch_consistency.md") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_batch_selected_loops.csv") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_benchmark_row.md") in proc.stdout
+    assert str(tmp_path / "out/mbes_beach_pond_loop_trajectory_metrics.md") in proc.stdout
+    assert str(tmp_path / "out/mbes_beach_pond_loop_trajectory_metrics") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_loop_audit.md") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_loop_audit.png") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_loop_geometry.md") in proc.stdout

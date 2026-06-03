@@ -126,6 +126,15 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --batch-consistency-selected-csv-out /tmp/mbes_beach_pond_batch_selected_loops.csv
 ```
 
+Export loop trajectory impact metrics from the same replay:
+
+```bash
+ros2 run aqua_localization mbes_loop_trajectory_metrics.py \
+  --bag /tmp/aqua_mbes_beach_pond_with_loop_status \
+  --out /tmp/mbes_beach_pond_loop_trajectory_metrics.md \
+  --out-dir /tmp/mbes_beach_pond_loop_trajectory_metrics
+```
+
 Generate the benchmark table row from the exported CSV:
 
 ```bash
@@ -151,6 +160,8 @@ Expected generated files:
 | `/tmp/mbes_beach_pond_consistency_rejections.md` | Runtime consistency rejections sorted by support deficit and nearest correction delta. |
 | `/tmp/mbes_beach_pond_batch_consistency.md` | PCM-like selected/rejected loop IDs from accepted and consistency-rejected corrections. |
 | `/tmp/mbes_beach_pond_batch_selected_loops.csv` | Selected `current_id,candidate_id` loop pairs for a `loop.selection.allowlist_csv` replay. |
+| `/tmp/mbes_beach_pond_loop_trajectory_metrics.md` | APE comparison of input odometry vs. latest pose-graph path against dataset reference odometry. |
+| `/tmp/mbes_beach_pond_loop_trajectory_metrics/*.tum` | Exported reference, input odometry, and pose-graph TUM trajectories used by the metric report. |
 | `mbes_loop_benchmark_row.py` output | One Markdown row for the measurement table below. |
 | `audit_mbes_loop_candidates.py` output | Accepted-loop visual audit priority list. |
 | `plot_mbes_loop_audit.py` output | Plan-view PNG of the pose graph and accepted-loop audit priorities. |

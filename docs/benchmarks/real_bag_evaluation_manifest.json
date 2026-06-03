@@ -73,6 +73,7 @@
         "consistency rejection audit",
         "batch consistency selection report",
         "batch selected loop allowlist CSV",
+        "loop trajectory metrics report",
         "accepted-loop audit report",
         "accepted-loop geometry review",
         "high-priority accepted-loop audit packet"

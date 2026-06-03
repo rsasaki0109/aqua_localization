@@ -38,6 +38,8 @@ CONSISTENCY_REJECTION_AUDIT_OUT="$OUT_DIR/mbes_beach_pond_consistency_rejections
 BATCH_CONSISTENCY_OUT="$OUT_DIR/mbes_beach_pond_batch_consistency.md"
 BATCH_CONSISTENCY_SELECTED_CSV="$OUT_DIR/mbes_beach_pond_batch_selected_loops.csv"
 ROW_OUT="$OUT_DIR/mbes_beach_pond_benchmark_row.md"
+TRAJECTORY_METRICS_OUT="$OUT_DIR/mbes_beach_pond_loop_trajectory_metrics.md"
+TRAJECTORY_METRICS_DIR="$OUT_DIR/mbes_beach_pond_loop_trajectory_metrics"
 AUDIT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.md"
 AUDIT_PLOT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.png"
 GEOMETRY_AUDIT_OUT="$OUT_DIR/mbes_beach_pond_loop_geometry.md"
@@ -231,6 +233,13 @@ run_cmd ros2 run aqua_localization mbes_loop_benchmark_row.py \
   --header \
   --out "$ROW_OUT"
 
+run_cmd ros2 run aqua_localization mbes_loop_trajectory_metrics.py \
+  --bag "$MBES_OUT" \
+  --out "$TRAJECTORY_METRICS_OUT" \
+  --out-dir "$TRAJECTORY_METRICS_DIR" \
+  --dataset "$DATASET" \
+  --sequence "$SEQUENCE"
+
 run_cmd ros2 run aqua_localization audit_mbes_loop_candidates.py \
   --csv "$STATUS_CSV" \
   --out "$AUDIT_OUT" \
@@ -266,6 +275,7 @@ MBES loop benchmark artifacts:
   batch consistency: $BATCH_CONSISTENCY_OUT
   batch selected loops CSV: $BATCH_CONSISTENCY_SELECTED_CSV
   benchmark row:    $ROW_OUT
+  trajectory metrics: $TRAJECTORY_METRICS_OUT
   audit report:      $AUDIT_OUT
   audit plot:        $AUDIT_PLOT_OUT
   geometry review:   $GEOMETRY_AUDIT_OUT

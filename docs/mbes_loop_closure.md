@@ -137,6 +137,15 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --consistency-min-support-count 1
 ```
 
+Export trajectory evidence from the same results-included replay:
+
+```bash
+ros2 run aqua_localization mbes_loop_trajectory_metrics.py \
+  --bag aqua_localization/datasets/public/mbes_slam/demo_with_estimate \
+  --out /tmp/mbes_loop_trajectory_metrics.md \
+  --out-dir /tmp/mbes_loop_trajectory_metrics
+```
+
 The CSV preserves every `/mbes_loop_closure/status` sample. The markdown
 summary reports accepted, rejected, and no-candidate counts, rejection
 reasons, fitness quantiles, correction translation/rotation quantiles, and
@@ -150,6 +159,12 @@ odometry-only chain, are driving pose-graph optimization work.
 Pass the same markdown file to `mbes_loop_benchmark_row.py --summary` to carry
 those optimization diagnostics into the benchmark table row without copying
 the values by hand.
+The trajectory metrics report exports `/nav/processed/odometry`,
+`/aqua_imu_loc/odometry`, and the latest `/aqua_pose_graph/path` as TUM files,
+then compares input odometry vs. pose graph APE against the dataset reference.
+Use it after normal, consistency-gated, and selected-loop replays to measure
+whether loop closures improve trajectory error rather than only changing loop
+counts.
 Descriptor fields are still exported when descriptor thresholds are disabled,
 so replay summaries can be used to choose initial threshold values before
 turning the gate on. The descriptor sweep report evaluates percentile-derived

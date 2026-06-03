@@ -21,6 +21,7 @@ install(PROGRAMS
   scripts/ingest_external_tum_result.py
   scripts/ingest_tank_aqua_slam_baseline.py
   scripts/export_rosbag_odometry_tum.py
+  scripts/export_rosbag_path_tum.py
   scripts/check_tank_aqua_slam_baseline_ready.py
   scripts/summarize_tank_aqua_slam_baseline_todos.py
   scripts/run_tank_aqua_slam_baseline_workflow.py
@@ -87,6 +88,7 @@ install(PROGRAMS
   scripts/check_mbes_benchmark_ready.py
   scripts/prepare_rosbag2_humble_metadata.py
   scripts/export_mbes_loop_status.py
+  scripts/mbes_loop_trajectory_metrics.py
   scripts/mbes_loop_benchmark_row.py
   scripts/audit_mbes_loop_candidates.py
   scripts/audit_mbes_loop_geometry.py
@@ -116,6 +118,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_ingest_external_tum_result test/test_ingest_external_tum_result.py)
   ament_add_pytest_test(test_ingest_tank_aqua_slam_baseline test/test_ingest_tank_aqua_slam_baseline.py)
   ament_add_pytest_test(test_export_rosbag_odometry_tum test/test_export_rosbag_odometry_tum.py)
+  ament_add_pytest_test(test_export_rosbag_path_tum test/test_export_rosbag_path_tum.py)
   ament_add_pytest_test(test_check_tank_aqua_slam_baseline_ready test/test_check_tank_aqua_slam_baseline_ready.py)
   ament_add_pytest_test(test_summarize_tank_aqua_slam_baseline_todos test/test_summarize_tank_aqua_slam_baseline_todos.py)
   ament_add_pytest_test(test_run_tank_aqua_slam_baseline_workflow test/test_run_tank_aqua_slam_baseline_workflow.py)
@@ -174,6 +177,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_make_synthetic_sonar_bag test/test_make_synthetic_sonar_bag.py)
   ament_add_pytest_test(test_rerun_export_mbes_helpers test/test_rerun_export_mbes_helpers.py)
   ament_add_pytest_test(test_export_mbes_loop_status test/test_export_mbes_loop_status.py)
+  ament_add_pytest_test(test_mbes_loop_trajectory_metrics test/test_mbes_loop_trajectory_metrics.py)
   ament_add_pytest_test(test_mbes_loop_benchmark_row test/test_mbes_loop_benchmark_row.py)
   ament_add_pytest_test(test_audit_mbes_loop_candidates test/test_audit_mbes_loop_candidates.py)
   ament_add_pytest_test(test_audit_mbes_loop_geometry test/test_audit_mbes_loop_geometry.py)
