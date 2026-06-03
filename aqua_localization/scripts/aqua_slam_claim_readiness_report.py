@@ -91,6 +91,14 @@ def build_heldout_args(args: argparse.Namespace) -> argparse.Namespace:
         str(args.min_target_samples),
         "--min-target-matched-s",
         str(args.min_target_matched_s),
+        "--min-dvl-coverage-ratio",
+        str(args.min_dvl_coverage_ratio),
+        "--min-prior-applied-ratio",
+        str(args.min_prior_applied_ratio),
+        "--min-prior-match-confidence",
+        str(args.min_prior_match_confidence),
+        "--min-applied-prior-confidence",
+        str(args.min_applied_prior_confidence),
         "--max-gap-x",
         str(args.max_gap_x),
         "--locator-max-depth",
@@ -383,6 +391,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--min-baseline-matched-s", type=float, default=baseline_ready.DEFAULT_MIN_BASELINE_MATCHED_S)
     parser.add_argument("--min-target-samples", type=int, default=10)
     parser.add_argument("--min-target-matched-s", type=float, default=10.0)
+    parser.add_argument("--min-dvl-coverage-ratio", type=float,
+                        default=heldout_ready.DEFAULT_MIN_DVL_COVERAGE_RATIO)
+    parser.add_argument("--min-prior-applied-ratio", type=float,
+                        default=heldout_ready.DEFAULT_MIN_PRIOR_APPLIED_RATIO)
+    parser.add_argument("--min-prior-match-confidence", type=float,
+                        default=heldout_ready.DEFAULT_MIN_PRIOR_MATCH_CONFIDENCE)
+    parser.add_argument("--min-applied-prior-confidence", type=float,
+                        default=heldout_ready.DEFAULT_MIN_APPLIED_PRIOR_CONFIDENCE)
     parser.add_argument("--max-gap-x", type=float, default=1.0)
     parser.add_argument("--locator-root", action="append", type=Path, default=[])
     parser.add_argument("--locator-max-depth", type=int, default=7)

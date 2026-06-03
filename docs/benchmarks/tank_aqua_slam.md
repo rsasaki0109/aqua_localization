@@ -1168,6 +1168,9 @@ ros2 run aqua_localization aqua_slam_claim_readiness_report.py \
 Current readiness is `BLOCKED`: the best numeric row is still the `0.79x`
 diagnostic short-test win, while the Medium held-out verifier is first blocked
 on `/tmp/tank_medium_gt.tum`.
+The verifier's final validation command now carries the same loose DVL-prior
+quality gates as the manual bundle command above, so a ready report can be run
+directly as the claim-gated Medium test.
 
 After placing downloaded Medium files under `/tmp`, `~/Downloads`, or the repo
 dataset tree, safely link any located candidates into the expected default

@@ -14,6 +14,8 @@
 - Added DVL-prior quality gates to the Tank held-out validation path so
   AQUA-SLAM comparison candidates can require coverage and confidence evidence,
   not only lower RMSE.
+- Forwarded those DVL-prior quality gates through the Medium held-out verifier
+  and AQUA-SLAM claim-readiness report.
 - Rebuilt the GitHub Pages landing page around the full public-data demo wall,
   MBES hero replay, 3DGS viewer entry point, and GitHub star CTA.
 - Recorded a readiness-only 3DGS training smoke report for the published Tank

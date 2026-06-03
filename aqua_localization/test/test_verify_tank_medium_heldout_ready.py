@@ -330,6 +330,36 @@ def test_ready_report_prints_validation_bundle_command(tmp_path):
     assert "run_tank_dvl_validation_bundle.py" in text
     assert "--min-target-samples 10" in text
     assert "--min-target-matched-s 10.0" in text
+    assert "--min-dvl-coverage-ratio 0.5" in text
+    assert "--min-prior-applied-ratio 0.2" in text
+    assert "--min-prior-match-confidence 0.1" in text
+    assert "--min-applied-prior-confidence 0.1" in text
+
+
+def test_ready_report_allows_prior_quality_gate_overrides(tmp_path):
+    module = load_module()
+    args = ready_args(
+        module,
+        tmp_path,
+        [
+            "--min-dvl-coverage-ratio",
+            "0.75",
+            "--min-prior-applied-ratio",
+            "0.4",
+            "--min-prior-match-confidence",
+            "0.3",
+            "--min-applied-prior-confidence",
+            "0.2",
+        ],
+    )
+
+    verify = module.build_verify_report(args)
+    command = module.validation_command(verify.readiness_report, args)
+
+    assert command[command.index("--min-dvl-coverage-ratio") + 1] == "0.75"
+    assert command[command.index("--min-prior-applied-ratio") + 1] == "0.4"
+    assert command[command.index("--min-prior-match-confidence") + 1] == "0.3"
+    assert command[command.index("--min-applied-prior-confidence") + 1] == "0.2"
 
 
 def test_main_writes_report(tmp_path):

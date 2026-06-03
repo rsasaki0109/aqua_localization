@@ -15,6 +15,10 @@ import run_tank_dvl_validation_bundle as validation_bundle
 
 
 DEFAULT_OUT_DIR = Path("/tmp/aqua_slam_medium_heldout_verify")
+DEFAULT_MIN_DVL_COVERAGE_RATIO = 0.5
+DEFAULT_MIN_PRIOR_APPLIED_RATIO = 0.2
+DEFAULT_MIN_PRIOR_MATCH_CONFIDENCE = 0.1
+DEFAULT_MIN_APPLIED_PRIOR_CONFIDENCE = 0.1
 
 
 @dataclass(frozen=True)
@@ -267,6 +271,14 @@ def validation_command(report: readiness.ReadinessReport, args) -> tuple[str, ..
         str(args.min_target_samples),
         "--min-target-matched-s",
         str(args.min_target_matched_s),
+        "--min-dvl-coverage-ratio",
+        str(args.min_dvl_coverage_ratio),
+        "--min-prior-applied-ratio",
+        str(args.min_prior_applied_ratio),
+        "--min-prior-match-confidence",
+        str(args.min_prior_match_confidence),
+        "--min-applied-prior-confidence",
+        str(args.min_applied_prior_confidence),
         "--fail-on-gate-failure",
         "--out-dir",
         str(args.validation_out_dir),
@@ -576,6 +588,10 @@ def parse_args(argv):
     parser.add_argument("--min-baseline-matched-s", type=float, default=readiness.DEFAULT_MIN_BASELINE_MATCHED_S)
     parser.add_argument("--min-target-samples", type=int, default=validation_bundle.DEFAULT_MIN_TARGET_SAMPLES)
     parser.add_argument("--min-target-matched-s", type=float, default=validation_bundle.DEFAULT_MIN_TARGET_MATCHED_S)
+    parser.add_argument("--min-dvl-coverage-ratio", type=float, default=DEFAULT_MIN_DVL_COVERAGE_RATIO)
+    parser.add_argument("--min-prior-applied-ratio", type=float, default=DEFAULT_MIN_PRIOR_APPLIED_RATIO)
+    parser.add_argument("--min-prior-match-confidence", type=float, default=DEFAULT_MIN_PRIOR_MATCH_CONFIDENCE)
+    parser.add_argument("--min-applied-prior-confidence", type=float, default=DEFAULT_MIN_APPLIED_PRIOR_CONFIDENCE)
     parser.add_argument("--max-gap-x", type=float, default=1.0)
     parser.add_argument("--validation-out-dir", type=Path)
     parser.add_argument("--locator-root", action="append", type=Path, default=[])

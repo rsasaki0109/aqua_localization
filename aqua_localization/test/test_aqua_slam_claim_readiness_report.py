@@ -100,6 +100,30 @@ def test_report_marks_existing_heldout_win_claimable(tmp_path):
     assert "Best claimable win: `aqua_dvl_prior_visual` on `Medium` at 0.86x." in report
 
 
+def test_heldout_args_forward_prior_quality_gates(tmp_path):
+    module = load_module()
+    markdown = tmp_path / "bench.md"
+    markdown.write_text(claimable_markdown(), encoding="utf-8")
+    args = module.parse_args([
+        str(markdown),
+        "--min-dvl-coverage-ratio",
+        "0.75",
+        "--min-prior-applied-ratio",
+        "0.4",
+        "--min-prior-match-confidence",
+        "0.3",
+        "--min-applied-prior-confidence",
+        "0.2",
+    ])
+
+    heldout_args = module.build_heldout_args(args)
+
+    assert heldout_args.min_dvl_coverage_ratio == 0.75
+    assert heldout_args.min_prior_applied_ratio == 0.4
+    assert heldout_args.min_prior_match_confidence == 0.3
+    assert heldout_args.min_applied_prior_confidence == 0.2
+
+
 def test_cli_writes_blocked_report_and_returns_nonzero(tmp_path):
     markdown = tmp_path / "bench.md"
     out = tmp_path / "claim.md"
