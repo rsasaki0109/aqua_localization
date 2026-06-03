@@ -32,6 +32,9 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "POSE_GRAPH_LOOP_ROBUST_KERNEL_TYPE": "dcs",
             "POSE_GRAPH_LOOP_ROBUST_KERNEL_DELTA": "0.2",
             "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD": "0.4",
+            "MBES_LOOP_TRANSLATION_SIGMA_M": "8.0",
+            "MBES_LOOP_ROTATION_SIGMA_RAD": "1.2",
+            "MBES_LOOP_OPTIMIZE_AFTER_INSERT": "false",
             "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO": "5.0",
             "MBES_LOOP_CONSISTENCY_MAX_TRANSLATION_DELTA_M": "1.3",
             "MBES_LOOP_CONSISTENCY_MAX_ROTATION_DELTA_RAD": "0.16",
@@ -82,6 +85,9 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "POSE_GRAPH_LOOP_ROBUST_KERNEL_TYPE=dcs" in proc.stdout
     assert "POSE_GRAPH_LOOP_ROBUST_KERNEL_DELTA=0.2" in proc.stdout
     assert "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4" in proc.stdout
+    assert "MBES_LOOP_TRANSLATION_SIGMA_M=8.0" in proc.stdout
+    assert "MBES_LOOP_ROTATION_SIGMA_RAD=1.2" in proc.stdout
+    assert "MBES_LOOP_OPTIMIZE_AFTER_INSERT=false" in proc.stdout
     assert "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0" in proc.stdout
     assert "MBES_LOOP_CONSISTENCY_MAX_TRANSLATION_DELTA_M=1.3" in proc.stdout
     assert "MBES_LOOP_CONSISTENCY_MAX_ROTATION_DELTA_RAD=0.16" in proc.stdout

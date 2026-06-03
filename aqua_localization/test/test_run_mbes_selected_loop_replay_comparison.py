@@ -27,6 +27,9 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
             "POSE_GRAPH_OPTIMIZATION_ITERATIONS": "35",
             "POSE_GRAPH_LOOP_ROBUST_KERNEL_TYPE": "dcs",
             "POSE_GRAPH_LOOP_ROBUST_KERNEL_DELTA": "0.2",
+            "MBES_LOOP_TRANSLATION_SIGMA_M": "8.0",
+            "MBES_LOOP_ROTATION_SIGMA_RAD": "1.2",
+            "MBES_LOOP_OPTIMIZE_AFTER_INSERT": "false",
             "MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S": "0.25",
             "MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA": "0.02",
             "MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M": "0.4",
@@ -53,6 +56,9 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert "POSE_GRAPH_OPTIMIZATION_ITERATIONS=35" in proc.stdout
     assert "POSE_GRAPH_LOOP_ROBUST_KERNEL_TYPE=dcs" in proc.stdout
     assert "POSE_GRAPH_LOOP_ROBUST_KERNEL_DELTA=0.2" in proc.stdout
+    assert "MBES_LOOP_TRANSLATION_SIGMA_M=8.0" in proc.stdout
+    assert "MBES_LOOP_ROTATION_SIGMA_RAD=1.2" in proc.stdout
+    assert "MBES_LOOP_OPTIMIZE_AFTER_INSERT=false" in proc.stdout
     assert "MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S=0.25" in proc.stdout
     assert "MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA=0.02" in proc.stdout
     assert "MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M=0.4" in proc.stdout

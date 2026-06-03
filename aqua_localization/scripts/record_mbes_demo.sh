@@ -42,6 +42,9 @@ MBES_LOOP_MAX_DISTANCE_M="${MBES_LOOP_MAX_DISTANCE_M:-}"
 MBES_LOOP_MAX_FITNESS_SCORE="${MBES_LOOP_MAX_FITNESS_SCORE:-}"
 MBES_LOOP_MAX_CORRECTION_TRANSLATION_M="${MBES_LOOP_MAX_CORRECTION_TRANSLATION_M:-}"
 MBES_LOOP_MAX_CORRECTION_ROTATION_RAD="${MBES_LOOP_MAX_CORRECTION_ROTATION_RAD:-}"
+MBES_LOOP_TRANSLATION_SIGMA_M="${MBES_LOOP_TRANSLATION_SIGMA_M:-}"
+MBES_LOOP_ROTATION_SIGMA_RAD="${MBES_LOOP_ROTATION_SIGMA_RAD:-}"
+MBES_LOOP_OPTIMIZE_AFTER_INSERT="${MBES_LOOP_OPTIMIZE_AFTER_INSERT:-}"
 MBES_LOOP_DESCRIPTOR_MAX_CENTROID_DISTANCE_M="${MBES_LOOP_DESCRIPTOR_MAX_CENTROID_DISTANCE_M:-}"
 MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO="${MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO:-}"
 MBES_LOOP_DESCRIPTOR_MIN_POINT_COUNT_RATIO="${MBES_LOOP_DESCRIPTOR_MIN_POINT_COUNT_RATIO:-}"
@@ -95,6 +98,15 @@ if [[ -n "$MBES_LOOP_MAX_CORRECTION_TRANSLATION_M" ]]; then
 fi
 if [[ -n "$MBES_LOOP_MAX_CORRECTION_ROTATION_RAD" ]]; then
   MBES_LOOP_PARAM_ARGS+=("-p" "gates.max_correction_rotation_rad:=$MBES_LOOP_MAX_CORRECTION_ROTATION_RAD")
+fi
+if [[ -n "$MBES_LOOP_TRANSLATION_SIGMA_M" ]]; then
+  MBES_LOOP_PARAM_ARGS+=("-p" "loop.translation_sigma_m:=$MBES_LOOP_TRANSLATION_SIGMA_M")
+fi
+if [[ -n "$MBES_LOOP_ROTATION_SIGMA_RAD" ]]; then
+  MBES_LOOP_PARAM_ARGS+=("-p" "loop.rotation_sigma_rad:=$MBES_LOOP_ROTATION_SIGMA_RAD")
+fi
+if [[ -n "$MBES_LOOP_OPTIMIZE_AFTER_INSERT" ]]; then
+  MBES_LOOP_PARAM_ARGS+=("-p" "loop.optimize_after_insert:=$MBES_LOOP_OPTIMIZE_AFTER_INSERT")
 fi
 if [[ -n "$MBES_LOOP_DESCRIPTOR_MAX_CENTROID_DISTANCE_M" ]]; then
   MBES_LOOP_PARAM_ARGS+=("-p" "descriptor.max_centroid_distance_m:=$MBES_LOOP_DESCRIPTOR_MAX_CENTROID_DISTANCE_M")
@@ -215,6 +227,8 @@ ros2 bag record -s "$RECORD_STORAGE" -o "$MBES_OUT" \
            /aqua_pose_graph/keyframe_count \
            /aqua_pose_graph/loop_constraint \
            /aqua_pose_graph/loop_constraint_count \
+           /aqua_pose_graph/optimization_count \
+           /aqua_pose_graph/optimization_chi2 \
            /mbes_loop_closure/status \
            /tf /tf_static \
   > /tmp/aqua_record_mbes_bag.log 2>&1 &

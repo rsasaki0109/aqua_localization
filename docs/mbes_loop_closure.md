@@ -307,6 +307,9 @@ set `loop.selection.match_timestamp_window_s` positive, then optionally bound
 `loop.selection.match_max_rotation_delta_rad`. Exact ID matches are still
 accepted first; the signature path only decides otherwise accepted-looking
 loops that missed the exact `(candidate_id,current_id)` pair.
+Use the matching `check_mbes_loop_allowlist_replay.py --signature-*` options
+when auditing a signature replay; exact-ID-only strict audits are still useful
+for integrity probes that should not accept drifted IDs.
 
 To run the normal replay, selected-loop replay, and metric comparison as one
 artifact bundle:
