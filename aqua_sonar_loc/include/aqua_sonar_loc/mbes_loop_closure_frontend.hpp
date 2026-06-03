@@ -114,6 +114,8 @@ struct GateOptions
   double max_fitness_score{2.0};
   double max_correction_translation_m{5.0};
   double max_correction_rotation_rad{0.5};
+  double min_plan_view_separation_m{0.0};
+  double max_short_plan_view_rotation_rad{0.0};
 };
 
 struct DescriptorGateOptions

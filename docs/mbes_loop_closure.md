@@ -111,15 +111,22 @@ Tune in this order:
    from a replay. Leave these disabled until real-bag ranges are understood.
 4. `gates.max_fitness_score`, `gates.max_correction_translation_m`, and
    `gates.max_correction_rotation_rad` until false positives are rejected.
-5. `loop.min_repeat_keyframe_gap` to suppress near-duplicate accepted loops
+5. `gates.min_plan_view_separation_m` with
+   `gates.max_short_plan_view_rotation_rad` when accepted-loop geometry shows
+   nearly co-located plan-view endpoints getting large rotation corrections.
+   Both values are disabled by default; when both are positive, a candidate is
+   rejected as `short plan-view rotation gate rejected` if its odometry-derived
+   plan-view separation is below the configured distance and its registration
+   correction rotation exceeds the configured short-edge rotation cap.
+6. `loop.min_repeat_keyframe_gap` to suppress near-duplicate accepted loops
    while preserving distinct revisits.
-6. `loop.consistency.max_correction_translation_delta_m`,
+7. `loop.consistency.max_correction_translation_delta_m`,
    `loop.consistency.max_correction_rotation_delta_rad`, and optionally
    `loop.consistency.min_support_count` after trusted accepted loops exist.
    Positive delta values reject new accepted-looking candidates whose
    odometry-to-loop correction lacks enough support from previously accepted
    loop corrections.
-7. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
+8. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
    optimized path changes against the MBES-SLAM reference odometry.
 
 Export the loop-status stream after a replay to make tuning measurable:
@@ -209,6 +216,32 @@ After replaying with those values, export the status stream again and compare
 RViz, and optimized path changes. Descriptor thresholds should reduce wasted or
 implausible registration attempts; they should not be treated as calibrated
 defaults until they have been checked on the target bag.
+
+### Reading Short-Edge Rotation Gate Results
+
+The accepted-loop geometry review reports the plan-view distance between each
+accepted candidate/current keyframe pair. On the 2026-06-04 100 s
+`beach_pond` diagnostic replays, many harmful selected loops had plan-view
+edges below 1 m while asking for rotation corrections near the gate. The
+runtime guard for that pattern is:
+
+```yaml
+gates:
+  min_plan_view_separation_m: <Plan XY below m>
+  max_short_plan_view_rotation_rad: <Rotation cap for short plan-view edges>
+```
+
+For wrapper-based experiments, pass the same values as:
+
+```bash
+MBES_LOOP_MIN_PLAN_VIEW_SEPARATION_M=<Plan XY below m>
+MBES_LOOP_MAX_SHORT_PLAN_VIEW_ROTATION_RAD=<Rotation cap rad>
+```
+
+Treat this as a false-positive guard, not as proof that short plan-view loops
+are invalid. A true revisit can be spatially close, so keep the gate disabled
+until the geometry worksheet shows the specific short-edge/high-rotation
+failure mode and trajectory metrics confirm that the cap reduces harm.
 
 ### Reading the Consistency Sweep
 

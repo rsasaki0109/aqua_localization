@@ -92,6 +92,46 @@ TEST(MbesLoopClosureFrontendTest, GateEvaluatorKeepsExistingAcceptanceRules)
   EXPECT_EQ(rejected_gate.status, "translation correction exceeds gate");
 }
 
+TEST(MbesLoopClosureFrontendTest, GateEvaluatorRejectsHighRotationOnShortPlanViewEdges)
+{
+  aqua_sonar_loc::GateOptions options;
+  options.max_fitness_score = 1.0;
+  options.max_correction_translation_m = 1.0;
+  options.max_correction_rotation_rad = 0.5;
+  options.min_plan_view_separation_m = 1.0;
+  options.max_short_plan_view_rotation_rad = 0.2;
+  aqua_sonar_loc::LoopGateEvaluator evaluator(options);
+
+  Eigen::Isometry3d short_guess = Eigen::Isometry3d::Identity();
+  short_guess.translation().x() = 0.5;
+  aqua_sonar_loc::MatchResult short_rotated;
+  short_rotated.success = true;
+  short_rotated.converged = true;
+  short_rotated.fitness = 0.2;
+  short_rotated.candidate_to_current = short_guess;
+  short_rotated.candidate_to_current.linear() =
+    Eigen::AngleAxisd(0.3, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+
+  const auto short_gate = evaluator.evaluate(short_guess, short_rotated);
+
+  EXPECT_FALSE(short_gate.accepted);
+  EXPECT_TRUE(short_gate.correction_pose_valid);
+  EXPECT_NEAR(short_gate.correction_rotation_rad, 0.3, 1.0e-9);
+  EXPECT_EQ(short_gate.status, "short plan-view rotation gate rejected");
+
+  Eigen::Isometry3d long_guess = Eigen::Isometry3d::Identity();
+  long_guess.translation().x() = 2.0;
+  auto long_rotated = short_rotated;
+  long_rotated.candidate_to_current = long_guess;
+  long_rotated.candidate_to_current.linear() =
+    Eigen::AngleAxisd(0.3, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+
+  const auto long_gate = evaluator.evaluate(long_guess, long_rotated);
+
+  EXPECT_TRUE(long_gate.accepted);
+  EXPECT_EQ(long_gate.status, "accepted");
+}
+
 TEST(MbesLoopClosureFrontendTest, DescribeCloudComputesCentroidExtentAndPointCount)
 {
   aqua_sonar_loc::PointCloud cloud;

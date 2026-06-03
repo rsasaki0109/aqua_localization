@@ -196,6 +196,10 @@ private:
       declare_parameter<double>("gates.max_correction_translation_m", 5.0);
     gate_options_.max_correction_rotation_rad =
       declare_parameter<double>("gates.max_correction_rotation_rad", 0.5);
+    gate_options_.min_plan_view_separation_m =
+      declare_parameter<double>("gates.min_plan_view_separation_m", 0.0);
+    gate_options_.max_short_plan_view_rotation_rad =
+      declare_parameter<double>("gates.max_short_plan_view_rotation_rad", 0.0);
 
     descriptor_options_.max_centroid_distance_m =
       declare_parameter<double>("descriptor.max_centroid_distance_m", 0.0);

@@ -44,6 +44,12 @@ double rotation_distance_rad(const Eigen::Isometry3d & delta)
   return std::abs(aa.angle());
 }
 
+double plan_view_distance_m(const Eigen::Isometry3d & transform)
+{
+  const Eigen::Vector3d translation = transform.translation();
+  return std::hypot(translation.x(), translation.y());
+}
+
 Eigen::Isometry3d loop_correction(
   const Eigen::Isometry3d & guess,
   const Eigen::Isometry3d & candidate_to_current)
@@ -415,6 +421,14 @@ GateResult LoopGateEvaluator::evaluate(
     gate.correction_rotation_rad > options_.max_correction_rotation_rad)
   {
     gate.status = "rotation correction exceeds gate";
+    return gate;
+  }
+  if (options_.min_plan_view_separation_m > 0.0 &&
+    options_.max_short_plan_view_rotation_rad > 0.0 &&
+    plan_view_distance_m(guess) < options_.min_plan_view_separation_m &&
+    gate.correction_rotation_rad > options_.max_short_plan_view_rotation_rad)
+  {
+    gate.status = "short plan-view rotation gate rejected";
     return gate;
   }
   gate.accepted = true;

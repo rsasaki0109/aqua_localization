@@ -41,6 +41,11 @@ mbes_loop_closure:
       # relative transform before the candidate is rejected.
       max_correction_translation_m: 5.0
       max_correction_rotation_rad: 0.5
+      # Optional MBES false-positive guard for candidates whose odometry
+      # endpoints are nearly co-located in plan view but whose registration
+      # asks for a large rotation correction. Disabled unless both are positive.
+      min_plan_view_separation_m: 0.0
+      max_short_plan_view_rotation_rad: 0.0
 
     descriptor:
       # Experimental pre-registration shape gate. These are disabled by default
