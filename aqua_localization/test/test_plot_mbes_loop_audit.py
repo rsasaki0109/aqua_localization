@@ -67,3 +67,20 @@ def test_parse_args_defaults_to_all_tuned_accepted_loops(tmp_path):
     assert args.max_labels == 12
     assert args.priority == "all"
     assert args.keyframe_topic == "/aqua_pose_graph/keyframe"
+    assert not args.allow_empty
+
+
+def test_parse_args_accepts_allow_empty(tmp_path):
+    module = load_module()
+
+    args = module.parse_args([
+        "--bag",
+        str(tmp_path / "bag"),
+        "--csv",
+        str(tmp_path / "status.csv"),
+        "--out",
+        str(tmp_path / "plot.png"),
+        "--allow-empty",
+    ])
+
+    assert args.allow_empty

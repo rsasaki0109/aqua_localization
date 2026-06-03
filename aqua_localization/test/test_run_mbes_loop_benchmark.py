@@ -20,6 +20,9 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "MBES_OUT": str(tmp_path / "recorded"),
             "MBES_DURATION": "42",
             "OUT_DIR": str(tmp_path / "out"),
+            "RECORD_READY_TIMEOUT_S": "33",
+            "RECORD_READY_TOPICS": "/aqua_imu_loc/odometry /mbes_loop_closure/status",
+            "PLAY_START_DELAY_S": "7",
             "NOTE": "dry run",
             "MBES_LOOP_MIN_POINTS": "120",
             "MBES_LOOP_VOXEL_LEAF_M": "0.25",
@@ -34,6 +37,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "PLAY_TOPIC_ARGS": "--topics /norbit/detections",
             "AUDIT_MAX_ACCEPTED": "77",
             "AUDIT_MAX_MARKERS": "88",
+            "AUDIT_PLOT_ALLOW_EMPTY": "1",
         }
     )
 
@@ -74,6 +78,9 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert f"MBES_SRC={tmp_path / 'out/mbes_source_humble_sqlite'}" in proc.stdout
     assert "PLAY_TOPIC_ARGS=--topics\\ /norbit/detections" in proc.stdout
     assert "LOCAL_SETUP=/tmp/current_install/setup.bash" in proc.stdout
+    assert "RECORD_READY_TIMEOUT_S=33" in proc.stdout
+    assert "RECORD_READY_TOPICS=/aqua_imu_loc/odometry\\ /mbes_loop_closure/status" in proc.stdout
+    assert "PLAY_START_DELAY_S=7" in proc.stdout
     assert "--max-rotation-rad 0.4" in proc.stdout
     assert "--descriptor-extent-warn 5.0" in proc.stdout
     assert "--consistency-min-support-count 2" in proc.stdout
@@ -83,6 +90,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "--pose-graph-path-topic" not in proc.stdout
     assert "--max-accepted 77" in proc.stdout
     assert "--max-markers 88" in proc.stdout
+    assert "--allow-empty" in proc.stdout
     assert "--require-complete" in proc.stdout
     assert "MBES loop benchmark artifacts:" in proc.stdout
 
@@ -121,4 +129,5 @@ def test_dry_run_uses_default_artifact_names(tmp_path):
     assert str(tmp_path / "out/mbes_beach_pond_loop_geometry.md") in proc.stdout
     assert "--max-accepted 100" in proc.stdout
     assert "--max-markers 100" in proc.stdout
+    assert "--allow-empty" in proc.stdout
     assert "--require-complete" in proc.stdout

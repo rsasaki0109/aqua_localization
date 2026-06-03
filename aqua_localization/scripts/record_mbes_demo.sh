@@ -24,6 +24,9 @@ MBES_LOOP_PROFILE="${MBES_LOOP_PROFILE:-$WORKSPACE/install/aqua_sonar_loc/share/
 MBES_DURATION="${MBES_DURATION:-60}"
 RECORD_STORAGE="${RECORD_STORAGE:-mcap}"
 RECORD_TOPIC_FLAG="${RECORD_TOPIC_FLAG:-}"
+RECORD_READY_TIMEOUT_S="${RECORD_READY_TIMEOUT_S:-75}"
+RECORD_READY_TOPICS="${RECORD_READY_TOPICS:-/aqua_imu_loc/odometry /aqua_sonar_loc/points_filtered /aqua_pose_graph/keyframe /mbes_loop_closure/status}"
+PLAY_START_DELAY_S="${PLAY_START_DELAY_S:-25}"
 PLAY_DURATION_ARG="${PLAY_DURATION_ARG:-}"
 PLAY_TOPIC_ARGS="${PLAY_TOPIC_ARGS:-}"
 POSE_GRAPH_KEYFRAME_TRANSLATION_M="${POSE_GRAPH_KEYFRAME_TRANSLATION_M:-}"
@@ -95,6 +98,41 @@ if [[ -n "$MBES_LOOP_SELECTION_ALLOWLIST_CSV" ]]; then
   MBES_LOOP_PARAM_ARGS+=("-p" "loop.selection.allowlist_csv:=$MBES_LOOP_SELECTION_ALLOWLIST_CSV")
 fi
 
+wait_for_recorder_ready() {
+  if [[ "$RECORD_READY_TIMEOUT_S" == "0" ]]; then
+    return 0
+  fi
+
+  read -r -a ready_topics <<< "$RECORD_READY_TOPICS"
+  if [[ "${#ready_topics[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  local deadline=$((SECONDS + RECORD_READY_TIMEOUT_S))
+  while (( SECONDS < deadline )); do
+    local missing=0
+    for topic in "${ready_topics[@]}"; do
+      if ! grep -q "Subscribed to topic '$topic'" /tmp/aqua_record_mbes_bag.log 2>/dev/null; then
+        missing=1
+        break
+      fi
+    done
+    if [[ "$missing" == "0" ]]; then
+      echo "MBES recorder ready: essential output topics subscribed"
+      return 0
+    fi
+    if ! kill -0 "$REC_PID" 2>/dev/null; then
+      echo "MBES recorder exited before essential output topics were subscribed" >&2
+      return 1
+    fi
+    sleep 1
+  done
+
+  echo \
+    "MBES recorder readiness timeout after ${RECORD_READY_TIMEOUT_S}s; starting replay anyway" \
+    >&2
+}
+
 cd "$WORKSPACE"
 # shellcheck disable=SC1091
 set +u
@@ -150,14 +188,25 @@ ros2 bag record -s "$RECORD_STORAGE" -o "$MBES_OUT" \
   > /tmp/aqua_record_mbes_bag.log 2>&1 &
 REC_PID=$!
 
-sleep 2
+wait_for_recorder_ready
+
+PLAY_DELAY_ARGS=()
+if [[ "$PLAY_START_DELAY_S" != "0" ]]; then
+  PLAY_DELAY_ARGS=("--delay" "$PLAY_START_DELAY_S")
+fi
 
 if [[ -n "$PLAY_DURATION_ARG" ]]; then
-  ros2 bag play "$MBES_SRC" --clock "$PLAY_DURATION_ARG" "$MBES_DURATION" \
+  ros2 bag play "$MBES_SRC" --clock "${PLAY_DELAY_ARGS[@]}" \
+    "$PLAY_DURATION_ARG" "$MBES_DURATION" \
     ${PLAY_TOPIC_ARGS:+$PLAY_TOPIC_ARGS} \
     > /tmp/aqua_record_mbes_play.log 2>&1
 else
-  timeout "${MBES_DURATION}s" ros2 bag play "$MBES_SRC" --clock \
+  PLAY_TIMEOUT_S="$MBES_DURATION"
+  if [[ "$PLAY_START_DELAY_S" != "0" ]]; then
+    PLAY_TIMEOUT_S=$((MBES_DURATION + PLAY_START_DELAY_S))
+  fi
+  timeout "${PLAY_TIMEOUT_S}s" ros2 bag play "$MBES_SRC" --clock \
+    "${PLAY_DELAY_ARGS[@]}" \
     ${PLAY_TOPIC_ARGS:+$PLAY_TOPIC_ARGS} \
     > /tmp/aqua_record_mbes_play.log 2>&1 || true
 fi

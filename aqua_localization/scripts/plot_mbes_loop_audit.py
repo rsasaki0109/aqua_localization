@@ -106,7 +106,7 @@ def build_specs(args: argparse.Namespace):
         max_markers=args.max_markers,
         label_z_offset=args.label_z_offset,
     )
-    if not specs:
+    if not specs and not args.allow_empty:
         raise RuntimeError("no accepted loop markers could be built")
     return keyframes, specs
 
@@ -130,6 +130,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--max-labels", type=int, default=12)
     parser.add_argument("--label-z-offset", type=float, default=1.0)
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="Write the pose-graph plot even when no accepted loop markers are available",
+    )
 
     parser.add_argument("--max-fitness", type=float, default=2.0)
     parser.add_argument("--max-translation-m", type=float, default=5.0)

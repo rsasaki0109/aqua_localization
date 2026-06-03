@@ -381,7 +381,7 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, RejectsLoopOutsideSelectionAllowlist)
   {
     std::ofstream allowlist(allowlist_path);
     allowlist << "timestamp,current_id,candidate_id\n";
-    allowlist << "0.0,99,88\n";
+    allowlist << "0.0,2,0\n";
   }
 
   rclcpp::NodeOptions options;

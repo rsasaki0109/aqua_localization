@@ -312,6 +312,13 @@ non-zero when the allowlist audit finds off-allowlist accepted loops. Set
 `ALLOWLIST_AUDIT_STRICT=0` only when you need to preserve a diagnostic replay
 bundle despite that failure.
 
+Replay recording waits for rosbag2 to subscribe to essential output topics
+before playback starts (`RECORD_READY_TIMEOUT_S=75` by default; override
+`RECORD_READY_TOPICS` to tune the set). Playback also starts with
+`PLAY_START_DELAY_S=25` so rosbag2 can discover source input publishers before
+messages flow. Keep both waits enabled for paired comparisons so normal and
+selected runs start with similar topic coverage.
+
 Useful live checks while tuning:
 
 ```bash
