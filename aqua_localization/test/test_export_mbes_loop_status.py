@@ -254,3 +254,68 @@ def test_descriptor_sweep_markdown_contains_threshold_table():
     assert "Descriptor samples: 2" in text
     assert "| Centroid <= m |" in text
     assert "Would pass" in text
+
+
+def test_consistency_sweep_rows_count_retained_accepted_loops():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 1.0, 0.10,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, True, True, 0.1, 1.2, 0.15,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            3.0, "map", 3, 0, True, True, 0.1, 2.0, 0.40,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            4.0, "map", 4, 0, False, True, 2.0, 4.0, 1.0,
+            math.nan, math.nan, math.nan, "fitness gate rejected"),
+    ]
+
+    rows = module.consistency_sweep_rows(samples)
+
+    assert rows
+    assert all(row["total_count"] == 3 for row in rows)
+    assert any(
+        math.isclose(row["translation_threshold_m"], 0.8) and
+        math.isclose(row["rotation_threshold_rad"], 0.25) and
+        row["supported_count"] == 3 and
+        row["pair_support_count"] == 2
+        for row in rows
+    )
+
+
+def test_consistency_sweep_markdown_handles_too_few_accepted_samples():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 1.0, 0.10,
+            math.nan, math.nan, math.nan, "accepted")
+    ]
+
+    text = module.format_consistency_sweep_markdown(
+        samples, "/mbes_loop_closure/status")
+
+    assert "# MBES Loop Closure Consistency Threshold Sweep" in text
+    assert "Accepted loops with finite corrections: 1" in text
+    assert "At least two accepted loop corrections" in text
+
+
+def test_consistency_sweep_markdown_contains_threshold_table():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 1.0, 0.10,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, True, True, 0.1, 1.2, 0.15,
+            math.nan, math.nan, math.nan, "accepted"),
+    ]
+
+    text = module.format_consistency_sweep_markdown(
+        samples, "/mbes_loop_closure/status")
+
+    assert "magnitude-only tuning aid" in text
+    assert "| Translation delta <= m |" in text
+    assert "Would keep accepted" in text

@@ -128,7 +128,8 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --bag aqua_localization/datasets/public/mbes_slam/demo_with_estimate \
   --out /tmp/mbes_loop_status.csv \
   --summary-out /tmp/mbes_loop_status.md \
-  --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md
+  --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md \
+  --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md
 ```
 
 The CSV preserves every `/mbes_loop_closure/status` sample. The markdown
@@ -147,7 +148,10 @@ Descriptor fields are still exported when descriptor thresholds are disabled,
 so replay summaries can be used to choose initial threshold values before
 turning the gate on. The descriptor sweep report evaluates percentile-derived
 threshold grids and reports how many tested candidates would pass each
-combination.
+combination. The consistency sweep report uses accepted loop correction
+magnitudes to propose initial values for the accepted-loop consistency guard.
+It is only a magnitude-only tuning aid; inspect loop geometry before enabling
+positive `loop.consistency.*` thresholds.
 
 ### Reading the Descriptor Sweep
 
@@ -173,6 +177,30 @@ After replaying with those values, export the status stream again and compare
 RViz, and optimized path changes. Descriptor thresholds should reduce wasted or
 implausible registration attempts; they should not be treated as calibrated
 defaults until they have been checked on the target bag.
+
+### Reading the Consistency Sweep
+
+See [the consistency sweep example](examples/mbes_loop_consistency_sweep.md) for
+the report shape. Each row estimates how many currently accepted loop
+corrections would remain supported if the runtime consistency guard used those
+translation and rotation delta thresholds. The first accepted loop always
+bootstraps the guard, so run the sweep only after visually auditing the earliest
+accepted loops.
+
+Use one row as an initial consistency config:
+
+```yaml
+loop:
+  consistency:
+    max_correction_translation_delta_m: <Translation delta <= m>
+    max_correction_rotation_delta_rad: <Rotation delta <= rad>
+```
+
+Replay with those values and confirm that `loop consistency rejected` samples
+are the intended outlier loop corrections. If accepted loops split into several
+valid motion regimes, leave the guard disabled until a batch consistency
+selector can reason over full transforms instead of scalar correction
+magnitudes.
 
 Useful live checks while tuning:
 
@@ -219,7 +247,10 @@ the odometry guess to the registration result, and later candidates can be
 rejected as `loop consistency rejected` when their correction disagrees with all
 recorded accepted loops. Keep this disabled until at least one replay has a
 trusted accepted loop; a bad first accepted loop would otherwise become the
-reference.
+reference. Generate `/tmp/mbes_loop_consistency_sweep.md` from the same replay
+used for descriptor tuning to choose conservative initial translation/rotation
+delta thresholds, then replay once more and check that rejected candidates are
+the intended inconsistent loops.
 
 `LoopClosureStatus.candidate_id` is `UINT32_MAX` when a keyframe has no
 eligible historical submap. Rejections report the specific gate that failed,

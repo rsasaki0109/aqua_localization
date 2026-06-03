@@ -27,7 +27,7 @@ datasets and baseline comparisons.
   current fusion regression to fix next.
 - [`mbes_beach_pond_loop_status.md`](mbes_beach_pond_loop_status.md):
   first MBES-SLAM `beach_pond` tuning measurement with loop-status counts,
-  descriptor sweep output, and false-positive audit notes.
+  descriptor/consistency sweep output, and false-positive audit notes.
 
 ## Real-Bag Evaluation Manifest
 

@@ -5,6 +5,7 @@ This is a synthetic example of the markdown produced by:
 ```bash
 ros2 run aqua_localization export_mbes_loop_status.py \
   --bag aqua_localization/datasets/public/mbes_slam/demo_with_estimate \
+  --out /tmp/mbes_loop_status.csv \
   --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md
 ```
 

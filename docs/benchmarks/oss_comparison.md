@@ -80,8 +80,8 @@ The strongest paper path is not "beats every OSS package." It is:
    Convert benchmark markdown rows into a compact table for README and paper
    drafts.
 4. **Add MBES loop-status benchmark artifacts.**
-   Pair APE with descriptor sweep summaries, accepted/rejected counts, and a
-   short false-positive review checklist.
+   Pair APE with descriptor/consistency sweep summaries, accepted/rejected
+   counts, and a short false-positive review checklist.
 5. **Add AQUA-SLAM head-to-head on Tank Dataset.**
    Follow [`aqua_slam_comparison.md`](aqua_slam_comparison.md), record the
    AQUA-SLAM output trajectory, and compare with `aqua_localization` on the

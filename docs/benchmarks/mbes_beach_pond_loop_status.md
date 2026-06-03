@@ -119,7 +119,8 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --bag /tmp/aqua_mbes_beach_pond_with_loop_status \
   --out /tmp/mbes_beach_pond_loop_status.csv \
   --summary-out /tmp/mbes_beach_pond_loop_status.md \
-  --descriptor-sweep-out /tmp/mbes_beach_pond_descriptor_sweep.md
+  --descriptor-sweep-out /tmp/mbes_beach_pond_descriptor_sweep.md \
+  --consistency-sweep-out /tmp/mbes_beach_pond_consistency_sweep.md
 ```
 
 Generate the benchmark table row from the exported CSV:
@@ -228,6 +229,9 @@ The descriptor sweep suggests useful first-pass descriptor gates around
 `centroid <= 1.29 m`, `extent ratio <= 5.69`, and
 `point-count ratio >= 0.42` if a replay needs to reduce registration load
 without removing most plausible candidates.
+The next rerun should also archive the consistency sweep so
+`loop.consistency.*` thresholds are chosen from audited accepted-loop
+correction deltas instead of from a single summary tail value.
 
 ### Candidate-Separation Sweep
 
@@ -287,7 +291,8 @@ Promote `mbes-beach-pond-loop-status` from `scaffolded` to `measured` only when:
 - the readiness report passes for the source bag,
 - the measurement table above is filled from the generated summary,
 - every accepted loop has a false-positive audit note,
-- the descriptor sweep is linked or copied into this benchmark folder, and
+- the descriptor and consistency sweeps are linked or copied into this
+  benchmark folder, and
 - the replay duration, bag path, config files, and commit hash are recorded.
 
 This keeps the MBES story strong without overstating the current loop-closure

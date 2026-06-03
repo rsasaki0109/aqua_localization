@@ -4,7 +4,7 @@
 # This orchestrates:
 #   1. Source bag readiness check.
 #   2. Results-included replay recording with MBES loop diagnostics.
-#   3. Loop-status CSV/summary/descriptor-sweep export.
+#   3. Loop-status CSV/summary/descriptor/consistency-sweep export.
 #   4. Markdown benchmark-row generation.
 #
 # Set DRY_RUN=1 to print the commands without executing them.
@@ -33,6 +33,7 @@ READINESS_OUT="$OUT_DIR/mbes_beach_pond_readiness.md"
 STATUS_CSV="$OUT_DIR/mbes_beach_pond_loop_status.csv"
 SUMMARY_OUT="$OUT_DIR/mbes_beach_pond_loop_status.md"
 DESCRIPTOR_SWEEP_OUT="$OUT_DIR/mbes_beach_pond_descriptor_sweep.md"
+CONSISTENCY_SWEEP_OUT="$OUT_DIR/mbes_beach_pond_consistency_sweep.md"
 ROW_OUT="$OUT_DIR/mbes_beach_pond_benchmark_row.md"
 AUDIT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.md"
 AUDIT_PLOT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.png"
@@ -168,7 +169,8 @@ run_cmd ros2 run aqua_localization export_mbes_loop_status.py \
   --bag "$MBES_OUT" \
   --out "$STATUS_CSV" \
   --summary-out "$SUMMARY_OUT" \
-  --descriptor-sweep-out "$DESCRIPTOR_SWEEP_OUT"
+  --descriptor-sweep-out "$DESCRIPTOR_SWEEP_OUT" \
+  --consistency-sweep-out "$CONSISTENCY_SWEEP_OUT"
 
 run_cmd ros2 run aqua_localization mbes_loop_benchmark_row.py \
   --csv "$STATUS_CSV" \
@@ -209,6 +211,7 @@ MBES loop benchmark artifacts:
   status CSV:       $STATUS_CSV
   summary:          $SUMMARY_OUT
   descriptor sweep: $DESCRIPTOR_SWEEP_OUT
+  consistency sweep: $CONSISTENCY_SWEEP_OUT
   benchmark row:    $ROW_OUT
   audit report:      $AUDIT_OUT
   audit plot:        $AUDIT_PLOT_OUT

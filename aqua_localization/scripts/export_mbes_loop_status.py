@@ -12,7 +12,8 @@ Example:
     --bag aqua_localization/datasets/public/mbes_slam/demo_with_estimate \\
     --out /tmp/mbes_loop_status.csv \\
     --summary-out /tmp/mbes_loop_status.md \\
-    --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md
+    --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md \\
+    --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md
 """
 
 from __future__ import annotations
@@ -87,6 +88,14 @@ class OptimizationDiagnostics:
         if not self.chi2_samples:
             return math.nan
         return float(self.chi2_samples[-1].value)
+
+
+@dataclass(frozen=True)
+class ConsistencyDeltaSample:
+    anchor_current_id: int
+    current_id: int
+    translation_delta_m: float
+    rotation_delta_rad: float
 
 
 def stamp_to_seconds(stamp) -> float:
@@ -273,6 +282,121 @@ def descriptor_sweep_rows(samples: list[LoopStatusSample]) -> list[dict[str, flo
     return rows
 
 
+def accepted_correction_samples(samples: list[LoopStatusSample]) -> list[LoopStatusSample]:
+    return [
+        sample for sample in samples
+        if sample.accepted and
+        math.isfinite(sample.correction_translation_m) and
+        math.isfinite(sample.correction_rotation_rad)
+    ]
+
+
+def consistency_delta_samples(
+    samples: list[LoopStatusSample],
+) -> list[ConsistencyDeltaSample]:
+    accepted = accepted_correction_samples(samples)
+    deltas: list[ConsistencyDeltaSample] = []
+    for index, sample in enumerate(accepted):
+        for anchor in accepted[:index]:
+            deltas.append(ConsistencyDeltaSample(
+                anchor_current_id=anchor.current_id,
+                current_id=sample.current_id,
+                translation_delta_m=abs(
+                    sample.correction_translation_m -
+                    anchor.correction_translation_m
+                ),
+                rotation_delta_rad=abs(
+                    sample.correction_rotation_rad -
+                    anchor.correction_rotation_rad
+                ),
+            ))
+    return deltas
+
+
+def consistency_delta_summary(samples: list[LoopStatusSample]) -> dict:
+    accepted = accepted_correction_samples(samples)
+    deltas = consistency_delta_samples(samples)
+    return {
+        "accepted_count": len(accepted),
+        "pair_count": len(deltas),
+        "translation_delta_m": stats([
+            delta.translation_delta_m for delta in deltas
+        ]),
+        "rotation_delta_rad": stats([
+            delta.rotation_delta_rad for delta in deltas
+        ]),
+    }
+
+
+def consistency_supported_count(
+    accepted: list[LoopStatusSample],
+    translation_threshold: float,
+    rotation_threshold: float,
+) -> int:
+    if not accepted:
+        return 0
+    retained = [accepted[0]]
+    for sample in accepted[1:]:
+        supported = any(
+            abs(sample.correction_translation_m -
+                anchor.correction_translation_m) <= translation_threshold and
+            abs(sample.correction_rotation_rad -
+                anchor.correction_rotation_rad) <= rotation_threshold
+            for anchor in retained
+        )
+        if supported:
+            retained.append(sample)
+    return len(retained)
+
+
+def consistency_sweep_rows(
+    samples: list[LoopStatusSample],
+) -> list[dict[str, float | int]]:
+    accepted = accepted_correction_samples(samples)
+    if len(accepted) < 2:
+        return []
+
+    deltas = consistency_delta_samples(samples)
+    translation_thresholds = candidate_thresholds(
+        [delta.translation_delta_m for delta in deltas],
+        [0.5, 0.75, 0.9, 0.95, 1.0],
+    )
+    rotation_thresholds = candidate_thresholds(
+        [delta.rotation_delta_rad for delta in deltas],
+        [0.5, 0.75, 0.9, 0.95, 1.0],
+    )
+
+    rows = []
+    for translation_threshold in translation_thresholds:
+        for rotation_threshold in rotation_thresholds:
+            supported_count = consistency_supported_count(
+                accepted,
+                translation_threshold,
+                rotation_threshold,
+            )
+            pair_support_count = sum(
+                1 for delta in deltas
+                if delta.translation_delta_m <= translation_threshold and
+                delta.rotation_delta_rad <= rotation_threshold
+            )
+            rows.append({
+                "translation_threshold_m": translation_threshold,
+                "rotation_threshold_rad": rotation_threshold,
+                "supported_count": supported_count,
+                "total_count": len(accepted),
+                "pair_support_count": pair_support_count,
+                "pair_total_count": len(deltas),
+            })
+    rows.sort(
+        key=lambda row: (
+            -int(row["supported_count"]),
+            float(row["translation_threshold_m"]),
+            float(row["rotation_threshold_rad"]),
+        )
+    )
+    return rows
+
+
 def format_float(value: float) -> str:
     if not math.isfinite(value):
         return "n/a"
@@ -318,6 +442,63 @@ def format_descriptor_sweep_markdown(samples: list[LoopStatusSample], topic: str
             f"{format_float(float(row['extent_threshold']))} | "
             f"{format_float(float(row['point_ratio_threshold']))} | "
             f"{pass_count} | {pass_pct:.1f}% |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def format_consistency_sweep_markdown(samples: list[LoopStatusSample], topic: str) -> str:
+    summary = consistency_delta_summary(samples)
+    rows = consistency_sweep_rows(samples)
+    accepted_count = int(summary["accepted_count"])
+    lines = [
+        "# MBES Loop Closure Consistency Threshold Sweep",
+        "",
+        f"- Topic: `{topic}`",
+        f"- Samples: {len(samples)}",
+        f"- Accepted loops with finite corrections: {accepted_count}",
+        "",
+        "This report is a magnitude-only tuning aid for "
+        "`loop.consistency.max_correction_translation_delta_m` and "
+        "`loop.consistency.max_correction_rotation_delta_rad`. Confirm loop "
+        "geometry before copying thresholds into runtime config.",
+        "",
+    ]
+    if not rows:
+        lines.extend([
+            "At least two accepted loop corrections with finite translation and "
+            "rotation magnitudes are required for a consistency sweep.",
+            "",
+        ])
+        return "\n".join(lines)
+
+    pair_count = int(summary["pair_count"])
+    lines.extend([
+        "Runtime note: the first accepted loop bootstraps the consistency guard, "
+        "so use trusted accepted-loop replays before enabling tight thresholds.",
+        "",
+        "## Pairwise Accepted Correction Deltas",
+        "",
+        "| Metric | Count | Min | Median | P95 | Max |",
+        "|--------|------:|----:|-------:|----:|----:|",
+        format_stats("translation_delta_m", summary["translation_delta_m"]),
+        format_stats("rotation_delta_rad", summary["rotation_delta_rad"]),
+        "",
+        "## Threshold Candidates",
+        "",
+        "| Translation delta <= m | Rotation delta <= rad | Would keep accepted | Keep % | Supported pairs | Pair % |",
+        "|-----------------------:|----------------------:|--------------------:|-------:|----------------:|-------:|",
+    ])
+    for row in rows:
+        supported_count = int(row["supported_count"])
+        pair_support_count = int(row["pair_support_count"])
+        keep_pct = 100.0 * supported_count / accepted_count if accepted_count else 0.0
+        pair_pct = 100.0 * pair_support_count / pair_count if pair_count else 0.0
+        lines.append(
+            f"| {format_float(float(row['translation_threshold_m']))} | "
+            f"{format_float(float(row['rotation_threshold_rad']))} | "
+            f"{supported_count}/{accepted_count} | {keep_pct:.1f}% | "
+            f"{pair_support_count}/{pair_count} | {pair_pct:.1f}% |"
         )
     lines.append("")
     return "\n".join(lines)
@@ -580,6 +761,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="Optional markdown summary output path")
     parser.add_argument("--descriptor-sweep-out", type=Path,
                         help="Optional descriptor threshold sweep markdown output path")
+    parser.add_argument("--consistency-sweep-out", type=Path,
+                        help="Optional consistency threshold sweep markdown output path")
     return parser.parse_args(argv)
 
 
@@ -611,12 +794,23 @@ def main(argv: list[str] | None = None) -> int:
             format_descriptor_sweep_markdown(samples, args.topic),
             encoding="utf-8",
         )
+    if args.consistency_sweep_out:
+        args.consistency_sweep_out.parent.mkdir(parents=True, exist_ok=True)
+        args.consistency_sweep_out.write_text(
+            format_consistency_sweep_markdown(samples, args.topic),
+            encoding="utf-8",
+        )
     print(summary_text)
     print(f"wrote {len(samples)} samples to {args.out}", file=sys.stderr)
     if args.summary_out:
         print(f"wrote summary to {args.summary_out}", file=sys.stderr)
     if args.descriptor_sweep_out:
         print(f"wrote descriptor sweep to {args.descriptor_sweep_out}", file=sys.stderr)
+    if args.consistency_sweep_out:
+        print(
+            f"wrote consistency sweep to {args.consistency_sweep_out}",
+            file=sys.stderr,
+        )
     return 0
 
 
