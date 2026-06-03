@@ -90,6 +90,83 @@ def test_validation_status_applies_rmse_and_improvement_gates():
     assert len(failures) == 2
 
 
+def test_summarize_prior_quality_counts_confidence_rows():
+    module = load_module()
+    result = SimpleNamespace(steps=3)
+    rows = [
+        {
+            "dvl_covered": True,
+            "used_prior": True,
+            "prior_confidence_accepted": True,
+            "prior_match_confidence": 0.9,
+            "prior_confidence": 0.8,
+            "effective_blend_alpha": 0.7,
+            "prior_reject_reason": "accepted",
+        },
+        {
+            "dvl_covered": True,
+            "used_prior": False,
+            "prior_confidence_accepted": False,
+            "prior_match_confidence": 0.2,
+            "prior_confidence": 0.0,
+            "effective_blend_alpha": 0.0,
+            "prior_reject_reason": "direction mismatch",
+        },
+        {
+            "dvl_covered": False,
+            "used_prior": False,
+            "prior_confidence_accepted": False,
+            "prior_match_confidence": 0.1,
+            "prior_confidence": 0.0,
+            "effective_blend_alpha": 0.0,
+            "prior_reject_reason": "direction mismatch",
+        },
+    ]
+
+    quality = module.summarize_prior_quality(rows, result)
+
+    assert quality.dvl_covered_steps == 2
+    assert quality.dvl_coverage_ratio == pytest.approx(2 / 3)
+    assert quality.prior_applied_steps == 1
+    assert quality.prior_applied_ratio == pytest.approx(1 / 3)
+    assert quality.prior_match_accepted_steps == 1
+    assert quality.mean_prior_match_confidence == pytest.approx(0.4)
+    assert quality.mean_applied_prior_confidence == pytest.approx(0.8)
+    assert quality.dominant_prior_reject_reason == "direction mismatch"
+
+
+def test_validation_status_applies_prior_quality_gates():
+    module = load_module()
+    gate_args = SimpleNamespace(
+        max_corrected_rmse_m=None,
+        min_improvement_percent=None,
+        min_dvl_coverage_ratio=0.9,
+        min_prior_applied_ratio=0.5,
+        min_prior_match_confidence=0.6,
+        min_applied_prior_confidence=0.7,
+    )
+    result = SimpleNamespace(corrected_rmse_m=0.03, rmse_improvement_percent=70.0)
+    quality = module.PriorQualitySummary(
+        steps=10,
+        dvl_covered_steps=8,
+        dvl_coverage_ratio=0.8,
+        prior_applied_steps=4,
+        prior_applied_ratio=0.4,
+        prior_match_accepted_steps=3,
+        prior_match_accepted_ratio=0.3,
+        mean_prior_match_confidence=0.5,
+        mean_applied_prior_confidence=0.6,
+        mean_effective_blend_alpha=0.2,
+        dominant_prior_reject_reason="direction mismatch",
+    )
+
+    status, failures = module.validation_status(gate_args, result, quality)
+
+    assert status == "FAIL"
+    assert len(failures) == 4
+    assert "DVL coverage ratio" in failures[0]
+
+
 def test_format_markdown_marks_benchmark_candidate(tmp_path):
     module = load_module()
     validation_args = SimpleNamespace(
@@ -121,10 +198,25 @@ def test_format_markdown_marks_benchmark_candidate(tmp_path):
         dvl_prior_tum=tmp_path / "prior.tum",
     )
     app_args = SimpleNamespace(csv_out=tmp_path / "steps.csv")
+    quality = module.PriorQualitySummary(
+        steps=12,
+        dvl_covered_steps=10,
+        dvl_coverage_ratio=10 / 12,
+        prior_applied_steps=8,
+        prior_applied_ratio=8 / 12,
+        prior_match_accepted_steps=7,
+        prior_match_accepted_ratio=7 / 12,
+        mean_prior_match_confidence=0.71,
+        mean_applied_prior_confidence=0.80,
+        mean_effective_blend_alpha=0.55,
+        dominant_prior_reject_reason="direction mismatch",
+    )
 
-    text = module.format_markdown(validation_args, metadata, result, [], app_args)
+    text = module.format_markdown(validation_args, metadata, result, [], app_args, quality)
 
     assert "Status: `PASS`" in text
+    assert "## Prior Quality" in text
+    assert "Mean prior-match confidence: 0.710" in text
     assert "benchmark candidate" in text
 
 

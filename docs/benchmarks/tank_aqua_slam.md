@@ -777,11 +777,21 @@ ros2 run aqua_localization run_tank_dvl_validation_bundle.py \
   --benchmark-markdown docs/benchmarks/tank_aqua_slam.md \
   --benchmark-markdown /tmp/aqua_slam_medium_baseline/Medium_aqua_slam_benchmark_row.md \
   --max-gap-x 1.0 \
+  --min-dvl-coverage-ratio 0.5 \
+  --min-prior-applied-ratio 0.2 \
+  --min-prior-match-confidence 0.1 \
+  --min-applied-prior-confidence 0.1 \
   --min-target-samples 10 \
   --min-target-matched-s 10.0 \
   --fail-on-gate-failure \
   --out-dir /tmp/aqua_tank_dvl_prior_medium_validation_bundle
 ```
+
+The prior-quality gates keep the row from becoming a claim candidate when the
+numeric RMSE improves but the real DVL/IMU prior has poor coverage, is rarely
+applied, or has low residual consistency with the visual motion. Start with the
+loose thresholds above, then tighten them once the held-out report shows stable
+coverage and confidence.
 
 On 2026-05-23 this profile-based real-prior application reduced the best strict
 PnP visual row from `0.1128 m` to `0.0323 m` SE(3) RMSE, a `71.4%` reduction,

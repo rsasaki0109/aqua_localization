@@ -96,6 +96,10 @@ def test_make_validation_args_forwards_guards_and_gates(tmp_path):
         allow_profile_sequence_mismatch=False,
         max_corrected_rmse_m=0.0194,
         min_improvement_percent=80.0,
+        min_dvl_coverage_ratio=0.5,
+        min_prior_applied_ratio=0.2,
+        min_prior_match_confidence=0.1,
+        min_applied_prior_confidence=0.1,
     )
 
     validation_args = module.make_validation_args(args, paths)
@@ -103,6 +107,10 @@ def test_make_validation_args_forwards_guards_and_gates(tmp_path):
     assert validation_args.sequence == "Medium"
     assert validation_args.max_corrected_rmse_m == 0.0194
     assert validation_args.min_improvement_percent == 80.0
+    assert validation_args.min_dvl_coverage_ratio == 0.5
+    assert validation_args.min_prior_applied_ratio == 0.2
+    assert validation_args.min_prior_match_confidence == 0.1
+    assert validation_args.min_applied_prior_confidence == 0.1
     assert validation_args.benchmark_row_out == paths.benchmark_row
     assert validation_args.system == "aqua_dvl_prior_visual"
     assert validation_args.note == "held-out candidate"

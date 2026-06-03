@@ -25,6 +25,21 @@ class ValidationMetadata:
     profile_sequence_mismatch_allowed: bool
 
 
+@dataclass(frozen=True)
+class PriorQualitySummary:
+    steps: int
+    dvl_covered_steps: int
+    dvl_coverage_ratio: float
+    prior_applied_steps: int
+    prior_applied_ratio: float
+    prior_match_accepted_steps: int
+    prior_match_accepted_ratio: float
+    mean_prior_match_confidence: float
+    mean_applied_prior_confidence: float
+    mean_effective_blend_alpha: float
+    dominant_prior_reject_reason: str
+
+
 def validate_sequence_split(args, profile: dict) -> ValidationMetadata:
     label = tank_dvl_prior_profile.profile_label(args.profile, profile)
     metadata = profile.get("metadata", {}) if isinstance(profile, dict) else {}
@@ -83,7 +98,75 @@ def application_args(args):
     return app_args
 
 
-def validation_status(args, result) -> tuple[str, list[str]]:
+def finite_mean(values) -> float:
+    finite = [float(value) for value in values if math.isfinite(float(value))]
+    if not finite:
+        return math.nan
+    return sum(finite) / len(finite)
+
+
+def ratio(numerator: int, denominator: int) -> float:
+    if denominator <= 0:
+        return math.nan
+    return numerator / denominator
+
+
+def dominant_reject_reason(quality_rows: list[dict]) -> str:
+    counts: dict[str, int] = {}
+    for row in quality_rows:
+        reason = str(row.get("prior_reject_reason", ""))
+        if not reason or reason == "accepted":
+            continue
+        counts[reason] = counts.get(reason, 0) + 1
+    if not counts:
+        return "none"
+    return max(counts.items(), key=lambda item: (item[1], item[0]))[0]
+
+
+def summarize_prior_quality(quality_rows: list[dict], result) -> PriorQualitySummary:
+    steps = int(getattr(result, "steps", len(quality_rows)))
+    dvl_covered_steps = sum(1 for row in quality_rows if bool(row.get("dvl_covered")))
+    prior_applied_steps = sum(1 for row in quality_rows if bool(row.get("used_prior")))
+    accepted_steps = sum(
+        1 for row in quality_rows if bool(row.get("prior_confidence_accepted"))
+    )
+    applied_rows = [row for row in quality_rows if bool(row.get("used_prior"))]
+    return PriorQualitySummary(
+        steps=steps,
+        dvl_covered_steps=dvl_covered_steps,
+        dvl_coverage_ratio=ratio(dvl_covered_steps, steps),
+        prior_applied_steps=prior_applied_steps,
+        prior_applied_ratio=ratio(prior_applied_steps, steps),
+        prior_match_accepted_steps=accepted_steps,
+        prior_match_accepted_ratio=ratio(accepted_steps, steps),
+        mean_prior_match_confidence=finite_mean(
+            row.get("prior_match_confidence", math.nan) for row in quality_rows
+        ),
+        mean_applied_prior_confidence=finite_mean(
+            row.get("prior_confidence", math.nan) for row in applied_rows
+        ),
+        mean_effective_blend_alpha=finite_mean(
+            row.get("effective_blend_alpha", math.nan) for row in quality_rows
+        ),
+        dominant_prior_reject_reason=dominant_reject_reason(quality_rows),
+    )
+
+
+def ratio_failure(label: str, value: float, minimum: float | None) -> str | None:
+    if minimum is None:
+        return None
+    if not math.isfinite(value):
+        return f"{label} n/a is below minimum {minimum:.3f}"
+    if value < minimum:
+        return f"{label} {value:.3f} is below minimum {minimum:.3f}"
+    return None
+
+
+def validation_status(
+    args,
+    result,
+    quality: PriorQualitySummary | None = None,
+) -> tuple[str, list[str]]:
     failures = []
     if args.max_corrected_rmse_m is not None and result.corrected_rmse_m > args.max_corrected_rmse_m:
         failures.append(
@@ -96,6 +179,31 @@ def validation_status(args, result) -> tuple[str, list[str]]:
         failures.append(
             f"improvement {result.rmse_improvement_percent:.1f}% is below {args.min_improvement_percent:.1f}%"
         )
+    if quality is not None:
+        for failure in (
+            ratio_failure(
+                "DVL coverage ratio",
+                quality.dvl_coverage_ratio,
+                getattr(args, "min_dvl_coverage_ratio", None),
+            ),
+            ratio_failure(
+                "prior-applied ratio",
+                quality.prior_applied_ratio,
+                getattr(args, "min_prior_applied_ratio", None),
+            ),
+            ratio_failure(
+                "mean prior-match confidence",
+                quality.mean_prior_match_confidence,
+                getattr(args, "min_prior_match_confidence", None),
+            ),
+            ratio_failure(
+                "mean applied-prior confidence",
+                quality.mean_applied_prior_confidence,
+                getattr(args, "min_applied_prior_confidence", None),
+            ),
+        ):
+            if failure is not None:
+                failures.append(failure)
     return ("FAIL" if failures else "PASS"), failures
 
 
@@ -105,7 +213,14 @@ def format_float(value: float, precision: int = 4) -> str:
     return f"{value:.{precision}f}"
 
 
-def format_markdown(args, metadata: ValidationMetadata, result, failures: list[str], app_args) -> str:
+def format_markdown(
+    args,
+    metadata: ValidationMetadata,
+    result,
+    failures: list[str],
+    app_args,
+    quality: PriorQualitySummary | None = None,
+) -> str:
     status = "FAIL" if failures else "PASS"
     lines = [
         "# Tank DVL Prior Held-Out Validation",
@@ -132,9 +247,43 @@ def format_markdown(args, metadata: ValidationMetadata, result, failures: list[s
         f"- Step CSV: `{app_args.csv_out}`",
         f"- Benchmark row: `{args.benchmark_row_out}`",
     ]
+    if quality is not None:
+        lines.extend([
+            "",
+            "## Prior Quality",
+            "",
+            f"- DVL coverage ratio: {format_float(quality.dvl_coverage_ratio, 3)} "
+            f"({quality.dvl_covered_steps}/{quality.steps})",
+            f"- Prior-applied ratio: {format_float(quality.prior_applied_ratio, 3)} "
+            f"({quality.prior_applied_steps}/{quality.steps})",
+            f"- Prior-match accepted ratio: "
+            f"{format_float(quality.prior_match_accepted_ratio, 3)} "
+            f"({quality.prior_match_accepted_steps}/{quality.steps})",
+            f"- Mean prior-match confidence: "
+            f"{format_float(quality.mean_prior_match_confidence, 3)}",
+            f"- Mean applied-prior confidence: "
+            f"{format_float(quality.mean_applied_prior_confidence, 3)}",
+            f"- Mean effective blend alpha: "
+            f"{format_float(quality.mean_effective_blend_alpha, 3)}",
+            f"- Dominant prior reject reason: `{quality.dominant_prior_reject_reason}`",
+        ])
     lines.extend(["", "## Gates", ""])
     lines.append(f"- Max corrected RMSE m: `{args.max_corrected_rmse_m}`")
     lines.append(f"- Min improvement percent: `{args.min_improvement_percent}`")
+    lines.append(
+        f"- Min DVL coverage ratio: `{getattr(args, 'min_dvl_coverage_ratio', None)}`"
+    )
+    lines.append(
+        f"- Min prior-applied ratio: `{getattr(args, 'min_prior_applied_ratio', None)}`"
+    )
+    lines.append(
+        f"- Min prior-match confidence: "
+        f"`{getattr(args, 'min_prior_match_confidence', None)}`"
+    )
+    lines.append(
+        f"- Min applied-prior confidence: "
+        f"`{getattr(args, 'min_applied_prior_confidence', None)}`"
+    )
     lines.extend(["", "## Failures", ""])
     if failures:
         for failure in failures:
@@ -191,9 +340,10 @@ def run_validation(args):
     app_args = application_args(args)
     result, _sim_rows, quality_rows = apply_tank_dvl_motion_prior.run_application(app_args)
     apply_tank_dvl_motion_prior.write_application_csv(app_args.csv_out, quality_rows)
-    _status, failures = validation_status(args, result)
+    quality = summarize_prior_quality(quality_rows, result)
+    _status, failures = validation_status(args, result, quality)
     write_benchmark_row(args, metadata, result, failures)
-    summary = format_markdown(args, metadata, result, failures, app_args)
+    summary = format_markdown(args, metadata, result, failures, app_args, quality)
     args.summary_out.parent.mkdir(parents=True, exist_ok=True)
     args.summary_out.write_text(summary, encoding="utf-8")
     return result, failures, summary
@@ -224,6 +374,10 @@ def parse_args(argv):
     parser.add_argument("--allow-profile-sequence-mismatch", action="store_true")
     parser.add_argument("--max-corrected-rmse-m", type=float)
     parser.add_argument("--min-improvement-percent", type=float)
+    parser.add_argument("--min-dvl-coverage-ratio", type=float)
+    parser.add_argument("--min-prior-applied-ratio", type=float)
+    parser.add_argument("--min-prior-match-confidence", type=float)
+    parser.add_argument("--min-applied-prior-confidence", type=float)
     parser.add_argument("--fail-on-gate-failure", action="store_true")
     return parser.parse_args(argv)
 
@@ -248,6 +402,15 @@ def validate_args(args) -> None:
         raise ValueError("--max-corrected-rmse-m must be positive")
     if args.min_improvement_percent is not None and args.min_improvement_percent < 0.0:
         raise ValueError("--min-improvement-percent must be non-negative")
+    for name in (
+        "min_dvl_coverage_ratio",
+        "min_prior_applied_ratio",
+        "min_prior_match_confidence",
+        "min_applied_prior_confidence",
+    ):
+        value = getattr(args, name)
+        if value is not None and not 0.0 <= value <= 1.0:
+            raise ValueError(f"--{name.replace('_', '-')} must be in [0, 1]")
 
 
 def main(argv=None) -> int:

@@ -128,6 +128,17 @@ def make_validation_args(args, paths: BundlePaths):
         argv.extend(["--max-corrected-rmse-m", str(args.max_corrected_rmse_m)])
     if args.min_improvement_percent is not None:
         argv.extend(["--min-improvement-percent", str(args.min_improvement_percent)])
+    if args.min_dvl_coverage_ratio is not None:
+        argv.extend(["--min-dvl-coverage-ratio", str(args.min_dvl_coverage_ratio)])
+    if args.min_prior_applied_ratio is not None:
+        argv.extend(["--min-prior-applied-ratio", str(args.min_prior_applied_ratio)])
+    if args.min_prior_match_confidence is not None:
+        argv.extend(["--min-prior-match-confidence", str(args.min_prior_match_confidence)])
+    if args.min_applied_prior_confidence is not None:
+        argv.extend([
+            "--min-applied-prior-confidence",
+            str(args.min_applied_prior_confidence),
+        ])
     return validation.parse_args(argv)
 
 
@@ -288,6 +299,10 @@ def parse_args(argv):
     parser.add_argument("--allow-profile-sequence-mismatch", action="store_true")
     parser.add_argument("--max-corrected-rmse-m", type=float)
     parser.add_argument("--min-improvement-percent", type=float)
+    parser.add_argument("--min-dvl-coverage-ratio", type=float)
+    parser.add_argument("--min-prior-applied-ratio", type=float)
+    parser.add_argument("--min-prior-match-confidence", type=float)
+    parser.add_argument("--min-applied-prior-confidence", type=float)
     parser.add_argument("--fail-on-gate-failure", action="store_true")
     parser.add_argument("--max-gap-x", type=float)
     parser.add_argument("--max-improvement-to-tie-percent", type=float)
@@ -306,6 +321,15 @@ def validate_args(args) -> None:
         raise ValueError("--max-corrected-rmse-m must be positive")
     if args.min_improvement_percent is not None and args.min_improvement_percent < 0.0:
         raise ValueError("--min-improvement-percent must be non-negative")
+    for name in (
+        "min_dvl_coverage_ratio",
+        "min_prior_applied_ratio",
+        "min_prior_match_confidence",
+        "min_applied_prior_confidence",
+    ):
+        value = getattr(args, name)
+        if value is not None and not 0.0 <= value <= 1.0:
+            raise ValueError(f"--{name.replace('_', '-')} must be in [0, 1]")
     if args.max_gap_x is not None and args.max_gap_x <= 0.0:
         raise ValueError("--max-gap-x must be positive")
     if args.max_improvement_to_tie_percent is not None and args.max_improvement_to_tie_percent < 0.0:
