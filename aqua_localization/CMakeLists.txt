@@ -22,6 +22,8 @@ install(PROGRAMS
   scripts/ingest_tank_aqua_slam_baseline.py
   scripts/export_rosbag_odometry_tum.py
   scripts/export_rosbag_path_tum.py
+  scripts/compare_mbes_loop_metric_reports.py
+  scripts/check_mbes_loop_allowlist_replay.py
   scripts/check_tank_aqua_slam_baseline_ready.py
   scripts/summarize_tank_aqua_slam_baseline_todos.py
   scripts/run_tank_aqua_slam_baseline_workflow.py
@@ -96,6 +98,7 @@ install(PROGRAMS
   scripts/publish_mbes_loop_audit_markers.py
   scripts/plot_mbes_loop_audit.py
   scripts/run_mbes_loop_benchmark.sh
+  scripts/run_mbes_selected_loop_replay_comparison.sh
   scripts/pose_graph_loop_demo.py
   scripts/pose_graph_loop_smoke.sh
   DESTINATION lib/${PROJECT_NAME}
@@ -119,6 +122,8 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_ingest_tank_aqua_slam_baseline test/test_ingest_tank_aqua_slam_baseline.py)
   ament_add_pytest_test(test_export_rosbag_odometry_tum test/test_export_rosbag_odometry_tum.py)
   ament_add_pytest_test(test_export_rosbag_path_tum test/test_export_rosbag_path_tum.py)
+  ament_add_pytest_test(test_compare_mbes_loop_metric_reports test/test_compare_mbes_loop_metric_reports.py)
+  ament_add_pytest_test(test_check_mbes_loop_allowlist_replay test/test_check_mbes_loop_allowlist_replay.py)
   ament_add_pytest_test(test_check_tank_aqua_slam_baseline_ready test/test_check_tank_aqua_slam_baseline_ready.py)
   ament_add_pytest_test(test_summarize_tank_aqua_slam_baseline_todos test/test_summarize_tank_aqua_slam_baseline_todos.py)
   ament_add_pytest_test(test_run_tank_aqua_slam_baseline_workflow test/test_run_tank_aqua_slam_baseline_workflow.py)
@@ -185,6 +190,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_publish_mbes_loop_audit_markers test/test_publish_mbes_loop_audit_markers.py)
   ament_add_pytest_test(test_plot_mbes_loop_audit test/test_plot_mbes_loop_audit.py)
   ament_add_pytest_test(test_run_mbes_loop_benchmark test/test_run_mbes_loop_benchmark.py)
+  ament_add_pytest_test(
+    test_run_mbes_selected_loop_replay_comparison
+    test/test_run_mbes_selected_loop_replay_comparison.py
+  )
 endif()
 
 ament_package()

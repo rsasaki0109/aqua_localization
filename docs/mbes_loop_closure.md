@@ -293,6 +293,25 @@ accepted-loop consistency guard with the offline selected ID set. Otherwise
 valid loops that are not in the CSV are published in status as
 `loop selection rejected` and are not sent to the pose graph.
 
+To run the normal replay, selected-loop replay, and metric comparison as one
+artifact bundle:
+
+```bash
+OUT_ROOT=/tmp/aqua_mbes_selected_loop_comparison \
+MBES_DURATION=120 \
+./aqua_localization/scripts/run_mbes_selected_loop_replay_comparison.sh
+```
+
+The wrapper writes separate normal/selected benchmark directories,
+`mbes_selected_loop_replay_comparison.md`, and
+`mbes_selected_loop_allowlist_audit.md`. The comparison report checks
+pose-graph RMSE from the two `mbes_loop_trajectory_metrics.py` reports; the
+allowlist audit checks that a selected replay did not accept loop IDs outside
+the CSV used for `loop.selection.allowlist_csv`. By default the wrapper exits
+non-zero when the allowlist audit finds off-allowlist accepted loops. Set
+`ALLOWLIST_AUDIT_STRICT=0` only when you need to preserve a diagnostic replay
+bundle despite that failure.
+
 Useful live checks while tuning:
 
 ```bash

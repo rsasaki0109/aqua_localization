@@ -14,6 +14,7 @@ set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-aqua_loc_ws}"
 ROS_SETUP="${ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
+LOCAL_SETUP="${LOCAL_SETUP:-install/setup.bash}"
 MBES_SRC="${MBES_SRC:-$WORKSPACE/aqua_localization/datasets/public/mbes_slam/beach_pond_ros2}"
 MBES_OUT="${MBES_OUT:-$WORKSPACE/aqua_localization/datasets/public/mbes_slam/demo_with_estimate}"
 IMU_PROFILE="${IMU_PROFILE:-$WORKSPACE/install/aqua_imu_loc/share/aqua_imu_loc/config/mbes_slam.yaml}"
@@ -98,8 +99,10 @@ cd "$WORKSPACE"
 # shellcheck disable=SC1091
 set +u
 source "$ROS_SETUP"
-# shellcheck disable=SC1091
-source install/setup.bash
+if [[ -n "$LOCAL_SETUP" ]]; then
+  # shellcheck disable=SC1091
+  source "$LOCAL_SETUP"
+fi
 set -u
 
 rm -rf "$MBES_OUT"

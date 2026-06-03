@@ -37,9 +37,9 @@ manual audit.
 |-----|---------------|------------------------|----------------|
 | Held-out AQUA-SLAM comparison | `short_test` rows exist, but Medium held-out inputs are blocked. | Claim gate must pass on a held-out Tank sequence with AQUA-SLAM and `aqua_*` rows generated from scripts. | Finish Medium input discovery, ingest AQUA-SLAM trajectory, run `aqua_slam_head_to_head_report.py --fail-without-claimable-win`. |
 | Sensor-equivalent Tank stack | Visual frontend is diagnostic; fusion can regress relative to standalone visual. | Stereo + IMU + DVL + pressure should be optimized with explicit residuals and calibrated frames. | Add graph/UKF path that uses DVL velocity, visual pose/feature residuals, pressure, and IMU in one estimator; keep scale/extrinsic tuning out of the held-out segment. |
-| MBES trajectory proof | `beach_pond` loop-status counts, sweeps, audit worksheets, and `mbes_loop_trajectory_metrics.py` APE reports exist. | APE/RPE, pose-graph effect, and false-positive audit must be tied to the same run and commit. | Run normal and selected-loop replays, publish the loop trajectory metric report for both, then require accepted-loop audit notes before claiming improvement. |
+| MBES trajectory proof | `beach_pond` loop-status counts, sweeps, audit worksheets, `mbes_loop_trajectory_metrics.py` APE reports, and `run_mbes_selected_loop_replay_comparison.sh` paired replay automation exist. The paired replay now includes an allowlist integrity audit. | APE/RPE, pose-graph effect, selected-loop integrity, and false-positive audit must be tied to the same run and commit. | Run the paired comparison, publish the measured normal-vs-selected report, pass the allowlist audit, then require accepted-loop audit notes before claiming improvement. |
 | Loop proposal quality | Candidate selection is temporal/spatial plus simple descriptor gates. | Sonar/bathymetry place recognition should propose loop candidates robustly under drift and low-resolution terrain. | Add bathymetric descriptor export and offline retrieval evaluation: recall@k against trusted loop/audit pairs, then use it before registration. |
-| Loop consistency | Online accepted-loop support count is observable. `export_mbes_loop_status.py --batch-consistency-out` exports a PCM-like selected/rejected loop-id report, `--batch-consistency-selected-csv-out` exports replayable IDs, and `loop.selection.allowlist_csv` can feed those IDs back into the MBES loop node. | Batch PCM/GkCM-style selection or robust maximum-consensus should select a globally consistent set of candidate loops and improve measured trajectory metrics. | Run the selected-loop replay, compare trajectory metrics against the dataset reference, then decide whether group-k consistency is needed for ambiguous bathymetry. |
+| Loop consistency | Online accepted-loop support count is observable. `export_mbes_loop_status.py --batch-consistency-out` exports a PCM-like selected/rejected loop-id report, `--batch-consistency-selected-csv-out` exports replayable IDs, `loop.selection.allowlist_csv` can feed those IDs back into the MBES loop node, and `check_mbes_loop_allowlist_replay.py` verifies the replay accepted only selected IDs. | Batch PCM/GkCM-style selection or robust maximum-consensus should select a globally consistent set of candidate loops and improve measured trajectory metrics without off-allowlist accepted loops. | Run the selected-loop replay, compare trajectory metrics against the dataset reference, inspect the allowlist audit, then decide whether group-k consistency is needed for ambiguous bathymetry. |
 | Registration uncertainty | Fitness/correction gates are exported, but loop information is mostly configured. | Registration should return covariance/information that reflects geometry, overlap, and degeneracy. | Add overlap/condition-number diagnostics and map them into loop information; support partially constrained factors when yaw/translation are degenerate. |
 | Robust backend | DCS/huber/none are available backend guards. | False loop closures should be downweighted or switched off automatically and reported. | Add switchable loop factors or an offline GNC/PCM-selected loop set; compare against DCS on the same `beach_pond` replay. |
 | Reproducibility claim | Public docs and Pages are good. | Paper evidence needs exact source bag, duration, config, commit, metrics, and failure gates. | Add a generated SOTA-readiness report that fails when a claim lacks held-out data, baseline row, trajectory metric, or loop audit. |
@@ -51,9 +51,11 @@ manual audit.
    plausible. Without it, any "SOTA" wording should be blocked.
 
 2. **Run MBES trajectory evidence.**
-   The repo can now export input-odometry vs. pose-graph APE from each replay.
-   The missing evidence is measured normal vs. selected-loop replay results and
-   audited false-positive decisions for the accepted loops.
+   The repo can now export input-odometry vs. pose-graph APE from each replay
+   and run the normal/selected comparison as one wrapper. The missing evidence
+   is a full replay whose selected-loop comparison improves the pose graph,
+   whose allowlist audit passes, and whose accepted loops have false-positive
+   decisions.
 
 3. **Measure the selected-loop replay.**
    The repo now has a PCM-like offline selector and a selected-loop replay

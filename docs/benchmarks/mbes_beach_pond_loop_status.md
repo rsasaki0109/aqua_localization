@@ -135,6 +135,14 @@ ros2 run aqua_localization mbes_loop_trajectory_metrics.py \
   --out-dir /tmp/mbes_beach_pond_loop_trajectory_metrics
 ```
 
+Run the normal replay, selected-loop replay, and metric comparison together:
+
+```bash
+OUT_ROOT=/tmp/aqua_mbes_selected_loop_comparison \
+MBES_DURATION=120 \
+./aqua_localization/scripts/run_mbes_selected_loop_replay_comparison.sh
+```
+
 Generate the benchmark table row from the exported CSV:
 
 ```bash
@@ -162,6 +170,8 @@ Expected generated files:
 | `/tmp/mbes_beach_pond_batch_selected_loops.csv` | Selected `current_id,candidate_id` loop pairs for a `loop.selection.allowlist_csv` replay. |
 | `/tmp/mbes_beach_pond_loop_trajectory_metrics.md` | APE comparison of input odometry vs. latest pose-graph path against dataset reference odometry. |
 | `/tmp/mbes_beach_pond_loop_trajectory_metrics/*.tum` | Exported reference, input odometry, and pose-graph TUM trajectories used by the metric report. |
+| `/tmp/aqua_mbes_selected_loop_comparison/mbes_selected_loop_replay_comparison.md` | Normal vs. selected-loop pose-graph RMSE comparison generated from paired metric reports. |
+| `/tmp/aqua_mbes_selected_loop_comparison/mbes_selected_loop_allowlist_audit.md` | Strict selected-replay integrity check that fails if any accepted loop is outside the selected-loop CSV. |
 | `mbes_loop_benchmark_row.py` output | One Markdown row for the measurement table below. |
 | `audit_mbes_loop_candidates.py` output | Accepted-loop visual audit priority list. |
 | `plot_mbes_loop_audit.py` output | Plan-view PNG of the pose graph and accepted-loop audit priorities. |

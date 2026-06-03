@@ -14,6 +14,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
         {
             "DRY_RUN": "1",
             "WORKSPACE": str(tmp_path),
+            "LOCAL_SETUP": "/tmp/current_install/setup.bash",
             "MBES_SRC": str(tmp_path / "beach_pond_ros2"),
             "MBES_PREPARE_HUMBLE_METADATA": "1",
             "MBES_OUT": str(tmp_path / "recorded"),
@@ -72,6 +73,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert f"MBES_LOOP_SELECTION_ALLOWLIST_CSV={tmp_path / 'selected.csv'}" in proc.stdout
     assert f"MBES_SRC={tmp_path / 'out/mbes_source_humble_sqlite'}" in proc.stdout
     assert "PLAY_TOPIC_ARGS=--topics\\ /norbit/detections" in proc.stdout
+    assert "LOCAL_SETUP=/tmp/current_install/setup.bash" in proc.stdout
     assert "--max-rotation-rad 0.4" in proc.stdout
     assert "--descriptor-extent-warn 5.0" in proc.stdout
     assert "--consistency-min-support-count 2" in proc.stdout

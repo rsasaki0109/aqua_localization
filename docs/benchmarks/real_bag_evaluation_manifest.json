@@ -74,6 +74,8 @@
         "batch consistency selection report",
         "batch selected loop allowlist CSV",
         "loop trajectory metrics report",
+        "selected-loop replay comparison report",
+        "selected-loop allowlist replay audit",
         "accepted-loop audit report",
         "accepted-loop geometry review",
         "high-priority accepted-loop audit packet"
