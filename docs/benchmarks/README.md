@@ -28,6 +28,9 @@ datasets and baseline comparisons.
 - [`mbes_beach_pond_loop_status.md`](mbes_beach_pond_loop_status.md):
   first MBES-SLAM `beach_pond` tuning measurement with loop-status counts,
   descriptor/consistency sweep output, and false-positive audit notes.
+- [`sota_gap_analysis.md`](sota_gap_analysis.md): paper-backed gap analysis
+  that blocks SOTA wording until held-out accuracy, robust loop selection, and
+  MBES trajectory evidence are in place.
 
 ## Real-Bag Evaluation Manifest
 
@@ -52,6 +55,8 @@ the report before a benchmark session.
 - [`oss_comparison.md`](oss_comparison.md): protocol for comparing
   `aqua_localization` against existing open-source localization and SLAM tools
   without overstating results.
+- [`sota_gap_analysis.md`](sota_gap_analysis.md): primary-source reading list,
+  current SOTA bar, and concrete implementation order for closing the gap.
 - [`aqua_slam_comparison.md`](aqua_slam_comparison.md): focused comparison
   plan for SenseRoboticsLab/AQUA-SLAM, the closest current underwater SLAM
   baseline.
