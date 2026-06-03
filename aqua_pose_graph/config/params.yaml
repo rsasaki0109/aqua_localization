@@ -15,6 +15,10 @@ aqua_pose_graph:
       loop_constraint: /aqua_pose_graph/loop_constraint
       # Diagnostic count of accepted loop constraints (std_msgs/UInt32).
       loop_constraint_count: /aqua_pose_graph/loop_constraint_count
+      # Diagnostic count of actual g2o optimize() runs (std_msgs/UInt32).
+      optimization_count: /aqua_pose_graph/optimization_count
+      # Latest post-optimization active chi^2 (std_msgs/Float64).
+      optimization_chi2: /aqua_pose_graph/optimization_chi2
 
     frames:
       # Frame for the published path. This node does not publish TF.

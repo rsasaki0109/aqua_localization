@@ -91,6 +91,7 @@ public:
   std::size_t edge_count() const { return edges_; }
   std::size_t loop_constraint_count() const { return loop_edges_; }
   std::size_t optimization_count() const { return optimization_runs_; }
+  double last_optimization_chi2() const { return last_optimization_chi2_; }
 
   // Pull the current optimized pose for a given keyframe id (returns false
   // if the id does not exist).
@@ -111,6 +112,7 @@ private:
   std::size_t edges_{0};
   std::size_t loop_edges_{0};
   std::size_t optimization_runs_{0};
+  double last_optimization_chi2_{0.0};
   int keyframes_since_last_optimize_{0};
 };
 

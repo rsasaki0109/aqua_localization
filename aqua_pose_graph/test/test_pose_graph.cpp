@@ -86,6 +86,8 @@ TEST(PoseGraph, OptimizeOnChainPreservesPoses)
   ASSERT_EQ(graph.keyframes().size(), 4u);
 
   graph.optimize();
+  EXPECT_EQ(graph.optimization_count(), 1u);
+  EXPECT_GE(graph.last_optimization_chi2(), 0.0);
 
   // Without loop closures the chain optimization is a no-op against the
   // odometry-only initialisation. Verify keyframe poses match the input.

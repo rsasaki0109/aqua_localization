@@ -13,6 +13,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/u_int32.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <tf2/LinearMath/Quaternion.h>
@@ -151,6 +152,10 @@ public:
       "topics.loop_constraint", "/aqua_pose_graph/loop_constraint");
     loop_constraint_count_topic_ = declare_parameter<std::string>(
       "topics.loop_constraint_count", "/aqua_pose_graph/loop_constraint_count");
+    optimization_count_topic_ = declare_parameter<std::string>(
+      "topics.optimization_count", "/aqua_pose_graph/optimization_count");
+    optimization_chi2_topic_ = declare_parameter<std::string>(
+      "topics.optimization_chi2", "/aqua_pose_graph/optimization_chi2");
     map_frame_ = declare_parameter<std::string>("frames.map", "map");
 
     graph_ = std::make_unique<PoseGraph>(cfg);
@@ -176,6 +181,10 @@ public:
       keyframe_topic_, rclcpp::QoS(2000).transient_local());
     loop_constraint_count_pub_ = create_publisher<std_msgs::msg::UInt32>(
       loop_constraint_count_topic_, rclcpp::QoS(1).transient_local());
+    optimization_count_pub_ = create_publisher<std_msgs::msg::UInt32>(
+      optimization_count_topic_, rclcpp::QoS(1).transient_local());
+    optimization_chi2_pub_ = create_publisher<std_msgs::msg::Float64>(
+      optimization_chi2_topic_, rclcpp::QoS(1).transient_local());
 
     optimize_srv_ = create_service<std_srvs::srv::Trigger>(
       "/aqua_pose_graph/optimize",
@@ -184,6 +193,7 @@ public:
         std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
         const double chi2 = graph_->optimize();
         publish_path();
+        publish_optimization_status();
         response->success = true;
         response->message = "optimized; chi2=" + std::to_string(chi2);
       });
@@ -196,6 +206,7 @@ public:
         publish_path();
         publish_keyframe_count();
         publish_loop_constraint_count();
+        publish_optimization_status();
         response->success = true;
         response->message = "graph reset";
       });
@@ -220,11 +231,15 @@ private:
       covariance_to_eigen(msg.pose.covariance);
     const double t = static_cast<double>(msg.header.stamp.sec)
       + static_cast<double>(msg.header.stamp.nanosec) * 1e-9;
+    const std::size_t optimization_count_before = graph_->optimization_count();
     const bool added = graph_->add_odometry_sample(t, pose, cov);
     if (added) {
       publish_keyframe_count();
       publish_latest_keyframe();
       publish_path();
+      if (graph_->optimization_count() != optimization_count_before) {
+        publish_optimization_status();
+      }
     }
   }
 
@@ -260,12 +275,16 @@ private:
       return;
     }
 
+    const std::size_t optimization_count_before = graph_->optimization_count();
     double chi2 = 0.0;
     if (msg.optimize_after_insert) {
       chi2 = graph_->optimize();
     }
     publish_loop_constraint_count();
     publish_path();
+    if (graph_->optimization_count() != optimization_count_before) {
+      publish_optimization_status();
+    }
 
     RCLCPP_INFO(
       get_logger(),
@@ -312,6 +331,17 @@ private:
     loop_constraint_count_pub_->publish(msg);
   }
 
+  void publish_optimization_status()
+  {
+    std_msgs::msg::UInt32 count_msg;
+    count_msg.data = static_cast<uint32_t>(graph_->optimization_count());
+    optimization_count_pub_->publish(count_msg);
+
+    std_msgs::msg::Float64 chi2_msg;
+    chi2_msg.data = graph_->last_optimization_chi2();
+    optimization_chi2_pub_->publish(chi2_msg);
+  }
+
   void publish_path()
   {
     nav_msgs::msg::Path path;
@@ -332,6 +362,8 @@ private:
   rclcpp::Publisher<std_msgs::msg::UInt32>::SharedPtr keyframe_count_pub_;
   rclcpp::Publisher<aqua_msgs::msg::PoseGraphKeyframe>::SharedPtr keyframe_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt32>::SharedPtr loop_constraint_count_pub_;
+  rclcpp::Publisher<std_msgs::msg::UInt32>::SharedPtr optimization_count_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr optimization_chi2_pub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr optimize_srv_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_srv_;
   std::string odom_topic_;
@@ -340,6 +372,8 @@ private:
   std::string keyframe_topic_;
   std::string loop_constraint_topic_;
   std::string loop_constraint_count_topic_;
+  std::string optimization_count_topic_;
+  std::string optimization_chi2_topic_;
   std::string map_frame_;
 };
 

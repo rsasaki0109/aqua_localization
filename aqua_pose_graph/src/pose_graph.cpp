@@ -83,6 +83,7 @@ void PoseGraph::reset()
   edges_ = 0;
   loop_edges_ = 0;
   optimization_runs_ = 0;
+  last_optimization_chi2_ = 0.0;
   keyframes_since_last_optimize_ = 0;
 }
 
@@ -182,6 +183,7 @@ bool PoseGraph::add_loop_constraint(const LoopConstraint & constraint)
 double PoseGraph::optimize()
 {
   if (keyframes_.size() < 2 || edges_ == 0) {
+    last_optimization_chi2_ = 0.0;
     return 0.0;
   }
   optimizer_->initializeOptimization();
@@ -198,7 +200,8 @@ double PoseGraph::optimize()
     }
   }
   optimizer_->computeActiveErrors();
-  return optimizer_->activeChi2();
+  last_optimization_chi2_ = optimizer_->activeChi2();
+  return last_optimization_chi2_;
 }
 
 bool PoseGraph::keyframe_pose(std::size_t id, Eigen::Isometry3d * pose) const
