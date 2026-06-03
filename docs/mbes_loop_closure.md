@@ -130,6 +130,11 @@ The CSV preserves every `/mbes_loop_closure/status` sample. The markdown
 summary reports accepted, rejected, and no-candidate counts, rejection
 reasons, fitness quantiles, correction translation/rotation quantiles, and
 descriptor centroid-distance, extent-ratio, and point-count-ratio quantiles.
+When `/aqua_pose_graph/optimization_count` and
+`/aqua_pose_graph/optimization_chi2` are present in the recorded bag, the
+summary also reports how many g2o optimization runs actually happened and the
+latest active chi-square. This helps confirm that loop constraints, not the
+odometry-only chain, are driving pose-graph optimization work.
 Descriptor fields are still exported when descriptor thresholds are disabled,
 so replay summaries can be used to choose initial threshold values before
 turning the gate on. The descriptor sweep report evaluates percentile-derived
@@ -166,6 +171,8 @@ Useful live checks while tuning:
 ```bash
 ros2 topic echo /mbes_loop_closure/status
 ros2 topic echo /aqua_pose_graph/loop_constraint_count
+ros2 topic echo /aqua_pose_graph/optimization_count
+ros2 topic echo /aqua_pose_graph/optimization_chi2
 ```
 
 `LoopClosureStatus.candidate_id` is `UINT32_MAX` when a keyframe has no

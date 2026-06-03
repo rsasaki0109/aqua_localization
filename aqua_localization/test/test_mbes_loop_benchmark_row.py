@@ -122,6 +122,30 @@ def test_format_row_matches_benchmark_table_shape(tmp_path):
     )
 
 
+def test_format_row_can_include_optimization_columns(tmp_path):
+    module = load_module()
+    path = tmp_path / "status.csv"
+    write_status_csv(path)
+
+    class Args:
+        dataset = "MBES-SLAM"
+        sequence = "beach_pond"
+        duration = 120.0
+        optimization_count = 4
+        optimization_chi2 = 12.5
+        note = "diagnostics"
+
+    header = module.table_header(module.include_optimization_columns(Args))
+    row = module.format_row(Args, module.summarize_rows(module.read_loop_status_csv(path)))
+
+    assert "Optimize runs" in header
+    assert "Latest chi2" in header
+    assert row == (
+        "| MBES-SLAM | `beach_pond` | 120 | 3 | 1 | 1 | 1 | 2 | "
+        "0.2000 | 0.5800 | 4 | 12.5000 | diagnostics |"
+    )
+
+
 def test_cli_prints_header_and_row(tmp_path):
     path = tmp_path / "status.csv"
     write_status_csv(path)

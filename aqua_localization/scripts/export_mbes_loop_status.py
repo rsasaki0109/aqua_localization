@@ -63,6 +63,32 @@ class LoopStatusSample:
     status: str
 
 
+@dataclass(frozen=True)
+class TopicValueSample:
+    timestamp: float
+    value: float
+
+
+@dataclass(frozen=True)
+class OptimizationDiagnostics:
+    count_topic: str
+    chi2_topic: str
+    count_samples: list[TopicValueSample]
+    chi2_samples: list[TopicValueSample]
+
+    @property
+    def latest_count(self) -> int | None:
+        if not self.count_samples:
+            return None
+        return int(round(self.count_samples[-1].value))
+
+    @property
+    def latest_chi2(self) -> float:
+        if not self.chi2_samples:
+            return math.nan
+        return float(self.chi2_samples[-1].value)
+
+
 def stamp_to_seconds(stamp) -> float:
     return float(stamp.sec) + float(stamp.nanosec) * 1.0e-9
 
@@ -297,7 +323,32 @@ def format_descriptor_sweep_markdown(samples: list[LoopStatusSample], topic: str
     return "\n".join(lines)
 
 
-def format_summary_markdown(summary: dict, topic: str) -> str:
+def format_optimization_diagnostics_markdown(
+    optimization: OptimizationDiagnostics | None,
+) -> list[str]:
+    if optimization is None:
+        return []
+    latest_count = (
+        "n/a" if optimization.latest_count is None else str(optimization.latest_count)
+    )
+    return [
+        "## Pose Graph Optimization",
+        "",
+        f"- Count topic: `{optimization.count_topic}`",
+        f"- Count samples: {len(optimization.count_samples)}",
+        f"- Latest optimize count: {latest_count}",
+        f"- Chi2 topic: `{optimization.chi2_topic}`",
+        f"- Chi2 samples: {len(optimization.chi2_samples)}",
+        f"- Latest active chi2: {format_float(optimization.latest_chi2)}",
+        "",
+    ]
+
+
+def format_summary_markdown(
+    summary: dict,
+    topic: str,
+    optimization: OptimizationDiagnostics | None = None,
+) -> str:
     lines = [
         "# MBES Loop Closure Status Summary",
         "",
@@ -308,6 +359,9 @@ def format_summary_markdown(summary: dict, topic: str) -> str:
         f"- No candidate: {summary['no_candidate']}",
         f"- Converged registrations: {summary['converged']}",
         "",
+    ]
+    lines.extend(format_optimization_diagnostics_markdown(optimization))
+    lines.extend([
         "## Numeric Distributions",
         "",
         "| Metric | Count | Min | Median | P95 | Max |",
@@ -328,7 +382,7 @@ def format_summary_markdown(summary: dict, topic: str) -> str:
         "",
         "## Rejection Reasons",
         "",
-    ]
+    ])
     if summary["rejection_counts"]:
         for reason, count in summary["rejection_counts"].most_common():
             lines.append(f"- {reason}: {count}")
@@ -418,6 +472,21 @@ def deserialize_status_message(reader, raw, msgtype: str):
     return deserialize_message(raw, LoopClosureStatus)
 
 
+def deserialize_scalar_message(reader, raw, msgtype: str):
+    try:
+        return reader.deserialize(raw, msgtype)
+    except Exception:
+        if msgtype == "std_msgs/msg/UInt32":
+            from rclpy.serialization import deserialize_message
+            from std_msgs.msg import UInt32
+            return deserialize_message(raw, UInt32)
+        if msgtype == "std_msgs/msg/Float64":
+            from rclpy.serialization import deserialize_message
+            from std_msgs.msg import Float64
+            return deserialize_message(raw, Float64)
+        raise
+
+
 def read_bag_samples(bag: Path, topic: str) -> list[LoopStatusSample]:
     try:
         from rosbags.highlevel import AnyReader
@@ -448,6 +517,51 @@ def read_bag_samples(bag: Path, topic: str) -> list[LoopStatusSample]:
     return samples
 
 
+def read_bag_scalar_samples(bag: Path, topic: str) -> list[TopicValueSample]:
+    try:
+        from rosbags.highlevel import AnyReader
+    except ImportError as e:
+        raise RuntimeError("missing dependency: install rosbags to read rosbag2 files") from e
+
+    bag_dir = bag if bag.is_dir() else bag.parent
+    if not bag_dir.is_dir():
+        raise RuntimeError(f"not a rosbag2 directory: {bag_dir}")
+
+    samples: list[TopicValueSample] = []
+    reader = open_reader_with_typestore_fallback(AnyReader, bag_dir)
+    try:
+        wanted = [connection for connection in reader.connections if connection.topic == topic]
+        if not wanted:
+            return samples
+        for connection, t_ns, raw in reader.messages(connections=wanted):
+            try:
+                msg = deserialize_scalar_message(reader, raw, connection.msgtype)
+            except Exception:
+                continue
+            value = getattr(msg, "data", math.nan)
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                continue
+            samples.append(TopicValueSample(t_ns * 1.0e-9, value))
+    finally:
+        reader.close()
+    return samples
+
+
+def read_optimization_diagnostics(
+    bag: Path,
+    count_topic: str,
+    chi2_topic: str,
+) -> OptimizationDiagnostics:
+    return OptimizationDiagnostics(
+        count_topic=count_topic,
+        chi2_topic=chi2_topic,
+        count_samples=read_bag_scalar_samples(bag, count_topic),
+        chi2_samples=read_bag_scalar_samples(bag, chi2_topic),
+    )
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bag", required=True, type=Path,
@@ -456,6 +570,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="Output CSV path")
     parser.add_argument("--topic", default="/mbes_loop_closure/status",
                         help="LoopClosureStatus topic")
+    parser.add_argument("--optimization-count-topic",
+                        default="/aqua_pose_graph/optimization_count",
+                        help="Optional std_msgs/UInt32 pose-graph optimize-count topic")
+    parser.add_argument("--optimization-chi2-topic",
+                        default="/aqua_pose_graph/optimization_chi2",
+                        help="Optional std_msgs/Float64 pose-graph active-chi2 topic")
     parser.add_argument("--summary-out", type=Path,
                         help="Optional markdown summary output path")
     parser.add_argument("--descriptor-sweep-out", type=Path,
@@ -467,12 +587,21 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     try:
         samples = read_bag_samples(args.bag, args.topic)
+        optimization = read_optimization_diagnostics(
+            args.bag,
+            args.optimization_count_topic,
+            args.optimization_chi2_topic,
+        )
     except RuntimeError as e:
         sys.stderr.write(f"{e}\n")
         return 1
 
     write_csv(args.out, samples)
-    summary_text = format_summary_markdown(summarize(samples), args.topic)
+    summary_text = format_summary_markdown(
+        summarize(samples),
+        args.topic,
+        optimization,
+    )
     if args.summary_out:
         args.summary_out.parent.mkdir(parents=True, exist_ok=True)
         args.summary_out.write_text(summary_text, encoding="utf-8")

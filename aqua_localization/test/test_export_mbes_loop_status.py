@@ -162,6 +162,34 @@ def test_format_summary_markdown_contains_key_sections():
     assert "| descriptor_point_count_ratio |" in text
 
 
+def test_format_summary_markdown_includes_optimization_diagnostics():
+    module = load_module()
+    summary = module.summarize([
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.2, 0.3, 0.04,
+            0.5, 1.2, 0.8, "accepted")
+    ])
+    optimization = module.OptimizationDiagnostics(
+        count_topic="/aqua_pose_graph/optimization_count",
+        chi2_topic="/aqua_pose_graph/optimization_chi2",
+        count_samples=[
+            module.TopicValueSample(1.0, 0.0),
+            module.TopicValueSample(2.0, 3.0),
+        ],
+        chi2_samples=[module.TopicValueSample(2.0, 12.5)],
+    )
+
+    text = module.format_summary_markdown(
+        summary,
+        "/mbes_loop_closure/status",
+        optimization,
+    )
+
+    assert "## Pose Graph Optimization" in text
+    assert "Latest optimize count: 3" in text
+    assert "Latest active chi2: 12.5" in text
+
+
 def test_descriptor_sweep_rows_count_threshold_passes():
     module = load_module()
     samples = [

@@ -127,7 +127,21 @@ def format_number(value: float | int | str, precision: int = 4) -> str:
     return f"{float(value):.{precision}f}"
 
 
-def table_header() -> str:
+def include_optimization_columns(args) -> bool:
+    return (
+        getattr(args, "optimization_count", None) is not None or
+        getattr(args, "optimization_chi2", None) is not None
+    )
+
+
+def table_header(include_optimization: bool = False) -> str:
+    if include_optimization:
+        return "\n".join(
+            [
+                "| Dataset | Sequence | Duration s | Status samples | Accepted | Rejected | No candidate | Converged | Median fitness | P95 correction m | Optimize runs | Latest chi2 | Notes |",
+                "|---------|----------|-----------:|---------------:|---------:|---------:|-------------:|----------:|---------------:|-----------------:|--------------:|------------:|-------|",
+            ]
+        )
     return "\n".join(
         [
             "| Dataset | Sequence | Duration s | Status samples | Accepted | Rejected | No candidate | Converged | Median fitness | P95 correction m | Notes |",
@@ -149,8 +163,18 @@ def format_row(args, summary: dict[str, float | int]) -> str:
         format_number(summary["converged"]),
         format_number(summary["median_fitness"]),
         format_number(summary["p95_correction_m"]),
-        args.note,
     ]
+    if include_optimization_columns(args):
+        optimize_runs = (
+            "TBD" if getattr(args, "optimization_count", None) is None
+            else format_number(args.optimization_count)
+        )
+        latest_chi2 = (
+            "TBD" if getattr(args, "optimization_chi2", None) is None
+            else format_number(args.optimization_chi2)
+        )
+        cells.extend([optimize_runs, latest_chi2])
+    cells.append(args.note)
     return "| " + " | ".join(escape_cell(cell) for cell in cells) + " |"
 
 
@@ -173,6 +197,10 @@ def parse_args(argv):
     parser.add_argument("--dataset", required=True, help="Dataset name.")
     parser.add_argument("--sequence", required=True, help="Sequence name.")
     parser.add_argument("--duration", type=float, help="Replay duration in seconds.")
+    parser.add_argument("--optimization-count", type=int,
+                        help="Latest /aqua_pose_graph/optimization_count value.")
+    parser.add_argument("--optimization-chi2", type=float,
+                        help="Latest /aqua_pose_graph/optimization_chi2 value.")
     parser.add_argument("--note", default="", help="Short note for the row.")
     parser.add_argument("--header", action="store_true", help="Print the table header.")
     parser.add_argument("--out", type=Path, help="Optional output Markdown file.")
@@ -190,7 +218,7 @@ def main(argv=None) -> int:
 
     parts = []
     if args.header:
-        parts.append(table_header())
+        parts.append(table_header(include_optimization_columns(args)))
     parts.append(format_row(args, summarize_rows(rows)))
     text = "\n".join(parts)
 
