@@ -21,6 +21,9 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
             "OUT_ROOT": str(tmp_path / "comparison"),
             "MBES_DURATION": "5",
             "LOCAL_SETUP": "/tmp/current_install/setup.bash",
+            "NORMAL_ROS_DOMAIN_ID": "31",
+            "SELECTED_ROS_DOMAIN_ID": "131",
+            "POSE_GRAPH_ODOMETRY_TOPIC": "/nav/processed/odometry",
         }
     )
 
@@ -37,6 +40,9 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     selected_csv = normal_dir / "mbes_beach_pond_batch_selected_loops.csv"
     selected_status = selected_dir / "mbes_beach_pond_loop_status.csv"
     assert "run_mbes_loop_benchmark.sh" in proc.stdout
+    assert "ROS_DOMAIN_ID=31" in proc.stdout
+    assert "ROS_DOMAIN_ID=131" in proc.stdout
+    assert "POSE_GRAPH_ODOMETRY_TOPIC=/nav/processed/odometry" in proc.stdout
     assert f"WORKSPACE={tmp_path / 'ws'}" in proc.stdout
     assert f"OUT_DIR={normal_dir}" in proc.stdout
     assert f"OUT_DIR={selected_dir}" in proc.stdout
@@ -53,4 +59,6 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert f"--status {selected_status}" in proc.stdout
     assert "--strict" in proc.stdout
     assert "mbes_selected_loop_allowlist_audit.md" in proc.stdout
+    assert "normal ROS_DOMAIN_ID: 31" in proc.stdout
+    assert "selected ROS_DOMAIN_ID: 131" in proc.stdout
     assert "MBES selected-loop replay comparison artifacts:" in proc.stdout

@@ -317,10 +317,24 @@ timestamp coverage, or replaced by accepted-looking candidates with different
 IDs. The comparison report checks pose-graph RMSE from the two
 `mbes_loop_trajectory_metrics.py` reports; the allowlist audit checks that a
 selected replay did not accept loop IDs outside the CSV used for
-`loop.selection.allowlist_csv`. By default the wrapper exits non-zero when the
-allowlist audit finds off-allowlist accepted loops. Set
+`loop.selection.allowlist_csv`. The wrapper exits before the selected replay if
+the normal replay writes only a CSV header and no selected loop rows. By default
+the wrapper also exits non-zero when the allowlist audit finds off-allowlist
+accepted loops. Set
 `ALLOWLIST_AUDIT_STRICT=0` only when you need to preserve a diagnostic replay
 bundle despite that failure.
+
+The wrapper also assigns separate `ROS_DOMAIN_ID` values to the normal and
+selected replays by default. This keeps stale transient-local
+`/aqua_pose_graph/keyframe` publishers or interrupted prior runs from feeding
+old keyframes into a new loop-closure node. Set `NORMAL_ROS_DOMAIN_ID` and
+`SELECTED_ROS_DOMAIN_ID` when you need fixed values for a reproducible run log.
+If coverage still shows keyframe-ID drift, set
+`POSE_GRAPH_ODOMETRY_TOPIC=/nav/processed/odometry` to generate pose-graph
+keyframes from the recorded source navigation topic instead of the replayed
+`/aqua_imu_loc/odometry` estimate. Use that as a determinism probe first; do
+not treat it as an accuracy claim unless the baseline definition is documented
+with the report.
 
 Replay recording waits for rosbag2 to subscribe to essential output topics
 before playback starts (`RECORD_READY_TIMEOUT_S=75` by default; override

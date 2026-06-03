@@ -213,7 +213,13 @@ def format_report(
         "",
     ]
 
-    if selected and exact_accepted == len(selected):
+    if not selected:
+        lines.append(
+            "EMPTY: the selected loop CSV has no data rows. The normal replay did not "
+            "produce a selected set, so selected-loop replay and allowlist audit results "
+            "are not meaningful."
+        )
+    elif exact_accepted == len(selected):
         lines.append("PASS: every selected loop was observed and accepted by exact ID.")
     elif exact_missing == len(selected) and nearby_with_candidates == 0:
         lines.append(

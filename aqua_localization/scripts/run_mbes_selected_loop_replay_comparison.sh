@@ -22,12 +22,20 @@ ALLOWLIST_AUDIT_OUT="${ALLOWLIST_AUDIT_OUT:-$OUT_ROOT/mbes_selected_loop_allowli
 SELECTED_COVERAGE_OUT="${SELECTED_COVERAGE_OUT:-$OUT_ROOT/mbes_selected_loop_coverage.md}"
 SELECTED_COVERAGE_TIMESTAMP_WINDOW_S="${SELECTED_COVERAGE_TIMESTAMP_WINDOW_S:-1.0}"
 SELECTED_GEOMETRY_AUDIT_REQUIRE_COMPLETE="${SELECTED_GEOMETRY_AUDIT_REQUIRE_COMPLETE:-0}"
+NORMAL_ROS_DOMAIN_ID="${NORMAL_ROS_DOMAIN_ID:-$((20 + RANDOM % 90))}"
+SELECTED_ROS_DOMAIN_ID="${SELECTED_ROS_DOMAIN_ID:-$((120 + RANDOM % 90))}"
 ALLOWLIST_AUDIT_STRICT="${ALLOWLIST_AUDIT_STRICT:-1}"
 DRY_RUN="${DRY_RUN:-0}"
 ALLOWLIST_AUDIT_ARGS=()
 if [[ "$ALLOWLIST_AUDIT_STRICT" == "1" ]]; then
   ALLOWLIST_AUDIT_ARGS+=("--strict")
 fi
+BENCHMARK_ENV_ARGS=()
+for optional_name in POSE_GRAPH_ODOMETRY_TOPIC; do
+  if [[ -n "${!optional_name+x}" ]]; then
+    BENCHMARK_ENV_ARGS+=("$optional_name=${!optional_name}")
+  fi
+done
 
 run_cmd() {
   printf '+'
@@ -66,21 +74,36 @@ run_env_cmd() {
   env "${env_args[@]}" "$@"
 }
 
+csv_data_row_count() {
+  awk 'NR > 1 && $0 !~ /^[[:space:]]*$/ {count += 1} END {print count + 0}' "$1"
+}
+
 mkdir -p "$OUT_ROOT"
 
 run_env_cmd \
+  "ROS_DOMAIN_ID=$NORMAL_ROS_DOMAIN_ID" \
+  "${BENCHMARK_ENV_ARGS[@]}" \
   "WORKSPACE=$WORKSPACE" \
   "OUT_DIR=$NORMAL_OUT_DIR" \
   "MBES_OUT=$NORMAL_MBES_OUT" \
   "NOTE=normal replay for selected-loop comparison" \
   -- "$BENCHMARK_SCRIPT"
 
-if [[ "$DRY_RUN" != "1" && ! -s "$NORMAL_SELECTED_CSV" ]]; then
-  echo "missing selected loop CSV from normal replay: $NORMAL_SELECTED_CSV" >&2
-  exit 1
+if [[ "$DRY_RUN" != "1" ]]; then
+  if [[ ! -f "$NORMAL_SELECTED_CSV" ]]; then
+    echo "missing selected loop CSV from normal replay: $NORMAL_SELECTED_CSV" >&2
+    exit 1
+  fi
+  NORMAL_SELECTED_ROWS=$(csv_data_row_count "$NORMAL_SELECTED_CSV")
+  if (( NORMAL_SELECTED_ROWS == 0 )); then
+    echo "selected loop CSV has no data rows: $NORMAL_SELECTED_CSV" >&2
+    exit 1
+  fi
 fi
 
 run_env_cmd \
+  "ROS_DOMAIN_ID=$SELECTED_ROS_DOMAIN_ID" \
+  "${BENCHMARK_ENV_ARGS[@]}" \
   "WORKSPACE=$WORKSPACE" \
   "OUT_DIR=$SELECTED_OUT_DIR" \
   "MBES_OUT=$SELECTED_MBES_OUT" \
@@ -111,6 +134,8 @@ cat <<EOF
 MBES selected-loop replay comparison artifacts:
   normal out dir:       $NORMAL_OUT_DIR
   selected out dir:     $SELECTED_OUT_DIR
+  normal ROS_DOMAIN_ID: $NORMAL_ROS_DOMAIN_ID
+  selected ROS_DOMAIN_ID: $SELECTED_ROS_DOMAIN_ID
   selected loop CSV:    $NORMAL_SELECTED_CSV
   normal metrics:       $NORMAL_METRICS_OUT
   selected metrics:     $SELECTED_METRICS_OUT

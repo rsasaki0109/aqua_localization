@@ -129,3 +129,32 @@ timestamp,current_id,candidate_id,accepted,status
     assert rc == 0
     text = out.read_text(encoding="utf-8")
     assert "MISS: selected loop source times did not overlap replay candidate generation." in text
+
+
+def test_empty_selected_csv_is_reported_as_empty(tmp_path):
+    module = load_module()
+    selected_path = tmp_path / "selected.csv"
+    status_path = tmp_path / "status.csv"
+    write_csv(
+        selected_path,
+        """
+timestamp,current_id,candidate_id
+""",
+    )
+    write_csv(
+        status_path,
+        """
+timestamp,current_id,candidate_id,accepted,status
+10.0,100,4,0,loop selection rejected
+""",
+    )
+
+    selected = module.read_selected(selected_path)
+    status_rows = module.read_status(status_path)
+    rows = module.coverage_rows(selected, status_rows, timestamp_window_s=1.0)
+    text = module.format_report(
+        selected_path, status_path, selected, status_rows, rows, 1.0, max_rows=20
+    )
+
+    assert "- Allowlisted loops: 0" in text
+    assert "EMPTY: the selected loop CSV has no data rows." in text
