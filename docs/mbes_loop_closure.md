@@ -131,6 +131,7 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --summary-out /tmp/mbes_loop_status.md \
   --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md \
   --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md \
+  --consistency-rejection-audit-out /tmp/mbes_loop_consistency_rejections.md \
   --consistency-min-support-count 1
 ```
 
@@ -154,7 +155,10 @@ threshold grids and reports how many tested candidates would pass each
 combination. The consistency sweep report uses recorded correction poses when
 available, with scalar correction-magnitude fallback for older bags, to mirror
 the accepted-loop consistency guard and propose initial threshold values.
-Inspect loop geometry before enabling positive `loop.consistency.*` thresholds.
+The consistency rejection audit lists actual `loop consistency rejected`
+samples by support deficit and nearest correction delta after replaying with
+positive consistency thresholds. Inspect loop geometry before enabling positive
+`loop.consistency.*` thresholds.
 
 ### Reading the Descriptor Sweep
 
@@ -219,6 +223,8 @@ the nearest deltas are just above threshold, loosen thresholds or keep
 `min_support_count: 1` until more trusted loops are available. If accepted loops
 split into several valid motion regimes, leave the guard disabled until a batch
 consistency selector can reason over batches of candidate transforms.
+Use `/tmp/mbes_loop_consistency_rejections.md` to sort those rejections by
+support deficit before reviewing RViz/rerun markers.
 
 Useful live checks while tuning:
 

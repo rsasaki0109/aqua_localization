@@ -13,7 +13,8 @@ Example:
     --out /tmp/mbes_loop_status.csv \\
     --summary-out /tmp/mbes_loop_status.md \\
     --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md \\
-    --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md
+    --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md \\
+    --consistency-rejection-audit-out /tmp/mbes_loop_consistency_rejections.md
 """
 
 from __future__ import annotations
@@ -552,6 +553,43 @@ def consistency_sweep_rows(
     return rows
 
 
+def is_consistency_rejection(sample: LoopStatusSample) -> bool:
+    return (
+        not sample.accepted and
+        "loop consistency rejected" in sample.status.lower()
+    )
+
+
+def support_deficit(sample: LoopStatusSample) -> int:
+    return max(
+        0,
+        int(sample.consistency_required_support_count) -
+        int(sample.consistency_support_count),
+    )
+
+
+def finite_sort_value(value: float) -> float:
+    return value if math.isfinite(value) else -math.inf
+
+
+def consistency_rejection_samples(
+    samples: list[LoopStatusSample],
+    limit: int = 50,
+) -> list[LoopStatusSample]:
+    rejections = [sample for sample in samples if is_consistency_rejection(sample)]
+    rejections.sort(
+        key=lambda sample: (
+            -support_deficit(sample),
+            -finite_sort_value(sample.consistency_nearest_translation_delta_m),
+            -finite_sort_value(sample.consistency_nearest_rotation_delta_rad),
+            sample.timestamp,
+        )
+    )
+    if limit <= 0:
+        return []
+    return rejections[:limit]
+
+
 def format_float(value: float) -> str:
     if not math.isfinite(value):
         return "n/a"
@@ -667,6 +705,83 @@ def format_consistency_sweep_markdown(
             f"{format_float(float(row['rotation_threshold_rad']))} | "
             f"{supported_count}/{accepted_count} | {keep_pct:.1f}% | "
             f"{pair_support_count}/{pair_count} | {pair_pct:.1f}% |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def format_consistency_rejection_audit_markdown(
+    samples: list[LoopStatusSample],
+    topic: str,
+    limit: int = 50,
+) -> str:
+    rejections = [sample for sample in samples if is_consistency_rejection(sample)]
+    diagnostic_count = sum(
+        1 for sample in rejections
+        if sample.consistency_required_support_count > 0 or
+        math.isfinite(sample.consistency_nearest_translation_delta_m) or
+        math.isfinite(sample.consistency_nearest_rotation_delta_rad)
+    )
+    deficits = Counter(support_deficit(sample) for sample in rejections)
+    rows = consistency_rejection_samples(samples, limit)
+    lines = [
+        "# MBES Loop Closure Consistency Rejection Audit",
+        "",
+        f"- Topic: `{topic}`",
+        f"- Samples: {len(samples)}",
+        f"- Consistency rejections: {len(rejections)}",
+        f"- Rejections with runtime diagnostics: {diagnostic_count}",
+        f"- Rows shown: {len(rows)}",
+        "",
+    ]
+    if not rejections:
+        lines.extend([
+            "No `loop consistency rejected` samples were found in this replay.",
+            "",
+        ])
+        return "\n".join(lines)
+
+    lines.extend([
+        "Rows are sorted by largest support deficit, then by nearest correction "
+        "delta. Use this report after enabling positive `loop.consistency.*` "
+        "thresholds to distinguish a too-strict support count from a genuinely "
+        "far correction outlier.",
+        "",
+        "## Support Deficits",
+        "",
+    ])
+    for deficit, count in sorted(deficits.items()):
+        lines.append(f"- required - support = {deficit}: {count}")
+    lines.extend([
+        "",
+        "## Rejected Candidates",
+        "",
+        "| Time s | Current | Candidate | Support | Required | Deficit | "
+        "Nearest trans m | Nearest rot rad | Correction trans m | "
+        "Correction rot rad | Fitness |",
+        "|-------:|--------:|----------:|--------:|---------:|--------:|"
+        "----------------:|----------------:|-------------------:|"
+        "-------------------:|--------:|",
+    ])
+    if not rows:
+        lines.extend([
+            "| n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |",
+            "",
+        ])
+        return "\n".join(lines)
+
+    for sample in rows:
+        lines.append(
+            f"| {format_float(sample.timestamp)} | "
+            f"{sample.current_id} | {sample.candidate_id} | "
+            f"{sample.consistency_support_count} | "
+            f"{sample.consistency_required_support_count} | "
+            f"{support_deficit(sample)} | "
+            f"{format_float(sample.consistency_nearest_translation_delta_m)} | "
+            f"{format_float(sample.consistency_nearest_rotation_delta_rad)} | "
+            f"{format_float(sample.correction_translation_m)} | "
+            f"{format_float(sample.correction_rotation_rad)} | "
+            f"{format_float(sample.fitness_score)} |"
         )
     lines.append("")
     return "\n".join(lines)
@@ -957,6 +1072,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="Optional descriptor threshold sweep markdown output path")
     parser.add_argument("--consistency-sweep-out", type=Path,
                         help="Optional consistency threshold sweep markdown output path")
+    parser.add_argument("--consistency-rejection-audit-out", type=Path,
+                        help="Optional runtime consistency rejection audit markdown output path")
+    parser.add_argument("--consistency-rejection-audit-limit", type=int, default=50,
+                        help="Maximum rows to include in the consistency rejection audit")
     parser.add_argument("--consistency-min-support-count", type=int, default=1,
                         help="Support count to simulate in the consistency sweep")
     return parser.parse_args(argv)
@@ -1000,6 +1119,16 @@ def main(argv: list[str] | None = None) -> int:
             ),
             encoding="utf-8",
         )
+    if args.consistency_rejection_audit_out:
+        args.consistency_rejection_audit_out.parent.mkdir(parents=True, exist_ok=True)
+        args.consistency_rejection_audit_out.write_text(
+            format_consistency_rejection_audit_markdown(
+                samples,
+                args.topic,
+                args.consistency_rejection_audit_limit,
+            ),
+            encoding="utf-8",
+        )
     print(summary_text)
     print(f"wrote {len(samples)} samples to {args.out}", file=sys.stderr)
     if args.summary_out:
@@ -1009,6 +1138,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.consistency_sweep_out:
         print(
             f"wrote consistency sweep to {args.consistency_sweep_out}",
+            file=sys.stderr,
+        )
+    if args.consistency_rejection_audit_out:
+        print(
+            f"wrote consistency rejection audit to "
+            f"{args.consistency_rejection_audit_out}",
             file=sys.stderr,
         )
     return 0

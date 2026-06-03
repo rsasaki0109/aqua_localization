@@ -70,6 +70,7 @@
         "mbes_loop_status.csv",
         "descriptor sweep report",
         "consistency sweep report",
+        "consistency rejection audit",
         "accepted-loop audit report",
         "accepted-loop geometry review",
         "high-priority accepted-loop audit packet"

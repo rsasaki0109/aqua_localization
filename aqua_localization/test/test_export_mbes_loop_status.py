@@ -526,3 +526,53 @@ def test_consistency_sweep_markdown_contains_threshold_table():
     assert "Min support count: 1" in text
     assert "| Translation delta <= m |" in text
     assert "Would keep accepted" in text
+
+
+def test_consistency_rejection_audit_markdown_handles_no_rejections():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 1.0, 0.10,
+            math.nan, math.nan, math.nan, "accepted")
+    ]
+
+    text = module.format_consistency_rejection_audit_markdown(
+        samples, "/mbes_loop_closure/status")
+
+    assert "# MBES Loop Closure Consistency Rejection Audit" in text
+    assert "Consistency rejections: 0" in text
+    assert "No `loop consistency rejected` samples" in text
+
+
+def test_consistency_rejection_audit_markdown_lists_runtime_diagnostics():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, False, True, 0.3, 0.8, 0.10,
+            math.nan, math.nan, math.nan, "loop consistency rejected",
+            consistency_support_count=1,
+            consistency_required_support_count=2,
+            consistency_nearest_translation_delta_m=0.7,
+            consistency_nearest_rotation_delta_rad=0.08),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, False, True, 0.4, 1.2, 0.20,
+            math.nan, math.nan, math.nan, "loop consistency rejected",
+            consistency_support_count=0,
+            consistency_required_support_count=3,
+            consistency_nearest_translation_delta_m=2.5,
+            consistency_nearest_rotation_delta_rad=0.4),
+        module.LoopStatusSample(
+            3.0, "map", 3, 0, False, True, 0.5, 2.0, 0.30,
+            math.nan, math.nan, math.nan, "fitness gate rejected"),
+    ]
+
+    rows = module.consistency_rejection_samples(samples, limit=1)
+    text = module.format_consistency_rejection_audit_markdown(
+        samples, "/mbes_loop_closure/status", limit=2)
+
+    assert rows[0].current_id == 2
+    assert "Consistency rejections: 2" in text
+    assert "Rejections with runtime diagnostics: 2" in text
+    assert "required - support = 1: 1" in text
+    assert "required - support = 3: 1" in text
+    assert "| 2 | 2 | 0 | 0 | 3 | 3 | 2.5 | 0.4 | 1.2 | 0.2 | 0.4 |" in text
