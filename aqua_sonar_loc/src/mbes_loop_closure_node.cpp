@@ -180,7 +180,8 @@ private:
       declare_parameter<int>("loop.consistency.min_support_count", 1);
     loop_selection_allowlist_csv_ =
       declare_parameter<std::string>("loop.selection.allowlist_csv", "");
-    if (!loop_selection_allowlist_csv_.empty()) {
+    loop_selection_enabled_ = !loop_selection_allowlist_csv_.empty();
+    if (loop_selection_enabled_) {
       selected_loop_pairs_ = load_loop_allowlist(loop_selection_allowlist_csv_);
       RCLCPP_INFO(
         get_logger(),
@@ -387,7 +388,7 @@ private:
 
   bool loop_selection_enabled() const
   {
-    return !loop_selection_allowlist_csv_.empty();
+    return loop_selection_enabled_;
   }
 
   bool is_selected_loop(std::uint32_t candidate_id, std::uint32_t current_id) const
@@ -526,6 +527,7 @@ private:
   bool optimize_after_insert_{true};
   std::uint32_t marker_sequence_{0};
   std::string loop_selection_allowlist_csv_;
+  bool loop_selection_enabled_{false};
   std::unordered_set<std::uint64_t> selected_loop_pairs_;
 
   SubmapManager submap_manager_{submap_options_};

@@ -292,6 +292,12 @@ registration, fitness, and correction gates to pass, but it replaces the online
 accepted-loop consistency guard with the offline selected ID set. Otherwise
 valid loops that are not in the CSV are published in status as
 `loop selection rejected` and are not sent to the pose graph.
+The CSV currently matches exact `(candidate_id,current_id)` pairs from the
+source replay. A selected replay with 0 accepted loops can still be a useful
+integrity probe when the allowlist audit passes, but it is not trajectory
+evidence. Treat the selected-vs-normal APE comparison as claimable only when
+the replay accepts audited selected loops and the comparison report does not
+warn about baseline drift or mismatched matched-time coverage.
 
 To run the normal replay, selected-loop replay, and metric comparison as one
 artifact bundle:
