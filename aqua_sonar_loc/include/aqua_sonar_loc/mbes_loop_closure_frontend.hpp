@@ -55,6 +55,12 @@ struct GateResult
   Eigen::Isometry3d correction{Eigen::Isometry3d::Identity()};
   double correction_translation_m{std::numeric_limits<double>::quiet_NaN()};
   double correction_rotation_rad{std::numeric_limits<double>::quiet_NaN()};
+  std::size_t consistency_support_count{0};
+  std::size_t consistency_required_support_count{0};
+  double consistency_nearest_translation_delta_m{
+    std::numeric_limits<double>::quiet_NaN()};
+  double consistency_nearest_rotation_delta_rad{
+    std::numeric_limits<double>::quiet_NaN()};
   double descriptor_centroid_distance_m{std::numeric_limits<double>::quiet_NaN()};
   double descriptor_extent_ratio{std::numeric_limits<double>::quiet_NaN()};
   double descriptor_point_count_ratio{std::numeric_limits<double>::quiet_NaN()};
@@ -130,6 +136,15 @@ struct AcceptedLoop
   std::uint32_t from_id{0};
   std::uint32_t to_id{0};
   Eigen::Isometry3d correction{Eigen::Isometry3d::Identity()};
+};
+
+struct ConsistencyCheckResult
+{
+  bool consistent{true};
+  std::size_t support_count{0};
+  std::size_t required_support_count{0};
+  double nearest_translation_delta_m{std::numeric_limits<double>::quiet_NaN()};
+  double nearest_rotation_delta_rad{std::numeric_limits<double>::quiet_NaN()};
 };
 
 Eigen::Isometry3d pose_to_isometry(const geometry_msgs::msg::Pose & msg);
@@ -217,6 +232,7 @@ public:
   explicit AcceptedLoopTracker(LoopSuppressionOptions options);
 
   bool is_suppressed(std::uint32_t from_id, std::uint32_t to_id) const;
+  ConsistencyCheckResult check_consistency(const Eigen::Isometry3d & correction) const;
   bool is_consistent(const Eigen::Isometry3d & correction) const;
   void record(std::uint32_t from_id, std::uint32_t to_id);
   void record(

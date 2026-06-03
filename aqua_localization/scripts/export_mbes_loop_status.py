@@ -48,6 +48,10 @@ CSV_FIELDS = [
     "correction_qy",
     "correction_qz",
     "correction_qw",
+    "consistency_support_count",
+    "consistency_required_support_count",
+    "consistency_nearest_translation_delta_m",
+    "consistency_nearest_rotation_delta_rad",
     "descriptor_centroid_distance_m",
     "descriptor_extent_ratio",
     "descriptor_point_count_ratio",
@@ -78,6 +82,10 @@ class LoopStatusSample:
     correction_qy: float = math.nan
     correction_qz: float = math.nan
     correction_qw: float = math.nan
+    consistency_support_count: int = 0
+    consistency_required_support_count: int = 0
+    consistency_nearest_translation_delta_m: float = math.nan
+    consistency_nearest_rotation_delta_rad: float = math.nan
 
 
 @dataclass(frozen=True)
@@ -127,6 +135,10 @@ def optional_bool(msg, attr: str) -> bool:
     return bool(getattr(msg, attr, False))
 
 
+def optional_int(msg, attr: str) -> int:
+    return int(getattr(msg, attr, 0))
+
+
 def optional_pose_float(msg, attr: str, component: str) -> float:
     pose = getattr(msg, attr, None)
     if pose is None:
@@ -169,6 +181,16 @@ def sample_from_msg(msg, fallback_time: float) -> LoopStatusSample:
         correction_qy=optional_pose_float(msg, "correction_pose", "orientation.y"),
         correction_qz=optional_pose_float(msg, "correction_pose", "orientation.z"),
         correction_qw=optional_pose_float(msg, "correction_pose", "orientation.w"),
+        consistency_support_count=optional_int(msg, "consistency_support_count"),
+        consistency_required_support_count=optional_int(
+            msg, "consistency_required_support_count"
+        ),
+        consistency_nearest_translation_delta_m=optional_float(
+            msg, "consistency_nearest_translation_delta_m"
+        ),
+        consistency_nearest_rotation_delta_rad=optional_float(
+            msg, "consistency_nearest_rotation_delta_rad"
+        ),
     )
 
 
@@ -265,6 +287,12 @@ def summarize(samples: list[LoopStatusSample]) -> dict:
         ),
         "descriptor_point_count_ratio": stats(
             finite_values(samples, "descriptor_point_count_ratio")
+        ),
+        "consistency_nearest_translation_delta_m": stats(
+            finite_values(samples, "consistency_nearest_translation_delta_m")
+        ),
+        "consistency_nearest_rotation_delta_rad": stats(
+            finite_values(samples, "consistency_nearest_rotation_delta_rad")
         ),
     }
 
@@ -700,6 +728,14 @@ def format_summary_markdown(
             "descriptor_point_count_ratio",
             summary["descriptor_point_count_ratio"],
         ),
+        format_stats(
+            "consistency_nearest_translation_delta_m",
+            summary["consistency_nearest_translation_delta_m"],
+        ),
+        format_stats(
+            "consistency_nearest_rotation_delta_rad",
+            summary["consistency_nearest_rotation_delta_rad"],
+        ),
         "",
         "## Rejection Reasons",
         "",
@@ -743,6 +779,16 @@ def write_csv(path: Path, samples: list[LoopStatusSample]) -> None:
                 "correction_qy": f"{sample.correction_qy:.9f}",
                 "correction_qz": f"{sample.correction_qz:.9f}",
                 "correction_qw": f"{sample.correction_qw:.9f}",
+                "consistency_support_count": sample.consistency_support_count,
+                "consistency_required_support_count": (
+                    sample.consistency_required_support_count
+                ),
+                "consistency_nearest_translation_delta_m": (
+                    f"{sample.consistency_nearest_translation_delta_m:.9f}"
+                ),
+                "consistency_nearest_rotation_delta_rad": (
+                    f"{sample.consistency_nearest_rotation_delta_rad:.9f}"
+                ),
                 "descriptor_centroid_distance_m": (
                     f"{sample.descriptor_centroid_distance_m:.9f}"
                 ),

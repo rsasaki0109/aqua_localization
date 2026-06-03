@@ -16,6 +16,13 @@ float64 correction_rotation_rad
 bool correction_pose_valid
 geometry_msgs/Pose correction_pose
 
+# Diagnostics for the accepted-loop consistency guard. Counts are zero and
+# deltas are NaN when the guard was not evaluated for this candidate.
+uint32 consistency_support_count
+uint32 consistency_required_support_count
+float64 consistency_nearest_translation_delta_m
+float64 consistency_nearest_rotation_delta_rad
+
 # Pre-registration descriptor metrics. NaN means unavailable or not evaluated.
 float64 descriptor_centroid_distance_m
 float64 descriptor_extent_ratio

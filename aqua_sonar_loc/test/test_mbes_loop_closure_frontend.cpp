@@ -260,8 +260,18 @@ TEST(MbesLoopClosureFrontendTest, AcceptedLoopTrackerCanRequireMultipleConsisten
   Eigen::Isometry3d supported_by_one = Eigen::Isometry3d::Identity();
   supported_by_one.translation().x() = 0.9;
   EXPECT_FALSE(tracker.is_consistent(supported_by_one));
+  const auto supported_by_one_check = tracker.check_consistency(supported_by_one);
+  EXPECT_FALSE(supported_by_one_check.consistent);
+  EXPECT_EQ(supported_by_one_check.support_count, 1U);
+  EXPECT_EQ(supported_by_one_check.required_support_count, 2U);
+  EXPECT_NEAR(supported_by_one_check.nearest_translation_delta_m, 0.5, 1.0e-9);
 
   Eigen::Isometry3d supported_by_two = Eigen::Isometry3d::Identity();
   supported_by_two.translation().x() = 0.2;
   EXPECT_TRUE(tracker.is_consistent(supported_by_two));
+  const auto supported_by_two_check = tracker.check_consistency(supported_by_two);
+  EXPECT_TRUE(supported_by_two_check.consistent);
+  EXPECT_EQ(supported_by_two_check.support_count, 2U);
+  EXPECT_EQ(supported_by_two_check.required_support_count, 2U);
+  EXPECT_NEAR(supported_by_two_check.nearest_translation_delta_m, 0.2, 1.0e-9);
 }

@@ -193,8 +193,9 @@ relative transforms as loop constraints.
 `aqua_sonar_loc/mbes_loop_closure_node` also publishes
 `aqua_msgs/msg/LoopClosureStatus` on `/mbes_loop_closure/status`. The status
 stream reports each tested candidate's convergence, fitness, correction
-pose/magnitude, descriptor metrics, acceptance flag, and rejection reason,
-which makes real-bag tuning observable without enabling debug logs. It also publishes
+pose/magnitude, accepted-loop consistency support diagnostics, descriptor
+metrics, acceptance flag, and rejection reason, which makes real-bag tuning
+observable without enabling debug logs. It also publishes
 `visualization_msgs/msg/MarkerArray` on `/mbes_loop_closure/markers` so RViz
 can show accepted and rejected candidate loop edges in the map frame.
 

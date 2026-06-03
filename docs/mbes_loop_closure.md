@@ -137,7 +137,8 @@ ros2 run aqua_localization export_mbes_loop_status.py \
 The CSV preserves every `/mbes_loop_closure/status` sample. The markdown
 summary reports accepted, rejected, and no-candidate counts, rejection
 reasons, fitness quantiles, correction translation/rotation quantiles, and
-descriptor centroid-distance, extent-ratio, and point-count-ratio quantiles.
+descriptor centroid-distance, extent-ratio, point-count-ratio, and consistency
+nearest-delta quantiles.
 When `/aqua_pose_graph/optimization_count` and
 `/aqua_pose_graph/optimization_chi2` are present in the recorded bag, the
 summary also reports how many g2o optimization runs actually happened and the
@@ -189,7 +190,13 @@ translation and rotation delta thresholds. New replays use
 `LoopClosureStatus.correction_pose` for the same SE(3) delta magnitude checked
 by the runtime guard; old bags without that field fall back to scalar
 correction magnitudes. The first accepted loop always bootstraps the guard, so
-run the sweep only after visually auditing the earliest accepted loops.
+run the sweep only after visually auditing the earliest accepted loops. Newer
+status CSVs also include `consistency_support_count`,
+`consistency_required_support_count`,
+`consistency_nearest_translation_delta_m`, and
+`consistency_nearest_rotation_delta_rad`, so a rejected candidate shows both
+how many prior loops supported it and how close the nearest prior correction
+was.
 
 Use one row as an initial consistency config:
 
@@ -206,9 +213,12 @@ loop:
 accepted-loop history exists; the bootstrap requirement is clamped to the
 available history size so the second trusted loop is not impossible to accept.
 Replay with those values and confirm that `loop consistency rejected` samples
-are the intended outlier loop corrections. If accepted loops split into several
-valid motion regimes, leave the guard disabled until a batch consistency
-selector can reason over batches of candidate transforms.
+are the intended outlier loop corrections. A typical bad single-support replay
+has `consistency_support_count` below `consistency_required_support_count`; if
+the nearest deltas are just above threshold, loosen thresholds or keep
+`min_support_count: 1` until more trusted loops are available. If accepted loops
+split into several valid motion regimes, leave the guard disabled until a batch
+consistency selector can reason over batches of candidate transforms.
 
 Useful live checks while tuning:
 
@@ -253,21 +263,26 @@ The live front end now has a lightweight accepted-loop consistency guard using
 the same idea at a smaller scope: each accepted loop records its correction from
 the odometry guess to the registration result, and later candidates can be
 rejected as `loop consistency rejected` when their correction lacks the
-configured support count from recorded accepted loops. Keep this disabled until
-at least one replay has trusted accepted loops; a bad bootstrap set would
-otherwise become the reference. Generate `/tmp/mbes_loop_consistency_sweep.md`
-from the same replay used for descriptor tuning to choose conservative initial
-translation/rotation delta thresholds, then replay once more and check that
-rejected candidates are the intended inconsistent loops.
+configured support count from recorded accepted loops. The status stream records
+the support count, required support count, and nearest translation/rotation
+delta to the accepted-loop history for each evaluated candidate. Keep this
+disabled until at least one replay has trusted accepted loops; a bad bootstrap
+set would otherwise become the reference. Generate
+`/tmp/mbes_loop_consistency_sweep.md` from the same replay used for descriptor
+tuning to choose conservative initial translation/rotation delta thresholds,
+then replay once more and check that rejected candidates are the intended
+inconsistent loops.
 
 `LoopClosureStatus.candidate_id` is `UINT32_MAX` when a keyframe has no
 eligible historical submap. Rejections report the specific gate that failed,
 `descriptor gate rejected` when the pre-registration shape check rejects a
 candidate, `duplicate loop suppressed` when accepted-loop cooldown blocks a
 near-repeat, or `loop consistency rejected` when an accepted-looking candidate
-disagrees with previously accepted loop corrections. This makes overly strict
-candidate, descriptor, fitness, correction, repeat, or consistency thresholds
-visible without reading debug logs.
+disagrees with previously accepted loop corrections. The consistency diagnostic
+fields show whether a rejection was caused by too few supporting loops or by
+translation/rotation deltas that are far outside threshold. This makes overly
+strict candidate, descriptor, fitness, correction, repeat, or consistency
+thresholds visible without reading debug logs.
 
 In RViz, use the dedicated tuning config:
 

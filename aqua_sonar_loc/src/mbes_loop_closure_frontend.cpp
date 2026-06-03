@@ -442,41 +442,62 @@ bool AcceptedLoopTracker::is_suppressed(std::uint32_t from_id, std::uint32_t to_
     });
 }
 
-bool AcceptedLoopTracker::is_consistent(const Eigen::Isometry3d & correction) const
+ConsistencyCheckResult AcceptedLoopTracker::check_consistency(
+  const Eigen::Isometry3d & correction) const
 {
+  ConsistencyCheckResult result;
   if (accepted_loops_.empty()) {
-    return true;
+    return result;
   }
   const bool check_translation =
     options_.max_consistency_translation_delta_m > 0.0;
   const bool check_rotation =
     options_.max_consistency_rotation_delta_rad > 0.0;
   if (!check_translation && !check_rotation) {
-    return true;
+    return result;
   }
 
   const auto configured_support =
     static_cast<std::size_t>(std::max(1, options_.min_consistency_support_count));
-  const auto required_support = std::min(configured_support, accepted_loops_.size());
+  result.required_support_count = std::min(configured_support, accepted_loops_.size());
+  double nearest_score = std::numeric_limits<double>::infinity();
   std::size_t support_count = 0;
   for (const auto & loop : accepted_loops_) {
     const Eigen::Isometry3d delta = loop.correction.inverse() * correction;
-    if (check_translation &&
-      delta.translation().norm() > options_.max_consistency_translation_delta_m)
-    {
-      continue;
+    const double translation_delta_m = delta.translation().norm();
+    const double rotation_delta_rad = rotation_distance_rad(delta);
+    double score = 0.0;
+    if (check_translation) {
+      score = std::max(
+        score, translation_delta_m / options_.max_consistency_translation_delta_m);
     }
-    if (check_rotation &&
-      rotation_distance_rad(delta) > options_.max_consistency_rotation_delta_rad)
-    {
-      continue;
+    if (check_rotation) {
+      score = std::max(
+        score, rotation_delta_rad / options_.max_consistency_rotation_delta_rad);
     }
-    ++support_count;
-    if (support_count >= required_support) {
-      return true;
+    if (score < nearest_score) {
+      nearest_score = score;
+      result.nearest_translation_delta_m = translation_delta_m;
+      result.nearest_rotation_delta_rad = rotation_delta_rad;
+    }
+    const bool translation_supported =
+      !check_translation ||
+      translation_delta_m <= options_.max_consistency_translation_delta_m;
+    const bool rotation_supported =
+      !check_rotation ||
+      rotation_delta_rad <= options_.max_consistency_rotation_delta_rad;
+    if (translation_supported && rotation_supported) {
+      ++support_count;
     }
   }
-  return false;
+  result.support_count = support_count;
+  result.consistent = support_count >= result.required_support_count;
+  return result;
+}
+
+bool AcceptedLoopTracker::is_consistent(const Eigen::Isometry3d & correction) const
+{
+  return check_consistency(correction).consistent;
 }
 
 void AcceptedLoopTracker::record(std::uint32_t from_id, std::uint32_t to_id)

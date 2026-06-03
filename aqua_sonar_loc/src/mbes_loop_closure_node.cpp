@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -253,9 +254,19 @@ private:
         descriptor_result.descriptor_centroid_distance_m;
       gate.descriptor_extent_ratio = descriptor_result.descriptor_extent_ratio;
       gate.descriptor_point_count_ratio = descriptor_result.descriptor_point_count_ratio;
-      if (gate.accepted && !accepted_loop_tracker_.is_consistent(gate.correction)) {
-        gate.accepted = false;
-        gate.status = "loop consistency rejected";
+      if (gate.accepted) {
+        const ConsistencyCheckResult consistency =
+          accepted_loop_tracker_.check_consistency(gate.correction);
+        gate.consistency_support_count = consistency.support_count;
+        gate.consistency_required_support_count = consistency.required_support_count;
+        gate.consistency_nearest_translation_delta_m =
+          consistency.nearest_translation_delta_m;
+        gate.consistency_nearest_rotation_delta_rad =
+          consistency.nearest_rotation_delta_rad;
+        if (!consistency.consistent) {
+          gate.accepted = false;
+          gate.status = "loop consistency rejected";
+        }
       }
       publish_status(candidate, current, result, gate);
       publish_candidate_marker(candidate, current, gate);
@@ -314,6 +325,18 @@ private:
     msg.correction_pose_valid = gate.correction_pose_valid;
     msg.correction_pose =
       gate.correction_pose_valid ? isometry_to_pose(gate.correction) : nan_pose();
+    msg.consistency_support_count = static_cast<std::uint32_t>(
+      std::min<std::size_t>(
+        gate.consistency_support_count,
+        std::numeric_limits<std::uint32_t>::max()));
+    msg.consistency_required_support_count = static_cast<std::uint32_t>(
+      std::min<std::size_t>(
+        gate.consistency_required_support_count,
+        std::numeric_limits<std::uint32_t>::max()));
+    msg.consistency_nearest_translation_delta_m =
+      gate.consistency_nearest_translation_delta_m;
+    msg.consistency_nearest_rotation_delta_rad =
+      gate.consistency_nearest_rotation_delta_rad;
     msg.descriptor_centroid_distance_m = gate.descriptor_centroid_distance_m;
     msg.descriptor_extent_ratio = gate.descriptor_extent_ratio;
     msg.descriptor_point_count_ratio = gate.descriptor_point_count_ratio;
@@ -361,6 +384,12 @@ private:
     msg.correction_rotation_rad = std::numeric_limits<double>::quiet_NaN();
     msg.correction_pose_valid = false;
     msg.correction_pose = nan_pose();
+    msg.consistency_support_count = 0;
+    msg.consistency_required_support_count = 0;
+    msg.consistency_nearest_translation_delta_m =
+      std::numeric_limits<double>::quiet_NaN();
+    msg.consistency_nearest_rotation_delta_rad =
+      std::numeric_limits<double>::quiet_NaN();
     msg.descriptor_centroid_distance_m = std::numeric_limits<double>::quiet_NaN();
     msg.descriptor_extent_ratio = std::numeric_limits<double>::quiet_NaN();
     msg.descriptor_point_count_ratio = std::numeric_limits<double>::quiet_NaN();

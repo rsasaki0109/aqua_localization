@@ -21,6 +21,10 @@ the first accepted loops have been visually audited.
 - Pairwise accepted correction pairs: 66
 - Delta source: 66 pose-aware pairs, 0 scalar-magnitude fallback pairs
 - Consistency thresholds at replay time: disabled
+- Runtime status diagnostics in new replays:
+  `consistency_support_count`, `consistency_required_support_count`,
+  `consistency_nearest_translation_delta_m`,
+  `consistency_nearest_rotation_delta_rad`
 
 ## Pairwise Accepted Correction Deltas
 
@@ -35,7 +39,10 @@ the first accepted loops have been visually audited.
 runtime guard. `Supported pairs` counts pairwise agreement among all accepted
 corrections and is useful for spotting loose thresholds. New replays use the
 recorded correction pose to mirror the runtime guard's SE(3) delta check; older
-bags without that field fall back to scalar correction magnitudes.
+bags without that field fall back to scalar correction magnitudes. After a
+replay with thresholds enabled, use the status CSV diagnostics to see whether a
+candidate missed the required support count or only barely exceeded the nearest
+translation/rotation delta threshold.
 
 | Translation delta <= m | Rotation delta <= rad | Would keep accepted | Keep % | Supported pairs | Pair % |
 |-----------------------:|----------------------:|--------------------:|-------:|----------------:|-------:|
@@ -68,6 +75,8 @@ that trusted loops support each other.
 Then replay the bag, export `/mbes_loop_closure/status` again, and compare:
 
 - `loop consistency rejected` count
+- support count vs. required support count for those rejections
+- nearest consistency translation/rotation deltas in the summary and CSV
 - accepted loop markers in `rviz/mbes_loop_closure.rviz`
 - accepted correction translation/rotation tails in the summary
 - optimized path changes against the MBES-SLAM reference odometry

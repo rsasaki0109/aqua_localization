@@ -65,6 +65,20 @@ class _LoopStatus:
             self.correction_pose_valid = kwargs["correction_pose_valid"]
         if "correction_pose" in kwargs:
             self.correction_pose = kwargs["correction_pose"]
+        if "consistency_support_count" in kwargs:
+            self.consistency_support_count = kwargs["consistency_support_count"]
+        if "consistency_required_support_count" in kwargs:
+            self.consistency_required_support_count = (
+                kwargs["consistency_required_support_count"]
+            )
+        if "consistency_nearest_translation_delta_m" in kwargs:
+            self.consistency_nearest_translation_delta_m = (
+                kwargs["consistency_nearest_translation_delta_m"]
+            )
+        if "consistency_nearest_rotation_delta_rad" in kwargs:
+            self.consistency_nearest_rotation_delta_rad = (
+                kwargs["consistency_nearest_rotation_delta_rad"]
+            )
         if "descriptor_centroid_distance_m" in kwargs:
             self.descriptor_centroid_distance_m = kwargs["descriptor_centroid_distance_m"]
         if "descriptor_extent_ratio" in kwargs:
@@ -93,6 +107,10 @@ def test_sample_from_msg_uses_fallback_for_zero_stamp():
     assert sample.fitness_score == 0.25
     assert sample.correction_pose_valid is False
     assert math.isnan(sample.correction_x_m)
+    assert sample.consistency_support_count == 0
+    assert sample.consistency_required_support_count == 0
+    assert math.isnan(sample.consistency_nearest_translation_delta_m)
+    assert math.isnan(sample.consistency_nearest_rotation_delta_rad)
     assert math.isnan(sample.descriptor_centroid_distance_m)
     assert math.isnan(sample.descriptor_extent_ratio)
     assert math.isnan(sample.descriptor_point_count_ratio)
@@ -134,6 +152,23 @@ def test_sample_from_msg_reads_correction_pose_when_available():
     assert sample.correction_qw == 0.70710678
 
 
+def test_sample_from_msg_reads_consistency_diagnostics_when_available():
+    module = load_module()
+    msg = _LoopStatus(
+        consistency_support_count=1,
+        consistency_required_support_count=2,
+        consistency_nearest_translation_delta_m=0.75,
+        consistency_nearest_rotation_delta_rad=0.12,
+    )
+
+    sample = module.sample_from_msg(msg, fallback_time=123.5)
+
+    assert sample.consistency_support_count == 1
+    assert sample.consistency_required_support_count == 2
+    assert sample.consistency_nearest_translation_delta_m == 0.75
+    assert sample.consistency_nearest_rotation_delta_rad == 0.12
+
+
 def test_summarize_counts_reasons_and_quantiles():
     module = load_module()
     samples = [
@@ -164,6 +199,7 @@ def test_summarize_counts_reasons_and_quantiles():
     assert summary["descriptor_centroid_distance_m"]["count"] == 2
     assert summary["descriptor_extent_ratio"]["max"] == 4.0
     assert summary["descriptor_point_count_ratio"]["min"] == 0.4
+    assert summary["consistency_nearest_translation_delta_m"]["count"] == 0
 
 
 def test_write_csv_quotes_status_and_preserves_numeric_fields(tmp_path):
@@ -186,6 +222,10 @@ def test_write_csv_quotes_status_and_preserves_numeric_fields(tmp_path):
     assert rows[0]["converged"] == "1"
     assert rows[0]["correction_pose_valid"] == "0"
     assert rows[0]["correction_x_m"] == "nan"
+    assert rows[0]["consistency_support_count"] == "0"
+    assert rows[0]["consistency_required_support_count"] == "0"
+    assert rows[0]["consistency_nearest_translation_delta_m"] == "nan"
+    assert rows[0]["consistency_nearest_rotation_delta_rad"] == "nan"
     assert rows[0]["descriptor_centroid_distance_m"] == "1.500000000"
     assert rows[0]["descriptor_extent_ratio"] == "2.500000000"
     assert rows[0]["descriptor_point_count_ratio"] == "0.750000000"
@@ -209,6 +249,7 @@ def test_format_summary_markdown_contains_key_sections():
     assert "| descriptor_centroid_distance_m |" in text
     assert "| descriptor_extent_ratio |" in text
     assert "| descriptor_point_count_ratio |" in text
+    assert "| consistency_nearest_translation_delta_m |" in text
 
 
 def test_format_summary_markdown_includes_optimization_diagnostics():
