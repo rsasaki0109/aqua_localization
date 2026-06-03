@@ -16,6 +16,13 @@ class SparseOptimizer;
 
 namespace aqua_pose_graph {
 
+enum class LoopRobustKernel
+{
+  kNone,
+  kHuber,
+  kDcs
+};
+
 struct PoseGraphConfig
 {
   // Minimum translation between successive keyframes (m). Smaller spacings
@@ -39,6 +46,11 @@ struct PoseGraphConfig
   // chains. This avoids burning CPU on a graph whose initial odometry chain is
   // already at its optimum.
   bool optimize_without_loop_constraints{false};
+  // Optional robust kernel on external loop-closure edges. This leaves odometry
+  // chain edges quadratic while reducing the influence of bad loop closures
+  // from sonar/visual place-recognition front ends.
+  LoopRobustKernel loop_constraint_robust_kernel{LoopRobustKernel::kNone};
+  double loop_constraint_robust_kernel_delta{1.0};
 };
 
 struct Keyframe

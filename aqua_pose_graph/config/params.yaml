@@ -48,3 +48,11 @@ aqua_pose_graph:
       # constraint exists. Set true to keep the older chain-only auto-optimise
       # behaviour for experiments that need periodic g2o runs without loops.
       optimize_without_loop_constraints: false
+
+    loop_constraints:
+      robust_kernel:
+        # Underwater loop candidates can include perceptual-aliasing false
+        # positives. Apply a robust kernel to external loop-closure edges while
+        # leaving odometry chain edges quadratic. Options: none, huber, dcs.
+        type: dcs
+        delta: 1.0

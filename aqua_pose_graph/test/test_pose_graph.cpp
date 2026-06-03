@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 using aqua_pose_graph::Keyframe;
+using aqua_pose_graph::LoopRobustKernel;
 using aqua_pose_graph::LoopConstraint;
 using aqua_pose_graph::PoseGraph;
 using aqua_pose_graph::PoseGraphConfig;
@@ -136,6 +137,45 @@ TEST(PoseGraph, LoopConstraintBendsTrajectory)
   // the loop constraint. Tolerance is loose because the chain edges still
   // resist with their default information.
   EXPECT_LT((kf4.translation() - kf0.translation()).norm(), 1.0);
+}
+
+TEST(PoseGraph, DcsKernelReducesBadLoopInfluence)
+{
+  auto optimized_tail_distance = [](LoopRobustKernel robust_kernel) {
+      PoseGraphConfig cfg;
+      cfg.keyframe_translation_m = 1.0;
+      cfg.keyframe_rotation_rad = M_PI;
+      cfg.optimize_every_n_keyframes = 0;
+      cfg.loop_constraint_robust_kernel = robust_kernel;
+      cfg.loop_constraint_robust_kernel_delta = 1.0;
+      PoseGraph graph(cfg);
+
+      for (int i = 0; i <= 4; ++i) {
+        graph.add_odometry_sample(
+          0.1 * i, translation(static_cast<double>(i), 0.0, 0.0),
+          Eigen::Matrix<double, 6, 6>::Identity());
+      }
+
+      LoopConstraint loop;
+      loop.from_id = 0;
+      loop.to_id = 4;
+      loop.relative_pose = Eigen::Isometry3d::Identity();
+      loop.information = tight_information();
+      EXPECT_TRUE(graph.add_loop_constraint(loop));
+      graph.optimize();
+
+      Eigen::Isometry3d kf0;
+      Eigen::Isometry3d kf4;
+      EXPECT_TRUE(graph.keyframe_pose(0, &kf0));
+      EXPECT_TRUE(graph.keyframe_pose(4, &kf4));
+      return (kf4.translation() - kf0.translation()).norm();
+    };
+
+  const double plain_distance = optimized_tail_distance(LoopRobustKernel::kNone);
+  const double robust_distance = optimized_tail_distance(LoopRobustKernel::kDcs);
+
+  EXPECT_LT(plain_distance, 1.0);
+  EXPECT_GT(robust_distance, plain_distance + 0.5);
 }
 
 TEST(PoseGraph, AutoOptimizeWaitsForLoopConstraintByDefault)

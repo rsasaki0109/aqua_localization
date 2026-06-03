@@ -8,6 +8,7 @@
 
 #include <g2o/core/block_solver.h>
 #include <g2o/core/optimization_algorithm_levenberg.h>
+#include <g2o/core/robust_kernel_impl.h>
 #include <g2o/core/sparse_optimizer.h>
 #include <g2o/solvers/eigen/linear_solver_eigen.h>
 #include <g2o/types/slam3d/edge_se3.h>
@@ -51,6 +52,31 @@ bool exceeds_keyframe_threshold(
   const Eigen::Matrix3d rel = last.linear().transpose() * current.linear();
   const Eigen::AngleAxisd aa(rel);
   return std::abs(aa.angle()) >= config.keyframe_rotation_rad;
+}
+
+void attach_loop_robust_kernel(
+  g2o::EdgeSE3 * edge,
+  const PoseGraphConfig & config)
+{
+  if (config.loop_constraint_robust_kernel == LoopRobustKernel::kNone ||
+    config.loop_constraint_robust_kernel_delta <= 0.0)
+  {
+    return;
+  }
+
+  g2o::RobustKernel * kernel = nullptr;
+  switch (config.loop_constraint_robust_kernel) {
+    case LoopRobustKernel::kHuber:
+      kernel = new g2o::RobustKernelHuber();
+      break;
+    case LoopRobustKernel::kDcs:
+      kernel = new g2o::RobustKernelDCS();
+      break;
+    case LoopRobustKernel::kNone:
+      return;
+  }
+  kernel->setDelta(config.loop_constraint_robust_kernel_delta);
+  edge->setRobustKernel(kernel);
 }
 
 }  // namespace
@@ -174,6 +200,7 @@ bool PoseGraph::add_loop_constraint(const LoopConstraint & constraint)
   e->setVertex(1, v_to);
   e->setMeasurement(constraint.relative_pose);
   e->setInformation(constraint.information);
+  attach_loop_robust_kernel(e, config_);
   optimizer_->addEdge(e);
   edges_ += 1;
   loop_edges_ += 1;

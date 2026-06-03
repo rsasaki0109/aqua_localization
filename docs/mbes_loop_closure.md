@@ -178,6 +178,36 @@ ros2 topic echo /aqua_pose_graph/optimization_count
 ros2 topic echo /aqua_pose_graph/optimization_chi2
 ```
 
+The pose-graph backend can apply a robust kernel to external loop constraints
+via:
+
+```yaml
+loop_constraints:
+  robust_kernel:
+    type: dcs
+    delta: 1.0
+```
+
+This is a backend safety layer for false-positive sonar loop closures. It is
+not a replacement for front-end auditing, degeneracy-aware factors, switchable
+constraints, or consensus-based loop selection; it just limits how hard one bad
+loop can pull the graph while those stronger filters are being developed.
+`dcs` is the recommended field default, `huber` is available for comparison
+runs, and `none` gives the plain quadratic loop-edge baseline.
+
+Paper trail for the backend decision:
+
+- Dynamic Covariance Scaling is the first backend guard because g2o already
+  ships it and it directly targets bad loop-closure edges:
+  <https://doi.org/10.1109/ICRA.2013.6630557>.
+- Switchable Constraints remain a next candidate when loop acceptance needs a
+  learned/optimized switch variable per closure:
+  <https://nikosuenderhauf.github.io/assets/papers/IROS12-switchableConstraints.pdf>.
+- Pairwise or group-k consistency selection is a stronger front-end/back-end
+  gate for batches of candidate loops:
+  <https://robots.engin.umich.edu/publications/jmangelson-2018a.pdf> and
+  <https://doi.org/10.1177/02783649241256970>.
+
 `LoopClosureStatus.candidate_id` is `UINT32_MAX` when a keyframe has no
 eligible historical submap. Rejections report the specific gate that failed,
 `descriptor gate rejected` when the pre-registration shape check rejects a

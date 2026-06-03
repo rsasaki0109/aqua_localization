@@ -81,6 +81,33 @@ Eigen::Matrix<double, 6, 6> information_to_eigen(
   return out;
 }
 
+LoopRobustKernel parse_loop_robust_kernel(const std::string & kernel)
+{
+  if (kernel == "none" || kernel == "off" || kernel == "disabled") {
+    return LoopRobustKernel::kNone;
+  }
+  if (kernel == "huber") {
+    return LoopRobustKernel::kHuber;
+  }
+  if (kernel == "dcs") {
+    return LoopRobustKernel::kDcs;
+  }
+  return LoopRobustKernel::kNone;
+}
+
+const char * loop_robust_kernel_name(LoopRobustKernel kernel)
+{
+  switch (kernel) {
+    case LoopRobustKernel::kHuber:
+      return "huber";
+    case LoopRobustKernel::kDcs:
+      return "dcs";
+    case LoopRobustKernel::kNone:
+      return "none";
+  }
+  return "none";
+}
+
 bool has_valid_information_diagonal(const Eigen::Matrix<double, 6, 6> & info)
 {
   for (int i = 0; i < 6; ++i) {
@@ -139,6 +166,21 @@ public:
     cfg.optimize_without_loop_constraints = declare_parameter<bool>(
       "optimization.optimize_without_loop_constraints",
       cfg.optimize_without_loop_constraints);
+    const auto robust_kernel = declare_parameter<std::string>(
+      "loop_constraints.robust_kernel.type",
+      loop_robust_kernel_name(cfg.loop_constraint_robust_kernel));
+    cfg.loop_constraint_robust_kernel = parse_loop_robust_kernel(robust_kernel);
+    cfg.loop_constraint_robust_kernel_delta = declare_parameter<double>(
+      "loop_constraints.robust_kernel.delta",
+      cfg.loop_constraint_robust_kernel_delta);
+    if (cfg.loop_constraint_robust_kernel == LoopRobustKernel::kNone &&
+      robust_kernel != "none" && robust_kernel != "off" && robust_kernel != "disabled")
+    {
+      RCLCPP_WARN(
+        get_logger(),
+        "unknown loop robust kernel '%s'; using none",
+        robust_kernel.c_str());
+    }
 
     odom_topic_ = declare_parameter<std::string>(
       "topics.odometry", "/aqua_imu_loc/odometry");
@@ -215,12 +257,14 @@ public:
       get_logger(),
       "aqua_pose_graph started: odometry=%s loop_constraints=%s path=%s frame=%s "
       "keyframe_thresholds=(t=%.2fm, r=%.2frad) optimize_every=%d "
-      "optimize_without_loops=%s",
+      "optimize_without_loops=%s loop_robust_kernel=%s(delta=%.3f)",
       odom_topic_.c_str(), loop_constraint_topic_.c_str(),
       path_topic_.c_str(), map_frame_.c_str(),
       cfg.keyframe_translation_m, cfg.keyframe_rotation_rad,
       cfg.optimize_every_n_keyframes,
-      cfg.optimize_without_loop_constraints ? "true" : "false");
+      cfg.optimize_without_loop_constraints ? "true" : "false",
+      loop_robust_kernel_name(cfg.loop_constraint_robust_kernel),
+      cfg.loop_constraint_robust_kernel_delta);
   }
 
 private:
