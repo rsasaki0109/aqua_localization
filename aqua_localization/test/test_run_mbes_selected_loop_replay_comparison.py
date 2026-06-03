@@ -69,6 +69,10 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert "check_mbes_loop_allowlist_replay.py" in proc.stdout
     assert f"--status {selected_status}" in proc.stdout
     assert "--strict" in proc.stdout
+    assert "--signature-timestamp-window-s 0.25" in proc.stdout
+    assert "--signature-max-fitness-delta 0.02" in proc.stdout
+    assert "--signature-max-translation-delta-m 0.4" in proc.stdout
+    assert "--signature-max-rotation-delta-rad 0.05" in proc.stdout
     assert "mbes_selected_loop_allowlist_audit.md" in proc.stdout
     assert "normal ROS_DOMAIN_ID: 31" in proc.stdout
     assert "selected ROS_DOMAIN_ID: 131" in proc.stdout

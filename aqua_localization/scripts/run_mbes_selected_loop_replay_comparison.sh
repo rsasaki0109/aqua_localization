@@ -33,6 +33,30 @@ ALLOWLIST_AUDIT_ARGS=()
 if [[ "$ALLOWLIST_AUDIT_STRICT" == "1" ]]; then
   ALLOWLIST_AUDIT_ARGS+=("--strict")
 fi
+if [[ -n "${MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S+x}" ]]; then
+  ALLOWLIST_AUDIT_ARGS+=(
+    "--signature-timestamp-window-s"
+    "$MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S"
+  )
+fi
+if [[ -n "${MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA+x}" ]]; then
+  ALLOWLIST_AUDIT_ARGS+=(
+    "--signature-max-fitness-delta"
+    "$MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA"
+  )
+fi
+if [[ -n "${MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M+x}" ]]; then
+  ALLOWLIST_AUDIT_ARGS+=(
+    "--signature-max-translation-delta-m"
+    "$MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M"
+  )
+fi
+if [[ -n "${MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD+x}" ]]; then
+  ALLOWLIST_AUDIT_ARGS+=(
+    "--signature-max-rotation-delta-rad"
+    "$MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD"
+  )
+fi
 BENCHMARK_ENV_ARGS=()
 for optional_name in \
   POSE_GRAPH_ODOMETRY_TOPIC \
