@@ -9,6 +9,7 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md \
   --consistency-rejection-audit-out /tmp/mbes_loop_consistency_rejections.md \
   --batch-consistency-out /tmp/mbes_loop_batch_consistency.md \
+  --batch-consistency-selected-csv-out /tmp/mbes_loop_batch_selected_loops.csv \
   --consistency-min-support-count 1
 ```
 
@@ -82,6 +83,8 @@ Then replay the bag, export `/mbes_loop_closure/status` again, and compare:
 - `/tmp/mbes_loop_consistency_rejections.md` sorted by support deficit
 - `/tmp/mbes_loop_batch_consistency.md` for the largest internally consistent
   correction set across accepted and consistency-rejected candidates
+- `/tmp/mbes_loop_batch_selected_loops.csv` as the
+  `loop.selection.allowlist_csv` input for a selected-loop replay
 - accepted loop markers in `rviz/mbes_loop_closure.rviz`
 - accepted correction translation/rotation tails in the summary
 - optimized path changes against the MBES-SLAM reference odometry

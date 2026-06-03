@@ -65,3 +65,9 @@ mbes_loop_closure:
         # Require this many previously accepted loops to support a new loop
         # once enough history exists. 1 preserves the legacy any-support guard.
         min_support_count: 1
+      selection:
+        # Optional CSV from export_mbes_loop_status.py
+        # --batch-consistency-selected-csv-out. When set, this offline selected
+        # loop set replaces the online consistency guard for accepted-looking
+        # loops and rejects otherwise valid loops as `loop selection rejected`.
+        allowlist_csv: ""

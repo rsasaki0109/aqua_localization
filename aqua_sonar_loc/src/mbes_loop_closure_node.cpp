@@ -1,8 +1,13 @@
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
 #include <limits>
 #include <memory>
+#include <sstream>
+#include <stdexcept>
 #include <string>
+#include <unordered_set>
+#include <vector>
 
 #include <Eigen/Geometry>
 
@@ -41,6 +46,32 @@ geometry_msgs::msg::Pose nan_pose()
   msg.orientation.z = nan;
   msg.orientation.w = nan;
   return msg;
+}
+
+std::uint64_t loop_pair_key(std::uint32_t candidate_id, std::uint32_t current_id)
+{
+  return (static_cast<std::uint64_t>(candidate_id) << 32) |
+         static_cast<std::uint64_t>(current_id);
+}
+
+std::vector<std::string> split_csv_line(const std::string & line)
+{
+  std::vector<std::string> fields;
+  std::stringstream stream(line);
+  std::string field;
+  while (std::getline(stream, field, ',')) {
+    fields.push_back(field);
+  }
+  return fields;
+}
+
+int csv_column_index(const std::vector<std::string> & header, const std::string & name)
+{
+  const auto it = std::find(header.begin(), header.end(), name);
+  if (it == header.end()) {
+    return -1;
+  }
+  return static_cast<int>(std::distance(header.begin(), it));
 }
 
 }  // namespace
@@ -147,6 +178,16 @@ private:
       declare_parameter<double>("loop.consistency.max_correction_rotation_delta_rad", 0.0);
     loop_suppression_options_.min_consistency_support_count =
       declare_parameter<int>("loop.consistency.min_support_count", 1);
+    loop_selection_allowlist_csv_ =
+      declare_parameter<std::string>("loop.selection.allowlist_csv", "");
+    if (!loop_selection_allowlist_csv_.empty()) {
+      selected_loop_pairs_ = load_loop_allowlist(loop_selection_allowlist_csv_);
+      RCLCPP_INFO(
+        get_logger(),
+        "loaded %zu MBES selected loop pairs from %s; offline selection replaces "
+        "the online consistency guard for accepted-looking loops",
+        selected_loop_pairs_.size(), loop_selection_allowlist_csv_.c_str());
+    }
 
     submap_manager_ = SubmapManager(submap_options_);
     accepted_loop_tracker_ = AcceptedLoopTracker(loop_suppression_options_);
@@ -255,17 +296,24 @@ private:
       gate.descriptor_extent_ratio = descriptor_result.descriptor_extent_ratio;
       gate.descriptor_point_count_ratio = descriptor_result.descriptor_point_count_ratio;
       if (gate.accepted) {
-        const ConsistencyCheckResult consistency =
-          accepted_loop_tracker_.check_consistency(gate.correction);
-        gate.consistency_support_count = consistency.support_count;
-        gate.consistency_required_support_count = consistency.required_support_count;
-        gate.consistency_nearest_translation_delta_m =
-          consistency.nearest_translation_delta_m;
-        gate.consistency_nearest_rotation_delta_rad =
-          consistency.nearest_rotation_delta_rad;
-        if (!consistency.consistent) {
-          gate.accepted = false;
-          gate.status = "loop consistency rejected";
+        if (loop_selection_enabled()) {
+          if (!is_selected_loop(candidate.id, current.id)) {
+            gate.accepted = false;
+            gate.status = "loop selection rejected";
+          }
+        } else {
+          const ConsistencyCheckResult consistency =
+            accepted_loop_tracker_.check_consistency(gate.correction);
+          gate.consistency_support_count = consistency.support_count;
+          gate.consistency_required_support_count = consistency.required_support_count;
+          gate.consistency_nearest_translation_delta_m =
+            consistency.nearest_translation_delta_m;
+          gate.consistency_nearest_rotation_delta_rad =
+            consistency.nearest_rotation_delta_rad;
+          if (!consistency.consistent) {
+            gate.accepted = false;
+            gate.status = "loop consistency rejected";
+          }
         }
       }
       publish_status(candidate, current, result, gate);
@@ -284,6 +332,68 @@ private:
     if (tested == 0) {
       publish_submap_status(current, "no candidate submaps");
     }
+  }
+
+  std::unordered_set<std::uint64_t> load_loop_allowlist(const std::string & path) const
+  {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+      throw std::runtime_error("cannot open MBES loop selection allowlist CSV: " + path);
+    }
+
+    std::string line;
+    if (!std::getline(file, line)) {
+      throw std::runtime_error("empty MBES loop selection allowlist CSV: " + path);
+    }
+    const auto header = split_csv_line(line);
+    const int current_column = csv_column_index(header, "current_id");
+    const int candidate_column = csv_column_index(header, "candidate_id");
+    if (current_column < 0 || candidate_column < 0) {
+      throw std::runtime_error(
+        "MBES loop selection allowlist CSV must contain current_id and candidate_id columns: " +
+        path);
+    }
+
+    std::unordered_set<std::uint64_t> pairs;
+    std::size_t line_number = 1;
+    while (std::getline(file, line)) {
+      ++line_number;
+      if (line.empty()) {
+        continue;
+      }
+      const auto fields = split_csv_line(line);
+      const int required_columns = std::max(current_column, candidate_column) + 1;
+      if (static_cast<int>(fields.size()) < required_columns) {
+        RCLCPP_WARN(
+          get_logger(), "skip malformed MBES loop selection row %zu in %s",
+          line_number, path.c_str());
+        continue;
+      }
+      try {
+        const auto current_id =
+          static_cast<std::uint32_t>(std::stoul(fields[static_cast<std::size_t>(current_column)]));
+        const auto candidate_id =
+          static_cast<std::uint32_t>(
+          std::stoul(fields[static_cast<std::size_t>(candidate_column)]));
+        pairs.insert(loop_pair_key(candidate_id, current_id));
+      } catch (const std::exception &) {
+        RCLCPP_WARN(
+          get_logger(), "skip non-numeric MBES loop selection row %zu in %s",
+          line_number, path.c_str());
+      }
+    }
+    return pairs;
+  }
+
+  bool loop_selection_enabled() const
+  {
+    return !loop_selection_allowlist_csv_.empty();
+  }
+
+  bool is_selected_loop(std::uint32_t candidate_id, std::uint32_t current_id) const
+  {
+    return selected_loop_pairs_.find(loop_pair_key(candidate_id, current_id)) !=
+           selected_loop_pairs_.end();
   }
 
   void publish_loop_constraint(
@@ -415,6 +525,8 @@ private:
   double loop_rotation_sigma_rad_{0.35};
   bool optimize_after_insert_{true};
   std::uint32_t marker_sequence_{0};
+  std::string loop_selection_allowlist_csv_;
+  std::unordered_set<std::uint64_t> selected_loop_pairs_;
 
   SubmapManager submap_manager_{submap_options_};
   AcceptedLoopTracker accepted_loop_tracker_{loop_suppression_options_};

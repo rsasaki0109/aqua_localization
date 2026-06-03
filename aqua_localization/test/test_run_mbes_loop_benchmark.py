@@ -29,6 +29,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "MBES_LOOP_CONSISTENCY_MAX_ROTATION_DELTA_RAD": "0.16",
             "MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT": "2",
             "MBES_LOOP_BATCH_CONSISTENCY_AUTO_QUANTILE": "0.9",
+            "MBES_LOOP_SELECTION_ALLOWLIST_CSV": str(tmp_path / "selected.csv"),
             "PLAY_TOPIC_ARGS": "--topics /norbit/detections",
             "AUDIT_MAX_ACCEPTED": "77",
             "AUDIT_MAX_MARKERS": "88",
@@ -52,6 +53,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "--consistency-sweep-out" in proc.stdout
     assert "--consistency-rejection-audit-out" in proc.stdout
     assert "--batch-consistency-out" in proc.stdout
+    assert "--batch-consistency-selected-csv-out" in proc.stdout
     assert "mbes_loop_benchmark_row.py" in proc.stdout
     assert "audit_mbes_loop_candidates.py" in proc.stdout
     assert "plot_mbes_loop_audit.py" in proc.stdout
@@ -66,6 +68,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "MBES_LOOP_CONSISTENCY_MAX_TRANSLATION_DELTA_M=1.3" in proc.stdout
     assert "MBES_LOOP_CONSISTENCY_MAX_ROTATION_DELTA_RAD=0.16" in proc.stdout
     assert "MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT=2" in proc.stdout
+    assert f"MBES_LOOP_SELECTION_ALLOWLIST_CSV={tmp_path / 'selected.csv'}" in proc.stdout
     assert f"MBES_SRC={tmp_path / 'out/mbes_source_humble_sqlite'}" in proc.stdout
     assert "PLAY_TOPIC_ARGS=--topics\\ /norbit/detections" in proc.stdout
     assert "--max-rotation-rad 0.4" in proc.stdout
@@ -105,6 +108,7 @@ def test_dry_run_uses_default_artifact_names(tmp_path):
     assert str(tmp_path / "out/mbes_beach_pond_consistency_sweep.md") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_consistency_rejections.md") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_batch_consistency.md") in proc.stdout
+    assert str(tmp_path / "out/mbes_beach_pond_batch_selected_loops.csv") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_benchmark_row.md") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_loop_audit.md") in proc.stdout
     assert str(tmp_path / "out/mbes_beach_pond_loop_audit.png") in proc.stdout

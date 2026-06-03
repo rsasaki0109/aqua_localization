@@ -7,6 +7,7 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --bag aqua_localization/datasets/public/mbes_slam/demo_with_estimate \
   --out /tmp/mbes_loop_status.csv \
   --batch-consistency-out /tmp/mbes_loop_batch_consistency.md \
+  --batch-consistency-selected-csv-out /tmp/mbes_loop_batch_selected_loops.csv \
   --batch-consistency-translation-threshold-m 1.3 \
   --batch-consistency-rotation-threshold-rad 0.16
 ```
@@ -57,3 +58,11 @@ IDs or inspect those IDs first in RViz/rerun, then compare APE/RPE against the
 dataset reference. The batch-rejected rows are the first false-positive review
 targets because they do not belong to the largest internally consistent
 correction set.
+
+The companion `/tmp/mbes_loop_batch_selected_loops.csv` has `current_id` and
+`candidate_id` columns that can be used directly by:
+
+```bash
+MBES_LOOP_SELECTION_ALLOWLIST_CSV=/tmp/mbes_loop_batch_selected_loops.csv \
+./aqua_localization/scripts/record_mbes_demo.sh
+```

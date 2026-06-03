@@ -133,6 +133,7 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md \
   --consistency-rejection-audit-out /tmp/mbes_loop_consistency_rejections.md \
   --batch-consistency-out /tmp/mbes_loop_batch_consistency.md \
+  --batch-consistency-selected-csv-out /tmp/mbes_loop_batch_selected_loops.csv \
   --consistency-min-support-count 1
 ```
 
@@ -165,6 +166,9 @@ The batch consistency report builds a pairwise graph from accepted and
 clique. Use it as the offline PCM-like handoff from tuning to replay planning:
 selected loop IDs are candidates for a constrained replay, while batch-rejected
 IDs need RViz/rerun review before they can support an accuracy claim.
+The selected-loop CSV can be passed back into `mbes_loop_closure_node` through
+`loop.selection.allowlist_csv` to replay with only the offline-selected loop
+pairs.
 
 ### Reading the Descriptor Sweep
 
@@ -253,6 +257,7 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --bag /tmp/aqua_mbes_beach_pond_with_loop_status \
   --out /tmp/mbes_loop_status.csv \
   --batch-consistency-out /tmp/mbes_loop_batch_consistency.md \
+  --batch-consistency-selected-csv-out /tmp/mbes_loop_batch_selected_loops.csv \
   --batch-consistency-translation-threshold-m 1.3 \
   --batch-consistency-rotation-threshold-rad 0.16
 ```
@@ -260,7 +265,18 @@ ros2 run aqua_localization export_mbes_loop_status.py \
 The selected set is not a full SOTA claim. Treat it as a replay/audit input:
 the next run should apply or inspect the selected loop IDs, compare pose-graph
 APE/RPE against the dataset reference, and keep false-positive notes attached
-to every accepted loop.
+to every accepted loop. To apply it during a replay, run the recorder with:
+
+```bash
+MBES_LOOP_SELECTION_ALLOWLIST_CSV=/tmp/mbes_loop_batch_selected_loops.csv \
+./aqua_localization/scripts/record_mbes_demo.sh
+```
+
+When `loop.selection.allowlist_csv` is set, the node still requires descriptor,
+registration, fitness, and correction gates to pass, but it replaces the online
+accepted-loop consistency guard with the offline selected ID set. Otherwise
+valid loops that are not in the CSV are published in status as
+`loop selection rejected` and are not sent to the pose graph.
 
 Useful live checks while tuning:
 

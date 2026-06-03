@@ -698,3 +698,35 @@ def test_batch_consistency_markdown_handles_no_candidates():
 
     assert "Candidate loop corrections: 0" in text
     assert "No accepted or `loop consistency rejected`" in text
+
+
+def test_write_batch_consistency_selected_csv_outputs_allowlist_schema(tmp_path):
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 1.0, 0.10,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, True, True, 0.2, 1.1, 0.11,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            3.0, "map", 3, 0, False, True, 0.3, 5.0, 0.90,
+            math.nan, math.nan, math.nan, "loop consistency rejected"),
+    ]
+    out = tmp_path / "selected_loops.csv"
+
+    module.write_batch_consistency_selected_csv(
+        out,
+        samples,
+        translation_threshold_m=0.2,
+        rotation_threshold_rad=0.02,
+    )
+
+    with out.open(newline="", encoding="utf-8") as fp:
+        rows = list(csv.DictReader(fp))
+    assert list(rows[0].keys())[:3] == ["timestamp", "current_id", "candidate_id"]
+    assert [(row["current_id"], row["candidate_id"]) for row in rows] == [
+        ("1", "0"),
+        ("2", "0"),
+    ]
+    assert rows[0]["degree"] == "1"

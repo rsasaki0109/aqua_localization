@@ -15,7 +15,8 @@ Example:
     --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md \\
     --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md \\
     --consistency-rejection-audit-out /tmp/mbes_loop_consistency_rejections.md \\
-    --batch-consistency-out /tmp/mbes_loop_batch_consistency.md
+    --batch-consistency-out /tmp/mbes_loop_batch_consistency.md \\
+    --batch-consistency-selected-csv-out /tmp/mbes_loop_batch_selected_loops.csv
 """
 
 from __future__ import annotations
@@ -1316,6 +1317,59 @@ def write_csv(path: Path, samples: list[LoopStatusSample]) -> None:
             })
 
 
+def write_batch_consistency_selected_csv(
+    path: Path,
+    samples: list[LoopStatusSample],
+    translation_threshold_m: float = math.nan,
+    rotation_threshold_rad: float = math.nan,
+    auto_quantile: float = 0.95,
+    exact_limit: int = 64,
+) -> None:
+    result = batch_consistency_selection(
+        samples,
+        translation_threshold_m,
+        rotation_threshold_rad,
+        auto_quantile,
+        exact_limit,
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fields = [
+        "timestamp",
+        "current_id",
+        "candidate_id",
+        "accepted",
+        "degree",
+        "fitness_score",
+        "correction_translation_m",
+        "correction_rotation_rad",
+        "status",
+    ]
+    sorted_indices = sorted(
+        result.selected_indices,
+        key=lambda index: (
+            result.candidates[index].timestamp,
+            result.candidates[index].current_id,
+            result.candidates[index].candidate_id,
+        ),
+    )
+    with path.open("w", encoding="utf-8", newline="") as fp:
+        writer = csv.DictWriter(fp, fieldnames=fields)
+        writer.writeheader()
+        for index in sorted_indices:
+            sample = result.candidates[index]
+            writer.writerow({
+                "timestamp": f"{sample.timestamp:.9f}",
+                "current_id": sample.current_id,
+                "candidate_id": sample.candidate_id,
+                "accepted": int(sample.accepted),
+                "degree": result.adjacency[index].bit_count(),
+                "fitness_score": f"{sample.fitness_score:.9f}",
+                "correction_translation_m": f"{sample.correction_translation_m:.9f}",
+                "correction_rotation_rad": f"{sample.correction_rotation_rad:.9f}",
+                "status": sample.status,
+            })
+
+
 def default_ros2_typestore():
     try:
         from rosbags.typesys import Stores, get_typestore
@@ -1481,6 +1535,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="Support count to simulate in the consistency sweep")
     parser.add_argument("--batch-consistency-out", type=Path,
                         help="Optional batch pairwise-consistency selection markdown output path")
+    parser.add_argument("--batch-consistency-selected-csv-out", type=Path,
+                        help="Optional selected loop-id CSV for loop.selection.allowlist_csv replay")
     parser.add_argument("--batch-consistency-translation-threshold-m",
                         type=float, default=math.nan,
                         help="Pairwise translation threshold for batch consistency; "
@@ -1561,6 +1617,15 @@ def main(argv: list[str] | None = None) -> int:
             ),
             encoding="utf-8",
         )
+    if args.batch_consistency_selected_csv_out:
+        write_batch_consistency_selected_csv(
+            args.batch_consistency_selected_csv_out,
+            samples,
+            args.batch_consistency_translation_threshold_m,
+            args.batch_consistency_rotation_threshold_rad,
+            args.batch_consistency_auto_quantile,
+            args.batch_consistency_exact_limit,
+        )
     print(summary_text)
     print(f"wrote {len(samples)} samples to {args.out}", file=sys.stderr)
     if args.summary_out:
@@ -1581,6 +1646,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.batch_consistency_out:
         print(
             f"wrote batch consistency selection to {args.batch_consistency_out}",
+            file=sys.stderr,
+        )
+    if args.batch_consistency_selected_csv_out:
+        print(
+            f"wrote batch selected loop CSV to "
+            f"{args.batch_consistency_selected_csv_out}",
             file=sys.stderr,
         )
     return 0

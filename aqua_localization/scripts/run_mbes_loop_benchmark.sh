@@ -36,6 +36,7 @@ DESCRIPTOR_SWEEP_OUT="$OUT_DIR/mbes_beach_pond_descriptor_sweep.md"
 CONSISTENCY_SWEEP_OUT="$OUT_DIR/mbes_beach_pond_consistency_sweep.md"
 CONSISTENCY_REJECTION_AUDIT_OUT="$OUT_DIR/mbes_beach_pond_consistency_rejections.md"
 BATCH_CONSISTENCY_OUT="$OUT_DIR/mbes_beach_pond_batch_consistency.md"
+BATCH_CONSISTENCY_SELECTED_CSV="$OUT_DIR/mbes_beach_pond_batch_selected_loops.csv"
 ROW_OUT="$OUT_DIR/mbes_beach_pond_benchmark_row.md"
 AUDIT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.md"
 AUDIT_PLOT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.png"
@@ -74,7 +75,8 @@ for optional_name in \
   MBES_LOOP_DESCRIPTOR_MIN_POINT_COUNT_RATIO \
   MBES_LOOP_CONSISTENCY_MAX_TRANSLATION_DELTA_M \
   MBES_LOOP_CONSISTENCY_MAX_ROTATION_DELTA_RAD \
-  MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT
+  MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT \
+  MBES_LOOP_SELECTION_ALLOWLIST_CSV
 do
   if [[ -n "${!optional_name+x}" ]]; then
     RECORD_ENV_ARGS+=("$optional_name=${!optional_name}")
@@ -216,6 +218,7 @@ run_cmd ros2 run aqua_localization export_mbes_loop_status.py \
   --consistency-sweep-out "$CONSISTENCY_SWEEP_OUT" \
   --consistency-rejection-audit-out "$CONSISTENCY_REJECTION_AUDIT_OUT" \
   --batch-consistency-out "$BATCH_CONSISTENCY_OUT" \
+  --batch-consistency-selected-csv-out "$BATCH_CONSISTENCY_SELECTED_CSV" \
   "${CONSISTENCY_SWEEP_ARGS[@]}" \
   "${BATCH_CONSISTENCY_ARGS[@]}"
 
@@ -261,6 +264,7 @@ MBES loop benchmark artifacts:
   consistency sweep: $CONSISTENCY_SWEEP_OUT
   consistency rejection audit: $CONSISTENCY_REJECTION_AUDIT_OUT
   batch consistency: $BATCH_CONSISTENCY_OUT
+  batch selected loops CSV: $BATCH_CONSISTENCY_SELECTED_CSV
   benchmark row:    $ROW_OUT
   audit report:      $AUDIT_OUT
   audit plot:        $AUDIT_PLOT_OUT

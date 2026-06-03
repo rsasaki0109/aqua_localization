@@ -122,7 +122,8 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --descriptor-sweep-out /tmp/mbes_beach_pond_descriptor_sweep.md \
   --consistency-sweep-out /tmp/mbes_beach_pond_consistency_sweep.md \
   --consistency-rejection-audit-out /tmp/mbes_beach_pond_consistency_rejections.md \
-  --batch-consistency-out /tmp/mbes_beach_pond_batch_consistency.md
+  --batch-consistency-out /tmp/mbes_beach_pond_batch_consistency.md \
+  --batch-consistency-selected-csv-out /tmp/mbes_beach_pond_batch_selected_loops.csv
 ```
 
 Generate the benchmark table row from the exported CSV:
@@ -149,6 +150,7 @@ Expected generated files:
 | `/tmp/mbes_beach_pond_consistency_sweep.md` | Accepted-loop correction threshold grid for runtime consistency gating. |
 | `/tmp/mbes_beach_pond_consistency_rejections.md` | Runtime consistency rejections sorted by support deficit and nearest correction delta. |
 | `/tmp/mbes_beach_pond_batch_consistency.md` | PCM-like selected/rejected loop IDs from accepted and consistency-rejected corrections. |
+| `/tmp/mbes_beach_pond_batch_selected_loops.csv` | Selected `current_id,candidate_id` loop pairs for a `loop.selection.allowlist_csv` replay. |
 | `mbes_loop_benchmark_row.py` output | One Markdown row for the measurement table below. |
 | `audit_mbes_loop_candidates.py` output | Accepted-loop visual audit priority list. |
 | `plot_mbes_loop_audit.py` output | Plan-view PNG of the pose graph and accepted-loop audit priorities. |
