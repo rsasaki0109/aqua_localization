@@ -28,6 +28,9 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "MBES_LOOP_VOXEL_LEAF_M": "0.25",
             "POSE_GRAPH_ODOMETRY_TOPIC": "/nav/processed/odometry",
             "POSE_GRAPH_KEYFRAME_TRANSLATION_M": "1.0",
+            "POSE_GRAPH_OPTIMIZATION_ITERATIONS": "35",
+            "POSE_GRAPH_LOOP_ROBUST_KERNEL_TYPE": "dcs",
+            "POSE_GRAPH_LOOP_ROBUST_KERNEL_DELTA": "0.2",
             "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD": "0.4",
             "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO": "5.0",
             "MBES_LOOP_CONSISTENCY_MAX_TRANSLATION_DELTA_M": "1.3",
@@ -75,6 +78,9 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "MBES_LOOP_VOXEL_LEAF_M=0.25" in proc.stdout
     assert "POSE_GRAPH_ODOMETRY_TOPIC=/nav/processed/odometry" in proc.stdout
     assert "POSE_GRAPH_KEYFRAME_TRANSLATION_M=1.0" in proc.stdout
+    assert "POSE_GRAPH_OPTIMIZATION_ITERATIONS=35" in proc.stdout
+    assert "POSE_GRAPH_LOOP_ROBUST_KERNEL_TYPE=dcs" in proc.stdout
+    assert "POSE_GRAPH_LOOP_ROBUST_KERNEL_DELTA=0.2" in proc.stdout
     assert "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4" in proc.stdout
     assert "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0" in proc.stdout
     assert "MBES_LOOP_CONSISTENCY_MAX_TRANSLATION_DELTA_M=1.3" in proc.stdout
