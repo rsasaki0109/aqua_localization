@@ -576,4 +576,111 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, AcceptsLoopBySelectionSignatureWhenIdsDri
   std::remove(allowlist_path.c_str());
 }
 
+TEST_F(MbesLoopClosureNodeRuntimeTest, RejectsSelectionSignatureWhenCandidateStampDrifts)
+{
+  constexpr auto kPointsTopic = "/mbes_loop_selection_endpoint_test/points";
+  constexpr auto kKeyframeTopic = "/mbes_loop_selection_endpoint_test/keyframe";
+  constexpr auto kLoopTopic = "/mbes_loop_selection_endpoint_test/loop_constraint";
+  constexpr auto kStatusTopic = "/mbes_loop_selection_endpoint_test/status";
+  constexpr auto kMarkerTopic = "/mbes_loop_selection_endpoint_test/markers";
+
+  const std::string allowlist_path =
+    std::string(::testing::TempDir()) + "/mbes_loop_selection_endpoint_allowlist.csv";
+  {
+    std::ofstream allowlist(allowlist_path);
+    allowlist << "timestamp,current_keyframe_timestamp,candidate_keyframe_timestamp,"
+              << "current_id,candidate_id,fitness_score,"
+              << "correction_translation_m,correction_rotation_rad\n";
+    allowlist << "20.0,20.0,999.0,99,98,0.0,0.0,0.0\n";
+  }
+
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({
+    rclcpp::Parameter("topics.points", std::string(kPointsTopic)),
+    rclcpp::Parameter("topics.keyframe", std::string(kKeyframeTopic)),
+    rclcpp::Parameter("topics.loop_constraint", std::string(kLoopTopic)),
+    rclcpp::Parameter("topics.status", std::string(kStatusTopic)),
+    rclcpp::Parameter("topics.markers", std::string(kMarkerTopic)),
+    rclcpp::Parameter("submaps.min_points", 5),
+    rclcpp::Parameter("submaps.max_points", 1000),
+    rclcpp::Parameter("submaps.voxel_leaf_m", 0.0),
+    rclcpp::Parameter("candidates.min_keyframe_separation", 0),
+    rclcpp::Parameter("candidates.max_distance_m", 10.0),
+    rclcpp::Parameter("candidates.max_per_keyframe", 1),
+    rclcpp::Parameter("registration.backend", std::string("icp")),
+    rclcpp::Parameter("registration.max_correspondence_distance_m", 2.0),
+    rclcpp::Parameter("registration.max_iterations", 100),
+    rclcpp::Parameter("registration.transformation_epsilon", 1.0e-10),
+    rclcpp::Parameter("gates.max_fitness_score", 1.0e-4),
+    rclcpp::Parameter("gates.max_correction_translation_m", 1.0),
+    rclcpp::Parameter("gates.max_correction_rotation_rad", 0.2),
+    rclcpp::Parameter("loop.selection.allowlist_csv", allowlist_path),
+    rclcpp::Parameter("loop.selection.match_timestamp_window_s", 1.0),
+    rclcpp::Parameter("loop.selection.match_max_fitness_delta", 1.0e-4),
+    rclcpp::Parameter("loop.selection.match_max_translation_delta_m", 1.0e-3),
+    rclcpp::Parameter("loop.selection.match_max_rotation_delta_rad", 1.0e-3),
+  });
+
+  auto loop_node = std::make_shared<aqua_sonar_loc::MbesLoopClosureNode>(options);
+  auto test_node = std::make_shared<rclcpp::Node>("mbes_loop_selection_endpoint_test");
+
+  std::vector<aqua_msgs::msg::PoseGraphLoopConstraint> loop_messages;
+  std::vector<aqua_msgs::msg::LoopClosureStatus> status_messages;
+  auto keyframe_pub = test_node->create_publisher<aqua_msgs::msg::PoseGraphKeyframe>(
+    kKeyframeTopic, rclcpp::QoS(10).transient_local());
+  auto points_pub = test_node->create_publisher<sensor_msgs::msg::PointCloud2>(
+    kPointsTopic, rclcpp::SensorDataQoS());
+  auto loop_sub = test_node->create_subscription<aqua_msgs::msg::PoseGraphLoopConstraint>(
+    kLoopTopic, 10,
+    [&loop_messages](const aqua_msgs::msg::PoseGraphLoopConstraint::SharedPtr msg) {
+      loop_messages.push_back(*msg);
+    });
+  auto status_sub = test_node->create_subscription<aqua_msgs::msg::LoopClosureStatus>(
+    kStatusTopic, 10,
+    [&status_messages](const aqua_msgs::msg::LoopClosureStatus::SharedPtr msg) {
+      status_messages.push_back(*msg);
+    });
+
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(loop_node);
+  executor.add_node(test_node);
+
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    return keyframe_pub->get_subscription_count() > 0 &&
+           points_pub->get_subscription_count() > 0;
+  }));
+
+  const auto points = asymmetric_points();
+  keyframe_pub->publish(make_keyframe(rclcpp::Time(10, 0, RCL_ROS_TIME), 0, 0.0));
+  ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));
+  points_pub->publish(make_cloud(rclcpp::Time(10, 0, RCL_ROS_TIME), points));
+  ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));
+
+  keyframe_pub->publish(make_keyframe(rclcpp::Time(20, 0, RCL_ROS_TIME), 1, 0.0));
+  ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));
+  points_pub->publish(make_cloud(rclcpp::Time(20, 0, RCL_ROS_TIME), points));
+  ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));
+
+  keyframe_pub->publish(make_keyframe(rclcpp::Time(30, 0, RCL_ROS_TIME), 2, 0.0));
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    return std::any_of(
+      status_messages.begin(), status_messages.end(),
+      [](const aqua_msgs::msg::LoopClosureStatus & msg) {
+        return msg.status == "loop selection rejected";
+      });
+  }));
+
+  EXPECT_TRUE(loop_messages.empty());
+  const auto rejected_status = std::find_if(
+    status_messages.begin(), status_messages.end(),
+    [](const aqua_msgs::msg::LoopClosureStatus & msg) {
+      return msg.status == "loop selection rejected";
+    });
+  ASSERT_NE(rejected_status, status_messages.end());
+  EXPECT_EQ(rejected_status->current_id, 1U);
+  EXPECT_EQ(rejected_status->candidate_id, 0U);
+
+  std::remove(allowlist_path.c_str());
+}
+
 }  // namespace

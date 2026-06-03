@@ -330,11 +330,15 @@ accepted-loop consistency guard with the offline selected ID set. Otherwise
 valid loops that are not in the CSV are published in status as
 `loop selection rejected` and are not sent to the pose graph.
 The CSV currently matches exact `(candidate_id,current_id)` pairs from the
-source replay. A selected replay with 0 accepted loops can still be a useful
-integrity probe when the allowlist audit passes, but it is not trajectory
-evidence. Treat the selected-vs-normal APE comparison as claimable only when
-the replay accepts audited selected loops and the comparison report does not
-warn about baseline drift or mismatched matched-time coverage.
+source replay. The exporter also writes `current_keyframe_timestamp` and
+`candidate_keyframe_timestamp` columns when the bag contains
+`/aqua_pose_graph/keyframe`, so later audits can distinguish loops that have a
+similar status timestamp but different endpoint keyframes. A selected replay
+with 0 accepted loops can still be a useful integrity probe when the allowlist
+audit passes, but it is not trajectory evidence. Treat the selected-vs-normal
+APE comparison as claimable only when the replay accepts audited selected loops
+and the comparison report does not warn about baseline drift or mismatched
+matched-time coverage.
 
 If exact keyframe IDs drift between replays, the node can also use the status
 export columns as an explicit signature fallback. This is disabled by default:
@@ -343,7 +347,12 @@ set `loop.selection.match_timestamp_window_s` positive, then optionally bound
 `loop.selection.match_max_translation_delta_m`, and
 `loop.selection.match_max_rotation_delta_rad`. Exact ID matches are still
 accepted first; the signature path only decides otherwise accepted-looking
-loops that missed the exact `(candidate_id,current_id)` pair.
+loops that missed the exact `(candidate_id,current_id)` pair. When endpoint
+timestamps are present in the allowlist CSV, signature matching requires both
+the current and candidate keyframe timestamps to fall inside the configured
+window. This is stricter than the older status-timestamp-only fallback and can
+turn a diagnostic PASS into a FAIL if the replay accepts a nearby but different
+candidate endpoint.
 Use the matching `check_mbes_loop_allowlist_replay.py --signature-*` options
 when auditing a signature replay; exact-ID-only strict audits are still useful
 for integrity probes that should not accept drifted IDs.

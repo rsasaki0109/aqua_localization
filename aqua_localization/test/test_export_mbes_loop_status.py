@@ -102,6 +102,8 @@ def test_sample_from_msg_uses_fallback_for_zero_stamp():
     sample = module.sample_from_msg(msg, fallback_time=123.5)
 
     assert sample.timestamp == 123.5
+    assert sample.current_keyframe_timestamp == 123.5
+    assert math.isnan(sample.candidate_keyframe_timestamp)
     assert sample.accepted is True
     assert sample.converged is True
     assert sample.fitness_score == 0.25
@@ -218,6 +220,8 @@ def test_write_csv_quotes_status_and_preserves_numeric_fields(tmp_path):
         rows = list(csv.DictReader(fp))
     assert len(rows) == 1
     assert rows[0]["timestamp"] == "10.250000000"
+    assert rows[0]["current_keyframe_timestamp"] == "10.250000000"
+    assert rows[0]["candidate_keyframe_timestamp"] == "nan"
     assert rows[0]["accepted"] == "0"
     assert rows[0]["converged"] == "1"
     assert rows[0]["correction_pose_valid"] == "0"
@@ -230,6 +234,29 @@ def test_write_csv_quotes_status_and_preserves_numeric_fields(tmp_path):
     assert rows[0]["descriptor_extent_ratio"] == "2.500000000"
     assert rows[0]["descriptor_point_count_ratio"] == "0.750000000"
     assert rows[0]["status"] == "fitness score exceeds gate, tune threshold"
+
+
+def test_enrich_samples_with_keyframe_stamps_adds_endpoint_timestamps():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            10.0, "map", 4, 2, True, True, 0.1, 0.2, 0.01,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            11.0, "map", 5, module.NO_CANDIDATE_ID, False, False,
+            math.nan, math.nan, math.nan, math.nan, math.nan, math.nan,
+            "no candidate submaps"),
+    ]
+
+    enriched = module.enrich_samples_with_keyframe_stamps(
+        samples,
+        {2: 20.5, 4: 40.25, 5: 50.75},
+    )
+
+    assert enriched[0].current_keyframe_timestamp == 40.25
+    assert enriched[0].candidate_keyframe_timestamp == 20.5
+    assert enriched[1].current_keyframe_timestamp == 50.75
+    assert math.isnan(enriched[1].candidate_keyframe_timestamp)
 
 
 def test_format_summary_markdown_contains_key_sections():
@@ -724,9 +751,17 @@ def test_write_batch_consistency_selected_csv_outputs_allowlist_schema(tmp_path)
 
     with out.open(newline="", encoding="utf-8") as fp:
         rows = list(csv.DictReader(fp))
-    assert list(rows[0].keys())[:3] == ["timestamp", "current_id", "candidate_id"]
+    assert list(rows[0].keys())[:5] == [
+        "timestamp",
+        "current_keyframe_timestamp",
+        "candidate_keyframe_timestamp",
+        "current_id",
+        "candidate_id",
+    ]
     assert [(row["current_id"], row["candidate_id"]) for row in rows] == [
         ("1", "0"),
         ("2", "0"),
     ]
+    assert rows[0]["current_keyframe_timestamp"] == "1.000000000"
+    assert rows[0]["candidate_keyframe_timestamp"] == "nan"
     assert rows[0]["degree"] == "1"

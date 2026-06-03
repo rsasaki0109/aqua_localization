@@ -24,7 +24,7 @@ from __future__ import annotations
 import argparse
 import csv
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 from pathlib import Path
 import sys
@@ -35,6 +35,8 @@ NO_CANDIDATE_ID = 2**32 - 1
 
 CSV_FIELDS = [
     "timestamp",
+    "current_keyframe_timestamp",
+    "candidate_keyframe_timestamp",
     "frame_id",
     "current_id",
     "candidate_id",
@@ -89,6 +91,8 @@ class LoopStatusSample:
     consistency_required_support_count: int = 0
     consistency_nearest_translation_delta_m: float = math.nan
     consistency_nearest_rotation_delta_rad: float = math.nan
+    current_keyframe_timestamp: float = math.nan
+    candidate_keyframe_timestamp: float = math.nan
 
 
 @dataclass(frozen=True)
@@ -210,6 +214,7 @@ def sample_from_msg(msg, fallback_time: float) -> LoopStatusSample:
         consistency_nearest_rotation_delta_rad=optional_float(
             msg, "consistency_nearest_rotation_delta_rad"
         ),
+        current_keyframe_timestamp=timestamp,
     )
 
 
@@ -855,6 +860,12 @@ def format_float(value: float) -> str:
     return f"{value:.6g}"
 
 
+def current_keyframe_timestamp(sample: LoopStatusSample) -> float:
+    if math.isfinite(sample.current_keyframe_timestamp):
+        return sample.current_keyframe_timestamp
+    return sample.timestamp
+
+
 def format_stats(label: str, summary: dict[str, float | int]) -> str:
     return (
         f"| {label} | {summary['count']} | {format_float(float(summary['min']))} | "
@@ -1280,6 +1291,10 @@ def write_csv(path: Path, samples: list[LoopStatusSample]) -> None:
         for sample in samples:
             writer.writerow({
                 "timestamp": f"{sample.timestamp:.9f}",
+                "current_keyframe_timestamp": (
+                    f"{current_keyframe_timestamp(sample):.9f}"
+                ),
+                "candidate_keyframe_timestamp": f"{sample.candidate_keyframe_timestamp:.9f}",
                 "frame_id": sample.frame_id,
                 "current_id": sample.current_id,
                 "candidate_id": sample.candidate_id,
@@ -1335,6 +1350,8 @@ def write_batch_consistency_selected_csv(
     path.parent.mkdir(parents=True, exist_ok=True)
     fields = [
         "timestamp",
+        "current_keyframe_timestamp",
+        "candidate_keyframe_timestamp",
         "current_id",
         "candidate_id",
         "accepted",
@@ -1359,6 +1376,12 @@ def write_batch_consistency_selected_csv(
             sample = result.candidates[index]
             writer.writerow({
                 "timestamp": f"{sample.timestamp:.9f}",
+                "current_keyframe_timestamp": (
+                    f"{current_keyframe_timestamp(sample):.9f}"
+                ),
+                "candidate_keyframe_timestamp": (
+                    f"{sample.candidate_keyframe_timestamp:.9f}"
+                ),
                 "current_id": sample.current_id,
                 "candidate_id": sample.candidate_id,
                 "accepted": int(sample.accepted),
@@ -1417,6 +1440,24 @@ def deserialize_status_message(reader, raw, msgtype: str):
     return deserialize_message(raw, LoopClosureStatus)
 
 
+def deserialize_keyframe_message(reader, raw, msgtype: str):
+    try:
+        return reader.deserialize(raw, msgtype)
+    except Exception:
+        if msgtype != "aqua_msgs/msg/PoseGraphKeyframe":
+            raise
+
+    try:
+        from aqua_msgs.msg import PoseGraphKeyframe
+        from rclpy.serialization import deserialize_message
+    except ImportError as e:
+        raise RuntimeError(
+            "cannot deserialize aqua_msgs/msg/PoseGraphKeyframe; source the ROS 2 "
+            "workspace or record bags with embedded type definitions"
+        ) from e
+    return deserialize_message(raw, PoseGraphKeyframe)
+
+
 def deserialize_scalar_message(reader, raw, msgtype: str):
     try:
         return reader.deserialize(raw, msgtype)
@@ -1460,6 +1501,60 @@ def read_bag_samples(bag: Path, topic: str) -> list[LoopStatusSample]:
     finally:
         reader.close()
     return samples
+
+
+def read_bag_keyframe_stamps(bag: Path, topic: str) -> dict[int, float]:
+    try:
+        from rosbags.highlevel import AnyReader
+    except ImportError as e:
+        raise RuntimeError("missing dependency: install rosbags to read rosbag2 files") from e
+
+    bag_dir = bag if bag.is_dir() else bag.parent
+    if not bag_dir.is_dir():
+        raise RuntimeError(f"not a rosbag2 directory: {bag_dir}")
+
+    stamps: dict[int, float] = {}
+    reader = open_reader_with_typestore_fallback(AnyReader, bag_dir)
+    try:
+        wanted = [connection for connection in reader.connections if connection.topic == topic]
+        if not wanted:
+            return stamps
+        for connection, t_ns, raw in reader.messages(connections=wanted):
+            try:
+                msg = deserialize_keyframe_message(reader, raw, connection.msgtype)
+            except Exception:
+                continue
+            stamp = stamp_to_seconds(msg.header.stamp)
+            if stamp <= 0.0:
+                stamp = t_ns * 1.0e-9
+            stamps[int(msg.id)] = stamp
+    finally:
+        reader.close()
+    return stamps
+
+
+def enrich_samples_with_keyframe_stamps(
+    samples: list[LoopStatusSample],
+    keyframe_stamps: dict[int, float],
+) -> list[LoopStatusSample]:
+    if not keyframe_stamps:
+        return samples
+    enriched = []
+    for sample in samples:
+        current_stamp = keyframe_stamps.get(sample.current_id, sample.timestamp)
+        candidate_stamp = (
+            math.nan
+            if sample.candidate_id == NO_CANDIDATE_ID
+            else keyframe_stamps.get(sample.candidate_id, math.nan)
+        )
+        enriched.append(
+            replace(
+                sample,
+                current_keyframe_timestamp=current_stamp,
+                candidate_keyframe_timestamp=candidate_stamp,
+            )
+        )
+    return enriched
 
 
 def read_bag_scalar_samples(bag: Path, topic: str) -> list[TopicValueSample]:
@@ -1515,6 +1610,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="Output CSV path")
     parser.add_argument("--topic", default="/mbes_loop_closure/status",
                         help="LoopClosureStatus topic")
+    parser.add_argument("--keyframe-topic", default="/aqua_pose_graph/keyframe",
+                        help="Optional PoseGraphKeyframe topic used to add stable "
+                        "candidate/current keyframe timestamps to CSV outputs")
     parser.add_argument("--optimization-count-topic",
                         default="/aqua_pose_graph/optimization_count",
                         help="Optional std_msgs/UInt32 pose-graph optimize-count topic")
@@ -1559,6 +1657,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     try:
         samples = read_bag_samples(args.bag, args.topic)
+        samples = enrich_samples_with_keyframe_stamps(
+            samples,
+            read_bag_keyframe_stamps(args.bag, args.keyframe_topic),
+        )
         optimization = read_optimization_diagnostics(
             args.bag,
             args.optimization_count_topic,

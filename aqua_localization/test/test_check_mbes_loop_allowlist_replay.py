@@ -123,3 +123,40 @@ timestamp,current_id,candidate_id,accepted,status,fitness_score,correction_trans
     assert "- Accepted by signature: 1" in text
     assert "- Accepted outside allowlist: 0" in text
     assert "matched the allowlist by exact ID or configured signature" in text
+
+
+def test_signature_match_uses_candidate_endpoint_timestamp_when_available(tmp_path):
+    module = load_module()
+    allowlist = tmp_path / "selected.csv"
+    status = tmp_path / "status.csv"
+    out = tmp_path / "audit.md"
+    write_csv(
+        allowlist,
+        """
+timestamp,current_keyframe_timestamp,candidate_keyframe_timestamp,current_id,candidate_id,fitness_score,correction_translation_m,correction_rotation_rad
+10.0,10.0,5.0,10,2,0.10,1.0,0.10
+""",
+    )
+    write_csv(
+        status,
+        """
+timestamp,current_keyframe_timestamp,candidate_keyframe_timestamp,current_id,candidate_id,accepted,status,fitness_score,correction_translation_m,correction_rotation_rad
+10.1,10.2,99.0,110,20,1,accepted,0.11,1.2,0.12
+""",
+    )
+
+    rc = module.main([
+        "--allowlist", str(allowlist),
+        "--status", str(status),
+        "--out", str(out),
+        "--strict",
+        "--signature-timestamp-window-s", "0.5",
+        "--signature-max-fitness-delta", "0.05",
+        "--signature-max-translation-delta-m", "0.5",
+        "--signature-max-rotation-delta-rad", "0.05",
+    ])
+
+    text = out.read_text(encoding="utf-8")
+    assert rc == 2
+    assert "- Endpoint timestamp signatures: 1" in text
+    assert "- Accepted outside allowlist: 1" in text

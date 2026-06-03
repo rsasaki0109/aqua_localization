@@ -14,6 +14,8 @@ import sys
 @dataclass(frozen=True)
 class LoopStatusRow:
     timestamp: str
+    current_keyframe_timestamp: str
+    candidate_keyframe_timestamp: str
     current_id: int
     candidate_id: int
     accepted: bool
@@ -26,6 +28,8 @@ class LoopStatusRow:
 @dataclass(frozen=True)
 class LoopSignature:
     timestamp_s: float
+    current_keyframe_timestamp_s: float | None
+    candidate_keyframe_timestamp_s: float | None
     fitness_score: float | None
     correction_translation_m: float | None
     correction_rotation_rad: float | None
@@ -77,10 +81,22 @@ def read_allowlist(path: Path) -> LoopAllowlist:
                 raise ValueError(f"{path}:{line_number}: non-numeric loop IDs") from exc
             pairs.add((candidate_id, current_id))
             timestamp_s = parse_optional_float(row.get("timestamp"))
-            if timestamp_s is not None:
+            current_keyframe_timestamp_s = parse_optional_float(
+                row.get("current_keyframe_timestamp")
+            )
+            if current_keyframe_timestamp_s is None:
+                current_keyframe_timestamp_s = timestamp_s
+            candidate_keyframe_timestamp_s = parse_optional_float(
+                row.get("candidate_keyframe_timestamp")
+            )
+            if current_keyframe_timestamp_s is not None:
                 signatures.append(
                     LoopSignature(
-                        timestamp_s=timestamp_s,
+                        timestamp_s=timestamp_s
+                        if timestamp_s is not None
+                        else current_keyframe_timestamp_s,
+                        current_keyframe_timestamp_s=current_keyframe_timestamp_s,
+                        candidate_keyframe_timestamp_s=candidate_keyframe_timestamp_s,
                         fitness_score=parse_optional_float(row.get("fitness_score")),
                         correction_translation_m=parse_optional_float(
                             row.get("correction_translation_m")
@@ -107,6 +123,12 @@ def read_status_rows(path: Path) -> list[LoopStatusRow]:
                 rows.append(
                     LoopStatusRow(
                         timestamp=row.get("timestamp", ""),
+                        current_keyframe_timestamp=row.get(
+                            "current_keyframe_timestamp", ""
+                        ),
+                        candidate_keyframe_timestamp=row.get(
+                            "candidate_keyframe_timestamp", ""
+                        ),
                         current_id=int(row["current_id"]),
                         candidate_id=int(row["candidate_id"]),
                         accepted=truthy(row.get("accepted")) or row.get("status") == "accepted",
@@ -145,11 +167,25 @@ def signature_matches(
 ) -> bool:
     if options.timestamp_window_s <= 0.0:
         return False
-    timestamp_s = parse_optional_float(row.timestamp)
-    if timestamp_s is None:
+    current_timestamp_s = parse_optional_float(row.current_keyframe_timestamp)
+    if current_timestamp_s is None:
+        current_timestamp_s = parse_optional_float(row.timestamp)
+    if current_timestamp_s is None or signature.current_keyframe_timestamp_s is None:
         return False
-    if abs(timestamp_s - signature.timestamp_s) > options.timestamp_window_s:
+    if (
+        abs(current_timestamp_s - signature.current_keyframe_timestamp_s) >
+        options.timestamp_window_s
+    ):
         return False
+    if signature.candidate_keyframe_timestamp_s is not None:
+        candidate_timestamp_s = parse_optional_float(row.candidate_keyframe_timestamp)
+        if candidate_timestamp_s is None:
+            return False
+        if (
+            abs(candidate_timestamp_s - signature.candidate_keyframe_timestamp_s) >
+            options.timestamp_window_s
+        ):
+            return False
     return (
         metric_matches(row.fitness_score, signature.fitness_score, options.max_fitness_delta)
         and metric_matches(
@@ -216,6 +252,10 @@ def format_report(
     exact_accepted = len(classified["exact"])
     signature_accepted = len(classified["signature"])
     allowed_accepted = exact_accepted + signature_accepted
+    endpoint_signature_count = sum(
+        1 for signature in allowlist.signatures
+        if signature.candidate_keyframe_timestamp_s is not None
+    )
     lines = [
         "# MBES Selected-Loop Allowlist Replay Audit",
         "",
@@ -223,6 +263,7 @@ def format_report(
         f"- Selected replay status CSV: `{status_path}`",
         f"- Allowlisted pairs: {len(allowlist.pairs)}",
         f"- Allowlist signatures: {len(allowlist.signatures)}",
+        f"- Endpoint timestamp signatures: {endpoint_signature_count}",
         f"- Signature timestamp window: {options.timestamp_window_s:.3f} s",
         f"- Accepted replay loops: {len(accepted)}",
         f"- Accepted allowlisted loops: {allowed_accepted}",

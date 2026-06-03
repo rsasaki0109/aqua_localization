@@ -105,6 +105,8 @@ bool metric_within_delta(double observed, double expected, double max_delta)
 struct SelectedLoopSignature
 {
   double timestamp_s{std::numeric_limits<double>::quiet_NaN()};
+  double current_keyframe_timestamp_s{std::numeric_limits<double>::quiet_NaN()};
+  double candidate_keyframe_timestamp_s{std::numeric_limits<double>::quiet_NaN()};
   double fitness_score{std::numeric_limits<double>::quiet_NaN()};
   double correction_translation_m{std::numeric_limits<double>::quiet_NaN()};
   double correction_rotation_rad{std::numeric_limits<double>::quiet_NaN()};
@@ -422,6 +424,9 @@ private:
     const int current_column = csv_column_index(header, "current_id");
     const int candidate_column = csv_column_index(header, "candidate_id");
     const int timestamp_column = csv_column_index(header, "timestamp");
+    const int current_timestamp_column = csv_column_index(header, "current_keyframe_timestamp");
+    const int candidate_timestamp_column =
+      csv_column_index(header, "candidate_keyframe_timestamp");
     const int fitness_column = csv_column_index(header, "fitness_score");
     const int translation_column = csv_column_index(header, "correction_translation_m");
     const int rotation_column = csv_column_index(header, "correction_rotation_rad");
@@ -455,7 +460,15 @@ private:
         selection.pairs.insert(loop_pair_key(candidate_id, current_id));
 
         SelectedLoopSignature signature;
-        if (parse_csv_double_field(fields, timestamp_column, signature.timestamp_s)) {
+        parse_csv_double_field(fields, timestamp_column, signature.timestamp_s);
+        parse_csv_double_field(
+          fields, current_timestamp_column, signature.current_keyframe_timestamp_s);
+        parse_csv_double_field(
+          fields, candidate_timestamp_column, signature.candidate_keyframe_timestamp_s);
+        if (!std::isfinite(signature.current_keyframe_timestamp_s)) {
+          signature.current_keyframe_timestamp_s = signature.timestamp_s;
+        }
+        if (std::isfinite(signature.current_keyframe_timestamp_s)) {
           parse_csv_double_field(fields, fitness_column, signature.fitness_score);
           parse_csv_double_field(
             fields, translation_column, signature.correction_translation_m);
@@ -501,10 +514,18 @@ private:
     if (!std::isfinite(current_timestamp_s)) {
       return false;
     }
+    const double candidate_timestamp_s = candidate.stamp.seconds();
     for (const auto & signature : selected_loop_signatures_) {
-      if (!std::isfinite(signature.timestamp_s) ||
-        std::abs(current_timestamp_s - signature.timestamp_s) >
+      if (!std::isfinite(signature.current_keyframe_timestamp_s) ||
+        std::abs(current_timestamp_s - signature.current_keyframe_timestamp_s) >
         loop_selection_match_timestamp_window_s_)
+      {
+        continue;
+      }
+      if (std::isfinite(signature.candidate_keyframe_timestamp_s) &&
+        (!std::isfinite(candidate_timestamp_s) ||
+        std::abs(candidate_timestamp_s - signature.candidate_keyframe_timestamp_s) >
+        loop_selection_match_timestamp_window_s_))
       {
         continue;
       }
