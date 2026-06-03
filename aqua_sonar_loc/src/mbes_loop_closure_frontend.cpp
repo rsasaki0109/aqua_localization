@@ -38,6 +38,19 @@ double ratio_or_infinity(double a, double b)
   return hi / lo;
 }
 
+double rotation_distance_rad(const Eigen::Isometry3d & delta)
+{
+  const Eigen::AngleAxisd aa(delta.linear());
+  return std::abs(aa.angle());
+}
+
+Eigen::Isometry3d loop_correction(
+  const Eigen::Isometry3d & guess,
+  const Eigen::Isometry3d & candidate_to_current)
+{
+  return guess.inverse() * candidate_to_current;
+}
+
 template<typename RegistrationT>
 MatchResult run_registration(
   RegistrationT & registration,
@@ -382,10 +395,9 @@ GateResult LoopGateEvaluator::evaluate(
     gate.status = result.status.empty() ? "registration failed" : result.status;
     return gate;
   }
-  const Eigen::Isometry3d correction = guess.inverse() * result.candidate_to_current;
+  const Eigen::Isometry3d correction = loop_correction(guess, result.candidate_to_current);
   gate.correction_translation_m = correction.translation().norm();
-  const Eigen::AngleAxisd aa(correction.linear());
-  gate.correction_rotation_rad = std::abs(aa.angle());
+  gate.correction_rotation_rad = rotation_distance_rad(correction);
 
   if (options_.max_fitness_score > 0.0 && result.fitness > options_.max_fitness_score) {
     gate.status = "fitness score exceeds gate";
@@ -428,9 +440,52 @@ bool AcceptedLoopTracker::is_suppressed(std::uint32_t from_id, std::uint32_t to_
     });
 }
 
+bool AcceptedLoopTracker::is_consistent(const Eigen::Isometry3d & correction) const
+{
+  if (accepted_loops_.empty()) {
+    return true;
+  }
+  const bool check_translation =
+    options_.max_consistency_translation_delta_m > 0.0;
+  const bool check_rotation =
+    options_.max_consistency_rotation_delta_rad > 0.0;
+  if (!check_translation && !check_rotation) {
+    return true;
+  }
+
+  return std::any_of(
+    accepted_loops_.begin(), accepted_loops_.end(),
+    [this, check_translation, check_rotation, &correction](const AcceptedLoop & loop) {
+      const Eigen::Isometry3d delta = loop.correction.inverse() * correction;
+      if (check_translation &&
+        delta.translation().norm() > options_.max_consistency_translation_delta_m)
+      {
+        return false;
+      }
+      if (check_rotation &&
+        rotation_distance_rad(delta) > options_.max_consistency_rotation_delta_rad)
+      {
+        return false;
+      }
+      return true;
+    });
+}
+
 void AcceptedLoopTracker::record(std::uint32_t from_id, std::uint32_t to_id)
 {
-  accepted_loops_.push_back(AcceptedLoop{from_id, to_id});
+  record(from_id, to_id, Eigen::Isometry3d::Identity());
+}
+
+void AcceptedLoopTracker::record(
+  std::uint32_t from_id,
+  std::uint32_t to_id,
+  const Eigen::Isometry3d & correction)
+{
+  AcceptedLoop loop;
+  loop.from_id = from_id;
+  loop.to_id = to_id;
+  loop.correction = correction;
+  accepted_loops_.push_back(loop);
 }
 
 const std::vector<AcceptedLoop> & AcceptedLoopTracker::accepted_loops() const

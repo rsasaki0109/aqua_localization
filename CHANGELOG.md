@@ -20,6 +20,9 @@
   blockers and visible DVL-prior gate thresholds.
 - Added optional Huber/DCS robust kernels on pose-graph loop constraints to
   reduce bad-loop influence during MBES loop-closure tuning.
+- Added an optional accepted-loop consistency guard for MBES loop closures so
+  new candidates can be rejected when their correction disagrees with trusted
+  prior loop corrections.
 - Rebuilt the GitHub Pages landing page around the full public-data demo wall,
   MBES hero replay, 3DGS viewer entry point, and GitHub star CTA.
 - Recorded a readiness-only 3DGS training smoke report for the published Tank

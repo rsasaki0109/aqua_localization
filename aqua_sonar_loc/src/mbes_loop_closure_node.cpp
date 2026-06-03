@@ -126,6 +126,10 @@ private:
       declare_parameter<bool>("loop.optimize_after_insert", true);
     loop_suppression_options_.min_repeat_keyframe_gap =
       declare_parameter<int>("loop.min_repeat_keyframe_gap", 5);
+    loop_suppression_options_.max_consistency_translation_delta_m =
+      declare_parameter<double>("loop.consistency.max_correction_translation_delta_m", 0.0);
+    loop_suppression_options_.max_consistency_rotation_delta_rad =
+      declare_parameter<double>("loop.consistency.max_correction_rotation_delta_rad", 0.0);
 
     submap_manager_ = SubmapManager(submap_options_);
     accepted_loop_tracker_ = AcceptedLoopTracker(loop_suppression_options_);
@@ -199,6 +203,20 @@ private:
         candidate.pose.inverse() * current.pose;
       const Eigen::Isometry3d current_to_candidate_guess =
         candidate_to_current_guess.inverse();
+      if (accepted_loop_tracker_.is_suppressed(candidate.id, current.id)) {
+        MatchResult result;
+        result.fitness = std::numeric_limits<double>::quiet_NaN();
+        result.status = "duplicate loop suppressed";
+        GateResult gate;
+        gate.accepted = false;
+        gate.status = result.status;
+        publish_status(candidate, current, result, gate);
+        publish_candidate_marker(candidate, current, gate);
+        RCLCPP_DEBUG(
+          get_logger(), "rejected loop candidate %u -> %u: %s",
+          candidate.id, current.id, gate.status.c_str());
+        continue;
+      }
       const GateResult descriptor_result = descriptor_gate.evaluate(candidate, current);
       if (!descriptor_result.accepted) {
         MatchResult result;
@@ -219,11 +237,11 @@ private:
         descriptor_result.descriptor_centroid_distance_m;
       gate.descriptor_extent_ratio = descriptor_result.descriptor_extent_ratio;
       gate.descriptor_point_count_ratio = descriptor_result.descriptor_point_count_ratio;
-      if (gate.accepted &&
-        accepted_loop_tracker_.is_suppressed(candidate.id, current.id))
-      {
+      const Eigen::Isometry3d correction =
+        candidate_to_current_guess.inverse() * result.candidate_to_current;
+      if (gate.accepted && !accepted_loop_tracker_.is_consistent(correction)) {
         gate.accepted = false;
-        gate.status = "duplicate loop suppressed";
+        gate.status = "loop consistency rejected";
       }
       publish_status(candidate, current, result, gate);
       publish_candidate_marker(candidate, current, gate);
@@ -235,7 +253,7 @@ private:
       }
 
       publish_loop_constraint(candidate, current, result.candidate_to_current);
-      accepted_loop_tracker_.record(candidate.id, current.id);
+      accepted_loop_tracker_.record(candidate.id, current.id, correction);
       return;
     }
     if (tested == 0) {

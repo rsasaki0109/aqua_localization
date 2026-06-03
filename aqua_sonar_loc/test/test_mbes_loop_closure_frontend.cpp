@@ -210,3 +210,26 @@ TEST(MbesLoopClosureFrontendTest, AcceptedLoopTrackerCanBeDisabled)
   EXPECT_FALSE(tracker.is_suppressed(10, 30));
   EXPECT_FALSE(tracker.is_suppressed(11, 31));
 }
+
+TEST(MbesLoopClosureFrontendTest, AcceptedLoopTrackerRejectsInconsistentCorrections)
+{
+  aqua_sonar_loc::LoopSuppressionOptions options;
+  options.max_consistency_translation_delta_m = 1.0;
+  options.max_consistency_rotation_delta_rad = 0.25;
+  aqua_sonar_loc::AcceptedLoopTracker tracker(options);
+
+  tracker.record(10, 30, Eigen::Isometry3d::Identity());
+
+  Eigen::Isometry3d consistent = Eigen::Isometry3d::Identity();
+  consistent.translation().x() = 0.5;
+  EXPECT_TRUE(tracker.is_consistent(consistent));
+
+  Eigen::Isometry3d inconsistent_translation = Eigen::Isometry3d::Identity();
+  inconsistent_translation.translation().x() = 2.0;
+  EXPECT_FALSE(tracker.is_consistent(inconsistent_translation));
+
+  Eigen::Isometry3d inconsistent_rotation = Eigen::Isometry3d::Identity();
+  inconsistent_rotation.linear() =
+    Eigen::AngleAxisd(0.5, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+  EXPECT_FALSE(tracker.is_consistent(inconsistent_rotation));
+}

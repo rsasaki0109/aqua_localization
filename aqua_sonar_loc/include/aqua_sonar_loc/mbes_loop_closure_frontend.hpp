@@ -118,12 +118,15 @@ struct DescriptorGateOptions
 struct LoopSuppressionOptions
 {
   int min_repeat_keyframe_gap{0};
+  double max_consistency_translation_delta_m{0.0};
+  double max_consistency_rotation_delta_rad{0.0};
 };
 
 struct AcceptedLoop
 {
   std::uint32_t from_id{0};
   std::uint32_t to_id{0};
+  Eigen::Isometry3d correction{Eigen::Isometry3d::Identity()};
 };
 
 Eigen::Isometry3d pose_to_isometry(const geometry_msgs::msg::Pose & msg);
@@ -211,7 +214,12 @@ public:
   explicit AcceptedLoopTracker(LoopSuppressionOptions options);
 
   bool is_suppressed(std::uint32_t from_id, std::uint32_t to_id) const;
+  bool is_consistent(const Eigen::Isometry3d & correction) const;
   void record(std::uint32_t from_id, std::uint32_t to_id);
+  void record(
+    std::uint32_t from_id,
+    std::uint32_t to_id,
+    const Eigen::Isometry3d & correction);
 
   const std::vector<AcceptedLoop> & accepted_loops() const;
 

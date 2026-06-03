@@ -113,7 +113,12 @@ Tune in this order:
    `gates.max_correction_rotation_rad` until false positives are rejected.
 5. `loop.min_repeat_keyframe_gap` to suppress near-duplicate accepted loops
    while preserving distinct revisits.
-6. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
+6. `loop.consistency.max_correction_translation_delta_m` and
+   `loop.consistency.max_correction_rotation_delta_rad` after at least one
+   trusted accepted loop exists. Positive values reject new accepted-looking
+   candidates whose odometry-to-loop correction disagrees with all previously
+   accepted loop corrections.
+7. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
    optimized path changes against the MBES-SLAM reference odometry.
 
 Export the loop-status stream after a replay to make tuning measurable:
@@ -208,12 +213,22 @@ Paper trail for the backend decision:
   <https://robots.engin.umich.edu/publications/jmangelson-2018a.pdf> and
   <https://doi.org/10.1177/02783649241256970>.
 
+The live front end now has a lightweight accepted-loop consistency guard using
+the same idea at a smaller scope: each accepted loop records its correction from
+the odometry guess to the registration result, and later candidates can be
+rejected as `loop consistency rejected` when their correction disagrees with all
+recorded accepted loops. Keep this disabled until at least one replay has a
+trusted accepted loop; a bad first accepted loop would otherwise become the
+reference.
+
 `LoopClosureStatus.candidate_id` is `UINT32_MAX` when a keyframe has no
 eligible historical submap. Rejections report the specific gate that failed,
 `descriptor gate rejected` when the pre-registration shape check rejects a
-candidate, or `duplicate loop suppressed` when accepted-loop cooldown blocks a
-near-repeat. This makes overly strict candidate, descriptor, fitness,
-correction, or repeat thresholds visible without reading debug logs.
+candidate, `duplicate loop suppressed` when accepted-loop cooldown blocks a
+near-repeat, or `loop consistency rejected` when an accepted-looking candidate
+disagrees with previously accepted loop corrections. This makes overly strict
+candidate, descriptor, fitness, correction, repeat, or consistency thresholds
+visible without reading debug logs.
 
 In RViz, use the dedicated tuning config:
 
