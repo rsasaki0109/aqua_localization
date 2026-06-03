@@ -66,3 +66,15 @@ The companion `/tmp/mbes_loop_batch_selected_loops.csv` has `current_id` and
 MBES_LOOP_SELECTION_ALLOWLIST_CSV=/tmp/mbes_loop_batch_selected_loops.csv \
 ./aqua_localization/scripts/record_mbes_demo.sh
 ```
+
+For drifted replay IDs, keep the same CSV and enable the opt-in signature
+fallback from the exported status columns:
+
+```bash
+MBES_LOOP_SELECTION_ALLOWLIST_CSV=/tmp/mbes_loop_batch_selected_loops.csv \
+MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S=0.25 \
+MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA=0.05 \
+MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M=0.5 \
+MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD=0.05 \
+./aqua_localization/scripts/record_mbes_demo.sh
+```

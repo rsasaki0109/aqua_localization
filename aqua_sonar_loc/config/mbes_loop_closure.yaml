@@ -71,3 +71,10 @@ mbes_loop_closure:
         # loop set replaces the online consistency guard for accepted-looking
         # loops and rejects otherwise valid loops as `loop selection rejected`.
         allowlist_csv: ""
+        # Optional replay-stable fallback for allowlist CSVs that include the
+        # status export columns below. Disabled unless the timestamp window is
+        # positive; exact current_id/candidate_id matching remains the default.
+        match_timestamp_window_s: 0.0
+        match_max_fitness_delta: 0.0
+        match_max_translation_delta_m: 0.0
+        match_max_rotation_delta_rad: 0.0

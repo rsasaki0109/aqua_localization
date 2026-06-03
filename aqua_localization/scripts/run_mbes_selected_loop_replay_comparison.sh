@@ -34,7 +34,13 @@ if [[ "$ALLOWLIST_AUDIT_STRICT" == "1" ]]; then
   ALLOWLIST_AUDIT_ARGS+=("--strict")
 fi
 BENCHMARK_ENV_ARGS=()
-for optional_name in POSE_GRAPH_ODOMETRY_TOPIC; do
+for optional_name in \
+  POSE_GRAPH_ODOMETRY_TOPIC \
+  MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S \
+  MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA \
+  MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M \
+  MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD
+do
   if [[ -n "${!optional_name+x}" ]]; then
     BENCHMARK_ENV_ARGS+=("$optional_name=${!optional_name}")
   fi

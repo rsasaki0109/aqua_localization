@@ -24,6 +24,10 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
             "NORMAL_ROS_DOMAIN_ID": "31",
             "SELECTED_ROS_DOMAIN_ID": "131",
             "POSE_GRAPH_ODOMETRY_TOPIC": "/nav/processed/odometry",
+            "MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S": "0.25",
+            "MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA": "0.02",
+            "MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M": "0.4",
+            "MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD": "0.05",
         }
     )
 
@@ -43,6 +47,10 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert "ROS_DOMAIN_ID=31" in proc.stdout
     assert "ROS_DOMAIN_ID=131" in proc.stdout
     assert "POSE_GRAPH_ODOMETRY_TOPIC=/nav/processed/odometry" in proc.stdout
+    assert "MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S=0.25" in proc.stdout
+    assert "MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA=0.02" in proc.stdout
+    assert "MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M=0.4" in proc.stdout
+    assert "MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD=0.05" in proc.stdout
     assert f"WORKSPACE={tmp_path / 'ws'}" in proc.stdout
     assert f"OUT_DIR={normal_dir}" in proc.stdout
     assert f"OUT_DIR={selected_dir}" in proc.stdout

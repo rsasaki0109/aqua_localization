@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <limits>
@@ -74,7 +75,46 @@ int csv_column_index(const std::vector<std::string> & header, const std::string 
   return static_cast<int>(std::distance(header.begin(), it));
 }
 
+bool parse_csv_double_field(
+  const std::vector<std::string> & fields,
+  int column,
+  double & value)
+{
+  if (column < 0 || static_cast<std::size_t>(column) >= fields.size()) {
+    return false;
+  }
+  try {
+    value = std::stod(fields[static_cast<std::size_t>(column)]);
+  } catch (const std::exception &) {
+    return false;
+  }
+  return std::isfinite(value);
+}
+
+bool metric_within_delta(double observed, double expected, double max_delta)
+{
+  if (max_delta <= 0.0) {
+    return true;
+  }
+  return std::isfinite(observed) && std::isfinite(expected) &&
+         std::abs(observed - expected) <= max_delta;
+}
+
 }  // namespace
+
+struct SelectedLoopSignature
+{
+  double timestamp_s{std::numeric_limits<double>::quiet_NaN()};
+  double fitness_score{std::numeric_limits<double>::quiet_NaN()};
+  double correction_translation_m{std::numeric_limits<double>::quiet_NaN()};
+  double correction_rotation_rad{std::numeric_limits<double>::quiet_NaN()};
+};
+
+struct LoadedLoopSelection
+{
+  std::unordered_set<std::uint64_t> pairs;
+  std::vector<SelectedLoopSignature> signatures;
+};
 
 class MbesLoopClosureNode : public rclcpp::Node
 {
@@ -180,14 +220,42 @@ private:
       declare_parameter<int>("loop.consistency.min_support_count", 1);
     loop_selection_allowlist_csv_ =
       declare_parameter<std::string>("loop.selection.allowlist_csv", "");
+    loop_selection_match_timestamp_window_s_ =
+      declare_parameter<double>("loop.selection.match_timestamp_window_s", 0.0);
+    loop_selection_match_max_fitness_delta_ =
+      declare_parameter<double>("loop.selection.match_max_fitness_delta", 0.0);
+    loop_selection_match_max_translation_delta_m_ =
+      declare_parameter<double>("loop.selection.match_max_translation_delta_m", 0.0);
+    loop_selection_match_max_rotation_delta_rad_ =
+      declare_parameter<double>("loop.selection.match_max_rotation_delta_rad", 0.0);
     loop_selection_enabled_ = !loop_selection_allowlist_csv_.empty();
     if (loop_selection_enabled_) {
-      selected_loop_pairs_ = load_loop_allowlist(loop_selection_allowlist_csv_);
+      const LoadedLoopSelection selection = load_loop_allowlist(loop_selection_allowlist_csv_);
+      selected_loop_pairs_ = selection.pairs;
+      selected_loop_signatures_ = selection.signatures;
       RCLCPP_INFO(
         get_logger(),
-        "loaded %zu MBES selected loop pairs from %s; offline selection replaces "
+        "loaded %zu MBES selected loop pairs and %zu timestamp signatures from %s; "
+        "offline selection replaces "
         "the online consistency guard for accepted-looking loops",
-        selected_loop_pairs_.size(), loop_selection_allowlist_csv_.c_str());
+        selected_loop_pairs_.size(), selected_loop_signatures_.size(),
+        loop_selection_allowlist_csv_.c_str());
+      if (loop_selection_signature_enabled()) {
+        RCLCPP_INFO(
+          get_logger(),
+          "MBES selected-loop signature fallback enabled: timestamp_window=%.3fs "
+          "fitness_delta=%.6f translation_delta=%.6f rotation_delta=%.6f",
+          loop_selection_match_timestamp_window_s_,
+          loop_selection_match_max_fitness_delta_,
+          loop_selection_match_max_translation_delta_m_,
+          loop_selection_match_max_rotation_delta_rad_);
+      } else if (loop_selection_match_timestamp_window_s_ > 0.0) {
+        RCLCPP_WARN(
+          get_logger(),
+          "MBES selected-loop signature fallback requested but no timestamp "
+          "signatures were loaded from %s",
+          loop_selection_allowlist_csv_.c_str());
+      }
     }
 
     submap_manager_ = SubmapManager(submap_options_);
@@ -298,7 +366,7 @@ private:
       gate.descriptor_point_count_ratio = descriptor_result.descriptor_point_count_ratio;
       if (gate.accepted) {
         if (loop_selection_enabled()) {
-          if (!is_selected_loop(candidate.id, current.id)) {
+          if (!is_selected_loop(candidate, current, result, gate)) {
             gate.accepted = false;
             gate.status = "loop selection rejected";
           }
@@ -335,7 +403,7 @@ private:
     }
   }
 
-  std::unordered_set<std::uint64_t> load_loop_allowlist(const std::string & path) const
+  LoadedLoopSelection load_loop_allowlist(const std::string & path) const
   {
     std::ifstream file(path);
     if (!file.is_open()) {
@@ -349,13 +417,17 @@ private:
     const auto header = split_csv_line(line);
     const int current_column = csv_column_index(header, "current_id");
     const int candidate_column = csv_column_index(header, "candidate_id");
+    const int timestamp_column = csv_column_index(header, "timestamp");
+    const int fitness_column = csv_column_index(header, "fitness_score");
+    const int translation_column = csv_column_index(header, "correction_translation_m");
+    const int rotation_column = csv_column_index(header, "correction_rotation_rad");
     if (current_column < 0 || candidate_column < 0) {
       throw std::runtime_error(
         "MBES loop selection allowlist CSV must contain current_id and candidate_id columns: " +
         path);
     }
 
-    std::unordered_set<std::uint64_t> pairs;
+    LoadedLoopSelection selection;
     std::size_t line_number = 1;
     while (std::getline(file, line)) {
       ++line_number;
@@ -376,14 +448,23 @@ private:
         const auto candidate_id =
           static_cast<std::uint32_t>(
           std::stoul(fields[static_cast<std::size_t>(candidate_column)]));
-        pairs.insert(loop_pair_key(candidate_id, current_id));
+        selection.pairs.insert(loop_pair_key(candidate_id, current_id));
+
+        SelectedLoopSignature signature;
+        if (parse_csv_double_field(fields, timestamp_column, signature.timestamp_s)) {
+          parse_csv_double_field(fields, fitness_column, signature.fitness_score);
+          parse_csv_double_field(
+            fields, translation_column, signature.correction_translation_m);
+          parse_csv_double_field(fields, rotation_column, signature.correction_rotation_rad);
+          selection.signatures.push_back(signature);
+        }
       } catch (const std::exception &) {
         RCLCPP_WARN(
           get_logger(), "skip non-numeric MBES loop selection row %zu in %s",
           line_number, path.c_str());
       }
     }
-    return pairs;
+    return selection;
   }
 
   bool loop_selection_enabled() const
@@ -391,10 +472,59 @@ private:
     return loop_selection_enabled_;
   }
 
-  bool is_selected_loop(std::uint32_t candidate_id, std::uint32_t current_id) const
+  bool loop_selection_signature_enabled() const
   {
-    return selected_loop_pairs_.find(loop_pair_key(candidate_id, current_id)) !=
-           selected_loop_pairs_.end();
+    return loop_selection_match_timestamp_window_s_ > 0.0 &&
+           !selected_loop_signatures_.empty();
+  }
+
+  bool is_selected_loop(
+    const Submap & candidate,
+    const Submap & current,
+    const MatchResult & result,
+    const GateResult & gate) const
+  {
+    if (selected_loop_pairs_.find(loop_pair_key(candidate.id, current.id)) !=
+      selected_loop_pairs_.end())
+    {
+      return true;
+    }
+    if (!loop_selection_signature_enabled()) {
+      return false;
+    }
+
+    const double current_timestamp_s = current.stamp.seconds();
+    if (!std::isfinite(current_timestamp_s)) {
+      return false;
+    }
+    for (const auto & signature : selected_loop_signatures_) {
+      if (!std::isfinite(signature.timestamp_s) ||
+        std::abs(current_timestamp_s - signature.timestamp_s) >
+        loop_selection_match_timestamp_window_s_)
+      {
+        continue;
+      }
+      if (!metric_within_delta(
+          result.fitness, signature.fitness_score,
+          loop_selection_match_max_fitness_delta_))
+      {
+        continue;
+      }
+      if (!metric_within_delta(
+          gate.correction_translation_m, signature.correction_translation_m,
+          loop_selection_match_max_translation_delta_m_))
+      {
+        continue;
+      }
+      if (!metric_within_delta(
+          gate.correction_rotation_rad, signature.correction_rotation_rad,
+          loop_selection_match_max_rotation_delta_rad_))
+      {
+        continue;
+      }
+      return true;
+    }
+    return false;
   }
 
   void publish_loop_constraint(
@@ -527,8 +657,13 @@ private:
   bool optimize_after_insert_{true};
   std::uint32_t marker_sequence_{0};
   std::string loop_selection_allowlist_csv_;
+  double loop_selection_match_timestamp_window_s_{0.0};
+  double loop_selection_match_max_fitness_delta_{0.0};
+  double loop_selection_match_max_translation_delta_m_{0.0};
+  double loop_selection_match_max_rotation_delta_rad_{0.0};
   bool loop_selection_enabled_{false};
   std::unordered_set<std::uint64_t> selected_loop_pairs_;
+  std::vector<SelectedLoopSignature> selected_loop_signatures_;
 
   SubmapManager submap_manager_{submap_options_};
   AcceptedLoopTracker accepted_loop_tracker_{loop_suppression_options_};

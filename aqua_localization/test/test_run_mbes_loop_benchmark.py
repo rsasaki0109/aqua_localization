@@ -35,6 +35,10 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT": "2",
             "MBES_LOOP_BATCH_CONSISTENCY_AUTO_QUANTILE": "0.9",
             "MBES_LOOP_SELECTION_ALLOWLIST_CSV": str(tmp_path / "selected.csv"),
+            "MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S": "0.25",
+            "MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA": "0.02",
+            "MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M": "0.4",
+            "MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD": "0.05",
             "PLAY_TOPIC_ARGS": "--topics /norbit/detections",
             "AUDIT_MAX_ACCEPTED": "77",
             "AUDIT_MAX_MARKERS": "88",
@@ -77,6 +81,10 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "MBES_LOOP_CONSISTENCY_MAX_ROTATION_DELTA_RAD=0.16" in proc.stdout
     assert "MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT=2" in proc.stdout
     assert f"MBES_LOOP_SELECTION_ALLOWLIST_CSV={tmp_path / 'selected.csv'}" in proc.stdout
+    assert "MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S=0.25" in proc.stdout
+    assert "MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA=0.02" in proc.stdout
+    assert "MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M=0.4" in proc.stdout
+    assert "MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD=0.05" in proc.stdout
     assert f"MBES_SRC={tmp_path / 'out/mbes_source_humble_sqlite'}" in proc.stdout
     assert "PLAY_TOPIC_ARGS=--topics\\ /norbit/detections" in proc.stdout
     assert "LOCAL_SETUP=/tmp/current_install/setup.bash" in proc.stdout

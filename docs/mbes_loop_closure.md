@@ -299,6 +299,15 @@ evidence. Treat the selected-vs-normal APE comparison as claimable only when
 the replay accepts audited selected loops and the comparison report does not
 warn about baseline drift or mismatched matched-time coverage.
 
+If exact keyframe IDs drift between replays, the node can also use the status
+export columns as an explicit signature fallback. This is disabled by default:
+set `loop.selection.match_timestamp_window_s` positive, then optionally bound
+`loop.selection.match_max_fitness_delta`,
+`loop.selection.match_max_translation_delta_m`, and
+`loop.selection.match_max_rotation_delta_rad`. Exact ID matches are still
+accepted first; the signature path only decides otherwise accepted-looking
+loops that missed the exact `(candidate_id,current_id)` pair.
+
 To run the normal replay, selected-loop replay, and metric comparison as one
 artifact bundle:
 
