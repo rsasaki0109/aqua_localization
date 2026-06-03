@@ -30,6 +30,27 @@ class _Header:
         self.frame_id = frame_id
 
 
+class _Vector3:
+    def __init__(self, x, y, z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+
+class _Quaternion:
+    def __init__(self, x, y, z, w):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.w = w
+
+
+class _Pose:
+    def __init__(self, position, orientation):
+        self.position = position
+        self.orientation = orientation
+
+
 class _LoopStatus:
     def __init__(self, **kwargs):
         self.header = _Header(kwargs.get("stamp", _Stamp(0, 0)))
@@ -40,6 +61,10 @@ class _LoopStatus:
         self.fitness_score = kwargs.get("fitness_score", math.nan)
         self.correction_translation_m = kwargs.get("translation", math.nan)
         self.correction_rotation_rad = kwargs.get("rotation", math.nan)
+        if "correction_pose_valid" in kwargs:
+            self.correction_pose_valid = kwargs["correction_pose_valid"]
+        if "correction_pose" in kwargs:
+            self.correction_pose = kwargs["correction_pose"]
         if "descriptor_centroid_distance_m" in kwargs:
             self.descriptor_centroid_distance_m = kwargs["descriptor_centroid_distance_m"]
         if "descriptor_extent_ratio" in kwargs:
@@ -66,6 +91,8 @@ def test_sample_from_msg_uses_fallback_for_zero_stamp():
     assert sample.accepted is True
     assert sample.converged is True
     assert sample.fitness_score == 0.25
+    assert sample.correction_pose_valid is False
+    assert math.isnan(sample.correction_x_m)
     assert math.isnan(sample.descriptor_centroid_distance_m)
     assert math.isnan(sample.descriptor_extent_ratio)
     assert math.isnan(sample.descriptor_point_count_ratio)
@@ -85,6 +112,26 @@ def test_sample_from_msg_reads_descriptor_fields_when_available():
     assert sample.descriptor_centroid_distance_m == 1.5
     assert sample.descriptor_extent_ratio == 2.5
     assert sample.descriptor_point_count_ratio == 0.75
+
+
+def test_sample_from_msg_reads_correction_pose_when_available():
+    module = load_module()
+    msg = _LoopStatus(
+        correction_pose_valid=True,
+        correction_pose=_Pose(
+            _Vector3(1.0, -2.0, 3.5),
+            _Quaternion(0.0, 0.0, 0.70710678, 0.70710678),
+        ),
+    )
+
+    sample = module.sample_from_msg(msg, fallback_time=123.5)
+
+    assert sample.correction_pose_valid is True
+    assert sample.correction_x_m == 1.0
+    assert sample.correction_y_m == -2.0
+    assert sample.correction_z_m == 3.5
+    assert sample.correction_qz == 0.70710678
+    assert sample.correction_qw == 0.70710678
 
 
 def test_summarize_counts_reasons_and_quantiles():
@@ -137,6 +184,8 @@ def test_write_csv_quotes_status_and_preserves_numeric_fields(tmp_path):
     assert rows[0]["timestamp"] == "10.250000000"
     assert rows[0]["accepted"] == "0"
     assert rows[0]["converged"] == "1"
+    assert rows[0]["correction_pose_valid"] == "0"
+    assert rows[0]["correction_x_m"] == "nan"
     assert rows[0]["descriptor_centroid_distance_m"] == "1.500000000"
     assert rows[0]["descriptor_extent_ratio"] == "2.500000000"
     assert rows[0]["descriptor_point_count_ratio"] == "0.750000000"
@@ -286,6 +335,41 @@ def test_consistency_sweep_rows_count_retained_accepted_loops():
     )
 
 
+def test_consistency_delta_uses_pose_when_available():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 1.0, 0.0,
+            math.nan, math.nan, math.nan, "accepted",
+            correction_pose_valid=True,
+            correction_x_m=1.0,
+            correction_y_m=0.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, True, True, 0.1, 1.0, 0.0,
+            math.nan, math.nan, math.nan, "accepted",
+            correction_pose_valid=True,
+            correction_x_m=0.0,
+            correction_y_m=1.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=math.sqrt(0.5),
+            correction_qw=math.sqrt(0.5)),
+    ]
+
+    deltas = module.consistency_delta_samples(samples)
+
+    assert len(deltas) == 1
+    assert deltas[0].uses_pose is True
+    assert math.isclose(deltas[0].translation_delta_m, math.sqrt(2.0))
+    assert math.isclose(deltas[0].rotation_delta_rad, math.pi / 2.0)
+
+
 def test_consistency_sweep_markdown_handles_too_few_accepted_samples():
     module = load_module()
     samples = [
@@ -316,6 +400,6 @@ def test_consistency_sweep_markdown_contains_threshold_table():
     text = module.format_consistency_sweep_markdown(
         samples, "/mbes_loop_closure/status")
 
-    assert "magnitude-only tuning aid" in text
+    assert "recorded correction poses when available" in text
     assert "| Translation delta <= m |" in text
     assert "Would keep accepted" in text

@@ -18,6 +18,7 @@ the first accepted loops have been visually audited.
 - Source: synthetic example
 - Accepted loops with finite corrections: 12
 - Pairwise accepted correction pairs: 66
+- Delta source: 66 pose-aware pairs, 0 scalar-magnitude fallback pairs
 - Consistency thresholds at replay time: disabled
 
 ## Pairwise Accepted Correction Deltas
@@ -31,7 +32,9 @@ the first accepted loops have been visually audited.
 
 `Would keep accepted` includes the first accepted loop because it bootstraps the
 runtime guard. `Supported pairs` counts pairwise agreement among all accepted
-corrections and is useful for spotting loose thresholds.
+corrections and is useful for spotting loose thresholds. New replays use the
+recorded correction pose for these deltas; older bags without that field fall
+back to scalar correction magnitudes.
 
 | Translation delta <= m | Rotation delta <= rad | Would keep accepted | Keep % | Supported pairs | Pair % |
 |-----------------------:|----------------------:|--------------------:|-------:|----------------:|-------:|

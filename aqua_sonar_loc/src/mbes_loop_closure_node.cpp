@@ -28,6 +28,20 @@ geometry_msgs::msg::Point marker_point(const Eigen::Vector3d & p)
   return msg;
 }
 
+geometry_msgs::msg::Pose nan_pose()
+{
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  geometry_msgs::msg::Pose msg;
+  msg.position.x = nan;
+  msg.position.y = nan;
+  msg.position.z = nan;
+  msg.orientation.x = nan;
+  msg.orientation.y = nan;
+  msg.orientation.z = nan;
+  msg.orientation.w = nan;
+  return msg;
+}
+
 }  // namespace
 
 class MbesLoopClosureNode : public rclcpp::Node
@@ -237,9 +251,7 @@ private:
         descriptor_result.descriptor_centroid_distance_m;
       gate.descriptor_extent_ratio = descriptor_result.descriptor_extent_ratio;
       gate.descriptor_point_count_ratio = descriptor_result.descriptor_point_count_ratio;
-      const Eigen::Isometry3d correction =
-        candidate_to_current_guess.inverse() * result.candidate_to_current;
-      if (gate.accepted && !accepted_loop_tracker_.is_consistent(correction)) {
+      if (gate.accepted && !accepted_loop_tracker_.is_consistent(gate.correction)) {
         gate.accepted = false;
         gate.status = "loop consistency rejected";
       }
@@ -253,7 +265,7 @@ private:
       }
 
       publish_loop_constraint(candidate, current, result.candidate_to_current);
-      accepted_loop_tracker_.record(candidate.id, current.id, correction);
+      accepted_loop_tracker_.record(candidate.id, current.id, gate.correction);
       return;
     }
     if (tested == 0) {
@@ -297,6 +309,9 @@ private:
     msg.fitness_score = result.fitness;
     msg.correction_translation_m = gate.correction_translation_m;
     msg.correction_rotation_rad = gate.correction_rotation_rad;
+    msg.correction_pose_valid = gate.correction_pose_valid;
+    msg.correction_pose =
+      gate.correction_pose_valid ? isometry_to_pose(gate.correction) : nan_pose();
     msg.descriptor_centroid_distance_m = gate.descriptor_centroid_distance_m;
     msg.descriptor_extent_ratio = gate.descriptor_extent_ratio;
     msg.descriptor_point_count_ratio = gate.descriptor_point_count_ratio;
@@ -342,6 +357,8 @@ private:
     msg.fitness_score = std::numeric_limits<double>::quiet_NaN();
     msg.correction_translation_m = std::numeric_limits<double>::quiet_NaN();
     msg.correction_rotation_rad = std::numeric_limits<double>::quiet_NaN();
+    msg.correction_pose_valid = false;
+    msg.correction_pose = nan_pose();
     msg.descriptor_centroid_distance_m = std::numeric_limits<double>::quiet_NaN();
     msg.descriptor_extent_ratio = std::numeric_limits<double>::quiet_NaN();
     msg.descriptor_point_count_ratio = std::numeric_limits<double>::quiet_NaN();

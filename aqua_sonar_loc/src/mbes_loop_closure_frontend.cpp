@@ -396,6 +396,8 @@ GateResult LoopGateEvaluator::evaluate(
     return gate;
   }
   const Eigen::Isometry3d correction = loop_correction(guess, result.candidate_to_current);
+  gate.correction_pose_valid = true;
+  gate.correction = correction;
   gate.correction_translation_m = correction.translation().norm();
   gate.correction_rotation_rad = rotation_distance_rad(correction);
 

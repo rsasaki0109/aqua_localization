@@ -40,6 +40,14 @@ CSV_FIELDS = [
     "fitness_score",
     "correction_translation_m",
     "correction_rotation_rad",
+    "correction_pose_valid",
+    "correction_x_m",
+    "correction_y_m",
+    "correction_z_m",
+    "correction_qx",
+    "correction_qy",
+    "correction_qz",
+    "correction_qw",
     "descriptor_centroid_distance_m",
     "descriptor_extent_ratio",
     "descriptor_point_count_ratio",
@@ -62,6 +70,14 @@ class LoopStatusSample:
     descriptor_extent_ratio: float
     descriptor_point_count_ratio: float
     status: str
+    correction_pose_valid: bool = False
+    correction_x_m: float = math.nan
+    correction_y_m: float = math.nan
+    correction_z_m: float = math.nan
+    correction_qx: float = math.nan
+    correction_qy: float = math.nan
+    correction_qz: float = math.nan
+    correction_qw: float = math.nan
 
 
 @dataclass(frozen=True)
@@ -96,6 +112,7 @@ class ConsistencyDeltaSample:
     current_id: int
     translation_delta_m: float
     rotation_delta_rad: float
+    uses_pose: bool
 
 
 def stamp_to_seconds(stamp) -> float:
@@ -104,6 +121,22 @@ def stamp_to_seconds(stamp) -> float:
 
 def optional_float(msg, attr: str) -> float:
     return float(getattr(msg, attr, math.nan))
+
+
+def optional_bool(msg, attr: str) -> bool:
+    return bool(getattr(msg, attr, False))
+
+
+def optional_pose_float(msg, attr: str, component: str) -> float:
+    pose = getattr(msg, attr, None)
+    if pose is None:
+        return math.nan
+    target = pose
+    for name in component.split("."):
+        target = getattr(target, name, None)
+        if target is None:
+            return math.nan
+    return float(target)
 
 
 def sample_from_msg(msg, fallback_time: float) -> LoopStatusSample:
@@ -128,6 +161,14 @@ def sample_from_msg(msg, fallback_time: float) -> LoopStatusSample:
             msg, "descriptor_point_count_ratio"
         ),
         status=str(msg.status),
+        correction_pose_valid=optional_bool(msg, "correction_pose_valid"),
+        correction_x_m=optional_pose_float(msg, "correction_pose", "position.x"),
+        correction_y_m=optional_pose_float(msg, "correction_pose", "position.y"),
+        correction_z_m=optional_pose_float(msg, "correction_pose", "position.z"),
+        correction_qx=optional_pose_float(msg, "correction_pose", "orientation.x"),
+        correction_qy=optional_pose_float(msg, "correction_pose", "orientation.y"),
+        correction_qz=optional_pose_float(msg, "correction_pose", "orientation.z"),
+        correction_qw=optional_pose_float(msg, "correction_pose", "orientation.w"),
     )
 
 
@@ -291,6 +332,62 @@ def accepted_correction_samples(samples: list[LoopStatusSample]) -> list[LoopSta
     ]
 
 
+def has_finite_correction_pose(sample: LoopStatusSample) -> bool:
+    if not sample.correction_pose_valid:
+        return False
+    values = [
+        sample.correction_x_m,
+        sample.correction_y_m,
+        sample.correction_z_m,
+        sample.correction_qx,
+        sample.correction_qy,
+        sample.correction_qz,
+        sample.correction_qw,
+    ]
+    if not all(math.isfinite(value) for value in values):
+        return False
+    q_norm = math.sqrt(
+        sample.correction_qx * sample.correction_qx +
+        sample.correction_qy * sample.correction_qy +
+        sample.correction_qz * sample.correction_qz +
+        sample.correction_qw * sample.correction_qw
+    )
+    return q_norm > 1.0e-12
+
+
+def correction_pose_delta(
+    anchor: LoopStatusSample,
+    sample: LoopStatusSample,
+) -> tuple[float, float]:
+    dx = sample.correction_x_m - anchor.correction_x_m
+    dy = sample.correction_y_m - anchor.correction_y_m
+    dz = sample.correction_z_m - anchor.correction_z_m
+    translation_delta_m = math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    dot = (
+        anchor.correction_qx * sample.correction_qx +
+        anchor.correction_qy * sample.correction_qy +
+        anchor.correction_qz * sample.correction_qz +
+        anchor.correction_qw * sample.correction_qw
+    )
+    anchor_norm = math.sqrt(
+        anchor.correction_qx * anchor.correction_qx +
+        anchor.correction_qy * anchor.correction_qy +
+        anchor.correction_qz * anchor.correction_qz +
+        anchor.correction_qw * anchor.correction_qw
+    )
+    sample_norm = math.sqrt(
+        sample.correction_qx * sample.correction_qx +
+        sample.correction_qy * sample.correction_qy +
+        sample.correction_qz * sample.correction_qz +
+        sample.correction_qw * sample.correction_qw
+    )
+    normalized_dot = abs(dot / (anchor_norm * sample_norm))
+    normalized_dot = max(-1.0, min(1.0, normalized_dot))
+    rotation_delta_rad = 2.0 * math.acos(normalized_dot)
+    return translation_delta_m, rotation_delta_rad
+
+
 def consistency_delta_samples(
     samples: list[LoopStatusSample],
 ) -> list[ConsistencyDeltaSample]:
@@ -298,17 +395,29 @@ def consistency_delta_samples(
     deltas: list[ConsistencyDeltaSample] = []
     for index, sample in enumerate(accepted):
         for anchor in accepted[:index]:
+            uses_pose = (
+                has_finite_correction_pose(anchor) and
+                has_finite_correction_pose(sample)
+            )
+            if uses_pose:
+                translation_delta_m, rotation_delta_rad = correction_pose_delta(
+                    anchor, sample
+                )
+            else:
+                translation_delta_m = abs(
+                    sample.correction_translation_m -
+                    anchor.correction_translation_m
+                )
+                rotation_delta_rad = abs(
+                    sample.correction_rotation_rad -
+                    anchor.correction_rotation_rad
+                )
             deltas.append(ConsistencyDeltaSample(
                 anchor_current_id=anchor.current_id,
                 current_id=sample.current_id,
-                translation_delta_m=abs(
-                    sample.correction_translation_m -
-                    anchor.correction_translation_m
-                ),
-                rotation_delta_rad=abs(
-                    sample.correction_rotation_rad -
-                    anchor.correction_rotation_rad
-                ),
+                translation_delta_m=translation_delta_m,
+                rotation_delta_rad=rotation_delta_rad,
+                uses_pose=uses_pose,
             ))
     return deltas
 
@@ -319,6 +428,8 @@ def consistency_delta_summary(samples: list[LoopStatusSample]) -> dict:
     return {
         "accepted_count": len(accepted),
         "pair_count": len(deltas),
+        "pose_pair_count": sum(1 for delta in deltas if delta.uses_pose),
+        "magnitude_pair_count": sum(1 for delta in deltas if not delta.uses_pose),
         "translation_delta_m": stats([
             delta.translation_delta_m for delta in deltas
         ]),
@@ -458,7 +569,8 @@ def format_consistency_sweep_markdown(samples: list[LoopStatusSample], topic: st
         f"- Samples: {len(samples)}",
         f"- Accepted loops with finite corrections: {accepted_count}",
         "",
-        "This report is a magnitude-only tuning aid for "
+        "This report uses recorded correction poses when available, then falls "
+        "back to scalar correction magnitudes for older bags. It is a tuning aid for "
         "`loop.consistency.max_correction_translation_delta_m` and "
         "`loop.consistency.max_correction_rotation_delta_rad`. Confirm loop "
         "geometry before copying thresholds into runtime config.",
@@ -473,9 +585,13 @@ def format_consistency_sweep_markdown(samples: list[LoopStatusSample], topic: st
         return "\n".join(lines)
 
     pair_count = int(summary["pair_count"])
+    pose_pair_count = int(summary["pose_pair_count"])
+    magnitude_pair_count = int(summary["magnitude_pair_count"])
     lines.extend([
         "Runtime note: the first accepted loop bootstraps the consistency guard, "
         "so use trusted accepted-loop replays before enabling tight thresholds.",
+        f"Delta source: {pose_pair_count} pose-aware pairs, "
+        f"{magnitude_pair_count} scalar-magnitude fallback pairs.",
         "",
         "## Pairwise Accepted Correction Deltas",
         "",
@@ -595,6 +711,14 @@ def write_csv(path: Path, samples: list[LoopStatusSample]) -> None:
                 "fitness_score": f"{sample.fitness_score:.9f}",
                 "correction_translation_m": f"{sample.correction_translation_m:.9f}",
                 "correction_rotation_rad": f"{sample.correction_rotation_rad:.9f}",
+                "correction_pose_valid": int(sample.correction_pose_valid),
+                "correction_x_m": f"{sample.correction_x_m:.9f}",
+                "correction_y_m": f"{sample.correction_y_m:.9f}",
+                "correction_z_m": f"{sample.correction_z_m:.9f}",
+                "correction_qx": f"{sample.correction_qx:.9f}",
+                "correction_qy": f"{sample.correction_qy:.9f}",
+                "correction_qz": f"{sample.correction_qz:.9f}",
+                "correction_qw": f"{sample.correction_qw:.9f}",
                 "descriptor_centroid_distance_m": (
                     f"{sample.descriptor_centroid_distance_m:.9f}"
                 ),

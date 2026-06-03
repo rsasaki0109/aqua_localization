@@ -240,6 +240,11 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PublishesLoopConstraintForRepeatedSubmap)
   EXPECT_NEAR(accepted_status->fitness_score, 0.0, 1e-4);
   EXPECT_NEAR(accepted_status->correction_translation_m, 0.0, 1e-3);
   EXPECT_NEAR(accepted_status->correction_rotation_rad, 0.0, 1e-3);
+  EXPECT_TRUE(accepted_status->correction_pose_valid);
+  EXPECT_NEAR(accepted_status->correction_pose.position.x, 0.0, 1e-3);
+  EXPECT_NEAR(accepted_status->correction_pose.position.y, 0.0, 1e-3);
+  EXPECT_NEAR(accepted_status->correction_pose.position.z, 0.0, 1e-3);
+  EXPECT_NEAR(accepted_status->correction_pose.orientation.w, 1.0, 1e-3);
   EXPECT_NEAR(accepted_status->descriptor_centroid_distance_m, 0.0, 1e-6);
   EXPECT_NEAR(accepted_status->descriptor_extent_ratio, 1.0, 1e-6);
   EXPECT_NEAR(accepted_status->descriptor_point_count_ratio, 1.0, 1e-6);

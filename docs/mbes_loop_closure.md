@@ -148,10 +148,10 @@ Descriptor fields are still exported when descriptor thresholds are disabled,
 so replay summaries can be used to choose initial threshold values before
 turning the gate on. The descriptor sweep report evaluates percentile-derived
 threshold grids and reports how many tested candidates would pass each
-combination. The consistency sweep report uses accepted loop correction
-magnitudes to propose initial values for the accepted-loop consistency guard.
-It is only a magnitude-only tuning aid; inspect loop geometry before enabling
-positive `loop.consistency.*` thresholds.
+combination. The consistency sweep report uses recorded correction poses when
+available, with scalar correction-magnitude fallback for older bags, to propose
+initial values for the accepted-loop consistency guard. Inspect loop geometry
+before enabling positive `loop.consistency.*` thresholds.
 
 ### Reading the Descriptor Sweep
 
@@ -183,7 +183,9 @@ defaults until they have been checked on the target bag.
 See [the consistency sweep example](examples/mbes_loop_consistency_sweep.md) for
 the report shape. Each row estimates how many currently accepted loop
 corrections would remain supported if the runtime consistency guard used those
-translation and rotation delta thresholds. The first accepted loop always
+translation and rotation delta thresholds. New replays use
+`LoopClosureStatus.correction_pose` for pose-aware deltas; old bags without that
+field fall back to scalar correction magnitudes. The first accepted loop always
 bootstraps the guard, so run the sweep only after visually auditing the earliest
 accepted loops.
 
@@ -199,8 +201,7 @@ loop:
 Replay with those values and confirm that `loop consistency rejected` samples
 are the intended outlier loop corrections. If accepted loops split into several
 valid motion regimes, leave the guard disabled until a batch consistency
-selector can reason over full transforms instead of scalar correction
-magnitudes.
+selector can reason over batches of candidate transforms.
 
 Useful live checks while tuning:
 

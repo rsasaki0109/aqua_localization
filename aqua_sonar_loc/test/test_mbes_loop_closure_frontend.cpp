@@ -78,6 +78,8 @@ TEST(MbesLoopClosureFrontendTest, GateEvaluatorKeepsExistingAcceptanceRules)
 
   const auto accepted_gate = evaluator.evaluate(Eigen::Isometry3d::Identity(), accepted);
   EXPECT_TRUE(accepted_gate.accepted);
+  EXPECT_TRUE(accepted_gate.correction_pose_valid);
+  EXPECT_NEAR(accepted_gate.correction.translation().norm(), 0.0, 1e-9);
   EXPECT_EQ(accepted_gate.status, "accepted");
 
   aqua_sonar_loc::MatchResult rejected = accepted;
@@ -85,6 +87,8 @@ TEST(MbesLoopClosureFrontendTest, GateEvaluatorKeepsExistingAcceptanceRules)
 
   const auto rejected_gate = evaluator.evaluate(Eigen::Isometry3d::Identity(), rejected);
   EXPECT_FALSE(rejected_gate.accepted);
+  EXPECT_TRUE(rejected_gate.correction_pose_valid);
+  EXPECT_NEAR(rejected_gate.correction.translation().x(), 2.0, 1e-9);
   EXPECT_EQ(rejected_gate.status, "translation correction exceeds gate");
 }
 

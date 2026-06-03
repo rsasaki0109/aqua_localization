@@ -51,6 +51,8 @@ struct MatchResult
 struct GateResult
 {
   bool accepted{false};
+  bool correction_pose_valid{false};
+  Eigen::Isometry3d correction{Eigen::Isometry3d::Identity()};
   double correction_translation_m{std::numeric_limits<double>::quiet_NaN()};
   double correction_rotation_rad{std::numeric_limits<double>::quiet_NaN()};
   double descriptor_centroid_distance_m{std::numeric_limits<double>::quiet_NaN()};
