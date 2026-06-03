@@ -34,6 +34,11 @@ struct PoseGraphConfig
   // Number of keyframes added between automatic optimize() calls. 0 disables
   // automatic optimization (callers must trigger it manually).
   int optimize_every_n_keyframes{20};
+  // When false, automatic optimization waits until at least one loop
+  // constraint exists. Manual optimize() calls still run on odometry-only
+  // chains. This avoids burning CPU on a graph whose initial odometry chain is
+  // already at its optimum.
+  bool optimize_without_loop_constraints{false};
 };
 
 struct Keyframe
@@ -85,6 +90,7 @@ public:
   const std::vector<Keyframe> & keyframes() const { return keyframes_; }
   std::size_t edge_count() const { return edges_; }
   std::size_t loop_constraint_count() const { return loop_edges_; }
+  std::size_t optimization_count() const { return optimization_runs_; }
 
   // Pull the current optimized pose for a given keyframe id (returns false
   // if the id does not exist).
@@ -104,6 +110,7 @@ private:
   bool has_odometry_{false};
   std::size_t edges_{0};
   std::size_t loop_edges_{0};
+  std::size_t optimization_runs_{0};
   int keyframes_since_last_optimize_{0};
 };
 

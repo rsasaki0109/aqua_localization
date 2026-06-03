@@ -136,6 +136,53 @@ TEST(PoseGraph, LoopConstraintBendsTrajectory)
   EXPECT_LT((kf4.translation() - kf0.translation()).norm(), 1.0);
 }
 
+TEST(PoseGraph, AutoOptimizeWaitsForLoopConstraintByDefault)
+{
+  PoseGraphConfig cfg;
+  cfg.keyframe_translation_m = 1.0;
+  cfg.keyframe_rotation_rad = M_PI;
+  cfg.optimize_every_n_keyframes = 2;
+  PoseGraph graph(cfg);
+
+  for (int i = 0; i <= 4; ++i) {
+    graph.add_odometry_sample(
+      0.1 * i, translation(static_cast<double>(i), 0.0, 0.0),
+      Eigen::Matrix<double, 6, 6>::Identity());
+  }
+  ASSERT_EQ(graph.keyframes().size(), 5u);
+  EXPECT_EQ(graph.optimization_count(), 0u);
+
+  LoopConstraint loop;
+  loop.from_id = 0;
+  loop.to_id = 4;
+  loop.relative_pose = Eigen::Isometry3d::Identity();
+  loop.information = tight_information();
+  ASSERT_TRUE(graph.add_loop_constraint(loop));
+  EXPECT_EQ(graph.optimization_count(), 0u);
+
+  graph.add_odometry_sample(
+    0.5, translation(5.0, 0.0, 0.0),
+    Eigen::Matrix<double, 6, 6>::Identity());
+  EXPECT_EQ(graph.optimization_count(), 1u);
+}
+
+TEST(PoseGraph, AutoOptimizeCanRunWithoutLoopConstraintsWhenEnabled)
+{
+  PoseGraphConfig cfg;
+  cfg.keyframe_translation_m = 1.0;
+  cfg.keyframe_rotation_rad = M_PI;
+  cfg.optimize_every_n_keyframes = 2;
+  cfg.optimize_without_loop_constraints = true;
+  PoseGraph graph(cfg);
+
+  for (int i = 0; i <= 2; ++i) {
+    graph.add_odometry_sample(
+      0.1 * i, translation(static_cast<double>(i), 0.0, 0.0),
+      Eigen::Matrix<double, 6, 6>::Identity());
+  }
+  EXPECT_EQ(graph.optimization_count(), 1u);
+}
+
 TEST(PoseGraph, RejectsLoopConstraintWithUnknownKeyframe)
 {
   PoseGraphConfig cfg;

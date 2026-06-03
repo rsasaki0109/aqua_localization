@@ -82,6 +82,7 @@ void PoseGraph::reset()
   last_odometry_pose_.setIdentity();
   edges_ = 0;
   loop_edges_ = 0;
+  optimization_runs_ = 0;
   keyframes_since_last_optimize_ = 0;
 }
 
@@ -149,7 +150,10 @@ bool PoseGraph::add_odometry_sample(
   append_keyframe_with_edge(stamp_seconds, odometry_pose, covariance);
   last_odometry_pose_ = odometry_pose;
 
-  if (config_.optimize_every_n_keyframes > 0
+  const bool can_auto_optimize =
+    config_.optimize_without_loop_constraints || loop_edges_ > 0;
+  if (can_auto_optimize
+      && config_.optimize_every_n_keyframes > 0
       && keyframes_since_last_optimize_ >= config_.optimize_every_n_keyframes)
   {
     optimize();
@@ -182,6 +186,7 @@ double PoseGraph::optimize()
   }
   optimizer_->initializeOptimization();
   optimizer_->optimize(config_.optimization_iterations);
+  optimization_runs_ += 1;
   keyframes_since_last_optimize_ = 0;
 
   // Pull optimized poses back into the keyframe cache.

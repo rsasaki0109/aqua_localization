@@ -40,3 +40,7 @@ aqua_pose_graph:
       # added since the last optimisation. 0 disables automatic optimisation
       # (callers must trigger via the `/aqua_pose_graph/optimize` service).
       optimize_every_n_keyframes: 20
+      # When false, automatic optimisation waits until at least one loop
+      # constraint exists. Set true to keep the older chain-only auto-optimise
+      # behaviour for experiments that need periodic g2o runs without loops.
+      optimize_without_loop_constraints: false

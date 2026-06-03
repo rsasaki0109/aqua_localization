@@ -135,6 +135,9 @@ public:
     cfg.optimize_every_n_keyframes = declare_parameter<int>(
       "optimization.optimize_every_n_keyframes",
       cfg.optimize_every_n_keyframes);
+    cfg.optimize_without_loop_constraints = declare_parameter<bool>(
+      "optimization.optimize_without_loop_constraints",
+      cfg.optimize_without_loop_constraints);
 
     odom_topic_ = declare_parameter<std::string>(
       "topics.odometry", "/aqua_imu_loc/odometry");
@@ -200,11 +203,13 @@ public:
     RCLCPP_INFO(
       get_logger(),
       "aqua_pose_graph started: odometry=%s loop_constraints=%s path=%s frame=%s "
-      "keyframe_thresholds=(t=%.2fm, r=%.2frad) optimize_every=%d",
+      "keyframe_thresholds=(t=%.2fm, r=%.2frad) optimize_every=%d "
+      "optimize_without_loops=%s",
       odom_topic_.c_str(), loop_constraint_topic_.c_str(),
       path_topic_.c_str(), map_frame_.c_str(),
       cfg.keyframe_translation_m, cfg.keyframe_rotation_rad,
-      cfg.optimize_every_n_keyframes);
+      cfg.optimize_every_n_keyframes,
+      cfg.optimize_without_loop_constraints ? "true" : "false");
   }
 
 private:

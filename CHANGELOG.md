@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Reduced pose-graph runtime work by skipping automatic g2o optimization on
+  odometry-only chains until a loop constraint exists, with an opt-in parameter
+  for the older chain-only auto-optimize behavior.
 - Rebuilt the GitHub Pages landing page around the full public-data demo wall,
   MBES hero replay, 3DGS viewer entry point, and GitHub star CTA.
 - Recorded a readiness-only 3DGS training smoke report for the published Tank
