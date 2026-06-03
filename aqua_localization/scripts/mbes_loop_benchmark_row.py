@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import re
 from dataclasses import dataclass
 from pathlib import Path
 import sys
@@ -23,6 +24,12 @@ class LoopStatusRow:
     fitness_score: float
     correction_translation_m: float
     status: str
+
+
+@dataclass(frozen=True)
+class OptimizationSummary:
+    count: int | None
+    chi2: float | None
 
 
 def parse_bool(value: str) -> bool:
@@ -61,6 +68,56 @@ def read_loop_status_csv(path: Path) -> list[LoopStatusRow]:
                 )
             )
     return rows
+
+
+def parse_summary_value(text: str, label: str) -> str | None:
+    pattern = re.compile(
+        rf"^- {re.escape(label)}:\s*(?P<value>.*?)\s*$",
+        re.MULTILINE,
+    )
+    match = pattern.search(text)
+    if not match:
+        return None
+    value = match.group("value").strip()
+    if not value or value.lower() in {"n/a", "nan", "tbd"}:
+        return None
+    return value
+
+
+def parse_optional_summary_int(text: str, label: str) -> int | None:
+    value = parse_summary_value(text, label)
+    if value is None:
+        return None
+    try:
+        return int(round(float(value)))
+    except ValueError:
+        return None
+
+
+def parse_optional_summary_float(text: str, label: str) -> float | None:
+    value = parse_summary_value(text, label)
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except ValueError:
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def read_optimization_summary(path: Path) -> OptimizationSummary:
+    text = path.read_text(encoding="utf-8")
+    return OptimizationSummary(
+        count=parse_optional_summary_int(text, "Latest optimize count"),
+        chi2=parse_optional_summary_float(text, "Latest active chi2"),
+    )
+
+
+def apply_summary_optimization(args, summary: OptimizationSummary) -> None:
+    if getattr(args, "optimization_count", None) is None and summary.count is not None:
+        args.optimization_count = summary.count
+    if getattr(args, "optimization_chi2", None) is None and summary.chi2 is not None:
+        args.optimization_chi2 = summary.chi2
 
 
 def is_no_candidate(row: LoopStatusRow) -> bool:
@@ -194,6 +251,9 @@ def parse_args(argv):
         description="Generate a Markdown benchmark row from MBES loop-status CSV."
     )
     parser.add_argument("--csv", required=True, type=Path, help="Loop-status CSV.")
+    parser.add_argument("--summary", type=Path,
+                        help="Optional loop-status Markdown summary to fill "
+                             "optimization columns.")
     parser.add_argument("--dataset", required=True, help="Dataset name.")
     parser.add_argument("--sequence", required=True, help="Sequence name.")
     parser.add_argument("--duration", type=float, help="Replay duration in seconds.")
@@ -212,8 +272,10 @@ def main(argv=None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     try:
         rows = read_loop_status_csv(args.csv)
+        if args.summary:
+            apply_summary_optimization(args, read_optimization_summary(args.summary))
     except OSError as exc:
-        print(f"failed to read MBES loop-status CSV: {exc}", file=sys.stderr)
+        print(f"failed to read MBES loop-status input: {exc}", file=sys.stderr)
         return 2
 
     parts = []

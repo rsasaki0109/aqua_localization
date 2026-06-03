@@ -135,6 +135,9 @@ When `/aqua_pose_graph/optimization_count` and
 summary also reports how many g2o optimization runs actually happened and the
 latest active chi-square. This helps confirm that loop constraints, not the
 odometry-only chain, are driving pose-graph optimization work.
+Pass the same markdown file to `mbes_loop_benchmark_row.py --summary` to carry
+those optimization diagnostics into the benchmark table row without copying
+the values by hand.
 Descriptor fields are still exported when descriptor thresholds are disabled,
 so replay summaries can be used to choose initial threshold values before
 turning the gate on. The descriptor sweep report evaluates percentile-derived

@@ -127,11 +127,10 @@ Generate the benchmark table row from the exported CSV:
 ```bash
 ros2 run aqua_localization mbes_loop_benchmark_row.py \
   --csv /tmp/mbes_beach_pond_loop_status.csv \
+  --summary /tmp/mbes_beach_pond_loop_status.md \
   --dataset MBES-SLAM \
   --sequence beach_pond \
   --duration 120 \
-  --optimization-count <latest optimize count from summary> \
-  --optimization-chi2 <latest active chi2 from summary> \
   --note "first real replay"
 ```
 

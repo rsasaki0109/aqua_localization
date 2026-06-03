@@ -9,6 +9,8 @@
   active chi^2 so real-bag tuning can confirm when g2o actually runs.
 - Threaded those pose-graph optimization diagnostics into the MBES loop-status
   summary exporter and optional benchmark-row columns.
+- Added `mbes_loop_benchmark_row.py --summary` so benchmark rows can pull the
+  latest optimization diagnostics from the exported markdown summary.
 - Rebuilt the GitHub Pages landing page around the full public-data demo wall,
   MBES hero replay, 3DGS viewer entry point, and GitHub star CTA.
 - Recorded a readiness-only 3DGS training smoke report for the published Tank

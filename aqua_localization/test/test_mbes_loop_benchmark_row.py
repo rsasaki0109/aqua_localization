@@ -87,6 +87,27 @@ def write_status_csv(path: Path):
         writer.writerows(rows)
 
 
+def write_summary_md(path: Path, count: str = "4", chi2: str = "12.5"):
+    path.write_text(
+        "\n".join(
+            [
+                "# MBES Loop Closure Status Summary",
+                "",
+                "## Pose Graph Optimization",
+                "",
+                "- Count topic: `/aqua_pose_graph/optimization_count`",
+                "- Count samples: 5",
+                f"- Latest optimize count: {count}",
+                "- Chi2 topic: `/aqua_pose_graph/optimization_chi2`",
+                "- Chi2 samples: 5",
+                f"- Latest active chi2: {chi2}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_summarize_rows_counts_status_classes(tmp_path):
     module = load_module()
     path = tmp_path / "status.csv"
@@ -146,6 +167,59 @@ def test_format_row_can_include_optimization_columns(tmp_path):
     )
 
 
+def test_read_optimization_summary_parses_exported_markdown(tmp_path):
+    module = load_module()
+    path = tmp_path / "summary.md"
+    write_summary_md(path, count="7", chi2="31.25")
+
+    summary = module.read_optimization_summary(path)
+
+    assert summary.count == 7
+    assert summary.chi2 == 31.25
+
+
+def test_summary_values_fill_benchmark_row_columns(tmp_path):
+    module = load_module()
+    csv_path = tmp_path / "status.csv"
+    summary_path = tmp_path / "summary.md"
+    write_status_csv(csv_path)
+    write_summary_md(summary_path, count="4", chi2="12.5")
+
+    class Args:
+        dataset = "MBES-SLAM"
+        sequence = "beach_pond"
+        duration = 120.0
+        optimization_count = None
+        optimization_chi2 = None
+        note = "summary diagnostics"
+
+    module.apply_summary_optimization(Args, module.read_optimization_summary(summary_path))
+    row = module.format_row(
+        Args,
+        module.summarize_rows(module.read_loop_status_csv(csv_path)),
+    )
+
+    assert row == (
+        "| MBES-SLAM | `beach_pond` | 120 | 3 | 1 | 1 | 1 | 2 | "
+        "0.2000 | 0.5800 | 4 | 12.5000 | summary diagnostics |"
+    )
+
+
+def test_explicit_optimization_values_override_summary(tmp_path):
+    module = load_module()
+    path = tmp_path / "summary.md"
+    write_summary_md(path, count="4", chi2="12.5")
+
+    class Args:
+        optimization_count = 9
+        optimization_chi2 = 99.0
+
+    module.apply_summary_optimization(Args, module.read_optimization_summary(path))
+
+    assert Args.optimization_count == 9
+    assert Args.optimization_chi2 == 99.0
+
+
 def test_cli_prints_header_and_row(tmp_path):
     path = tmp_path / "status.csv"
     write_status_csv(path)
@@ -173,6 +247,42 @@ def test_cli_prints_header_and_row(tmp_path):
 
     assert "| Dataset | Sequence | Duration s |" in proc.stdout
     assert "| MBES-SLAM | `beach_pond` | 120 | 3 | 1 | 1 | 1 | 2 |" in proc.stdout
+
+
+def test_cli_reads_optimization_columns_from_summary(tmp_path):
+    csv_path = tmp_path / "status.csv"
+    summary_path = tmp_path / "summary.md"
+    write_status_csv(csv_path)
+    write_summary_md(summary_path, count="4", chi2="12.5")
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--csv",
+            str(csv_path),
+            "--summary",
+            str(summary_path),
+            "--dataset",
+            "MBES-SLAM",
+            "--sequence",
+            "beach_pond",
+            "--duration",
+            "120",
+            "--note",
+            "summary diagnostics",
+            "--header",
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    assert "Optimize runs" in proc.stdout
+    assert (
+        "| MBES-SLAM | `beach_pond` | 120 | 3 | 1 | 1 | 1 | 2 | "
+        "0.2000 | 0.5800 | 4 | 12.5000 | summary diagnostics |"
+    ) in proc.stdout
 
 
 def test_cli_appends_to_output_file(tmp_path):
