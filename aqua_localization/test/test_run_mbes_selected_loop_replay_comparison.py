@@ -46,6 +46,9 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert "--normal" in proc.stdout
     assert "--selected" in proc.stdout
     assert "mbes_selected_loop_replay_comparison.md" in proc.stdout
+    assert "diagnose_mbes_selected_loop_coverage.py" in proc.stdout
+    assert "--timestamp-window-s 1.0" in proc.stdout
+    assert "mbes_selected_loop_coverage.md" in proc.stdout
     assert "check_mbes_loop_allowlist_replay.py" in proc.stdout
     assert f"--status {selected_status}" in proc.stdout
     assert "--strict" in proc.stdout
