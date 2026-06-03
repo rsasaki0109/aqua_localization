@@ -21,6 +21,9 @@ COMPARISON_OUT="${COMPARISON_OUT:-$OUT_ROOT/mbes_selected_loop_replay_comparison
 ALLOWLIST_AUDIT_OUT="${ALLOWLIST_AUDIT_OUT:-$OUT_ROOT/mbes_selected_loop_allowlist_audit.md}"
 SELECTED_COVERAGE_OUT="${SELECTED_COVERAGE_OUT:-$OUT_ROOT/mbes_selected_loop_coverage.md}"
 SELECTED_COVERAGE_TIMESTAMP_WINDOW_S="${SELECTED_COVERAGE_TIMESTAMP_WINDOW_S:-1.0}"
+REMAPPED_SELECTED_CSV="${REMAPPED_SELECTED_CSV:-$OUT_ROOT/mbes_selected_loop_remapped_allowlist.csv}"
+REMAPPED_SELECTED_REPORT="${REMAPPED_SELECTED_REPORT:-$OUT_ROOT/mbes_selected_loop_remap.md}"
+SELECTED_REMAP_TIMESTAMP_WINDOW_S="${SELECTED_REMAP_TIMESTAMP_WINDOW_S:-1.0}"
 SELECTED_GEOMETRY_AUDIT_REQUIRE_COMPLETE="${SELECTED_GEOMETRY_AUDIT_REQUIRE_COMPLETE:-0}"
 NORMAL_ROS_DOMAIN_ID="${NORMAL_ROS_DOMAIN_ID:-$((20 + RANDOM % 90))}"
 SELECTED_ROS_DOMAIN_ID="${SELECTED_ROS_DOMAIN_ID:-$((120 + RANDOM % 90))}"
@@ -123,6 +126,13 @@ run_cmd ros2 run aqua_localization diagnose_mbes_selected_loop_coverage.py \
   --out "$SELECTED_COVERAGE_OUT" \
   --timestamp-window-s "$SELECTED_COVERAGE_TIMESTAMP_WINDOW_S"
 
+run_cmd ros2 run aqua_localization remap_mbes_selected_loop_allowlist.py \
+  --selected "$NORMAL_SELECTED_CSV" \
+  --status "$SELECTED_STATUS_CSV" \
+  --out "$REMAPPED_SELECTED_CSV" \
+  --report-out "$REMAPPED_SELECTED_REPORT" \
+  --timestamp-window-s "$SELECTED_REMAP_TIMESTAMP_WINDOW_S"
+
 run_cmd ros2 run aqua_localization check_mbes_loop_allowlist_replay.py \
   --allowlist "$NORMAL_SELECTED_CSV" \
   --status "$SELECTED_STATUS_CSV" \
@@ -141,5 +151,7 @@ MBES selected-loop replay comparison artifacts:
   selected metrics:     $SELECTED_METRICS_OUT
   comparison report:    $COMPARISON_OUT
   coverage report:      $SELECTED_COVERAGE_OUT
+  remapped allowlist:   $REMAPPED_SELECTED_CSV
+  remap report:         $REMAPPED_SELECTED_REPORT
   allowlist audit:       $ALLOWLIST_AUDIT_OUT
 EOF

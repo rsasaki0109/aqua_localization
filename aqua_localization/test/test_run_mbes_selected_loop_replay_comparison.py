@@ -55,10 +55,15 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert "diagnose_mbes_selected_loop_coverage.py" in proc.stdout
     assert "--timestamp-window-s 1.0" in proc.stdout
     assert "mbes_selected_loop_coverage.md" in proc.stdout
+    assert "remap_mbes_selected_loop_allowlist.py" in proc.stdout
+    assert "mbes_selected_loop_remapped_allowlist.csv" in proc.stdout
+    assert "mbes_selected_loop_remap.md" in proc.stdout
     assert "check_mbes_loop_allowlist_replay.py" in proc.stdout
     assert f"--status {selected_status}" in proc.stdout
     assert "--strict" in proc.stdout
     assert "mbes_selected_loop_allowlist_audit.md" in proc.stdout
     assert "normal ROS_DOMAIN_ID: 31" in proc.stdout
     assert "selected ROS_DOMAIN_ID: 131" in proc.stdout
+    assert "remapped allowlist:" in proc.stdout
+    assert "remap report:" in proc.stdout
     assert "MBES selected-loop replay comparison artifacts:" in proc.stdout

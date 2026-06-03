@@ -314,13 +314,17 @@ The wrapper writes separate normal/selected benchmark directories,
 `mbes_selected_loop_coverage.md` before the strict allowlist audit so failed
 selected replays still explain whether selected IDs were replayed, missed by
 timestamp coverage, or replaced by accepted-looking candidates with different
-IDs. The comparison report checks pose-graph RMSE from the two
-`mbes_loop_trajectory_metrics.py` reports; the allowlist audit checks that a
-selected replay did not accept loop IDs outside the CSV used for
-`loop.selection.allowlist_csv`. The wrapper exits before the selected replay if
-the normal replay writes only a CSV header and no selected loop rows. By default
-the wrapper also exits non-zero when the allowlist audit finds off-allowlist
-accepted loops. Set
+IDs. It also writes `mbes_selected_loop_remapped_allowlist.csv` and
+`mbes_selected_loop_remap.md`, which map normal selected loop rows onto
+accepted-looking target replay rows inside a timestamp window. Use that
+remapped CSV only as a diagnostic second-pass allowlist; it is not a substitute
+for a stable loop identity or false-positive review. The comparison report
+checks pose-graph RMSE from the two `mbes_loop_trajectory_metrics.py` reports;
+the allowlist audit checks that a selected replay did not accept loop IDs
+outside the CSV used for `loop.selection.allowlist_csv`. The wrapper exits
+before the selected replay if the normal replay writes only a CSV header and no
+selected loop rows. By default the wrapper also exits non-zero when the
+allowlist audit finds off-allowlist accepted loops. Set
 `ALLOWLIST_AUDIT_STRICT=0` only when you need to preserve a diagnostic replay
 bundle despite that failure.
 
