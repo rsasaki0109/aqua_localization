@@ -30,6 +30,19 @@ SELECTED_ROS_DOMAIN_ID="${SELECTED_ROS_DOMAIN_ID:-$((120 + RANDOM % 90))}"
 ALLOWLIST_AUDIT_STRICT="${ALLOWLIST_AUDIT_STRICT:-1}"
 DRY_RUN="${DRY_RUN:-0}"
 ALLOWLIST_AUDIT_ARGS=()
+
+validate_ros_domain_id() {
+  local name="$1"
+  local value="$2"
+  if ! [[ "$value" =~ ^[0-9]+$ ]] || (( value > 232 )); then
+    echo "$name must be an integer from 0 to 232 for this replay: $value" >&2
+    exit 1
+  fi
+}
+
+validate_ros_domain_id NORMAL_ROS_DOMAIN_ID "$NORMAL_ROS_DOMAIN_ID"
+validate_ros_domain_id SELECTED_ROS_DOMAIN_ID "$SELECTED_ROS_DOMAIN_ID"
+
 if [[ "$ALLOWLIST_AUDIT_STRICT" == "1" ]]; then
   ALLOWLIST_AUDIT_ARGS+=("--strict")
 fi

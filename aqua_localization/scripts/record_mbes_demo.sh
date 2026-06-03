@@ -59,6 +59,18 @@ MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA="${MBES_LOOP_SELECTION_MATCH_MAX_FIT
 MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M="${MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M:-}"
 MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD="${MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD:-}"
 
+validate_ros_domain_id() {
+  if [[ -z "${ROS_DOMAIN_ID:-}" ]]; then
+    return 0
+  fi
+  if ! [[ "$ROS_DOMAIN_ID" =~ ^[0-9]+$ ]] || (( ROS_DOMAIN_ID > 232 )); then
+    echo \
+      "ROS_DOMAIN_ID must be an integer from 0 to 232 for this replay: $ROS_DOMAIN_ID" \
+      >&2
+    exit 1
+  fi
+}
+
 POSE_GRAPH_PARAM_ARGS=()
 if [[ -n "$POSE_GRAPH_ODOMETRY_TOPIC" ]]; then
   POSE_GRAPH_PARAM_ARGS+=("-p" "topics.odometry:=$POSE_GRAPH_ODOMETRY_TOPIC")
@@ -184,6 +196,8 @@ wait_for_recorder_ready() {
     "MBES recorder readiness timeout after ${RECORD_READY_TIMEOUT_S}s; starting replay anyway" \
     >&2
 }
+
+validate_ros_domain_id
 
 cd "$WORKSPACE"
 # shellcheck disable=SC1091

@@ -223,7 +223,11 @@ The accepted-loop geometry review reports the plan-view distance between each
 accepted candidate/current keyframe pair. On the 2026-06-04 100 s
 `beach_pond` diagnostic replays, many harmful selected loops had plan-view
 edges below 1 m while asking for rotation corrections near the gate. The
-runtime guard for that pattern is:
+short-edge guard rejected 15 such candidates, but the replay still worsened
+trajectory RMSE. A stricter global `gates.max_correction_rotation_rad: 0.2`
+then improved the selected replay pose-graph RMSE by 4.82 m versus its input in
+a paired diagnostic run, while exact selected-loop IDs still drifted between
+normal and selected replays. The runtime guard for the short-edge pattern is:
 
 ```yaml
 gates:

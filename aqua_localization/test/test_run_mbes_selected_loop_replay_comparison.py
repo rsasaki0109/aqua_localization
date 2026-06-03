@@ -107,3 +107,27 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert "remapped allowlist:" in proc.stdout
     assert "remap report:" in proc.stdout
     assert "MBES selected-loop replay comparison artifacts:" in proc.stdout
+
+
+def test_rejects_invalid_selected_ros_domain_id(tmp_path):
+    env = os.environ.copy()
+    env.update(
+        {
+            "DRY_RUN": "1",
+            "WORKSPACE": str(tmp_path / "ws"),
+            "OUT_ROOT": str(tmp_path / "comparison"),
+            "NORMAL_ROS_DOMAIN_ID": "31",
+            "SELECTED_ROS_DOMAIN_ID": "253",
+        }
+    )
+
+    proc = subprocess.run(
+        [str(SCRIPT_PATH)],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert proc.returncode != 0
+    assert "SELECTED_ROS_DOMAIN_ID must be an integer from 0 to 232" in proc.stderr
