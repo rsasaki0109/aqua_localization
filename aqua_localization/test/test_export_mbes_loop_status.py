@@ -370,6 +370,39 @@ def test_consistency_delta_uses_pose_when_available():
     assert math.isclose(deltas[0].rotation_delta_rad, math.pi / 2.0)
 
 
+def test_consistency_supported_count_uses_pose_direction_when_available():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 1.0, 0.0,
+            math.nan, math.nan, math.nan, "accepted",
+            correction_pose_valid=True,
+            correction_x_m=1.0,
+            correction_y_m=0.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, True, True, 0.1, 1.0, 0.0,
+            math.nan, math.nan, math.nan, "accepted",
+            correction_pose_valid=True,
+            correction_x_m=0.0,
+            correction_y_m=1.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+    ]
+
+    accepted = module.accepted_correction_samples(samples)
+
+    assert module.consistency_supported_count(accepted, 0.0, 0.0) == 1
+    assert module.consistency_supported_count(accepted, math.sqrt(2.0), 0.0) == 2
+
+
 def test_consistency_sweep_markdown_handles_too_few_accepted_samples():
     module = load_module()
     samples = [

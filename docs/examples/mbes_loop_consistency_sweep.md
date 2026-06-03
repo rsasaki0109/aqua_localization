@@ -33,8 +33,8 @@ the first accepted loops have been visually audited.
 `Would keep accepted` includes the first accepted loop because it bootstraps the
 runtime guard. `Supported pairs` counts pairwise agreement among all accepted
 corrections and is useful for spotting loose thresholds. New replays use the
-recorded correction pose for these deltas; older bags without that field fall
-back to scalar correction magnitudes.
+recorded correction pose to mirror the runtime guard's SE(3) delta check; older
+bags without that field fall back to scalar correction magnitudes.
 
 | Translation delta <= m | Rotation delta <= rad | Would keep accepted | Keep % | Supported pairs | Pair % |
 |-----------------------:|----------------------:|--------------------:|-------:|----------------:|-------:|

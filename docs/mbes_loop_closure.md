@@ -149,9 +149,9 @@ so replay summaries can be used to choose initial threshold values before
 turning the gate on. The descriptor sweep report evaluates percentile-derived
 threshold grids and reports how many tested candidates would pass each
 combination. The consistency sweep report uses recorded correction poses when
-available, with scalar correction-magnitude fallback for older bags, to propose
-initial values for the accepted-loop consistency guard. Inspect loop geometry
-before enabling positive `loop.consistency.*` thresholds.
+available, with scalar correction-magnitude fallback for older bags, to mirror
+the accepted-loop consistency guard and propose initial threshold values.
+Inspect loop geometry before enabling positive `loop.consistency.*` thresholds.
 
 ### Reading the Descriptor Sweep
 
@@ -184,10 +184,10 @@ See [the consistency sweep example](examples/mbes_loop_consistency_sweep.md) for
 the report shape. Each row estimates how many currently accepted loop
 corrections would remain supported if the runtime consistency guard used those
 translation and rotation delta thresholds. New replays use
-`LoopClosureStatus.correction_pose` for pose-aware deltas; old bags without that
-field fall back to scalar correction magnitudes. The first accepted loop always
-bootstraps the guard, so run the sweep only after visually auditing the earliest
-accepted loops.
+`LoopClosureStatus.correction_pose` for the same SE(3) delta magnitude checked
+by the runtime guard; old bags without that field fall back to scalar
+correction magnitudes. The first accepted loop always bootstraps the guard, so
+run the sweep only after visually auditing the earliest accepted loops.
 
 Use one row as an initial consistency config:
 

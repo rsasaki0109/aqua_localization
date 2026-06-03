@@ -388,6 +388,36 @@ def correction_pose_delta(
     return translation_delta_m, rotation_delta_rad
 
 
+def correction_delta_between(
+    anchor: LoopStatusSample,
+    sample: LoopStatusSample,
+) -> ConsistencyDeltaSample:
+    uses_pose = (
+        has_finite_correction_pose(anchor) and
+        has_finite_correction_pose(sample)
+    )
+    if uses_pose:
+        translation_delta_m, rotation_delta_rad = correction_pose_delta(
+            anchor, sample
+        )
+    else:
+        translation_delta_m = abs(
+            sample.correction_translation_m -
+            anchor.correction_translation_m
+        )
+        rotation_delta_rad = abs(
+            sample.correction_rotation_rad -
+            anchor.correction_rotation_rad
+        )
+    return ConsistencyDeltaSample(
+        anchor_current_id=anchor.current_id,
+        current_id=sample.current_id,
+        translation_delta_m=translation_delta_m,
+        rotation_delta_rad=rotation_delta_rad,
+        uses_pose=uses_pose,
+    )
+
+
 def consistency_delta_samples(
     samples: list[LoopStatusSample],
 ) -> list[ConsistencyDeltaSample]:
@@ -395,30 +425,7 @@ def consistency_delta_samples(
     deltas: list[ConsistencyDeltaSample] = []
     for index, sample in enumerate(accepted):
         for anchor in accepted[:index]:
-            uses_pose = (
-                has_finite_correction_pose(anchor) and
-                has_finite_correction_pose(sample)
-            )
-            if uses_pose:
-                translation_delta_m, rotation_delta_rad = correction_pose_delta(
-                    anchor, sample
-                )
-            else:
-                translation_delta_m = abs(
-                    sample.correction_translation_m -
-                    anchor.correction_translation_m
-                )
-                rotation_delta_rad = abs(
-                    sample.correction_rotation_rad -
-                    anchor.correction_rotation_rad
-                )
-            deltas.append(ConsistencyDeltaSample(
-                anchor_current_id=anchor.current_id,
-                current_id=sample.current_id,
-                translation_delta_m=translation_delta_m,
-                rotation_delta_rad=rotation_delta_rad,
-                uses_pose=uses_pose,
-            ))
+            deltas.append(correction_delta_between(anchor, sample))
     return deltas
 
 
@@ -449,10 +456,9 @@ def consistency_supported_count(
     retained = [accepted[0]]
     for sample in accepted[1:]:
         supported = any(
-            abs(sample.correction_translation_m -
-                anchor.correction_translation_m) <= translation_threshold and
-            abs(sample.correction_rotation_rad -
-                anchor.correction_rotation_rad) <= rotation_threshold
+            (delta := correction_delta_between(anchor, sample)).translation_delta_m <=
+            translation_threshold and
+            delta.rotation_delta_rad <= rotation_threshold
             for anchor in retained
         )
         if supported:
