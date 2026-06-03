@@ -113,11 +113,12 @@ Tune in this order:
    `gates.max_correction_rotation_rad` until false positives are rejected.
 5. `loop.min_repeat_keyframe_gap` to suppress near-duplicate accepted loops
    while preserving distinct revisits.
-6. `loop.consistency.max_correction_translation_delta_m` and
-   `loop.consistency.max_correction_rotation_delta_rad` after at least one
-   trusted accepted loop exists. Positive values reject new accepted-looking
-   candidates whose odometry-to-loop correction disagrees with all previously
-   accepted loop corrections.
+6. `loop.consistency.max_correction_translation_delta_m`,
+   `loop.consistency.max_correction_rotation_delta_rad`, and optionally
+   `loop.consistency.min_support_count` after trusted accepted loops exist.
+   Positive delta values reject new accepted-looking candidates whose
+   odometry-to-loop correction lacks enough support from previously accepted
+   loop corrections.
 7. `loop.translation_sigma_m` and `loop.rotation_sigma_rad` after comparing
    optimized path changes against the MBES-SLAM reference odometry.
 
@@ -129,7 +130,8 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --out /tmp/mbes_loop_status.csv \
   --summary-out /tmp/mbes_loop_status.md \
   --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md \
-  --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md
+  --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md \
+  --consistency-min-support-count 1
 ```
 
 The CSV preserves every `/mbes_loop_closure/status` sample. The markdown
@@ -196,8 +198,13 @@ loop:
   consistency:
     max_correction_translation_delta_m: <Translation delta <= m>
     max_correction_rotation_delta_rad: <Rotation delta <= rad>
+    min_support_count: 1
 ```
 
+`min_support_count: 1` preserves the original any-support guard. Raising it to
+`2` or more requires multiple previously accepted loops to agree once enough
+accepted-loop history exists; the bootstrap requirement is clamped to the
+available history size so the second trusted loop is not impossible to accept.
 Replay with those values and confirm that `loop consistency rejected` samples
 are the intended outlier loop corrections. If accepted loops split into several
 valid motion regimes, leave the guard disabled until a batch consistency
@@ -245,13 +252,13 @@ Paper trail for the backend decision:
 The live front end now has a lightweight accepted-loop consistency guard using
 the same idea at a smaller scope: each accepted loop records its correction from
 the odometry guess to the registration result, and later candidates can be
-rejected as `loop consistency rejected` when their correction disagrees with all
-recorded accepted loops. Keep this disabled until at least one replay has a
-trusted accepted loop; a bad first accepted loop would otherwise become the
-reference. Generate `/tmp/mbes_loop_consistency_sweep.md` from the same replay
-used for descriptor tuning to choose conservative initial translation/rotation
-delta thresholds, then replay once more and check that rejected candidates are
-the intended inconsistent loops.
+rejected as `loop consistency rejected` when their correction lacks the
+configured support count from recorded accepted loops. Keep this disabled until
+at least one replay has trusted accepted loops; a bad bootstrap set would
+otherwise become the reference. Generate `/tmp/mbes_loop_consistency_sweep.md`
+from the same replay used for descriptor tuning to choose conservative initial
+translation/rotation delta thresholds, then replay once more and check that
+rejected candidates are the intended inconsistent loops.
 
 `LoopClosureStatus.candidate_id` is `UINT32_MAX` when a keyframe has no
 eligible historical submap. Rejections report the specific gate that failed,

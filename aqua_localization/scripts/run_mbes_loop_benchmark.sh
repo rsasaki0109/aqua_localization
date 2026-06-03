@@ -49,6 +49,7 @@ RECORD_ENV_ARGS=(
 )
 AUDIT_ARGS=()
 GEOMETRY_AUDIT_ARGS=()
+CONSISTENCY_SWEEP_ARGS=()
 MBES_SOURCE_TOPICS=(
   /norbit/detections
   /nav/processed/odometry
@@ -67,7 +68,10 @@ for optional_name in \
   MBES_LOOP_MAX_CORRECTION_ROTATION_RAD \
   MBES_LOOP_DESCRIPTOR_MAX_CENTROID_DISTANCE_M \
   MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO \
-  MBES_LOOP_DESCRIPTOR_MIN_POINT_COUNT_RATIO
+  MBES_LOOP_DESCRIPTOR_MIN_POINT_COUNT_RATIO \
+  MBES_LOOP_CONSISTENCY_MAX_TRANSLATION_DELTA_M \
+  MBES_LOOP_CONSISTENCY_MAX_ROTATION_DELTA_RAD \
+  MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT
 do
   if [[ -n "${!optional_name+x}" ]]; then
     RECORD_ENV_ARGS+=("$optional_name=${!optional_name}")
@@ -94,6 +98,12 @@ if [[ -n "${MBES_LOOP_DESCRIPTOR_MIN_POINT_COUNT_RATIO+x}" ]]; then
 fi
 if [[ "$GEOMETRY_AUDIT_REQUIRE_COMPLETE" == "1" ]]; then
   GEOMETRY_AUDIT_ARGS+=("--require-complete")
+fi
+if [[ -n "${MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT+x}" ]]; then
+  CONSISTENCY_SWEEP_ARGS+=(
+    "--consistency-min-support-count"
+    "$MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT"
+  )
 fi
 
 run_cmd() {
@@ -170,7 +180,8 @@ run_cmd ros2 run aqua_localization export_mbes_loop_status.py \
   --out "$STATUS_CSV" \
   --summary-out "$SUMMARY_OUT" \
   --descriptor-sweep-out "$DESCRIPTOR_SWEEP_OUT" \
-  --consistency-sweep-out "$CONSISTENCY_SWEEP_OUT"
+  --consistency-sweep-out "$CONSISTENCY_SWEEP_OUT" \
+  "${CONSISTENCY_SWEEP_ARGS[@]}"
 
 run_cmd ros2 run aqua_localization mbes_loop_benchmark_row.py \
   --csv "$STATUS_CSV" \

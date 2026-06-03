@@ -25,6 +25,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "POSE_GRAPH_KEYFRAME_TRANSLATION_M": "1.0",
             "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD": "0.4",
             "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO": "5.0",
+            "MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT": "2",
             "PLAY_TOPIC_ARGS": "--topics /norbit/detections",
             "AUDIT_MAX_ACCEPTED": "77",
             "AUDIT_MAX_MARKERS": "88",
@@ -57,10 +58,12 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "POSE_GRAPH_KEYFRAME_TRANSLATION_M=1.0" in proc.stdout
     assert "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4" in proc.stdout
     assert "MBES_LOOP_DESCRIPTOR_MAX_EXTENT_RATIO=5.0" in proc.stdout
+    assert "MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT=2" in proc.stdout
     assert f"MBES_SRC={tmp_path / 'out/mbes_source_humble_sqlite'}" in proc.stdout
     assert "PLAY_TOPIC_ARGS=--topics\\ /norbit/detections" in proc.stdout
     assert "--max-rotation-rad 0.4" in proc.stdout
     assert "--descriptor-extent-warn 5.0" in proc.stdout
+    assert "--consistency-min-support-count 2" in proc.stdout
     assert "--max-accepted 77" in proc.stdout
     assert "--max-markers 88" in proc.stdout
     assert "--require-complete" in proc.stdout

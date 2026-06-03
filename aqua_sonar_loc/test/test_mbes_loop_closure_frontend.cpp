@@ -237,3 +237,31 @@ TEST(MbesLoopClosureFrontendTest, AcceptedLoopTrackerRejectsInconsistentCorrecti
     Eigen::AngleAxisd(0.5, Eigen::Vector3d::UnitZ()).toRotationMatrix();
   EXPECT_FALSE(tracker.is_consistent(inconsistent_rotation));
 }
+
+TEST(MbesLoopClosureFrontendTest, AcceptedLoopTrackerCanRequireMultipleConsistencySupports)
+{
+  aqua_sonar_loc::LoopSuppressionOptions options;
+  options.max_consistency_translation_delta_m = 0.5;
+  options.max_consistency_rotation_delta_rad = 0.25;
+  options.min_consistency_support_count = 2;
+  aqua_sonar_loc::AcceptedLoopTracker tracker(options);
+
+  Eigen::Isometry3d first = Eigen::Isometry3d::Identity();
+  tracker.record(10, 30, first);
+
+  Eigen::Isometry3d bootstrap = Eigen::Isometry3d::Identity();
+  bootstrap.translation().x() = 0.25;
+  EXPECT_TRUE(tracker.is_consistent(bootstrap));
+
+  Eigen::Isometry3d second = Eigen::Isometry3d::Identity();
+  second.translation().x() = 0.4;
+  tracker.record(20, 40, second);
+
+  Eigen::Isometry3d supported_by_one = Eigen::Isometry3d::Identity();
+  supported_by_one.translation().x() = 0.9;
+  EXPECT_FALSE(tracker.is_consistent(supported_by_one));
+
+  Eigen::Isometry3d supported_by_two = Eigen::Isometry3d::Identity();
+  supported_by_two.translation().x() = 0.2;
+  EXPECT_TRUE(tracker.is_consistent(supported_by_two));
+}

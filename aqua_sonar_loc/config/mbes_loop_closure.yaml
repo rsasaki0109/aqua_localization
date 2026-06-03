@@ -62,3 +62,6 @@ mbes_loop_closure:
         # consistency checks. Set positive values only after replay tuning.
         max_correction_translation_delta_m: 0.0
         max_correction_rotation_delta_rad: 0.0
+        # Require this many previously accepted loops to support a new loop
+        # once enough history exists. 1 preserves the legacy any-support guard.
+        min_support_count: 1

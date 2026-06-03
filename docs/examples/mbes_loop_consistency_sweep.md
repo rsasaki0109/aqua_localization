@@ -6,7 +6,8 @@ This is a synthetic example of the markdown produced by:
 ros2 run aqua_localization export_mbes_loop_status.py \
   --bag aqua_localization/datasets/public/mbes_slam/demo_with_estimate \
   --out /tmp/mbes_loop_status.csv \
-  --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md
+  --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md \
+  --consistency-min-support-count 1
 ```
 
 Do not copy these values into `config/mbes_loop_closure.yaml`. Use this file to
@@ -57,7 +58,12 @@ loop:
   consistency:
     max_correction_translation_delta_m: 1.30
     max_correction_rotation_delta_rad: 0.16
+    min_support_count: 1
 ```
+
+Keep `min_support_count: 1` for first-pass tuning. Raise it to `2` or more only
+after multiple accepted loops have been visually audited and the sweep shows
+that trusted loops support each other.
 
 Then replay the bag, export `/mbes_loop_closure/status` again, and compare:
 

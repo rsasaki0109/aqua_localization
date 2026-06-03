@@ -450,24 +450,32 @@ def consistency_supported_count(
     accepted: list[LoopStatusSample],
     translation_threshold: float,
     rotation_threshold: float,
+    min_support_count: int = 1,
 ) -> int:
     if not accepted:
         return 0
+    configured_support = max(1, int(min_support_count))
     retained = [accepted[0]]
     for sample in accepted[1:]:
-        supported = any(
-            (delta := correction_delta_between(anchor, sample)).translation_delta_m <=
-            translation_threshold and
-            delta.rotation_delta_rad <= rotation_threshold
-            for anchor in retained
-        )
-        if supported:
+        required_support = min(configured_support, len(retained))
+        support_count = 0
+        for anchor in retained:
+            delta = correction_delta_between(anchor, sample)
+            if (
+                delta.translation_delta_m <= translation_threshold and
+                delta.rotation_delta_rad <= rotation_threshold
+            ):
+                support_count += 1
+                if support_count >= required_support:
+                    break
+        if support_count >= required_support:
             retained.append(sample)
     return len(retained)
 
 
 def consistency_sweep_rows(
     samples: list[LoopStatusSample],
+    min_support_count: int = 1,
 ) -> list[dict[str, float | int]]:
     accepted = accepted_correction_samples(samples)
     if len(accepted) < 2:
@@ -490,6 +498,7 @@ def consistency_sweep_rows(
                 accepted,
                 translation_threshold,
                 rotation_threshold,
+                min_support_count,
             )
             pair_support_count = sum(
                 1 for delta in deltas
@@ -501,6 +510,7 @@ def consistency_sweep_rows(
                 "rotation_threshold_rad": rotation_threshold,
                 "supported_count": supported_count,
                 "total_count": len(accepted),
+                "min_support_count": max(1, int(min_support_count)),
                 "pair_support_count": pair_support_count,
                 "pair_total_count": len(deltas),
             })
@@ -564,16 +574,22 @@ def format_descriptor_sweep_markdown(samples: list[LoopStatusSample], topic: str
     return "\n".join(lines)
 
 
-def format_consistency_sweep_markdown(samples: list[LoopStatusSample], topic: str) -> str:
+def format_consistency_sweep_markdown(
+    samples: list[LoopStatusSample],
+    topic: str,
+    min_support_count: int = 1,
+) -> str:
     summary = consistency_delta_summary(samples)
-    rows = consistency_sweep_rows(samples)
+    rows = consistency_sweep_rows(samples, min_support_count)
     accepted_count = int(summary["accepted_count"])
+    configured_support = max(1, int(min_support_count))
     lines = [
         "# MBES Loop Closure Consistency Threshold Sweep",
         "",
         f"- Topic: `{topic}`",
         f"- Samples: {len(samples)}",
         f"- Accepted loops with finite corrections: {accepted_count}",
+        f"- Min support count: {configured_support}",
         "",
         "This report uses recorded correction poses when available, then falls "
         "back to scalar correction magnitudes for older bags. It is a tuning aid for "
@@ -596,6 +612,8 @@ def format_consistency_sweep_markdown(samples: list[LoopStatusSample], topic: st
     lines.extend([
         "Runtime note: the first accepted loop bootstraps the consistency guard, "
         "so use trusted accepted-loop replays before enabling tight thresholds.",
+        "The simulated support requirement is clamped to the retained accepted-loop "
+        "history size during bootstrap, matching the runtime guard.",
         f"Delta source: {pose_pair_count} pose-aware pairs, "
         f"{magnitude_pair_count} scalar-magnitude fallback pairs.",
         "",
@@ -893,6 +911,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="Optional descriptor threshold sweep markdown output path")
     parser.add_argument("--consistency-sweep-out", type=Path,
                         help="Optional consistency threshold sweep markdown output path")
+    parser.add_argument("--consistency-min-support-count", type=int, default=1,
+                        help="Support count to simulate in the consistency sweep")
     return parser.parse_args(argv)
 
 
@@ -927,7 +947,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.consistency_sweep_out:
         args.consistency_sweep_out.parent.mkdir(parents=True, exist_ok=True)
         args.consistency_sweep_out.write_text(
-            format_consistency_sweep_markdown(samples, args.topic),
+            format_consistency_sweep_markdown(
+                samples,
+                args.topic,
+                args.consistency_min_support_count,
+            ),
             encoding="utf-8",
         )
     print(summary_text)

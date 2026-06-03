@@ -144,6 +144,8 @@ private:
       declare_parameter<double>("loop.consistency.max_correction_translation_delta_m", 0.0);
     loop_suppression_options_.max_consistency_rotation_delta_rad =
       declare_parameter<double>("loop.consistency.max_correction_rotation_delta_rad", 0.0);
+    loop_suppression_options_.min_consistency_support_count =
+      declare_parameter<int>("loop.consistency.min_support_count", 1);
 
     submap_manager_ = SubmapManager(submap_options_);
     accepted_loop_tracker_ = AcceptedLoopTracker(loop_suppression_options_);

@@ -403,6 +403,53 @@ def test_consistency_supported_count_uses_pose_direction_when_available():
     assert module.consistency_supported_count(accepted, math.sqrt(2.0), 0.0) == 2
 
 
+def test_consistency_supported_count_can_require_multiple_supports():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 0.0, 0.0,
+            math.nan, math.nan, math.nan, "accepted",
+            correction_pose_valid=True,
+            correction_x_m=0.0,
+            correction_y_m=0.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, True, True, 0.1, 0.4, 0.0,
+            math.nan, math.nan, math.nan, "accepted",
+            correction_pose_valid=True,
+            correction_x_m=0.4,
+            correction_y_m=0.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+        module.LoopStatusSample(
+            3.0, "map", 3, 0, True, True, 0.1, 0.9, 0.0,
+            math.nan, math.nan, math.nan, "accepted",
+            correction_pose_valid=True,
+            correction_x_m=0.9,
+            correction_y_m=0.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+    ]
+    accepted = module.accepted_correction_samples(samples)
+
+    assert module.consistency_supported_count(accepted, 0.5, 0.0, 1) == 3
+    assert module.consistency_supported_count(accepted, 0.5, 0.0, 2) == 2
+
+    rows = module.consistency_sweep_rows(samples, min_support_count=2)
+    assert rows
+    assert all(row["min_support_count"] == 2 for row in rows)
+
+
 def test_consistency_sweep_markdown_handles_too_few_accepted_samples():
     module = load_module()
     samples = [
@@ -416,6 +463,7 @@ def test_consistency_sweep_markdown_handles_too_few_accepted_samples():
 
     assert "# MBES Loop Closure Consistency Threshold Sweep" in text
     assert "Accepted loops with finite corrections: 1" in text
+    assert "Min support count: 1" in text
     assert "At least two accepted loop corrections" in text
 
 
@@ -434,5 +482,6 @@ def test_consistency_sweep_markdown_contains_threshold_table():
         samples, "/mbes_loop_closure/status")
 
     assert "recorded correction poses when available" in text
+    assert "Min support count: 1" in text
     assert "| Translation delta <= m |" in text
     assert "Would keep accepted" in text

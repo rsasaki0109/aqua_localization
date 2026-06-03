@@ -455,22 +455,28 @@ bool AcceptedLoopTracker::is_consistent(const Eigen::Isometry3d & correction) co
     return true;
   }
 
-  return std::any_of(
-    accepted_loops_.begin(), accepted_loops_.end(),
-    [this, check_translation, check_rotation, &correction](const AcceptedLoop & loop) {
-      const Eigen::Isometry3d delta = loop.correction.inverse() * correction;
-      if (check_translation &&
-        delta.translation().norm() > options_.max_consistency_translation_delta_m)
-      {
-        return false;
-      }
-      if (check_rotation &&
-        rotation_distance_rad(delta) > options_.max_consistency_rotation_delta_rad)
-      {
-        return false;
-      }
+  const auto configured_support =
+    static_cast<std::size_t>(std::max(1, options_.min_consistency_support_count));
+  const auto required_support = std::min(configured_support, accepted_loops_.size());
+  std::size_t support_count = 0;
+  for (const auto & loop : accepted_loops_) {
+    const Eigen::Isometry3d delta = loop.correction.inverse() * correction;
+    if (check_translation &&
+      delta.translation().norm() > options_.max_consistency_translation_delta_m)
+    {
+      continue;
+    }
+    if (check_rotation &&
+      rotation_distance_rad(delta) > options_.max_consistency_rotation_delta_rad)
+    {
+      continue;
+    }
+    ++support_count;
+    if (support_count >= required_support) {
       return true;
-    });
+    }
+  }
+  return false;
 }
 
 void AcceptedLoopTracker::record(std::uint32_t from_id, std::uint32_t to_id)

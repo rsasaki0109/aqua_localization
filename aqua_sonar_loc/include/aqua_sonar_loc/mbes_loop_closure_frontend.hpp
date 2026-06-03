@@ -122,6 +122,7 @@ struct LoopSuppressionOptions
   int min_repeat_keyframe_gap{0};
   double max_consistency_translation_delta_m{0.0};
   double max_consistency_rotation_delta_rad{0.0};
+  int min_consistency_support_count{1};
 };
 
 struct AcceptedLoop
