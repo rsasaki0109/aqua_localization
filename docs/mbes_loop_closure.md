@@ -132,6 +132,7 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md \
   --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md \
   --consistency-rejection-audit-out /tmp/mbes_loop_consistency_rejections.md \
+  --batch-consistency-out /tmp/mbes_loop_batch_consistency.md \
   --consistency-min-support-count 1
 ```
 
@@ -159,6 +160,11 @@ The consistency rejection audit lists actual `loop consistency rejected`
 samples by support deficit and nearest correction delta after replaying with
 positive consistency thresholds. Inspect loop geometry before enabling positive
 `loop.consistency.*` thresholds.
+The batch consistency report builds a pairwise graph from accepted and
+`loop consistency rejected` corrections, then selects one internally consistent
+clique. Use it as the offline PCM-like handoff from tuning to replay planning:
+selected loop IDs are candidates for a constrained replay, while batch-rejected
+IDs need RViz/rerun review before they can support an accuracy claim.
 
 ### Reading the Descriptor Sweep
 
@@ -225,6 +231,36 @@ split into several valid motion regimes, leave the guard disabled until a batch
 consistency selector can reason over batches of candidate transforms.
 Use `/tmp/mbes_loop_consistency_rejections.md` to sort those rejections by
 support deficit before reviewing RViz/rerun markers.
+
+### Reading the Batch Consistency Report
+
+See [the batch consistency example](examples/mbes_loop_batch_consistency.md) for
+the report shape and a worked interpretation flow.
+`--batch-consistency-out` produces a PCM-like selection report over finite loop
+corrections that were either accepted or rejected only by the runtime
+consistency guard. It uses `LoopClosureStatus.correction_pose` when present,
+falls back to scalar correction magnitudes for older bags, and connects two
+loops when both translation and rotation correction deltas are below the
+configured thresholds. If
+`--batch-consistency-translation-threshold-m` or
+`--batch-consistency-rotation-threshold-rad` is omitted, the exporter uses the
+configured auto quantile from the candidate pairwise delta distribution.
+
+Example with explicit thresholds:
+
+```bash
+ros2 run aqua_localization export_mbes_loop_status.py \
+  --bag /tmp/aqua_mbes_beach_pond_with_loop_status \
+  --out /tmp/mbes_loop_status.csv \
+  --batch-consistency-out /tmp/mbes_loop_batch_consistency.md \
+  --batch-consistency-translation-threshold-m 1.3 \
+  --batch-consistency-rotation-threshold-rad 0.16
+```
+
+The selected set is not a full SOTA claim. Treat it as a replay/audit input:
+the next run should apply or inspect the selected loop IDs, compare pose-graph
+APE/RPE against the dataset reference, and keep false-positive notes attached
+to every accepted loop.
 
 Useful live checks while tuning:
 

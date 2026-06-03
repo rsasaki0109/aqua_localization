@@ -39,7 +39,7 @@ manual audit.
 | Sensor-equivalent Tank stack | Visual frontend is diagnostic; fusion can regress relative to standalone visual. | Stereo + IMU + DVL + pressure should be optimized with explicit residuals and calibrated frames. | Add graph/UKF path that uses DVL velocity, visual pose/feature residuals, pressure, and IMU in one estimator; keep scale/extrinsic tuning out of the held-out segment. |
 | MBES trajectory proof | `beach_pond` loop-status counts, sweeps, and audit worksheets exist. | APE/RPE, pose-graph effect, and false-positive audit must be tied to the same run and commit. | Extend `run_mbes_loop_benchmark.sh` to compute pre/post loop trajectory metrics against dataset reference and fail if accepted loops lack audit notes. |
 | Loop proposal quality | Candidate selection is temporal/spatial plus simple descriptor gates. | Sonar/bathymetry place recognition should propose loop candidates robustly under drift and low-resolution terrain. | Add bathymetric descriptor export and offline retrieval evaluation: recall@k against trusted loop/audit pairs, then use it before registration. |
-| Loop consistency | Online accepted-loop support count is observable. | Batch PCM/GkCM-style selection or robust maximum-consensus should select a globally consistent set of candidate loops. | Implement an offline batch consistency selector over `LoopClosureStatus.correction_pose`, export selected/rejected loop ids, then replay with selected constraints. |
+| Loop consistency | Online accepted-loop support count is observable, and `export_mbes_loop_status.py --batch-consistency-out` now exports a PCM-like selected/rejected loop-id report over accepted and consistency-rejected corrections. | Batch PCM/GkCM-style selection or robust maximum-consensus should select a globally consistent set of candidate loops and feed the actual replay/backend. | Replay with the selected loop IDs, compare trajectory metrics against the dataset reference, then decide whether group-k consistency is needed for ambiguous bathymetry. |
 | Registration uncertainty | Fitness/correction gates are exported, but loop information is mostly configured. | Registration should return covariance/information that reflects geometry, overlap, and degeneracy. | Add overlap/condition-number diagnostics and map them into loop information; support partially constrained factors when yaw/translation are degenerate. |
 | Robust backend | DCS/huber/none are available backend guards. | False loop closures should be downweighted or switched off automatically and reported. | Add switchable loop factors or an offline GNC/PCM-selected loop set; compare against DCS on the same `beach_pond` replay. |
 | Reproducibility claim | Public docs and Pages are good. | Paper evidence needs exact source bag, duration, config, commit, metrics, and failure gates. | Add a generated SOTA-readiness report that fails when a claim lacks held-out data, baseline row, trajectory metric, or loop audit. |
@@ -54,10 +54,10 @@ manual audit.
    The current MBES tooling is close to publishable engineering evidence, but
    still lacks pre/post pose-graph APE/RPE and audited false-positive decisions.
 
-3. **Add batch consistency selection.**
-   Implement a PCM-like offline selector over candidate loop corrections before
-   trying more knobs. This directly follows the strongest robust loop-closure
-   literature and gives an interpretable artifact.
+3. **Replay the batch consistency selection.**
+   The repo now has a PCM-like offline selector over candidate loop corrections.
+   The next step is to apply that selected loop set to a replay and show
+   whether the pose graph improves against the dataset reference.
 
 4. **Add uncertainty and degeneracy diagnostics.**
    For MBES, calibrated loop information and partial constraints matter more

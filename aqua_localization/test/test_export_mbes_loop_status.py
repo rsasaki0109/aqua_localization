@@ -576,3 +576,125 @@ def test_consistency_rejection_audit_markdown_lists_runtime_diagnostics():
     assert "required - support = 1: 1" in text
     assert "required - support = 3: 1" in text
     assert "| 2 | 2 | 0 | 0 | 3 | 3 | 2.5 | 0.4 | 1.2 | 0.2 | 0.4 |" in text
+
+
+def test_batch_consistency_selection_picks_largest_pose_clique():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 0.0, 0.0,
+            math.nan, math.nan, math.nan, "accepted",
+            correction_pose_valid=True,
+            correction_x_m=0.0,
+            correction_y_m=0.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, True, True, 0.2, 0.2, 0.0,
+            math.nan, math.nan, math.nan, "accepted",
+            correction_pose_valid=True,
+            correction_x_m=0.2,
+            correction_y_m=0.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+        module.LoopStatusSample(
+            3.0, "map", 3, 0, False, True, 0.3, 0.4, 0.0,
+            math.nan, math.nan, math.nan, "loop consistency rejected",
+            correction_pose_valid=True,
+            correction_x_m=0.4,
+            correction_y_m=0.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+        module.LoopStatusSample(
+            4.0, "map", 4, 0, False, True, 0.4, 4.0, 0.0,
+            math.nan, math.nan, math.nan, "loop consistency rejected",
+            correction_pose_valid=True,
+            correction_x_m=4.0,
+            correction_y_m=0.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+        module.LoopStatusSample(
+            5.0, "map", 5, 0, False, True, 0.5, 0.1, 0.0,
+            math.nan, math.nan, math.nan, "fitness gate rejected",
+            correction_pose_valid=True,
+            correction_x_m=0.1,
+            correction_y_m=0.0,
+            correction_z_m=0.0,
+            correction_qx=0.0,
+            correction_qy=0.0,
+            correction_qz=0.0,
+            correction_qw=1.0),
+    ]
+
+    result = module.batch_consistency_selection(
+        samples,
+        translation_threshold_m=0.5,
+        rotation_threshold_rad=0.0,
+    )
+
+    selected_ids = {
+        result.candidates[index].current_id for index in result.selected_indices
+    }
+    assert len(result.candidates) == 4
+    assert result.pair_count == 6
+    assert result.edge_count == 3
+    assert selected_ids == {1, 2, 3}
+    assert result.algorithm == "exact maximum clique"
+
+
+def test_batch_consistency_markdown_lists_selected_and_rejected_candidates():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 1.0, 0.10,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, True, True, 0.2, 1.1, 0.11,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            3.0, "map", 3, 0, False, True, 0.3, 5.0, 0.90,
+            math.nan, math.nan, math.nan, "loop consistency rejected"),
+    ]
+
+    text = module.format_batch_consistency_markdown(
+        samples,
+        "/mbes_loop_closure/status",
+        translation_threshold_m=0.2,
+        rotation_threshold_rad=0.02,
+    )
+
+    assert "# MBES Loop Closure Batch Consistency Selection" in text
+    assert "Candidate loop corrections: 3" in text
+    assert "Selected consistent set: 2/3" in text
+    assert "Batch-rejected candidates: 1" in text
+    assert "Translation threshold m: 0.2 (explicit)" in text
+    assert "## Selected Loop IDs" in text
+    assert "## Batch-Rejected Candidates" in text
+    assert "| 1 | 3 | 3 | 0 | 0 | 0 |" in text
+
+
+def test_batch_consistency_markdown_handles_no_candidates():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, False, True, 0.5, 0.1, 0.0,
+            math.nan, math.nan, math.nan, "fitness gate rejected")
+    ]
+
+    text = module.format_batch_consistency_markdown(
+        samples, "/mbes_loop_closure/status")
+
+    assert "Candidate loop corrections: 0" in text
+    assert "No accepted or `loop consistency rejected`" in text

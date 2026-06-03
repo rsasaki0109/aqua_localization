@@ -14,7 +14,8 @@ Example:
     --summary-out /tmp/mbes_loop_status.md \\
     --descriptor-sweep-out /tmp/mbes_loop_descriptor_sweep.md \\
     --consistency-sweep-out /tmp/mbes_loop_consistency_sweep.md \\
-    --consistency-rejection-audit-out /tmp/mbes_loop_consistency_rejections.md
+    --consistency-rejection-audit-out /tmp/mbes_loop_consistency_rejections.md \\
+    --batch-consistency-out /tmp/mbes_loop_batch_consistency.md
 """
 
 from __future__ import annotations
@@ -122,6 +123,22 @@ class ConsistencyDeltaSample:
     translation_delta_m: float
     rotation_delta_rad: float
     uses_pose: bool
+
+
+@dataclass(frozen=True)
+class BatchConsistencyResult:
+    candidates: list[LoopStatusSample]
+    selected_indices: list[int]
+    adjacency: list[int]
+    translation_threshold_m: float
+    rotation_threshold_rad: float
+    translation_threshold_source: str
+    rotation_threshold_source: str
+    pair_count: int
+    edge_count: int
+    pose_pair_count: int
+    magnitude_pair_count: int
+    algorithm: str
 
 
 def stamp_to_seconds(stamp) -> float:
@@ -352,12 +369,17 @@ def descriptor_sweep_rows(samples: list[LoopStatusSample]) -> list[dict[str, flo
     return rows
 
 
+def has_finite_correction_magnitudes(sample: LoopStatusSample) -> bool:
+    return (
+        math.isfinite(sample.correction_translation_m) and
+        math.isfinite(sample.correction_rotation_rad)
+    )
+
+
 def accepted_correction_samples(samples: list[LoopStatusSample]) -> list[LoopStatusSample]:
     return [
         sample for sample in samples
-        if sample.accepted and
-        math.isfinite(sample.correction_translation_m) and
-        math.isfinite(sample.correction_rotation_rad)
+        if sample.accepted and has_finite_correction_magnitudes(sample)
     ]
 
 
@@ -590,6 +612,242 @@ def consistency_rejection_samples(
     return rejections[:limit]
 
 
+def batch_consistency_candidates(
+    samples: list[LoopStatusSample],
+) -> list[LoopStatusSample]:
+    return [
+        sample for sample in samples
+        if (
+            has_finite_correction_magnitudes(sample) and
+            not is_no_candidate(sample) and
+            (sample.accepted or is_consistency_rejection(sample))
+        )
+    ]
+
+
+def explicit_batch_threshold(value: float) -> float | None:
+    if math.isfinite(value) and value >= 0.0:
+        return value
+    return None
+
+
+def resolved_batch_threshold(
+    explicit_value: float,
+    values: list[float],
+    auto_quantile: float,
+) -> tuple[float, str]:
+    configured = explicit_batch_threshold(explicit_value)
+    if configured is not None:
+        return configured, "explicit"
+    if not values:
+        return math.nan, "unavailable"
+    quantile = min(1.0, max(0.0, float(auto_quantile)))
+    return percentile(values, quantile), f"auto p{quantile * 100.0:.0f}"
+
+
+def batch_clique_score(mask: int, candidates: list[LoopStatusSample]) -> tuple:
+    indices = mask_to_indices(mask)
+    accepted_count = sum(1 for index in indices if candidates[index].accepted)
+    fitness_sum = sum(
+        candidates[index].fitness_score
+        if math.isfinite(candidates[index].fitness_score) else 1.0e9
+        for index in indices
+    )
+    correction_sum = sum(
+        candidates[index].correction_translation_m
+        if math.isfinite(candidates[index].correction_translation_m) else 1.0e9
+        for index in indices
+    )
+    if indices:
+        first_current_id = min(candidates[index].current_id for index in indices)
+    else:
+        first_current_id = 0
+    return (
+        len(indices),
+        accepted_count,
+        -fitness_sum,
+        -correction_sum,
+        -first_current_id,
+    )
+
+
+def mask_to_indices(mask: int) -> list[int]:
+    indices = []
+    while mask:
+        bit = mask & -mask
+        indices.append(bit.bit_length() - 1)
+        mask &= ~bit
+    return indices
+
+
+def maximum_clique_exact(
+    adjacency: list[int],
+    candidates: list[LoopStatusSample],
+) -> int:
+    if not adjacency:
+        return 0
+
+    best_mask = 0
+    best_score = batch_clique_score(best_mask, candidates)
+
+    def consider(mask: int) -> None:
+        nonlocal best_mask, best_score
+        score = batch_clique_score(mask, candidates)
+        if score > best_score:
+            best_mask = mask
+            best_score = score
+
+    def expand(clique: int, possible: int, excluded: int) -> None:
+        nonlocal best_score
+        if not possible and not excluded:
+            consider(clique)
+            return
+        if clique.bit_count() + possible.bit_count() < best_score[0]:
+            return
+
+        pivot_pool = possible | excluded
+        if pivot_pool:
+            pivot = max(
+                mask_to_indices(pivot_pool),
+                key=lambda index: (adjacency[index] & possible).bit_count(),
+            )
+            branch = possible & ~adjacency[pivot]
+        else:
+            branch = possible
+
+        while branch:
+            bit = branch & -branch
+            index = bit.bit_length() - 1
+            expand(clique | bit, possible & adjacency[index], excluded & adjacency[index])
+            possible &= ~bit
+            excluded |= bit
+            branch &= ~bit
+            if clique.bit_count() + possible.bit_count() < best_score[0]:
+                break
+
+    expand(0, (1 << len(adjacency)) - 1, 0)
+    return best_mask
+
+
+def maximum_clique_greedy(
+    adjacency: list[int],
+    candidates: list[LoopStatusSample],
+) -> int:
+    if not adjacency:
+        return 0
+
+    degrees = [mask.bit_count() for mask in adjacency]
+    seed_order = sorted(
+        range(len(adjacency)),
+        key=lambda index: (
+            -degrees[index],
+            candidates[index].fitness_score
+            if math.isfinite(candidates[index].fitness_score) else math.inf,
+            candidates[index].current_id,
+        ),
+    )
+    best_mask = 0
+    best_score = batch_clique_score(best_mask, candidates)
+    for seed in seed_order:
+        clique = 1 << seed
+        possible = adjacency[seed]
+        while possible:
+            index = max(
+                mask_to_indices(possible),
+                key=lambda item: (
+                    degrees[item],
+                    -(
+                        candidates[item].fitness_score
+                        if math.isfinite(candidates[item].fitness_score)
+                        else math.inf
+                    ),
+                    -candidates[item].current_id,
+                ),
+            )
+            clique |= 1 << index
+            possible &= adjacency[index]
+        score = batch_clique_score(clique, candidates)
+        if score > best_score:
+            best_mask = clique
+            best_score = score
+    return best_mask
+
+
+def batch_consistency_selection(
+    samples: list[LoopStatusSample],
+    translation_threshold_m: float = math.nan,
+    rotation_threshold_rad: float = math.nan,
+    auto_quantile: float = 0.95,
+    exact_limit: int = 64,
+) -> BatchConsistencyResult:
+    candidates = batch_consistency_candidates(samples)
+    deltas = [
+        correction_delta_between(anchor, sample)
+        for index, sample in enumerate(candidates)
+        for anchor in candidates[:index]
+    ]
+    resolved_translation, translation_source = resolved_batch_threshold(
+        translation_threshold_m,
+        [delta.translation_delta_m for delta in deltas],
+        auto_quantile,
+    )
+    resolved_rotation, rotation_source = resolved_batch_threshold(
+        rotation_threshold_rad,
+        [delta.rotation_delta_rad for delta in deltas],
+        auto_quantile,
+    )
+
+    adjacency = [0 for _ in candidates]
+    edge_count = 0
+    if (
+        len(candidates) > 1 and
+        math.isfinite(resolved_translation) and
+        math.isfinite(resolved_rotation)
+    ):
+        for index, sample in enumerate(candidates):
+            for anchor_index, anchor in enumerate(candidates[:index]):
+                delta = correction_delta_between(anchor, sample)
+                if (
+                    delta.translation_delta_m <= resolved_translation and
+                    delta.rotation_delta_rad <= resolved_rotation
+                ):
+                    adjacency[index] |= 1 << anchor_index
+                    adjacency[anchor_index] |= 1 << index
+                    edge_count += 1
+
+    if not candidates:
+        selected_mask = 0
+        algorithm = "none"
+    elif len(candidates) == 1:
+        selected_mask = 1
+        algorithm = "single-candidate"
+    elif len(candidates) <= max(1, int(exact_limit)):
+        selected_mask = maximum_clique_exact(adjacency, candidates)
+        algorithm = "exact maximum clique"
+    else:
+        selected_mask = maximum_clique_greedy(adjacency, candidates)
+        algorithm = f"greedy clique, n>{max(1, int(exact_limit))}"
+
+    return BatchConsistencyResult(
+        candidates=candidates,
+        selected_indices=mask_to_indices(selected_mask),
+        adjacency=adjacency,
+        translation_threshold_m=resolved_translation,
+        rotation_threshold_rad=resolved_rotation,
+        translation_threshold_source=translation_source,
+        rotation_threshold_source=rotation_source,
+        pair_count=len(deltas),
+        edge_count=edge_count,
+        pose_pair_count=sum(1 for delta in deltas if delta.uses_pose),
+        magnitude_pair_count=sum(1 for delta in deltas if not delta.uses_pose),
+        algorithm=algorithm,
+    )
+
+
+def selected_index_set(result: BatchConsistencyResult) -> set[int]:
+    return set(result.selected_indices)
+
+
 def format_float(value: float) -> str:
     if not math.isfinite(value):
         return "n/a"
@@ -782,6 +1040,149 @@ def format_consistency_rejection_audit_markdown(
             f"{format_float(sample.correction_translation_m)} | "
             f"{format_float(sample.correction_rotation_rad)} | "
             f"{format_float(sample.fitness_score)} |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def format_batch_candidate_row(
+    rank: int,
+    sample: LoopStatusSample,
+    degree: int,
+) -> str:
+    return (
+        f"| {rank} | {format_float(sample.timestamp)} | "
+        f"{sample.current_id} | {sample.candidate_id} | "
+        f"{int(sample.accepted)} | {degree} | "
+        f"{format_float(sample.fitness_score)} | "
+        f"{format_float(sample.correction_translation_m)} | "
+        f"{format_float(sample.correction_rotation_rad)} | {sample.status} |"
+    )
+
+
+def format_batch_consistency_markdown(
+    samples: list[LoopStatusSample],
+    topic: str,
+    translation_threshold_m: float = math.nan,
+    rotation_threshold_rad: float = math.nan,
+    auto_quantile: float = 0.95,
+    exact_limit: int = 64,
+    limit: int = 100,
+) -> str:
+    result = batch_consistency_selection(
+        samples,
+        translation_threshold_m,
+        rotation_threshold_rad,
+        auto_quantile,
+        exact_limit,
+    )
+    selected = selected_index_set(result)
+    rejected_indices = [
+        index for index in range(len(result.candidates))
+        if index not in selected
+    ]
+    rows_limit = max(0, int(limit))
+    candidate_count = len(result.candidates)
+    selected_count = len(result.selected_indices)
+    rejected_count = len(rejected_indices)
+    edge_pct = 100.0 * result.edge_count / result.pair_count if result.pair_count else 0.0
+    lines = [
+        "# MBES Loop Closure Batch Consistency Selection",
+        "",
+        f"- Topic: `{topic}`",
+        f"- Samples: {len(samples)}",
+        f"- Candidate loop corrections: {candidate_count}",
+        f"- Selected consistent set: {selected_count}/{candidate_count}",
+        f"- Batch-rejected candidates: {rejected_count}",
+        f"- Translation threshold m: {format_float(result.translation_threshold_m)} "
+        f"({result.translation_threshold_source})",
+        f"- Rotation threshold rad: {format_float(result.rotation_threshold_rad)} "
+        f"({result.rotation_threshold_source})",
+        f"- Algorithm: {result.algorithm}",
+        f"- Pairwise consistent edges: {result.edge_count}/{result.pair_count} "
+        f"({edge_pct:.1f}%)",
+        f"- Delta source: {result.pose_pair_count} pose-aware pairs, "
+        f"{result.magnitude_pair_count} scalar-magnitude fallback pairs",
+        "",
+        "This PCM-like report builds a pairwise consistency graph from accepted "
+        "and runtime-consistency-rejected loop corrections, then selects one "
+        "internally consistent clique. It is an offline selection artifact for "
+        "audit and replay planning; it is not a trajectory-accuracy claim by "
+        "itself.",
+        "",
+    ]
+    if not result.candidates:
+        lines.extend([
+            "No accepted or `loop consistency rejected` finite loop corrections "
+            "were available for batch consistency selection.",
+            "",
+        ])
+        return "\n".join(lines)
+
+    if result.pair_count == 0:
+        lines.extend([
+            "At least two candidate loop corrections are required to build a "
+            "pairwise consistency graph.",
+            "",
+        ])
+
+    sorted_selected = sorted(
+        result.selected_indices,
+        key=lambda index: (
+            -result.adjacency[index].bit_count(),
+            result.candidates[index].timestamp,
+            result.candidates[index].current_id,
+        ),
+    )
+    sorted_rejected = sorted(
+        rejected_indices,
+        key=lambda index: (
+            result.adjacency[index].bit_count(),
+            result.candidates[index].timestamp,
+            result.candidates[index].current_id,
+        ),
+    )
+    lines.extend([
+        "## Selected Loop IDs",
+        "",
+        "| Rank | Time s | Current | Candidate | Accepted | Degree | Fitness | Correction trans m | Correction rot rad | Status |",
+        "|-----:|-------:|--------:|----------:|---------:|-------:|--------:|-------------------:|-------------------:|--------|",
+    ])
+    for rank, index in enumerate(sorted_selected[:rows_limit], start=1):
+        lines.append(
+            format_batch_candidate_row(
+                rank,
+                result.candidates[index],
+                result.adjacency[index].bit_count(),
+            )
+        )
+    if rows_limit < len(sorted_selected):
+        lines.append(
+            f"| ... | ... | ... | ... | ... | ... | ... | ... | ... | "
+            f"{len(sorted_selected) - rows_limit} more selected rows omitted |"
+        )
+    lines.append("")
+
+    lines.extend([
+        "## Batch-Rejected Candidates",
+        "",
+        "| Rank | Time s | Current | Candidate | Accepted | Degree | Fitness | Correction trans m | Correction rot rad | Status |",
+        "|-----:|-------:|--------:|----------:|---------:|-------:|--------:|-------------------:|-------------------:|--------|",
+    ])
+    if not sorted_rejected:
+        lines.append("| n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | none |")
+    for rank, index in enumerate(sorted_rejected[:rows_limit], start=1):
+        lines.append(
+            format_batch_candidate_row(
+                rank,
+                result.candidates[index],
+                result.adjacency[index].bit_count(),
+            )
+        )
+    if rows_limit < len(sorted_rejected):
+        lines.append(
+            f"| ... | ... | ... | ... | ... | ... | ... | ... | ... | "
+            f"{len(sorted_rejected) - rows_limit} more rejected rows omitted |"
         )
     lines.append("")
     return "\n".join(lines)
@@ -1078,6 +1479,23 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="Maximum rows to include in the consistency rejection audit")
     parser.add_argument("--consistency-min-support-count", type=int, default=1,
                         help="Support count to simulate in the consistency sweep")
+    parser.add_argument("--batch-consistency-out", type=Path,
+                        help="Optional batch pairwise-consistency selection markdown output path")
+    parser.add_argument("--batch-consistency-translation-threshold-m",
+                        type=float, default=math.nan,
+                        help="Pairwise translation threshold for batch consistency; "
+                        "omit to use the auto quantile")
+    parser.add_argument("--batch-consistency-rotation-threshold-rad",
+                        type=float, default=math.nan,
+                        help="Pairwise rotation threshold for batch consistency; "
+                        "omit to use the auto quantile")
+    parser.add_argument("--batch-consistency-auto-quantile",
+                        type=float, default=0.95,
+                        help="Delta quantile used when a batch consistency threshold is omitted")
+    parser.add_argument("--batch-consistency-exact-limit", type=int, default=64,
+                        help="Use exact maximum-clique search up to this candidate count")
+    parser.add_argument("--batch-consistency-limit", type=int, default=100,
+                        help="Maximum selected/rejected rows to include in the batch consistency report")
     return parser.parse_args(argv)
 
 
@@ -1129,6 +1547,20 @@ def main(argv: list[str] | None = None) -> int:
             ),
             encoding="utf-8",
         )
+    if args.batch_consistency_out:
+        args.batch_consistency_out.parent.mkdir(parents=True, exist_ok=True)
+        args.batch_consistency_out.write_text(
+            format_batch_consistency_markdown(
+                samples,
+                args.topic,
+                args.batch_consistency_translation_threshold_m,
+                args.batch_consistency_rotation_threshold_rad,
+                args.batch_consistency_auto_quantile,
+                args.batch_consistency_exact_limit,
+                args.batch_consistency_limit,
+            ),
+            encoding="utf-8",
+        )
     print(summary_text)
     print(f"wrote {len(samples)} samples to {args.out}", file=sys.stderr)
     if args.summary_out:
@@ -1144,6 +1576,11 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"wrote consistency rejection audit to "
             f"{args.consistency_rejection_audit_out}",
+            file=sys.stderr,
+        )
+    if args.batch_consistency_out:
+        print(
+            f"wrote batch consistency selection to {args.batch_consistency_out}",
             file=sys.stderr,
         )
     return 0

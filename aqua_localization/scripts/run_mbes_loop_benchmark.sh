@@ -4,7 +4,7 @@
 # This orchestrates:
 #   1. Source bag readiness check.
 #   2. Results-included replay recording with MBES loop diagnostics.
-#   3. Loop-status CSV/summary/descriptor/consistency-sweep/rejection-audit export.
+#   3. Loop-status CSV/summary/descriptor/consistency-sweep/consensus audit export.
 #   4. Markdown benchmark-row generation.
 #
 # Set DRY_RUN=1 to print the commands without executing them.
@@ -35,6 +35,7 @@ SUMMARY_OUT="$OUT_DIR/mbes_beach_pond_loop_status.md"
 DESCRIPTOR_SWEEP_OUT="$OUT_DIR/mbes_beach_pond_descriptor_sweep.md"
 CONSISTENCY_SWEEP_OUT="$OUT_DIR/mbes_beach_pond_consistency_sweep.md"
 CONSISTENCY_REJECTION_AUDIT_OUT="$OUT_DIR/mbes_beach_pond_consistency_rejections.md"
+BATCH_CONSISTENCY_OUT="$OUT_DIR/mbes_beach_pond_batch_consistency.md"
 ROW_OUT="$OUT_DIR/mbes_beach_pond_benchmark_row.md"
 AUDIT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.md"
 AUDIT_PLOT_OUT="$OUT_DIR/mbes_beach_pond_loop_audit.png"
@@ -51,6 +52,7 @@ RECORD_ENV_ARGS=(
 AUDIT_ARGS=()
 GEOMETRY_AUDIT_ARGS=()
 CONSISTENCY_SWEEP_ARGS=()
+BATCH_CONSISTENCY_ARGS=()
 MBES_SOURCE_TOPICS=(
   /norbit/detections
   /nav/processed/odometry
@@ -104,6 +106,36 @@ if [[ -n "${MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT+x}" ]]; then
   CONSISTENCY_SWEEP_ARGS+=(
     "--consistency-min-support-count"
     "$MBES_LOOP_CONSISTENCY_MIN_SUPPORT_COUNT"
+  )
+fi
+if [[ -n "${MBES_LOOP_CONSISTENCY_MAX_TRANSLATION_DELTA_M+x}" ]]; then
+  BATCH_CONSISTENCY_ARGS+=(
+    "--batch-consistency-translation-threshold-m"
+    "$MBES_LOOP_CONSISTENCY_MAX_TRANSLATION_DELTA_M"
+  )
+fi
+if [[ -n "${MBES_LOOP_CONSISTENCY_MAX_ROTATION_DELTA_RAD+x}" ]]; then
+  BATCH_CONSISTENCY_ARGS+=(
+    "--batch-consistency-rotation-threshold-rad"
+    "$MBES_LOOP_CONSISTENCY_MAX_ROTATION_DELTA_RAD"
+  )
+fi
+if [[ -n "${MBES_LOOP_BATCH_CONSISTENCY_AUTO_QUANTILE+x}" ]]; then
+  BATCH_CONSISTENCY_ARGS+=(
+    "--batch-consistency-auto-quantile"
+    "$MBES_LOOP_BATCH_CONSISTENCY_AUTO_QUANTILE"
+  )
+fi
+if [[ -n "${MBES_LOOP_BATCH_CONSISTENCY_EXACT_LIMIT+x}" ]]; then
+  BATCH_CONSISTENCY_ARGS+=(
+    "--batch-consistency-exact-limit"
+    "$MBES_LOOP_BATCH_CONSISTENCY_EXACT_LIMIT"
+  )
+fi
+if [[ -n "${MBES_LOOP_BATCH_CONSISTENCY_LIMIT+x}" ]]; then
+  BATCH_CONSISTENCY_ARGS+=(
+    "--batch-consistency-limit"
+    "$MBES_LOOP_BATCH_CONSISTENCY_LIMIT"
   )
 fi
 
@@ -183,7 +215,9 @@ run_cmd ros2 run aqua_localization export_mbes_loop_status.py \
   --descriptor-sweep-out "$DESCRIPTOR_SWEEP_OUT" \
   --consistency-sweep-out "$CONSISTENCY_SWEEP_OUT" \
   --consistency-rejection-audit-out "$CONSISTENCY_REJECTION_AUDIT_OUT" \
-  "${CONSISTENCY_SWEEP_ARGS[@]}"
+  --batch-consistency-out "$BATCH_CONSISTENCY_OUT" \
+  "${CONSISTENCY_SWEEP_ARGS[@]}" \
+  "${BATCH_CONSISTENCY_ARGS[@]}"
 
 run_cmd ros2 run aqua_localization mbes_loop_benchmark_row.py \
   --csv "$STATUS_CSV" \
@@ -226,6 +260,7 @@ MBES loop benchmark artifacts:
   descriptor sweep: $DESCRIPTOR_SWEEP_OUT
   consistency sweep: $CONSISTENCY_SWEEP_OUT
   consistency rejection audit: $CONSISTENCY_REJECTION_AUDIT_OUT
+  batch consistency: $BATCH_CONSISTENCY_OUT
   benchmark row:    $ROW_OUT
   audit report:      $AUDIT_OUT
   audit plot:        $AUDIT_PLOT_OUT
