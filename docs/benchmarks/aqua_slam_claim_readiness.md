@@ -26,12 +26,18 @@ ros2 run aqua_localization aqua_slam_head_to_head_report.py docs/benchmarks/tank
 
 - Status: `BLOCKED`
 - Next action: `Find Medium reference TUM`
+- Min target samples: `10`
+- Min target matched seconds: `10.0`
+- Min DVL coverage ratio: `0.5`
+- Min prior-applied ratio: `0.2`
+- Min prior-match confidence: `0.1`
+- Min applied-prior confidence: `0.1`
 
 | Input | Path | Status | Detail |
 |-------|------|--------|--------|
 | Reference TUM | `/tmp/tank_medium_gt.tum` | FAIL | missing |
 | ROS 2 bag | `/tmp/tank_medium_ros2_visual` | FAIL | missing |
-| Rank-1 profile | `/tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml` | PASS | exists |
+| Rank-1 profile | `/tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml` | FAIL | missing |
 | AQUA-SLAM source | `/tmp/aqua_slam_medium_orb_odom.csv` / `/tmp/aqua_slam_medium_baseline/Medium_aqua_slam.tum` | FAIL | none |
 | AQUA-SLAM baseline row | `/tmp/aqua_slam_medium_baseline/Medium_aqua_slam_benchmark_row.md` | FAIL | usable=0, rejected=0 |
 | Visual TUM | `/tmp/tank_medium_visual_frontend.tum` | FAIL | missing |
@@ -52,7 +58,7 @@ ros2 run aqua_localization verify_tank_medium_heldout_ready.py --sequence Medium
 | Visual TUM | 0 | none |
 | AQUA-SLAM CSV | 0 | none |
 | AQUA-SLAM TUM | 0 | none |
-| AQUA-SLAM baseline row | 1 | `/tmp/aqua_ingest_aqua_slam_dQaPVa/out/Medium_aqua_slam_benchmark_row.md` |
+| AQUA-SLAM baseline row | 0 | none |
 | Download archive | 0 | none |
 
 ## Next Action Command

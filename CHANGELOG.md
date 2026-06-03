@@ -16,6 +16,8 @@
   not only lower RMSE.
 - Forwarded those DVL-prior quality gates through the Medium held-out verifier
   and AQUA-SLAM claim-readiness report.
+- Regenerated the AQUA-SLAM claim-readiness page with the current Medium
+  blockers and visible DVL-prior gate thresholds.
 - Rebuilt the GitHub Pages landing page around the full public-data demo wall,
   MBES hero replay, 3DGS viewer entry point, and GitHub star CTA.
 - Recorded a readiness-only 3DGS training smoke report for the published Tank

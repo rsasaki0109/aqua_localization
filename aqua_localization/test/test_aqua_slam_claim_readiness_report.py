@@ -82,6 +82,8 @@ def test_report_blocks_diagnostic_win_and_points_to_heldout_input(tmp_path):
     assert "Status: `BLOCKED`" in report
     assert "0.79x" in report
     assert "current row is diagnostic; held-out validation not established" in report
+    assert "Min DVL coverage ratio: `0.5`" in report
+    assert "Min prior-applied ratio: `0.2`" in report
     assert "--apply-located-links" in report
     assert "Find Medium reference TUM" in report
 
