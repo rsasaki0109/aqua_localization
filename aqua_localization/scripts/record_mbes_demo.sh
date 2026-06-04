@@ -27,6 +27,7 @@ MBES_DURATION="${MBES_DURATION:-60}"
 RECORD_STORAGE="${RECORD_STORAGE:-mcap}"
 RECORD_TOPIC_FLAG="${RECORD_TOPIC_FLAG:-}"
 RECORD_READY_TIMEOUT_S="${RECORD_READY_TIMEOUT_S:-75}"
+RECORD_READY_STRICT="${RECORD_READY_STRICT:-0}"
 RECORD_READY_TOPICS="${RECORD_READY_TOPICS:-/aqua_imu_loc/odometry /aqua_sonar_loc/points_filtered /aqua_pose_graph/keyframe /mbes_loop_closure/status}"
 PLAY_START_DELAY_S="${PLAY_START_DELAY_S:-25}"
 PLAY_RATE="${PLAY_RATE:-}"
@@ -245,6 +246,10 @@ wait_for_recorder_ready() {
   echo \
     "MBES recorder readiness timeout after ${RECORD_READY_TIMEOUT_S}s; starting replay anyway" \
     >&2
+  if [[ "$RECORD_READY_STRICT" == "1" ]]; then
+    echo "strict recorder readiness is enabled; aborting replay" >&2
+    return 1
+  fi
 }
 
 compute_play_timeout_s() {

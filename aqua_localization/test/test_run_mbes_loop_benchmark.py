@@ -129,6 +129,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "PLAY_TOPIC_ARGS=--topics\\ /norbit/detections" in proc.stdout
     assert "LOCAL_SETUP=/tmp/current_install/setup.bash" in proc.stdout
     assert "RECORD_READY_TIMEOUT_S=33" in proc.stdout
+    assert "RECORD_READY_STRICT=1" in proc.stdout
     assert (
         "IMU_PROFILE=/tmp/current_install/aqua_imu_loc/share/aqua_imu_loc/config/mbes_slam.yaml"
         in proc.stdout

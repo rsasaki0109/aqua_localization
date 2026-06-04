@@ -485,17 +485,20 @@ with the report.
 
 Replay recording waits for rosbag2 to subscribe to essential output topics
 before playback starts (`RECORD_READY_TIMEOUT_S=75` by default; override
-`RECORD_READY_TOPICS` to tune the set). Playback also starts with
-`PLAY_START_DELAY_S=25` so rosbag2 can discover source input publishers before
-messages flow. Keep both waits enabled for paired comparisons so normal and
-selected runs start with similar topic coverage. For repeatability probes,
-also slow playback and enlarge rosbag2's read-ahead queue, for example
-`PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000`; the recorder adjusts its
-playback timeout from the configured rate. Keep node-side best-effort sensor
-queues shallow (`qos.sensor_depth=5` in the MBES profiles): a 1000-sample queue
-probe increased callback backlog and made beach_pond repeated baselines
-diverge. Override `IMU_QOS_SENSOR_DEPTH` or `SONAR_QOS_SENSOR_DEPTH` only when
-isolating queue pressure from algorithm changes.
+`RECORD_READY_TOPICS` to tune the set). The benchmark wrapper enables
+`RECORD_READY_STRICT=1` by default so output-topic discovery failures abort
+before producing source-only result bags; set it to `0` only for exploratory
+recordings. Playback also starts with `PLAY_START_DELAY_S=25` so rosbag2 can
+discover source input publishers before messages flow. Keep both waits enabled
+for paired comparisons so normal and selected runs start with similar topic
+coverage. For repeatability probes, also slow playback and enlarge rosbag2's
+read-ahead queue, for example `PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000`;
+the recorder adjusts its playback timeout from the configured rate. Keep
+node-side best-effort sensor queues shallow (`qos.sensor_depth=5` in the MBES
+profiles): a 1000-sample queue probe increased callback backlog and made
+beach_pond repeated baselines diverge. Override `IMU_QOS_SENSOR_DEPTH` or
+`SONAR_QOS_SENSOR_DEPTH` only when isolating queue pressure from algorithm
+changes.
 
 Useful live checks while tuning:
 
