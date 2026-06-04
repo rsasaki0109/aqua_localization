@@ -28,6 +28,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "MBES_LOOP_PROFILE": "/tmp/current_install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml",
             "IMU_QOS_SENSOR_DEPTH": "1000",
             "SONAR_QOS_SENSOR_DEPTH": "750",
+            "IMU_SONAR_ODOMETRY_TOPIC": "",
             "RECORD_READY_TOPICS": "/aqua_imu_loc/odometry /mbes_loop_closure/status",
             "PLAY_START_DELAY_S": "7",
             "PLAY_RATE": "0.5",
@@ -132,6 +133,7 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "LOCAL_SETUP=/tmp/current_install/setup.bash" in proc.stdout
     assert "RECORD_READY_TIMEOUT_S=33" in proc.stdout
     assert "RECORD_READY_STRICT=1" in proc.stdout
+    assert "IMU_SONAR_ODOMETRY_TOPIC=" in proc.stdout
     assert (
         "IMU_PROFILE=/tmp/current_install/aqua_imu_loc/share/aqua_imu_loc/config/mbes_slam.yaml"
         in proc.stdout

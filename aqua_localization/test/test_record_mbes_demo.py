@@ -86,6 +86,7 @@ def test_strict_recorder_readiness_cleans_up_background_processes(tmp_path):
             "SONAR_PROFILE": str(sonar_profile),
             "POSE_GRAPH_PROFILE": str(pose_graph_profile),
             "MBES_LOOP_PROFILE": str(loop_profile),
+            "IMU_SONAR_ODOMETRY_TOPIC": "",
             "RECORD_READY_TIMEOUT_S": "1",
             "RECORD_READY_STRICT": "1",
             "PLAY_START_DELAY_S": "0",
@@ -103,6 +104,7 @@ def test_strict_recorder_readiness_cleans_up_background_processes(tmp_path):
 
     assert proc.returncode != 0
     assert "strict recorder readiness is enabled; aborting replay" in proc.stderr
+    assert "topics.sonar_odometry:=''" in fake_log.read_text(encoding="utf-8")
     pids = [line.split()[0] for line in fake_log.read_text(encoding="utf-8").splitlines()]
     for _ in range(20):
         alive = _alive_non_zombie_pids(pids)

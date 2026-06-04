@@ -215,6 +215,32 @@ endpoint timestamp sets had zero shared pairs. Keep the timestamp-buffered
 submaps, then target candidate/registration ordering before descriptor-weight
 tuning.
 
+### Open-Loop Sonar Feedback Probe
+
+After exposing `IMU_SONAR_ODOMETRY_TOPIC`, the repeated baseline was rerun with
+`IMU_SONAR_ODOMETRY_TOPIC=` to disable the `/aqua_sonar_loc/odometry` feedback
+path into the IMU UKF while keeping the same timestamp-buffered MBES loop
+profile:
+
+`/tmp/aqua_mbes_candidate_descriptor_weight_repeat_openloop_sonar_wip_121801`
+
+| Weight | Status | Input RMSE m | Pose graph RMSE m | Graph vs input m | Graph vs baseline m | Matched s | Accepted | Rejected | No candidate |
+|-------:|--------|-------------:|------------------:|-----------------:|--------------------:|----------:|---------:|---------:|-------------:|
+| 0.0000 | baseline, best | 1025.0903 | 952.0746 | +73.0157 | 0.0000 | 119.37 | 4 | 121 | 920 |
+| 0.0000 | baseline repeat, check coverage | 1031.9192 | 971.9924 | +59.9268 | -19.9178 | 119.76 | 4 | 126 | 951 |
+
+Baseline repeat spread:
+
+- Input RMSE: `1025.0903..1031.9192` m, spread `6.8289` m.
+- Pose graph RMSE: `952.0746..971.9924` m, spread `19.9178` m.
+- Accepted loops: `4..4`, spread `0`.
+
+The accepted count became repeatable, and two of four accepted endpoint pairs
+matched exactly across repeats, but trajectory quality collapsed. Treat this as
+a diagnostic confirming that the sonar feedback path is performance-critical
+and replay-order-sensitive. The next useful target is to keep sonar feedback
+enabled while making its timestamp/order handling deterministic.
+
 ## Follow-Up
 
 - Use strict recorder readiness, endpoint-stamp status messages, and
@@ -223,6 +249,8 @@ tuning.
 - Pin node-side candidate evaluation and registration scheduling determinism
   before tuning descriptor weights again; timestamp-buffered submaps reduce
   RMSE variance but do not align accepted-loop identity yet.
+- Keep `IMU_SONAR_ODOMETRY_TOPIC=` as a diagnostic only; the open-loop probe
+  improved accepted-count repeatability but produced kilometer-scale RMSE.
 - Keep repeated `0.0` baseline cases in every weight sweep; duplicate weights
   keep the first output name and add `_run2`, for example `weight_0` and
   `weight_0_run2`.

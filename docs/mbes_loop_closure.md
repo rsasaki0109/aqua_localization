@@ -504,6 +504,12 @@ beach_pond repeated baselines diverge. Override `IMU_QOS_SENSOR_DEPTH` or
 `SONAR_QOS_SENSOR_DEPTH` only when isolating queue pressure from algorithm
 changes.
 
+The MBES IMU profile normally feeds `/aqua_sonar_loc/odometry` back into
+`aqua_imu_loc`. Set `IMU_SONAR_ODOMETRY_TOPIC=` only as a determinism diagnostic
+to disable that feedback path for one run; an open-loop probe made accepted
+counts more repeatable but degraded beach_pond trajectory RMSE to kilometer
+scale, so it is not the default performance profile.
+
 Useful live checks while tuning:
 
 ```bash
