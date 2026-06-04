@@ -208,7 +208,9 @@ wrapper writes `mbes_candidate_descriptor_weight_sweep.md` and
 `mbes_candidate_descriptor_weight_sweep.csv`, comparing input RMSE, pose-graph
 RMSE, accepted-loop counts, candidate rejections, and matched-time coverage
 against the `0.0` baseline. Rows marked `check coverage` should be treated as
-diagnostic until replay coverage is aligned.
+diagnostic until replay coverage is aligned. The wrapper assigns incrementing
+`ROS_DOMAIN_ID` values from `SWEEP_ROS_DOMAIN_ID_START` so sequential cases do
+not reuse stale transient-local graph publishers.
 The consistency rejection audit lists actual `loop consistency rejected`
 samples by support deficit and nearest correction delta after replaying with
 positive consistency thresholds. Inspect loop geometry before enabling positive

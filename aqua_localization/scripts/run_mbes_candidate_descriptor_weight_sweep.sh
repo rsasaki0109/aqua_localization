@@ -13,10 +13,20 @@ CSV_OUT="${CSV_OUT:-$OUT_ROOT/mbes_candidate_descriptor_weight_sweep.csv}"
 DATASET="${DATASET:-MBES-SLAM}"
 SEQUENCE="${SEQUENCE:-beach_pond}"
 MBES_DURATION="${MBES_DURATION:-120}"
+SWEEP_ROS_DOMAIN_ID_START="${SWEEP_ROS_DOMAIN_ID_START:-$((30 + RANDOM % 120))}"
 DRY_RUN="${DRY_RUN:-0}"
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 BENCHMARK_SCRIPT="$SCRIPT_DIR/run_mbes_loop_benchmark.sh"
+
+validate_ros_domain_id() {
+  local name="$1"
+  local value="$2"
+  if ! [[ "$value" =~ ^[0-9]+$ ]] || (( value > 232 )); then
+    echo "$name must be an integer from 0 to 232 for this sweep: $value" >&2
+    exit 1
+  fi
+}
 
 run_cmd() {
   printf '+'
@@ -63,9 +73,11 @@ label_number() {
 }
 
 mkdir -p "$OUT_ROOT"
+validate_ros_domain_id SWEEP_ROS_DOMAIN_ID_START "$SWEEP_ROS_DOMAIN_ID_START"
 
 IFS=', ' read -r -a WEIGHT_VALUES <<< "$WEIGHTS"
 SUMMARY_CASE_ARGS=()
+case_index=0
 
 for weight in "${WEIGHT_VALUES[@]}"; do
   if [[ -z "$weight" ]]; then
@@ -74,9 +86,12 @@ for weight in "${WEIGHT_VALUES[@]}"; do
   label=$(label_number "$weight")
   case_out="$OUT_ROOT/weight_$label"
   case_bag="$OUT_ROOT/bags/mbes_weight_$label"
+  case_ros_domain_id=$((SWEEP_ROS_DOMAIN_ID_START + case_index))
+  validate_ros_domain_id "case ROS_DOMAIN_ID" "$case_ros_domain_id"
   SUMMARY_CASE_ARGS+=("--case" "$weight:$case_out")
   run_env_cmd \
     "WORKSPACE=$WORKSPACE" \
+    "ROS_DOMAIN_ID=$case_ros_domain_id" \
     "OUT_DIR=$case_out" \
     "MBES_OUT=$case_bag" \
     "MBES_DURATION=$MBES_DURATION" \
@@ -85,6 +100,7 @@ for weight in "${WEIGHT_VALUES[@]}"; do
     "NOTE=candidate descriptor weight $weight, duration ${MBES_DURATION}s" \
     "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT=$weight" \
     -- "$BENCHMARK_SCRIPT"
+  case_index=$((case_index + 1))
 done
 
 SUMMARY_ARGS=(
@@ -123,4 +139,5 @@ MBES candidate descriptor-weight sweep artifacts:
   root:    $OUT_ROOT
   summary: $SUMMARY_OUT
   csv:     $CSV_OUT
+  ROS_DOMAIN_ID start: $SWEEP_ROS_DOMAIN_ID_START
 EOF
