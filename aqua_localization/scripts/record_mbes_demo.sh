@@ -17,10 +17,10 @@ ROS_SETUP="${ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
 LOCAL_SETUP="${LOCAL_SETUP:-install/setup.bash}"
 MBES_SRC="${MBES_SRC:-$WORKSPACE/aqua_localization/datasets/public/mbes_slam/beach_pond_ros2}"
 MBES_OUT="${MBES_OUT:-$WORKSPACE/aqua_localization/datasets/public/mbes_slam/demo_with_estimate}"
-IMU_PROFILE="${IMU_PROFILE:-$WORKSPACE/install/aqua_imu_loc/share/aqua_imu_loc/config/mbes_slam.yaml}"
-SONAR_PROFILE="${SONAR_PROFILE:-$WORKSPACE/install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_slam.yaml}"
-POSE_GRAPH_PROFILE="${POSE_GRAPH_PROFILE:-$WORKSPACE/install/aqua_pose_graph/share/aqua_pose_graph/config/params.yaml}"
-MBES_LOOP_PROFILE="${MBES_LOOP_PROFILE:-$WORKSPACE/install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml}"
+IMU_PROFILE="${IMU_PROFILE:-}"
+SONAR_PROFILE="${SONAR_PROFILE:-}"
+POSE_GRAPH_PROFILE="${POSE_GRAPH_PROFILE:-}"
+MBES_LOOP_PROFILE="${MBES_LOOP_PROFILE:-}"
 IMU_QOS_SENSOR_DEPTH="${IMU_QOS_SENSOR_DEPTH:-}"
 SONAR_QOS_SENSOR_DEPTH="${SONAR_QOS_SENSOR_DEPTH:-}"
 MBES_DURATION="${MBES_DURATION:-60}"
@@ -104,6 +104,32 @@ validate_ros_domain_id() {
     echo \
       "ROS_DOMAIN_ID must be an integer from 0 to 232 for this replay: $ROS_DOMAIN_ID" \
       >&2
+    exit 1
+  fi
+}
+
+resolve_profile() {
+  local configured="$1"
+  local package="$2"
+  local relative_path="$3"
+  local fallback="$4"
+  if [[ -n "$configured" ]]; then
+    printf '%s\n' "$configured"
+    return 0
+  fi
+  local prefix
+  if prefix=$(ros2 pkg prefix "$package" 2>/dev/null); then
+    printf '%s/share/%s/%s\n' "$prefix" "$package" "$relative_path"
+    return 0
+  fi
+  printf '%s\n' "$fallback"
+}
+
+require_readable_file() {
+  local label="$1"
+  local path="$2"
+  if [[ ! -r "$path" ]]; then
+    echo "$label does not exist or is not readable: $path" >&2
     exit 1
   fi
 }
@@ -298,6 +324,24 @@ if [[ -n "$LOCAL_SETUP" ]]; then
   source "$LOCAL_SETUP"
 fi
 set -u
+
+IMU_PROFILE=$(resolve_profile \
+  "$IMU_PROFILE" aqua_imu_loc config/mbes_slam.yaml \
+  "$WORKSPACE/install/aqua_imu_loc/share/aqua_imu_loc/config/mbes_slam.yaml")
+SONAR_PROFILE=$(resolve_profile \
+  "$SONAR_PROFILE" aqua_sonar_loc config/mbes_slam.yaml \
+  "$WORKSPACE/install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_slam.yaml")
+POSE_GRAPH_PROFILE=$(resolve_profile \
+  "$POSE_GRAPH_PROFILE" aqua_pose_graph config/params.yaml \
+  "$WORKSPACE/install/aqua_pose_graph/share/aqua_pose_graph/config/params.yaml")
+MBES_LOOP_PROFILE=$(resolve_profile \
+  "$MBES_LOOP_PROFILE" aqua_sonar_loc config/mbes_loop_closure.yaml \
+  "$WORKSPACE/install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml")
+
+require_readable_file IMU_PROFILE "$IMU_PROFILE"
+require_readable_file SONAR_PROFILE "$SONAR_PROFILE"
+require_readable_file POSE_GRAPH_PROFILE "$POSE_GRAPH_PROFILE"
+require_readable_file MBES_LOOP_PROFILE "$MBES_LOOP_PROFILE"
 
 rm -rf "$MBES_OUT"
 

@@ -63,6 +63,14 @@ def test_strict_recorder_readiness_cleans_up_background_processes(tmp_path):
     local_setup = tmp_path / "local_setup.bash"
     ros_setup.write_text("", encoding="utf-8")
     local_setup.write_text("", encoding="utf-8")
+    profile_dir = tmp_path / "profiles"
+    profile_dir.mkdir()
+    imu_profile = profile_dir / "imu.yaml"
+    sonar_profile = profile_dir / "sonar.yaml"
+    pose_graph_profile = profile_dir / "pose_graph.yaml"
+    loop_profile = profile_dir / "loop.yaml"
+    for profile in (imu_profile, sonar_profile, pose_graph_profile, loop_profile):
+        profile.write_text("/**:\n  ros__parameters: {}\n", encoding="utf-8")
 
     env = os.environ.copy()
     env.update(
@@ -74,6 +82,10 @@ def test_strict_recorder_readiness_cleans_up_background_processes(tmp_path):
             "LOCAL_SETUP": str(local_setup),
             "MBES_SRC": str(tmp_path / "source_bag"),
             "MBES_OUT": str(tmp_path / "recorded_bag"),
+            "IMU_PROFILE": str(imu_profile),
+            "SONAR_PROFILE": str(sonar_profile),
+            "POSE_GRAPH_PROFILE": str(pose_graph_profile),
+            "MBES_LOOP_PROFILE": str(loop_profile),
             "RECORD_READY_TIMEOUT_S": "1",
             "RECORD_READY_STRICT": "1",
             "PLAY_START_DELAY_S": "0",
