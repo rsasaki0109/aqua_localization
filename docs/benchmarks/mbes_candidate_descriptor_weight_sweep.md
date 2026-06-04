@@ -161,12 +161,40 @@ This rejects a deep sensor queue as the default replay setting. Keep
 `qos.sensor_depth=5` in MBES profiles and use the environment overrides only as
 diagnostics when testing callback pressure.
 
+### Endpoint-Stamp Replay Probe
+
+After adding endpoint keyframe stamps to `/mbes_loop_closure/status`, making
+benchmark recorder readiness strict, and resolving recorder profiles from the
+sourced install prefix, the repeated baseline was rerun with the same shallow
+queue and slow playback controls:
+
+`/tmp/aqua_mbes_candidate_descriptor_weight_repeat_endpoint_ef9e097`
+
+| Weight | Status | Input RMSE m | Pose graph RMSE m | Graph vs input m | Graph vs baseline m | Matched s | Accepted | Rejected | No candidate |
+|-------:|--------|-------------:|------------------:|-----------------:|--------------------:|----------:|---------:|---------:|-------------:|
+| 0.0000 | baseline, best | 53.3113 | 60.9428 | -7.6315 | 0.0000 | 119.61 | 6 | 345 | 258 |
+| 0.0000 | baseline repeat, check coverage | 60.7759 | 83.5053 | -22.7294 | -22.5625 | 119.61 | 15 | 297 | 173 |
+
+Baseline repeat spread:
+
+- Input RMSE: `53.3113..60.7759` m, spread `7.4646` m.
+- Pose graph RMSE: `60.9428..83.5053` m, spread `22.5625` m.
+- Accepted loops: `6..15`, spread `9`.
+
+The profile/recorder fixes are working: strict readiness passed in both runs,
+status samples were recorded, and accepted rows now carry finite
+`current_keyframe_timestamp` and `candidate_keyframe_timestamp` values directly
+from the status message. This does not solve replay variance by itself. The
+remaining spread points at candidate evaluation and registration scheduling
+rather than missing output-topic recording or missing endpoint identity.
+
 ## Follow-Up
 
-- Use `PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000` for the next descriptor
+- Use strict recorder readiness, endpoint-stamp status messages, and
+  `PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000` for the next descriptor
   sweep, with repeated baselines included.
-- Pin node-side input processing determinism before tuning descriptor weights
-  again.
+- Pin node-side candidate evaluation and registration scheduling determinism
+  before tuning descriptor weights again.
 - Keep repeated `0.0` baseline cases in every weight sweep; duplicate weights
   keep the first output name and add `_run2`, for example `weight_0` and
   `weight_0_run2`.
