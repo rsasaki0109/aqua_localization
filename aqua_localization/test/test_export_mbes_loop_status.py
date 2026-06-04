@@ -54,6 +54,10 @@ class _Pose:
 class _LoopStatus:
     def __init__(self, **kwargs):
         self.header = _Header(kwargs.get("stamp", _Stamp(0, 0)))
+        if "current_keyframe_stamp" in kwargs:
+            self.current_keyframe_stamp = kwargs["current_keyframe_stamp"]
+        if "candidate_keyframe_stamp" in kwargs:
+            self.candidate_keyframe_stamp = kwargs["candidate_keyframe_stamp"]
         self.current_id = kwargs.get("current_id", 1)
         self.candidate_id = kwargs.get("candidate_id", 0)
         self.accepted = kwargs.get("accepted", False)
@@ -117,6 +121,21 @@ def test_sample_from_msg_uses_fallback_for_zero_stamp():
     assert math.isnan(sample.descriptor_extent_ratio)
     assert math.isnan(sample.descriptor_point_count_ratio)
     assert sample.status == "accepted"
+
+
+def test_sample_from_msg_reads_embedded_keyframe_stamps():
+    module = load_module()
+    msg = _LoopStatus(
+        stamp=_Stamp(10, 0),
+        current_keyframe_stamp=_Stamp(20, 250_000_000),
+        candidate_keyframe_stamp=_Stamp(5, 500_000_000),
+    )
+
+    sample = module.sample_from_msg(msg, fallback_time=123.5)
+
+    assert sample.timestamp == 10.0
+    assert sample.current_keyframe_timestamp == 20.25
+    assert sample.candidate_keyframe_timestamp == 5.5
 
 
 def test_sample_from_msg_reads_descriptor_fields_when_available():

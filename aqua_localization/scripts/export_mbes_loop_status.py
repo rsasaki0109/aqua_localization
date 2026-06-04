@@ -162,6 +162,14 @@ def optional_int(msg, attr: str) -> int:
     return int(getattr(msg, attr, 0))
 
 
+def optional_stamp_seconds(msg, attr: str) -> float:
+    stamp = getattr(msg, attr, None)
+    if stamp is None:
+        return math.nan
+    value = stamp_to_seconds(stamp)
+    return value if value > 0.0 else math.nan
+
+
 def optional_pose_float(msg, attr: str, component: str) -> float:
     pose = getattr(msg, attr, None)
     if pose is None:
@@ -178,6 +186,10 @@ def sample_from_msg(msg, fallback_time: float) -> LoopStatusSample:
     timestamp = stamp_to_seconds(msg.header.stamp)
     if timestamp <= 0.0:
         timestamp = fallback_time
+    current_keyframe_timestamp = optional_stamp_seconds(msg, "current_keyframe_stamp")
+    if not math.isfinite(current_keyframe_timestamp):
+        current_keyframe_timestamp = timestamp
+    candidate_keyframe_timestamp = optional_stamp_seconds(msg, "candidate_keyframe_stamp")
     return LoopStatusSample(
         timestamp=timestamp,
         frame_id=str(msg.header.frame_id),
@@ -214,7 +226,8 @@ def sample_from_msg(msg, fallback_time: float) -> LoopStatusSample:
         consistency_nearest_rotation_delta_rad=optional_float(
             msg, "consistency_nearest_rotation_delta_rad"
         ),
-        current_keyframe_timestamp=timestamp,
+        current_keyframe_timestamp=current_keyframe_timestamp,
+        candidate_keyframe_timestamp=candidate_keyframe_timestamp,
     )
 
 

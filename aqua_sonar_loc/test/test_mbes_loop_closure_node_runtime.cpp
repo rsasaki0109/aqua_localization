@@ -679,6 +679,10 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, RejectsSelectionSignatureWhenCandidateSta
   ASSERT_NE(rejected_status, status_messages.end());
   EXPECT_EQ(rejected_status->current_id, 1U);
   EXPECT_EQ(rejected_status->candidate_id, 0U);
+  EXPECT_EQ(rejected_status->current_keyframe_stamp.sec, 20);
+  EXPECT_EQ(rejected_status->current_keyframe_stamp.nanosec, 0U);
+  EXPECT_EQ(rejected_status->candidate_keyframe_stamp.sec, 10);
+  EXPECT_EQ(rejected_status->candidate_keyframe_stamp.nanosec, 0U);
 
   std::remove(allowlist_path.c_str());
 }

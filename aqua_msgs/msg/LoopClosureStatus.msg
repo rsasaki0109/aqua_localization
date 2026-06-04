@@ -1,5 +1,10 @@
 std_msgs/Header header
 
+# Endpoint keyframe stamps are copied into the status message so status-only
+# bags still preserve replay-stable loop identity diagnostics.
+builtin_interfaces/Time current_keyframe_stamp
+builtin_interfaces/Time candidate_keyframe_stamp
+
 uint32 current_id
 # UINT32_MAX means no candidate submap was available for this keyframe.
 uint32 candidate_id

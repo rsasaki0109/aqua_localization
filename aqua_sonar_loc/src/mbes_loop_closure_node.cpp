@@ -782,6 +782,8 @@ private:
     aqua_msgs::msg::LoopClosureStatus msg;
     msg.header.stamp = current.stamp;
     msg.header.frame_id = map_frame_;
+    msg.current_keyframe_stamp = current.stamp;
+    msg.candidate_keyframe_stamp = candidate.stamp;
     msg.current_id = current.id;
     msg.candidate_id = candidate.id;
     msg.accepted = gate.accepted;
@@ -842,6 +844,7 @@ private:
     aqua_msgs::msg::LoopClosureStatus msg;
     msg.header.stamp = current.stamp;
     msg.header.frame_id = map_frame_;
+    msg.current_keyframe_stamp = current.stamp;
     msg.current_id = current.id;
     msg.candidate_id = std::numeric_limits<std::uint32_t>::max();
     msg.accepted = false;

@@ -378,15 +378,17 @@ offline-selected endpoint has been registered. Set
 `MBES_LOOP_SELECTION_PRIORITIZE_CANDIDATES=0` to reproduce the older
 distance-only ordering during diagnostics.
 The CSV currently matches exact `(candidate_id,current_id)` pairs from the
-source replay. The exporter also writes `current_keyframe_timestamp` and
-`candidate_keyframe_timestamp` columns when the bag contains
-`/aqua_pose_graph/keyframe`, so later audits can distinguish loops that have a
-similar status timestamp but different endpoint keyframes. A selected replay
-with 0 accepted loops can still be a useful integrity probe when the allowlist
-audit passes, but it is not trajectory evidence. Treat the selected-vs-normal
-APE comparison as claimable only when the replay accepts audited selected loops
-and the comparison report does not warn about baseline drift or mismatched
-matched-time coverage.
+source replay. New `/mbes_loop_closure/status` messages also carry the current
+and candidate keyframe stamps directly; the exporter writes them as
+`current_keyframe_timestamp` and `candidate_keyframe_timestamp` and still falls
+back to `/aqua_pose_graph/keyframe` for older bags. This lets later audits
+distinguish loops that have a similar status timestamp but different endpoint
+keyframes, even from status-only recordings. A selected replay with 0 accepted
+loops can still be a useful integrity probe when the allowlist audit passes,
+but it is not trajectory evidence. Treat the selected-vs-normal APE comparison
+as claimable only when the replay accepts audited selected loops and the
+comparison report does not warn about baseline drift or mismatched matched-time
+coverage.
 
 If exact keyframe IDs drift between replays, the node can also use the status
 export columns as an explicit signature fallback. This is disabled by default:
