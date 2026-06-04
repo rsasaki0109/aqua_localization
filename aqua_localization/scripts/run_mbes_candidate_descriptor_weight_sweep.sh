@@ -123,6 +123,7 @@ fi
 IFS=', ' read -r -a WEIGHT_VALUES <<< "$WEIGHTS"
 SUMMARY_CASE_ARGS=()
 case_index=0
+declare -A LABEL_COUNTS=()
 
 for weight in "${WEIGHT_VALUES[@]}"; do
   if [[ -z "$weight" ]]; then
@@ -130,8 +131,16 @@ for weight in "${WEIGHT_VALUES[@]}"; do
   fi
   label=$(label_number "$weight")
   weight_param=$(ros_double_literal "$weight")
-  case_out="$OUT_ROOT/weight_$label"
-  case_bag="$OUT_ROOT/bags/mbes_weight_$label"
+  base_case_label="weight_$label"
+  label_count=${LABEL_COUNTS[$base_case_label]:-0}
+  label_count=$((label_count + 1))
+  LABEL_COUNTS[$base_case_label]=$label_count
+  case_label="$base_case_label"
+  if (( label_count > 1 )); then
+    case_label="${base_case_label}_run${label_count}"
+  fi
+  case_out="$OUT_ROOT/$case_label"
+  case_bag="$OUT_ROOT/bags/mbes_$case_label"
   case_ros_domain_id=$((SWEEP_ROS_DOMAIN_ID_START + case_index))
   validate_ros_domain_id "case ROS_DOMAIN_ID" "$case_ros_domain_id"
   SUMMARY_CASE_ARGS+=("--case" "$weight:$case_out")

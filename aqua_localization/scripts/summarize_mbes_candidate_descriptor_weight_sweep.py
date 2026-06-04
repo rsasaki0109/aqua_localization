@@ -120,9 +120,13 @@ def baseline_result(results: list[CaseResult]) -> CaseResult | None:
     if not results:
         return None
     for result in results:
-        if abs(result.spec.weight) < 1.0e-12:
+        if is_baseline_weight(result):
             return result
     return results[0]
+
+
+def is_baseline_weight(result: CaseResult) -> bool:
+    return abs(result.spec.weight) < 1.0e-12
 
 
 def best_result(results: list[CaseResult]) -> CaseResult | None:
@@ -153,6 +157,8 @@ def status_label(
     labels = []
     if baseline is not None and result is baseline:
         labels.append("baseline")
+    elif is_baseline_weight(result):
+        labels.append("baseline repeat")
     if best is not None and result is best:
         labels.append("best")
     if coverage_warning(result, baseline):
@@ -160,6 +166,23 @@ def status_label(
     if not labels:
         labels.append("ok")
     return ", ".join(labels)
+
+
+def format_spread(values: list[float], digits: int = 4) -> str:
+    finite = [value for value in values if math.isfinite(value)]
+    if not finite:
+        return "n/a"
+    low = min(finite)
+    high = max(finite)
+    return f"{low:.{digits}f}..{high:.{digits}f} (spread {high - low:.{digits}f})"
+
+
+def format_count_spread(values: list[int]) -> str:
+    if not values:
+        return "n/a"
+    low = min(values)
+    high = max(values)
+    return f"{low}..{high} (spread {high - low})"
 
 
 def format_markdown(
@@ -221,6 +244,26 @@ def format_markdown(
             ])
             + " |"
         )
+    baseline_repeats = [result for result in ordered if is_baseline_weight(result)]
+    if len(baseline_repeats) > 1:
+        lines.extend([
+            "",
+            "## Baseline Repeat Spread",
+            "",
+            f"- Repeats: `{len(baseline_repeats)}`",
+            (
+                "- Input RMSE range m: "
+                f"`{format_spread([result.input_rmse_m for result in baseline_repeats])}`"
+            ),
+            (
+                "- Pose graph RMSE range m: "
+                f"`{format_spread([result.pose_graph_rmse_m for result in baseline_repeats])}`"
+            ),
+            (
+                "- Accepted loop count range: "
+                f"`{format_count_spread([result.accepted for result in baseline_repeats])}`"
+            ),
+        ])
     if best is not None:
         lines.extend([
             "",

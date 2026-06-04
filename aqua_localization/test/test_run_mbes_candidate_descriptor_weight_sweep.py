@@ -65,6 +65,40 @@ def test_dry_run_prints_weight_cases_and_summary(tmp_path):
     assert "ROS_DOMAIN_ID start: 41" in proc.stdout
 
 
+def test_dry_run_suffixes_duplicate_weight_cases(tmp_path):
+    env = os.environ.copy()
+    env.update(
+        {
+            "DRY_RUN": "1",
+            "WORKSPACE": str(tmp_path),
+            "OUT_ROOT": str(tmp_path / "sweep"),
+            "MBES_SRC": str(tmp_path / "source_bag"),
+            "WEIGHTS": "0,0,1.0",
+            "MBES_DURATION": "42",
+            "SWEEP_ROS_DOMAIN_ID_START": "50",
+        }
+    )
+
+    proc = subprocess.run(
+        [str(SCRIPT_PATH)],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert f"OUT_DIR={tmp_path / 'sweep/weight_0'}" in proc.stdout
+    assert f"OUT_DIR={tmp_path / 'sweep/weight_0_run2'}" in proc.stdout
+    assert f"MBES_OUT={tmp_path / 'sweep/bags/mbes_weight_0'}" in proc.stdout
+    assert f"MBES_OUT={tmp_path / 'sweep/bags/mbes_weight_0_run2'}" in proc.stdout
+    assert "ROS_DOMAIN_ID=50" in proc.stdout
+    assert "ROS_DOMAIN_ID=51" in proc.stdout
+    assert "ROS_DOMAIN_ID=52" in proc.stdout
+    assert f"--case 0:{tmp_path / 'sweep/weight_0'}" in proc.stdout
+    assert f"--case 0:{tmp_path / 'sweep/weight_0_run2'}" in proc.stdout
+    assert f"--case 1.0:{tmp_path / 'sweep/weight_1p0'}" in proc.stdout
+
+
 def test_rejects_invalid_domain_start(tmp_path):
     env = os.environ.copy()
     env.update(

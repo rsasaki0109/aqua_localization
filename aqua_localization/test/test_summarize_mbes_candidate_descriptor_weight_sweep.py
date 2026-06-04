@@ -101,6 +101,33 @@ def test_format_markdown_marks_baseline_best_and_delta(tmp_path):
     assert "Best pose-graph RMSE: `1.1000` m" in text
 
 
+def test_format_markdown_reports_repeated_baseline_spread(tmp_path):
+    module = load_module()
+    baseline_dir = make_case(tmp_path, "weight_0", input_rmse=2.0, graph_rmse=1.6)
+    repeat_dir = make_case(tmp_path, "weight_0_run2", input_rmse=2.4, graph_rmse=1.8)
+    tuned_dir = make_case(tmp_path, "weight_1", input_rmse=2.1, graph_rmse=1.1)
+    args = module.parse_args([
+        "--case", f"0.0:{baseline_dir}",
+        "--case", f"0:{repeat_dir}",
+        "--case", f"1.0:{tuned_dir}",
+    ])
+
+    results = [
+        module.load_case(module.CaseSpec(0.0, baseline_dir)),
+        module.load_case(module.CaseSpec(0.0, repeat_dir)),
+        module.load_case(module.CaseSpec(1.0, tuned_dir)),
+    ]
+    text = module.format_markdown(results, args)
+
+    assert "| 0.0000 | baseline | 2.0000 | 1.6000 | +0.4000 | 0.0000 |" in text
+    assert "| 0.0000 | baseline repeat | 2.4000 | 1.8000 | +0.6000 | -0.2000 |" in text
+    assert "## Baseline Repeat Spread" in text
+    assert "- Repeats: `2`" in text
+    assert "- Input RMSE range m: `2.0000..2.4000 (spread 0.4000)`" in text
+    assert "- Pose graph RMSE range m: `1.6000..1.8000 (spread 0.2000)`" in text
+    assert "- Accepted loop count range: `2..2 (spread 0)`" in text
+
+
 def test_main_writes_markdown_and_csv(tmp_path):
     module = load_module()
     baseline_dir = make_case(tmp_path, "weight_0", input_rmse=2.0, graph_rmse=1.6)

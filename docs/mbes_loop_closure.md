@@ -212,7 +212,9 @@ RMSE, accepted-loop counts, candidate rejections, and matched-time coverage
 against the `0.0` baseline. Rows marked `check coverage` should be treated as
 diagnostic until replay coverage is aligned. The wrapper assigns incrementing
 `ROS_DOMAIN_ID` values from `SWEEP_ROS_DOMAIN_ID_START` so sequential cases do
-not reuse stale transient-local graph publishers.
+not reuse stale transient-local graph publishers. Repeat a weight, such as
+`WEIGHTS=0,0,1.0,2.0`, to estimate replay variance; duplicate outputs keep the
+first directory name and then add `_run2`, `_run3`, and later suffixes.
 The consistency rejection audit lists actual `loop consistency rejected`
 samples by support deficit and nearest correction delta after replaying with
 positive consistency thresholds. Inspect loop geometry before enabling positive

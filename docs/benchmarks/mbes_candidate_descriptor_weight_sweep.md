@@ -63,8 +63,20 @@ pose-graph run before promoting the weight.
 
 ## Follow-Up
 
-- Re-run the best weights `1.0,2.0` with identical startup coverage and a
-  repeated `0.0` baseline to estimate replay variance.
+- Re-run the best weights with identical startup coverage and a repeated `0.0`
+  baseline to estimate replay variance:
+
+  ```bash
+  OUT_ROOT=/tmp/aqua_mbes_candidate_descriptor_weight_repeat_real \
+  WEIGHTS=0,0,1.0,2.0 \
+  MBES_DURATION=120 \
+  SWEEP_ROS_DOMAIN_ID_START=100 \
+  MBES_SRC_PLAY=/tmp/aqua_mbes_candidate_descriptor_weight_sweep_real/mbes_source_humble_sqlite_180s \
+  ./aqua_localization/scripts/run_mbes_candidate_descriptor_weight_sweep.sh
+  ```
+
+  Duplicate weights keep the first output name and add `_run2`, for example
+  `weight_0` and `weight_0_run2`.
 - Audit accepted-loop geometry before accepting the RMSE improvement as useful.
 - Add consistency thresholds after loop geometry is reviewed; this sweep has
   no positive consistency guard.
