@@ -26,6 +26,7 @@ install(PROGRAMS
   scripts/check_mbes_loop_allowlist_replay.py
   scripts/diagnose_mbes_selected_loop_coverage.py
   scripts/evaluate_mbes_descriptor_retrieval.py
+  scripts/summarize_mbes_candidate_descriptor_weight_sweep.py
   scripts/remap_mbes_selected_loop_allowlist.py
   scripts/check_tank_aqua_slam_baseline_ready.py
   scripts/summarize_tank_aqua_slam_baseline_todos.py
@@ -101,6 +102,7 @@ install(PROGRAMS
   scripts/publish_mbes_loop_audit_markers.py
   scripts/plot_mbes_loop_audit.py
   scripts/run_mbes_loop_benchmark.sh
+  scripts/run_mbes_candidate_descriptor_weight_sweep.sh
   scripts/run_mbes_selected_loop_replay_comparison.sh
   scripts/pose_graph_loop_demo.py
   scripts/pose_graph_loop_smoke.sh
@@ -134,6 +136,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_evaluate_mbes_descriptor_retrieval
     test/test_evaluate_mbes_descriptor_retrieval.py
+  )
+  ament_add_pytest_test(
+    test_summarize_mbes_candidate_descriptor_weight_sweep
+    test/test_summarize_mbes_candidate_descriptor_weight_sweep.py
   )
   ament_add_pytest_test(
     test_remap_mbes_selected_loop_allowlist
@@ -205,6 +211,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_publish_mbes_loop_audit_markers test/test_publish_mbes_loop_audit_markers.py)
   ament_add_pytest_test(test_plot_mbes_loop_audit test/test_plot_mbes_loop_audit.py)
   ament_add_pytest_test(test_run_mbes_loop_benchmark test/test_run_mbes_loop_benchmark.py)
+  ament_add_pytest_test(
+    test_run_mbes_candidate_descriptor_weight_sweep
+    test/test_run_mbes_candidate_descriptor_weight_sweep.py
+  )
   ament_add_pytest_test(
     test_run_mbes_selected_loop_replay_comparison
     test/test_run_mbes_selected_loop_replay_comparison.py

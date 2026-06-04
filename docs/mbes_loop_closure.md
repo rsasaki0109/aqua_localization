@@ -194,6 +194,21 @@ the same order used by descriptor-signature replay probes (`0.6 m`, `0.15`, and
 `0.10`). Keep the weight at `0.0` for baseline runs; increase it only in paired
 normal/selected comparisons where `mbes_descriptor_retrieval.md` shows that the
 desired endpoint appears in the replay candidate pool but is ranked too low.
+Use the descriptor-weight sweep wrapper to keep those paired runs comparable:
+
+```bash
+OUT_ROOT=/tmp/aqua_mbes_candidate_descriptor_weight_sweep \
+WEIGHTS=0,0.25,0.5,1.0,2.0 \
+MBES_DURATION=120 \
+./aqua_localization/scripts/run_mbes_candidate_descriptor_weight_sweep.sh
+```
+
+Each weight gets a separate benchmark replay directory and recorded bag. The
+wrapper writes `mbes_candidate_descriptor_weight_sweep.md` and
+`mbes_candidate_descriptor_weight_sweep.csv`, comparing input RMSE, pose-graph
+RMSE, accepted-loop counts, candidate rejections, and matched-time coverage
+against the `0.0` baseline. Rows marked `check coverage` should be treated as
+diagnostic until replay coverage is aligned.
 The consistency rejection audit lists actual `loop consistency rejected`
 samples by support deficit and nearest correction delta after replaying with
 positive consistency thresholds. Inspect loop geometry before enabling positive
