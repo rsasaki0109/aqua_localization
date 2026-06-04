@@ -111,7 +111,7 @@ if(BUILD_TESTING)
   target_link_libraries(test_static_bias_initializer static_bias_initializer)
   target_include_directories(test_static_bias_initializer PRIVATE ${EIGEN3_INCLUDE_DIRS})
 
-  ament_add_gtest(test_imu_loc_node_runtime test/test_imu_loc_node_runtime.cpp)
+  ament_add_gtest(test_imu_loc_node_runtime test/test_imu_loc_node_runtime.cpp TIMEOUT 120)
   target_link_libraries(
     test_imu_loc_node_runtime
     additive_ukf

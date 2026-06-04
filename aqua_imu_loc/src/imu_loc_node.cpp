@@ -32,12 +32,13 @@ public:
   {
     load_parameters();
 
+    const auto sensor_qos = make_sensor_qos();
     imu_sub_ = create_subscription<sensor_msgs::msg::Imu>(
-      imu_topic_, rclcpp::SensorDataQoS(),
+      imu_topic_, sensor_qos,
       std::bind(&ImuLocNode::on_imu, this, std::placeholders::_1));
     if (!pressure_topic_.empty()) {
       pressure_sub_ = create_subscription<sensor_msgs::msg::FluidPressure>(
-        pressure_topic_, rclcpp::SensorDataQoS(),
+        pressure_topic_, sensor_qos,
         std::bind(&ImuLocNode::on_pressure, this, std::placeholders::_1));
     }
     if (!current_velocity_topic_.empty()) {
@@ -47,17 +48,17 @@ public:
     }
     if (!sonar_odometry_topic_.empty()) {
       sonar_odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
-        sonar_odometry_topic_, rclcpp::SensorDataQoS(),
+        sonar_odometry_topic_, sensor_qos,
         std::bind(&ImuLocNode::on_sonar_odometry, this, std::placeholders::_1));
     }
     if (!visual_odometry_topic_.empty()) {
       visual_odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
-        visual_odometry_topic_, rclcpp::SensorDataQoS(),
+        visual_odometry_topic_, sensor_qos,
         std::bind(&ImuLocNode::on_visual_odometry, this, std::placeholders::_1));
     }
     if (!dvl_velocity_topic_.empty()) {
       dvl_sub_ = create_subscription<geometry_msgs::msg::TwistStamped>(
-        dvl_velocity_topic_, rclcpp::SensorDataQoS(),
+        dvl_velocity_topic_, sensor_qos,
         std::bind(&ImuLocNode::on_dvl_velocity, this, std::placeholders::_1));
     }
     odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(odometry_topic_, rclcpp::SystemDefaultsQoS());
@@ -93,6 +94,8 @@ private:
     odometry_topic_ = declare_parameter<std::string>("topics.odometry", "/aqua_imu_loc/odometry");
     status_topic_ = declare_parameter<std::string>("topics.status", "/aqua_imu_loc/status");
     reset_service_ = declare_parameter<std::string>("services.reset", "/aqua_imu_loc/reset");
+    sensor_qos_depth_ = static_cast<size_t>(std::max<long>(
+      1, declare_parameter<long>("qos.sensor_depth", 5)));
 
     map_frame_ = declare_parameter<std::string>("frames.map", "map");
     odom_frame_ = declare_parameter<std::string>("frames.odom", "odom");
@@ -243,6 +246,13 @@ private:
       declare_parameter<double>("imu.dvl.velocity_variance_floor", 0.01);
     dvl_max_age_s_ =
       declare_parameter<double>("imu.dvl.max_age_s", 0.5);
+  }
+
+  rclcpp::QoS make_sensor_qos() const
+  {
+    auto qos = rclcpp::SensorDataQoS();
+    qos.keep_last(sensor_qos_depth_);
+    return qos;
   }
 
   void on_dvl_velocity(const geometry_msgs::msg::TwistStamped::SharedPtr msg)
@@ -823,6 +833,7 @@ private:
   std::size_t surface_assumption_sample_count_{0};
   Eigen::Matrix3d imu_mount_rotation_{Eigen::Matrix3d::Identity()};
   std::string sonar_odometry_topic_;
+  size_t sensor_qos_depth_{5};
   double sonar_position_variance_floor_{0.04};
   double sonar_max_age_s_{1.0};
   std::string visual_odometry_topic_;

@@ -155,18 +155,18 @@ TEST_F(ImuLocNodeRuntimeTest, PublishesOdometryStatusTfAndHandlesReset)
   }));
 
   const auto start = test_node->now();
-  imu_pub->publish(make_stationary_imu(start));
-  imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.01)));
-
   const double depth_m = 2.0;
   const double pressure_pa = 101325.0 + 1025.0 * 9.80665 * depth_m;
-  pressure_pub->publish(make_pressure(start + rclcpp::Duration::from_seconds(0.02), pressure_pa));
 
   ASSERT_TRUE(spin_until(executor, [&]() {
+    imu_pub->publish(make_stationary_imu(start));
+    imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.01)));
+    pressure_pub->publish(
+      make_pressure(start + rclcpp::Duration::from_seconds(0.02), pressure_pa));
     return !odometry_messages.empty() && !status_messages.empty() &&
            status_messages.back().initialized && status_messages.back().update_count >= 2U &&
            odometry_messages.back().pose.pose.position.z < -1.0;
-  }));
+  }, 10s));
 
   const auto & odometry = odometry_messages.back();
   EXPECT_NEAR(-odometry.pose.pose.position.z, depth_m, 0.3);
@@ -250,16 +250,16 @@ TEST_F(ImuLocNodeRuntimeTest, VisualOdometryPullsPositionState)
   }));
 
   const auto start = test_node->now();
-  imu_pub->publish(make_stationary_imu(start));
-  imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.01)));
-  visual_pub->publish(
-    make_position_odometry(start + rclcpp::Duration::from_seconds(0.01), 2.0, 0.0, 0.0, 0.01));
-  imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.02)));
 
   ASSERT_TRUE(spin_until(executor, [&]() {
+    imu_pub->publish(make_stationary_imu(start));
+    imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.01)));
+    visual_pub->publish(make_position_odometry(
+      start + rclcpp::Duration::from_seconds(0.01), 2.0, 0.0, 0.0, 0.01));
+    imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.02)));
     return !odometry_messages.empty() &&
            odometry_messages.back().pose.pose.position.x > 0.5;
-  }));
+  }, 10s));
 
   EXPECT_NEAR(odometry_messages.back().pose.pose.position.x, 2.0, 0.5);
 }

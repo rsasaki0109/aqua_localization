@@ -489,7 +489,10 @@ messages flow. Keep both waits enabled for paired comparisons so normal and
 selected runs start with similar topic coverage. For repeatability probes,
 also slow playback and enlarge rosbag2's read-ahead queue, for example
 `PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000`; the recorder adjusts its
-playback timeout from the configured rate.
+playback timeout from the configured rate. The MBES IMU and sonar profiles
+also use a deeper best-effort sensor queue (`qos.sensor_depth=1000`). Override
+`IMU_QOS_SENSOR_DEPTH` or `SONAR_QOS_SENSOR_DEPTH` in the recorder environment
+when isolating queue pressure from algorithm changes.
 
 Useful live checks while tuning:
 

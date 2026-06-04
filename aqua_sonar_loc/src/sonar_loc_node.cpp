@@ -28,11 +28,12 @@ public:
   {
     load_parameters();
 
+    const auto sensor_qos = make_sensor_qos();
     points_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
-      points_topic_, rclcpp::SensorDataQoS(),
+      points_topic_, sensor_qos,
       std::bind(&SonarLocNode::on_points, this, std::placeholders::_1));
     filtered_points_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
-      filtered_points_topic_, rclcpp::SensorDataQoS());
+      filtered_points_topic_, sensor_qos);
     odometry_pub_ =
       create_publisher<nav_msgs::msg::Odometry>(odometry_topic_, rclcpp::SystemDefaultsQoS());
     status_pub_ = create_publisher<aqua_msgs::msg::ScanMatchingStatus>(
@@ -61,6 +62,8 @@ private:
     odometry_topic_ = declare_parameter<std::string>("topics.odometry", "/aqua_sonar_loc/odometry");
     status_topic_ =
       declare_parameter<std::string>("topics.status", "/aqua_sonar_loc/status");
+    sensor_qos_depth_ = static_cast<size_t>(std::max<long>(
+      1, declare_parameter<long>("qos.sensor_depth", 5)));
 
     map_frame_ = declare_parameter<std::string>("frames.map", "map");
     odom_frame_ = declare_parameter<std::string>("frames.odom", "odom");
@@ -136,6 +139,13 @@ private:
       declare_parameter<double>("motion_prior.max_time_diff_s", 0.5);
     motion_prior_buffer_seconds_ =
       declare_parameter<double>("motion_prior.buffer_seconds", 10.0);
+  }
+
+  rclcpp::QoS make_sensor_qos() const
+  {
+    auto qos = rclcpp::SensorDataQoS();
+    qos.keep_last(sensor_qos_depth_);
+    return qos;
   }
 
   void on_motion_prior(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -336,6 +346,7 @@ private:
   std::string filtered_points_topic_;
   std::string odometry_topic_;
   std::string status_topic_;
+  size_t sensor_qos_depth_{5};
   std::string map_frame_;
   std::string odom_frame_;
   std::string base_frame_;

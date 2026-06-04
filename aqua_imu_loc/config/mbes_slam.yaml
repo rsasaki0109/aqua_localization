@@ -22,6 +22,12 @@ aqua_imu_loc:
       odometry: /aqua_imu_loc/odometry
       status: /aqua_imu_loc/status
 
+    qos:
+      # MBES replay can burst high-rate IMU and sonar feedback messages through
+      # rosbag2. Keep a deeper best-effort sensor queue than the ROS 2 default
+      # so repeated benchmark runs are less sensitive to callback scheduling.
+      sensor_depth: 1000
+
     frames:
       map: map
       odom: odom

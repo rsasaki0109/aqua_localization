@@ -21,6 +21,8 @@ IMU_PROFILE="${IMU_PROFILE:-$WORKSPACE/install/aqua_imu_loc/share/aqua_imu_loc/c
 SONAR_PROFILE="${SONAR_PROFILE:-$WORKSPACE/install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_slam.yaml}"
 POSE_GRAPH_PROFILE="${POSE_GRAPH_PROFILE:-$WORKSPACE/install/aqua_pose_graph/share/aqua_pose_graph/config/params.yaml}"
 MBES_LOOP_PROFILE="${MBES_LOOP_PROFILE:-$WORKSPACE/install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml}"
+IMU_QOS_SENSOR_DEPTH="${IMU_QOS_SENSOR_DEPTH:-}"
+SONAR_QOS_SENSOR_DEPTH="${SONAR_QOS_SENSOR_DEPTH:-}"
 MBES_DURATION="${MBES_DURATION:-60}"
 RECORD_STORAGE="${RECORD_STORAGE:-mcap}"
 RECORD_TOPIC_FLAG="${RECORD_TOPIC_FLAG:-}"
@@ -84,6 +86,16 @@ validate_ros_domain_id() {
     exit 1
   fi
 }
+
+IMU_PARAM_ARGS=()
+if [[ -n "$IMU_QOS_SENSOR_DEPTH" ]]; then
+  IMU_PARAM_ARGS+=("-p" "qos.sensor_depth:=$IMU_QOS_SENSOR_DEPTH")
+fi
+
+SONAR_PARAM_ARGS=()
+if [[ -n "$SONAR_QOS_SENSOR_DEPTH" ]]; then
+  SONAR_PARAM_ARGS+=("-p" "qos.sensor_depth:=$SONAR_QOS_SENSOR_DEPTH")
+fi
 
 POSE_GRAPH_PARAM_ARGS=()
 if [[ -n "$POSE_GRAPH_ODOMETRY_TOPIC" ]]; then
@@ -266,12 +278,14 @@ rm -rf "$MBES_OUT"
 
 ros2 run aqua_imu_loc imu_loc_node --ros-args \
   --params-file "$IMU_PROFILE" \
+  "${IMU_PARAM_ARGS[@]}" \
   -p use_sim_time:=true \
   > /tmp/aqua_record_mbes_imu.log 2>&1 &
 IMU_PID=$!
 
 ros2 run aqua_sonar_loc sonar_loc_node --ros-args \
   --params-file "$SONAR_PROFILE" \
+  "${SONAR_PARAM_ARGS[@]}" \
   -p use_sim_time:=true \
   > /tmp/aqua_record_mbes_sonar.log 2>&1 &
 SON_PID=$!
