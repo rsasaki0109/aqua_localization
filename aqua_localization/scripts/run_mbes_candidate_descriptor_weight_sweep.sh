@@ -7,7 +7,13 @@ set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-$(pwd)}"
 OUT_ROOT="${OUT_ROOT:-/tmp/aqua_mbes_candidate_descriptor_weight_sweep}"
-WEIGHTS="${WEIGHTS:-0,0.25,0.5,1.0,2.0}"
+MBES_SRC="${MBES_SRC:-$WORKSPACE/datasets/public/mbes_slam/beach_pond_ros2}"
+MBES_SRC_PLAY="${MBES_SRC_PLAY:-$MBES_SRC}"
+MBES_PREPARE_HUMBLE_METADATA="${MBES_PREPARE_HUMBLE_METADATA:-0}"
+MBES_HUMBLE_METADATA_SRC="${MBES_HUMBLE_METADATA_SRC:-$OUT_ROOT/mbes_source_humble_metadata}"
+MBES_HUMBLE_SRC="${MBES_HUMBLE_SRC:-$OUT_ROOT/mbes_source_humble_sqlite}"
+MBES_HUMBLE_WINDOW_S="${MBES_HUMBLE_WINDOW_S:-180}"
+WEIGHTS="${WEIGHTS:-0.0,0.25,0.5,1.0,2.0}"
 SUMMARY_OUT="${SUMMARY_OUT:-$OUT_ROOT/mbes_candidate_descriptor_weight_sweep.md}"
 CSV_OUT="${CSV_OUT:-$OUT_ROOT/mbes_candidate_descriptor_weight_sweep.csv}"
 DATASET="${DATASET:-MBES-SLAM}"
@@ -18,6 +24,14 @@ DRY_RUN="${DRY_RUN:-0}"
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 BENCHMARK_SCRIPT="$SCRIPT_DIR/run_mbes_loop_benchmark.sh"
+MBES_SOURCE_TOPICS=(
+  /norbit/detections
+  /nav/processed/odometry
+  /nav/processed/microstrain/imu/madgwick
+  /nav/sensors/microstrain/imu/raw
+  /tf
+  /tf_static
+)
 
 validate_ros_domain_id() {
   local name="$1"
@@ -72,8 +86,39 @@ label_number() {
   printf '%s' "$value"
 }
 
+ros_double_literal() {
+  local value="$1"
+  if [[ "$value" =~ ^[+-]?[0-9]+$ ]]; then
+    printf '%s.0' "$value"
+    return 0
+  fi
+  printf '%s' "$value"
+}
+
 mkdir -p "$OUT_ROOT"
 validate_ros_domain_id SWEEP_ROS_DOMAIN_ID_START "$SWEEP_ROS_DOMAIN_ID_START"
+
+if [[ "$MBES_PREPARE_HUMBLE_METADATA" == "1" && "$MBES_SRC_PLAY" == "$MBES_SRC" ]]; then
+  if [[ "$DRY_RUN" != "1" ]]; then
+    rm -rf "$MBES_HUMBLE_METADATA_SRC" "$MBES_HUMBLE_SRC"
+  fi
+  run_cmd ros2 run aqua_localization prepare_rosbag2_humble_metadata.py \
+    --src "$MBES_SRC" \
+    --dst "$MBES_HUMBLE_METADATA_SRC"
+  HUMBLE_COPY_ARGS=()
+  for topic in "${MBES_SOURCE_TOPICS[@]}"; do
+    HUMBLE_COPY_ARGS+=("--include-topic" "$topic")
+  done
+  run_cmd ros2 run aqua_localization prepare_rosbag2_humble_metadata.py \
+    --src "$MBES_HUMBLE_METADATA_SRC" \
+    --copy-raw-window-out "$MBES_HUMBLE_SRC" \
+    --duration-s "$MBES_HUMBLE_WINDOW_S" \
+    "${HUMBLE_COPY_ARGS[@]}"
+  run_cmd ros2 run aqua_localization prepare_rosbag2_humble_metadata.py \
+    --src "$MBES_HUMBLE_SRC" \
+    --in-place
+  MBES_SRC_PLAY="$MBES_HUMBLE_SRC"
+fi
 
 IFS=', ' read -r -a WEIGHT_VALUES <<< "$WEIGHTS"
 SUMMARY_CASE_ARGS=()
@@ -84,6 +129,7 @@ for weight in "${WEIGHT_VALUES[@]}"; do
     continue
   fi
   label=$(label_number "$weight")
+  weight_param=$(ros_double_literal "$weight")
   case_out="$OUT_ROOT/weight_$label"
   case_bag="$OUT_ROOT/bags/mbes_weight_$label"
   case_ros_domain_id=$((SWEEP_ROS_DOMAIN_ID_START + case_index))
@@ -91,6 +137,9 @@ for weight in "${WEIGHT_VALUES[@]}"; do
   SUMMARY_CASE_ARGS+=("--case" "$weight:$case_out")
   run_env_cmd \
     "WORKSPACE=$WORKSPACE" \
+    "MBES_SRC=$MBES_SRC" \
+    "MBES_SRC_PLAY=$MBES_SRC_PLAY" \
+    "MBES_PREPARE_HUMBLE_METADATA=$MBES_PREPARE_HUMBLE_METADATA" \
     "ROS_DOMAIN_ID=$case_ros_domain_id" \
     "OUT_DIR=$case_out" \
     "MBES_OUT=$case_bag" \
@@ -98,7 +147,7 @@ for weight in "${WEIGHT_VALUES[@]}"; do
     "DATASET=$DATASET" \
     "SEQUENCE=$SEQUENCE" \
     "NOTE=candidate descriptor weight $weight, duration ${MBES_DURATION}s" \
-    "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT=$weight" \
+    "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT=$weight_param" \
     -- "$BENCHMARK_SCRIPT"
   case_index=$((case_index + 1))
 done

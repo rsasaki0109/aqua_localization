@@ -19,8 +19,13 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "MBES_PREPARE_HUMBLE_METADATA": "1",
             "MBES_OUT": str(tmp_path / "recorded"),
             "MBES_DURATION": "42",
+            "MBES_HUMBLE_WINDOW_S": "90",
             "OUT_DIR": str(tmp_path / "out"),
             "RECORD_READY_TIMEOUT_S": "33",
+            "IMU_PROFILE": "/tmp/current_install/aqua_imu_loc/share/aqua_imu_loc/config/mbes_slam.yaml",
+            "SONAR_PROFILE": "/tmp/current_install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_slam.yaml",
+            "POSE_GRAPH_PROFILE": "/tmp/current_install/aqua_pose_graph/share/aqua_pose_graph/config/params.yaml",
+            "MBES_LOOP_PROFILE": "/tmp/current_install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml",
             "RECORD_READY_TOPICS": "/aqua_imu_loc/odometry /mbes_loop_closure/status",
             "PLAY_START_DELAY_S": "7",
             "NOTE": "dry run",
@@ -69,8 +74,9 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
 
     assert "check_mbes_benchmark_ready.py" in proc.stdout
     assert "prepare_rosbag2_humble_metadata.py" in proc.stdout
-    assert "rosbags-convert" in proc.stdout
-    assert "--dst-storage sqlite3" in proc.stdout
+    assert "--copy-raw-window-out" in proc.stdout
+    assert "--duration-s 90" in proc.stdout
+    assert "--include-topic /norbit/detections" in proc.stdout
     assert "record_mbes_demo.sh" in proc.stdout
     assert "export_mbes_loop_status.py" in proc.stdout
     assert "--consistency-sweep-out" in proc.stdout
@@ -115,6 +121,22 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "PLAY_TOPIC_ARGS=--topics\\ /norbit/detections" in proc.stdout
     assert "LOCAL_SETUP=/tmp/current_install/setup.bash" in proc.stdout
     assert "RECORD_READY_TIMEOUT_S=33" in proc.stdout
+    assert (
+        "IMU_PROFILE=/tmp/current_install/aqua_imu_loc/share/aqua_imu_loc/config/mbes_slam.yaml"
+        in proc.stdout
+    )
+    assert (
+        "SONAR_PROFILE=/tmp/current_install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_slam.yaml"
+        in proc.stdout
+    )
+    assert (
+        "POSE_GRAPH_PROFILE=/tmp/current_install/aqua_pose_graph/share/aqua_pose_graph/config/params.yaml"
+        in proc.stdout
+    )
+    assert (
+        "MBES_LOOP_PROFILE=/tmp/current_install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml"
+        in proc.stdout
+    )
     assert "RECORD_READY_TOPICS=/aqua_imu_loc/odometry\\ /mbes_loop_closure/status" in proc.stdout
     assert "PLAY_START_DELAY_S=7" in proc.stdout
     assert "--max-rotation-rad 0.4" in proc.stdout

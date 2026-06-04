@@ -19,6 +19,9 @@ def test_dry_run_prints_weight_cases_and_summary(tmp_path):
             "DRY_RUN": "1",
             "WORKSPACE": str(tmp_path),
             "OUT_ROOT": str(tmp_path / "sweep"),
+            "MBES_SRC": str(tmp_path / "source_bag"),
+            "MBES_PREPARE_HUMBLE_METADATA": "1",
+            "MBES_HUMBLE_WINDOW_S": "90",
             "WEIGHTS": "0,0.5,1.0",
             "MBES_DURATION": "42",
             "SWEEP_ROS_DOMAIN_ID_START": "41",
@@ -39,7 +42,12 @@ def test_dry_run_prints_weight_cases_and_summary(tmp_path):
     )
 
     assert "run_mbes_loop_benchmark.sh" in proc.stdout
-    assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT=0" in proc.stdout
+    assert "prepare_rosbag2_humble_metadata.py" in proc.stdout
+    assert "--copy-raw-window-out" in proc.stdout
+    assert "--duration-s 90" in proc.stdout
+    assert f"MBES_SRC_PLAY={tmp_path / 'sweep/mbes_source_humble_sqlite'}" in proc.stdout
+    assert "MBES_PREPARE_HUMBLE_METADATA=1" in proc.stdout
+    assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT=0.0" in proc.stdout
     assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT=0.5" in proc.stdout
     assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT=1.0" in proc.stdout
     assert "ROS_DOMAIN_ID=41" in proc.stdout
@@ -48,6 +56,7 @@ def test_dry_run_prints_weight_cases_and_summary(tmp_path):
     assert f"OUT_DIR={tmp_path / 'sweep/weight_0p5'}" in proc.stdout
     assert f"MBES_OUT={tmp_path / 'sweep/bags/mbes_weight_1p0'}" in proc.stdout
     assert "summarize_mbes_candidate_descriptor_weight_sweep.py" in proc.stdout
+    assert f"--case 0:{tmp_path / 'sweep/weight_0'}" in proc.stdout
     assert f"--case 0.5:{tmp_path / 'sweep/weight_0p5'}" in proc.stdout
     assert "--descriptor-centroid-scale-m 0.7" in proc.stdout
     assert "--descriptor-extent-scale 0.2" in proc.stdout

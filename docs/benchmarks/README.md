@@ -28,6 +28,9 @@ datasets and baseline comparisons.
 - [`mbes_beach_pond_loop_status.md`](mbes_beach_pond_loop_status.md):
   first MBES-SLAM `beach_pond` tuning measurement with loop-status counts,
   descriptor/consistency sweep output, and false-positive audit notes.
+- [`mbes_candidate_descriptor_weight_sweep.md`](mbes_candidate_descriptor_weight_sweep.md):
+  diagnostic MBES candidate descriptor-weight sweep showing the current best
+  weight direction and remaining replay-determinism blockers.
 - [`sota_gap_analysis.md`](sota_gap_analysis.md): paper-backed gap analysis
   that blocks SOTA wording until held-out accuracy, robust loop selection, and
   MBES trajectory evidence are in place.

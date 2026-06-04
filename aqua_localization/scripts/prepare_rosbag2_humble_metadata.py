@@ -10,6 +10,7 @@ the original bag files and a rewritten ``metadata.yaml`` that Humble can read.
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 import shutil
 import sys
@@ -104,10 +105,81 @@ def prepare_metadata_view(src: Path, dst: Path) -> tuple[int, int]:
     return bag_files, rewrites
 
 
+def copy_raw_window(
+    src: Path,
+    dst: Path,
+    include_topics: list[str],
+    duration_s: float | None,
+) -> tuple[int, dict[str, int]]:
+    if duration_s is not None and duration_s <= 0.0:
+        raise ValueError("--duration-s must be positive")
+    if dst.exists():
+        raise FileExistsError(f"destination already exists: {dst}")
+    try:
+        from rosbags.rosbag2 import Reader, Writer
+    except ImportError as exc:
+        raise RuntimeError("Python package 'rosbags' is required for raw bag copy") from exc
+
+    topic_filter = set(include_topics)
+    per_topic: dict[str, int] = {}
+    total = 0
+    try:
+        with Reader(bag_dir_for(src)) as reader, Writer(dst) as writer:
+            selected = [
+                connection for connection in reader.connections
+                if not topic_filter or connection.topic in topic_filter
+            ]
+            if not selected:
+                raise ValueError("no source topics matched the requested include filter")
+            outputs = {}
+            for connection in selected:
+                ext = getattr(connection, "ext", None)
+                outputs[connection.id] = writer.add_connection(
+                    connection.topic,
+                    connection.msgtype,
+                    msgdef=getattr(connection, "msgdef", None),
+                    rihs01=getattr(connection, "rihs01", None),
+                    serialization_format=getattr(ext, "serialization_format", "cdr"),
+                    offered_qos_profiles=getattr(ext, "offered_qos_profiles", ""),
+                )
+                per_topic[connection.topic] = 0
+
+            stop = None
+            if duration_s is not None and math.isfinite(duration_s):
+                stop = reader.start_time + int(duration_s * 1_000_000_000)
+            for connection, timestamp, data in reader.messages(
+                connections=selected,
+                stop=stop,
+            ):
+                writer.write(outputs[connection.id], timestamp, data)
+                per_topic[connection.topic] += 1
+                total += 1
+    except Exception:
+        shutil.rmtree(dst, ignore_errors=True)
+        raise
+    return total, per_topic
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--src", required=True, type=Path, help="Source rosbag2 directory")
     parser.add_argument("--dst", type=Path, help="Output metadata view")
+    parser.add_argument(
+        "--copy-raw-window-out",
+        type=Path,
+        help="Optional output rosbag2 directory for raw CDR sqlite copy",
+    )
+    parser.add_argument(
+        "--include-topic",
+        action="append",
+        default=[],
+        help="Topic to include in --copy-raw-window-out. May be repeated.",
+    )
+    parser.add_argument(
+        "--duration-s",
+        type=float,
+        help="Optional leading source duration to copy for --copy-raw-window-out",
+    )
     parser.add_argument(
         "--in-place",
         action="store_true",
@@ -119,6 +191,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     try:
+        if args.copy_raw_window_out is not None:
+            total, per_topic = copy_raw_window(
+                args.src,
+                args.copy_raw_window_out,
+                args.include_topic,
+                args.duration_s,
+            )
+            print(
+                f"copied {total} raw CDR messages to {args.copy_raw_window_out}"
+            )
+            for topic, count in sorted(per_topic.items()):
+                print(f"  {topic}: {count}")
+            return 0
         if args.in_place:
             if args.dst is not None:
                 raise ValueError("--dst cannot be used with --in-place")

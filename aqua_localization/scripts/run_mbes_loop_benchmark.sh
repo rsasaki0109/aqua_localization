@@ -20,6 +20,7 @@ MBES_DURATION="${MBES_DURATION:-120}"
 OUT_DIR="${OUT_DIR:-/tmp/aqua_mbes_loop_benchmark}"
 MBES_HUMBLE_METADATA_SRC="${MBES_HUMBLE_METADATA_SRC:-$OUT_DIR/mbes_source_humble_metadata}"
 MBES_HUMBLE_SRC="${MBES_HUMBLE_SRC:-$OUT_DIR/mbes_source_humble_sqlite}"
+MBES_HUMBLE_WINDOW_S="${MBES_HUMBLE_WINDOW_S:-180}"
 DATASET="${DATASET:-MBES-SLAM}"
 SEQUENCE="${SEQUENCE:-beach_pond}"
 NOTE="${NOTE:-real replay, duration ${MBES_DURATION}s}"
@@ -69,6 +70,7 @@ MBES_SOURCE_TOPICS=(
 
 for optional_name in \
   ROS_SETUP LOCAL_SETUP RECORD_STORAGE RECORD_TOPIC_FLAG RECORD_READY_TIMEOUT_S \
+  IMU_PROFILE SONAR_PROFILE POSE_GRAPH_PROFILE MBES_LOOP_PROFILE \
   RECORD_READY_TOPICS PLAY_START_DELAY_S PLAY_DURATION_ARG PLAY_TOPIC_ARGS \
   POSE_GRAPH_ODOMETRY_TOPIC \
   POSE_GRAPH_KEYFRAME_TRANSLATION_M POSE_GRAPH_KEYFRAME_ROTATION_RAD \
@@ -222,12 +224,15 @@ if [[ "$MBES_PREPARE_HUMBLE_METADATA" == "1" ]]; then
     run_cmd ros2 run aqua_localization prepare_rosbag2_humble_metadata.py \
       --src "$MBES_SRC" \
       --dst "$MBES_HUMBLE_METADATA_SRC"
-    run_cmd rosbags-convert \
+    HUMBLE_COPY_ARGS=()
+    for topic in "${MBES_SOURCE_TOPICS[@]}"; do
+      HUMBLE_COPY_ARGS+=("--include-topic" "$topic")
+    done
+    run_cmd ros2 run aqua_localization prepare_rosbag2_humble_metadata.py \
       --src "$MBES_HUMBLE_METADATA_SRC" \
-      --dst "$MBES_HUMBLE_SRC" \
-      --dst-storage sqlite3 \
-      --dst-version 5 \
-      --include-topic "${MBES_SOURCE_TOPICS[@]}"
+      --copy-raw-window-out "$MBES_HUMBLE_SRC" \
+      --duration-s "$MBES_HUMBLE_WINDOW_S" \
+      "${HUMBLE_COPY_ARGS[@]}"
     run_cmd ros2 run aqua_localization prepare_rosbag2_humble_metadata.py \
       --src "$MBES_HUMBLE_SRC" \
       --in-place

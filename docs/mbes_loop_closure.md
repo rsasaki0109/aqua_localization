@@ -198,8 +198,10 @@ Use the descriptor-weight sweep wrapper to keep those paired runs comparable:
 
 ```bash
 OUT_ROOT=/tmp/aqua_mbes_candidate_descriptor_weight_sweep \
-WEIGHTS=0,0.25,0.5,1.0,2.0 \
+WEIGHTS=0.0,0.25,0.5,1.0,2.0 \
 MBES_DURATION=120 \
+MBES_PREPARE_HUMBLE_METADATA=1 \
+MBES_HUMBLE_WINDOW_S=180 \
 ./aqua_localization/scripts/run_mbes_candidate_descriptor_weight_sweep.sh
 ```
 
