@@ -61,22 +61,65 @@ odometry RMSE changed by more than 1 m across cases. The next repeat should
 pin replay startup more tightly or compare against a source-odometry-driven
 pose-graph run before promoting the weight.
 
+## Repeat Sweep
+
+Status: `diagnostic, replay variance dominates`
+
+After adding duplicate-weight support to
+`run_mbes_candidate_descriptor_weight_sweep.sh`, a repeated baseline run was
+recorded at:
+`/tmp/aqua_mbes_candidate_descriptor_weight_repeat_ae57502`
+
+```bash
+OUT_ROOT=/tmp/aqua_mbes_candidate_descriptor_weight_repeat_ae57502 \
+WEIGHTS=0,0,1.0,2.0 \
+MBES_DURATION=120 \
+MIN_DURATION_S=60 \
+RECORD_READY_TIMEOUT_S=60 \
+SWEEP_ROS_DOMAIN_ID_START=100 \
+MBES_SRC_PLAY=/tmp/aqua_mbes_candidate_descriptor_weight_sweep_real/mbes_source_humble_sqlite_180s \
+ROS_SETUP=/opt/ros/humble/setup.bash \
+LOCAL_SETUP=/tmp/aqua_weight_sweep_install/setup.bash \
+RECORD_STORAGE=sqlite3 \
+IMU_PROFILE=/tmp/aqua_weight_sweep_install/aqua_imu_loc/share/aqua_imu_loc/config/mbes_slam.yaml \
+SONAR_PROFILE=/tmp/aqua_weight_sweep_install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_slam.yaml \
+POSE_GRAPH_PROFILE=/tmp/aqua_weight_sweep_install/aqua_pose_graph/share/aqua_pose_graph/config/params.yaml \
+MBES_LOOP_PROFILE=/tmp/aqua_weight_sweep_install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml \
+MBES_LOOP_MIN_POINTS=120 \
+MBES_LOOP_VOXEL_LEAF_M=0.25 \
+MBES_LOOP_MIN_KEYFRAME_SEPARATION=40 \
+MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.2 \
+POSE_GRAPH_LOOP_ROBUST_KERNEL_TYPE=dcs \
+POSE_GRAPH_LOOP_ROBUST_KERNEL_DELTA=0.1 \
+./aqua_localization/scripts/run_mbes_candidate_descriptor_weight_sweep.sh
+```
+
+Generated summary:
+`/tmp/aqua_mbes_candidate_descriptor_weight_repeat_ae57502/mbes_candidate_descriptor_weight_sweep.md`
+
+| Weight | Status | Input RMSE m | Pose graph RMSE m | Graph vs input m | Graph vs baseline m | Matched s | Accepted | Rejected | No candidate |
+|-------:|--------|-------------:|------------------:|-----------------:|--------------------:|----------:|---------:|---------:|-------------:|
+| 0.0000 | baseline, best | 57.8057 | 69.4313 | -11.6256 | 0.0000 | 119.39 | 15 | 259 | 112 |
+| 0.0000 | baseline repeat, check coverage | 68.8071 | 80.5182 | -11.7111 | -11.0869 | 119.34 | 40 | 370 | 137 |
+| 1.0000 | check coverage | 62.0203 | 71.3160 | -9.2957 | -1.8847 | 119.30 | 6 | 172 | 170 |
+| 2.0000 | check coverage | 68.7107 | 88.6944 | -19.9837 | -19.2631 | 119.36 | 14 | 318 | 96 |
+
+Baseline repeat spread:
+
+- Input RMSE: `57.8057..68.8071` m, spread `11.0014` m.
+- Pose graph RMSE: `69.4313..80.5182` m, spread `11.0869` m.
+- Accepted loops: `15..40`, spread `25`.
+
+This invalidates the earlier apparent `2.0` improvement as a descriptor-weight
+claim. The next useful work is to reduce replay/pose-graph nondeterminism and
+then rerun the same repeated-baseline protocol.
+
 ## Follow-Up
 
-- Re-run the best weights with identical startup coverage and a repeated `0.0`
-  baseline to estimate replay variance:
-
-  ```bash
-  OUT_ROOT=/tmp/aqua_mbes_candidate_descriptor_weight_repeat_real \
-  WEIGHTS=0,0,1.0,2.0 \
-  MBES_DURATION=120 \
-  SWEEP_ROS_DOMAIN_ID_START=100 \
-  MBES_SRC_PLAY=/tmp/aqua_mbes_candidate_descriptor_weight_sweep_real/mbes_source_humble_sqlite_180s \
-  ./aqua_localization/scripts/run_mbes_candidate_descriptor_weight_sweep.sh
-  ```
-
-  Duplicate weights keep the first output name and add `_run2`, for example
-  `weight_0` and `weight_0_run2`.
+- Pin replay startup and node readiness before tuning descriptor weights again.
+- Keep repeated `0.0` baseline cases in every weight sweep; duplicate weights
+  keep the first output name and add `_run2`, for example `weight_0` and
+  `weight_0_run2`.
 - Audit accepted-loop geometry before accepting the RMSE improvement as useful.
 - Add consistency thresholds after loop geometry is reviewed; this sweep has
   no positive consistency guard.
