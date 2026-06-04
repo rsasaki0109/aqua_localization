@@ -52,6 +52,7 @@ install(PROGRAMS
   scripts/plot_trajectories.py
   scripts/make_synthetic_sonar_bag.py
   scripts/make_demo_gif.py
+  scripts/make_visual_odometry_gif.py
   scripts/convert_tank_dataset_bag.py
   scripts/stereo_visual_odometry.py
   scripts/rerun_export.py
@@ -165,6 +166,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_ros1_odometry_csv_to_tum test/test_ros1_odometry_csv_to_tum.py)
   ament_add_pytest_test(test_convert_tank_dataset_bag test/test_convert_tank_dataset_bag.py)
   ament_add_pytest_test(test_stereo_visual_odometry test/test_stereo_visual_odometry.py)
+  ament_add_pytest_test(test_make_visual_odometry_gif test/test_make_visual_odometry_gif.py)
   ament_add_pytest_test(test_calibrate_visual_scale test/test_calibrate_visual_scale.py)
   ament_add_pytest_test(test_validate_visual_scale test/test_validate_visual_scale.py)
   ament_add_pytest_test(test_visual_calibration_profile test/test_visual_calibration_profile.py)

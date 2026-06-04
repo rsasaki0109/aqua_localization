@@ -157,3 +157,23 @@ visual-inertial work.
 AQUALOC does not ship sonar data, so this profile does not exercise
 `aqua_sonar_loc` or `aqua_fusion`. The forward-looking visual track is not
 in scope for the first AQUALOC demo.
+
+## Camera visual-odometry hero (camera-only)
+
+The README hero pairs the real harbor camera with a trajectory recovered from
+that same footage. It is generated offline (no DDS) by a small sparse
+optical-flow visual odometry — `goodFeaturesToTrack` + Lucas-Kanade, integrating
+the median frame-to-frame flow:
+
+```bash
+ros2 run aqua_localization make_visual_odometry_gif.py \
+  --bag aqua_localization/datasets/public/aqualoc/demo_with_estimate \
+  --out aqua_localization/docs/media/aqualoc_harbor_hero.gif \
+  --title "aqua_localization  ·  AQUALOC harbor_07  ·  LIRMM 'Dumbo' ROV"
+```
+
+This is a visualization aid, not a fused estimate: the odometry is monocular, so
+the trajectory is **scale-relative** (pixel-integrated), and it is not coupled
+into `aqua_imu_loc`. Its value is that the seabed-textured camera yields a
+coherent traverse over the dive where the IMU-only position drifts off — the
+same gap called out in the honest status above.
