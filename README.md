@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/mbes_slam_beach_pond.gif" alt="MBES-SLAM beach_pond: accumulated multibeam seabed map building up alongside the ground-truth survey trajectory" width="86%">
+  <img src="docs/media/aqualoc_harbor_hero.gif" alt="Real AQUALOC harbor_07 underwater ROV camera footage with the aqua_localization estimated depth overlaid as a live HUD" width="86%">
 </p>
 
 Ocean localization is hard in specific ways: GNSS disappears at the surface,
