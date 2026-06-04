@@ -42,6 +42,7 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
             "MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA": "0.02",
             "MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M": "0.4",
             "MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD": "0.05",
+            "MBES_LOOP_SELECTION_PRIORITIZE_CANDIDATES": "false",
         }
     )
 
@@ -79,6 +80,7 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert "MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA=0.02" in proc.stdout
     assert "MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M=0.4" in proc.stdout
     assert "MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD=0.05" in proc.stdout
+    assert "MBES_LOOP_SELECTION_PRIORITIZE_CANDIDATES=false" in proc.stdout
     assert f"WORKSPACE={tmp_path / 'ws'}" in proc.stdout
     assert f"OUT_DIR={normal_dir}" in proc.stdout
     assert f"OUT_DIR={selected_dir}" in proc.stdout

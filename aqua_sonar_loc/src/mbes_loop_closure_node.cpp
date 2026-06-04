@@ -234,6 +234,8 @@ private:
       declare_parameter<double>("loop.selection.match_max_translation_delta_m", 0.0);
     loop_selection_match_max_rotation_delta_rad_ =
       declare_parameter<double>("loop.selection.match_max_rotation_delta_rad", 0.0);
+    loop_selection_prioritize_candidates_ =
+      declare_parameter<bool>("loop.selection.prioritize_candidates", true);
     loop_selection_enabled_ = !loop_selection_allowlist_csv_.empty();
     if (loop_selection_enabled_) {
       const LoadedLoopSelection selection = load_loop_allowlist(loop_selection_allowlist_csv_);
@@ -326,7 +328,9 @@ private:
     const RegistrationPipeline registration(registration_options_);
     const LoopGateEvaluator gate_evaluator(gate_options_);
 
-    for (const auto & candidate : selector.ranked_candidates(submap_manager_.submaps(), current)) {
+    auto candidates = selector.ranked_candidates(submap_manager_.submaps(), current);
+    prioritize_selected_candidates(candidates, current);
+    for (const auto & candidate : candidates) {
       if (tested >= candidate_options_.max_per_keyframe) {
         break;
       }
@@ -493,6 +497,86 @@ private:
   {
     return loop_selection_match_timestamp_window_s_ > 0.0 &&
            !selected_loop_signatures_.empty();
+  }
+
+  double selection_candidate_score(
+    const Submap & candidate,
+    const Submap & current) const
+  {
+    const double infinity = std::numeric_limits<double>::infinity();
+    if (!loop_selection_enabled()) {
+      return infinity;
+    }
+    if (selected_loop_pairs_.find(loop_pair_key(candidate.id, current.id)) !=
+      selected_loop_pairs_.end())
+    {
+      return 0.0;
+    }
+    if (!loop_selection_signature_enabled()) {
+      return infinity;
+    }
+
+    const double window_s = std::max(loop_selection_match_timestamp_window_s_, 1.0e-9);
+    const double current_timestamp_s = current.stamp.seconds();
+    const double candidate_timestamp_s = candidate.stamp.seconds();
+    if (!std::isfinite(current_timestamp_s)) {
+      return infinity;
+    }
+
+    double best_score = infinity;
+    for (const auto & signature : selected_loop_signatures_) {
+      if (!std::isfinite(signature.current_keyframe_timestamp_s)) {
+        continue;
+      }
+      const double current_delta_s =
+        std::abs(current_timestamp_s - signature.current_keyframe_timestamp_s);
+      if (current_delta_s > loop_selection_match_timestamp_window_s_) {
+        continue;
+      }
+      double score = current_delta_s / window_s;
+      if (std::isfinite(signature.candidate_keyframe_timestamp_s)) {
+        if (!std::isfinite(candidate_timestamp_s)) {
+          continue;
+        }
+        const double candidate_delta_s =
+          std::abs(candidate_timestamp_s - signature.candidate_keyframe_timestamp_s);
+        if (candidate_delta_s > loop_selection_match_timestamp_window_s_) {
+          continue;
+        }
+        score += candidate_delta_s / window_s;
+      } else {
+        // Prefer endpoint-aware signatures over older current-timestamp-only rows.
+        score += 1.0;
+      }
+      best_score = std::min(best_score, score);
+    }
+    return best_score;
+  }
+
+  void prioritize_selected_candidates(
+    std::vector<Submap> & candidates,
+    const Submap & current) const
+  {
+    if (!loop_selection_enabled() || !loop_selection_prioritize_candidates_ ||
+      candidates.size() < 2)
+    {
+      return;
+    }
+    std::stable_sort(
+      candidates.begin(), candidates.end(),
+      [this, &current](const Submap & a, const Submap & b) {
+        const double a_score = selection_candidate_score(a, current);
+        const double b_score = selection_candidate_score(b, current);
+        const bool a_selected = std::isfinite(a_score);
+        const bool b_selected = std::isfinite(b_score);
+        if (a_selected != b_selected) {
+          return a_selected;
+        }
+        if (a_selected && std::abs(a_score - b_score) > 1.0e-12) {
+          return a_score < b_score;
+        }
+        return false;
+      });
   }
 
   bool is_selected_loop(
@@ -686,6 +770,7 @@ private:
   double loop_selection_match_max_fitness_delta_{0.0};
   double loop_selection_match_max_translation_delta_m_{0.0};
   double loop_selection_match_max_rotation_delta_rad_{0.0};
+  bool loop_selection_prioritize_candidates_{true};
   bool loop_selection_enabled_{false};
   std::unordered_set<std::uint64_t> selected_loop_pairs_;
   std::vector<SelectedLoopSignature> selected_loop_signatures_;

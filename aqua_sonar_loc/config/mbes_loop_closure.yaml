@@ -83,3 +83,7 @@ mbes_loop_closure:
         match_max_fitness_delta: 0.0
         match_max_translation_delta_m: 0.0
         match_max_rotation_delta_rad: 0.0
+        # When an allowlist is active, try exact/signature-matching candidates
+        # before other distance-ranked candidates so max_per_keyframe budget is
+        # spent on the offline-selected endpoints first.
+        prioritize_candidates: true

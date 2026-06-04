@@ -329,6 +329,13 @@ registration, fitness, and correction gates to pass, but it replaces the online
 accepted-loop consistency guard with the offline selected ID set. Otherwise
 valid loops that are not in the CSV are published in status as
 `loop selection rejected` and are not sent to the pose graph.
+With `loop.selection.prioritize_candidates: true` (the default), candidates
+that match exact allowlist IDs or endpoint timestamp signatures are tried
+before other distance-ranked candidates. This keeps `candidates.max_per_keyframe`
+from spending the replay budget on nearby off-allowlist endpoints before the
+offline-selected endpoint has been registered. Set
+`MBES_LOOP_SELECTION_PRIORITIZE_CANDIDATES=0` to reproduce the older
+distance-only ordering during diagnostics.
 The CSV currently matches exact `(candidate_id,current_id)` pairs from the
 source replay. The exporter also writes `current_keyframe_timestamp` and
 `candidate_keyframe_timestamp` columns when the bag contains
