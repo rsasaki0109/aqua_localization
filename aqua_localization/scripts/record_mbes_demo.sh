@@ -27,6 +27,12 @@ RECORD_TOPIC_FLAG="${RECORD_TOPIC_FLAG:-}"
 RECORD_READY_TIMEOUT_S="${RECORD_READY_TIMEOUT_S:-75}"
 RECORD_READY_TOPICS="${RECORD_READY_TOPICS:-/aqua_imu_loc/odometry /aqua_sonar_loc/points_filtered /aqua_pose_graph/keyframe /mbes_loop_closure/status}"
 PLAY_START_DELAY_S="${PLAY_START_DELAY_S:-25}"
+PLAY_RATE="${PLAY_RATE:-}"
+PLAY_READ_AHEAD_QUEUE_SIZE="${PLAY_READ_AHEAD_QUEUE_SIZE:-}"
+PLAY_START_OFFSET_S="${PLAY_START_OFFSET_S:-}"
+PLAY_WAIT_FOR_ALL_ACKED_MS="${PLAY_WAIT_FOR_ALL_ACKED_MS:-}"
+PLAY_DISABLE_KEYBOARD_CONTROLS="${PLAY_DISABLE_KEYBOARD_CONTROLS:-1}"
+PLAY_TIMEOUT_MARGIN_S="${PLAY_TIMEOUT_MARGIN_S:-5}"
 PLAY_DURATION_ARG="${PLAY_DURATION_ARG:-}"
 PLAY_TOPIC_ARGS="${PLAY_TOPIC_ARGS:-}"
 POSE_GRAPH_KEYFRAME_TRANSLATION_M="${POSE_GRAPH_KEYFRAME_TRANSLATION_M:-}"
@@ -229,6 +235,21 @@ wait_for_recorder_ready() {
     >&2
 }
 
+compute_play_timeout_s() {
+  awk \
+    -v duration="$MBES_DURATION" \
+    -v delay="$PLAY_START_DELAY_S" \
+    -v rate="${PLAY_RATE:-1.0}" \
+    -v margin="$PLAY_TIMEOUT_MARGIN_S" \
+    'BEGIN {
+      if (duration <= 0.0 || delay < 0.0 || rate <= 0.0 || margin < 0.0) {
+        exit 1
+      }
+      timeout = duration / rate + delay + margin
+      printf "%d", int(timeout + 0.999999)
+    }'
+}
+
 validate_ros_domain_id
 
 cd "$WORKSPACE"
@@ -294,18 +315,34 @@ PLAY_DELAY_ARGS=()
 if [[ "$PLAY_START_DELAY_S" != "0" ]]; then
   PLAY_DELAY_ARGS=("--delay" "$PLAY_START_DELAY_S")
 fi
+PLAY_COMMON_ARGS=("--clock")
+if [[ -n "$PLAY_RATE" ]]; then
+  PLAY_COMMON_ARGS+=("--rate" "$PLAY_RATE")
+fi
+if [[ -n "$PLAY_READ_AHEAD_QUEUE_SIZE" ]]; then
+  PLAY_COMMON_ARGS+=("--read-ahead-queue-size" "$PLAY_READ_AHEAD_QUEUE_SIZE")
+fi
+if [[ -n "$PLAY_START_OFFSET_S" ]]; then
+  PLAY_COMMON_ARGS+=("--start-offset" "$PLAY_START_OFFSET_S")
+fi
+if [[ -n "$PLAY_WAIT_FOR_ALL_ACKED_MS" ]]; then
+  PLAY_COMMON_ARGS+=("--wait-for-all-acked" "$PLAY_WAIT_FOR_ALL_ACKED_MS")
+fi
+if [[ "$PLAY_DISABLE_KEYBOARD_CONTROLS" == "1" ]]; then
+  PLAY_COMMON_ARGS+=("--disable-keyboard-controls")
+fi
 
 if [[ -n "$PLAY_DURATION_ARG" ]]; then
-  ros2 bag play "$MBES_SRC" --clock "${PLAY_DELAY_ARGS[@]}" \
+  ros2 bag play "$MBES_SRC" "${PLAY_COMMON_ARGS[@]}" "${PLAY_DELAY_ARGS[@]}" \
     "$PLAY_DURATION_ARG" "$MBES_DURATION" \
     ${PLAY_TOPIC_ARGS:+$PLAY_TOPIC_ARGS} \
     > /tmp/aqua_record_mbes_play.log 2>&1
 else
-  PLAY_TIMEOUT_S="$MBES_DURATION"
-  if [[ "$PLAY_START_DELAY_S" != "0" ]]; then
-    PLAY_TIMEOUT_S=$((MBES_DURATION + PLAY_START_DELAY_S))
+  if ! PLAY_TIMEOUT_S=$(compute_play_timeout_s); then
+    echo "invalid playback timing: duration=$MBES_DURATION delay=$PLAY_START_DELAY_S rate=${PLAY_RATE:-1.0} margin=$PLAY_TIMEOUT_MARGIN_S" >&2
+    exit 1
   fi
-  timeout "${PLAY_TIMEOUT_S}s" ros2 bag play "$MBES_SRC" --clock \
+  timeout "${PLAY_TIMEOUT_S}s" ros2 bag play "$MBES_SRC" "${PLAY_COMMON_ARGS[@]}" \
     "${PLAY_DELAY_ARGS[@]}" \
     ${PLAY_TOPIC_ARGS:+$PLAY_TOPIC_ARGS} \
     > /tmp/aqua_record_mbes_play.log 2>&1 || true

@@ -117,6 +117,8 @@ then rerun the same repeated-baseline protocol.
 ## Follow-Up
 
 - Pin replay startup and node readiness before tuning descriptor weights again.
+- Probe replay overload by rerunning repeated baselines with
+  `PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000`.
 - Keep repeated `0.0` baseline cases in every weight sweep; duplicate weights
   keep the first output name and add `_run2`, for example `weight_0` and
   `weight_0_run2`.

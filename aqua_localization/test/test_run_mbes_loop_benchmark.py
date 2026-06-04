@@ -28,6 +28,12 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "MBES_LOOP_PROFILE": "/tmp/current_install/aqua_sonar_loc/share/aqua_sonar_loc/config/mbes_loop_closure.yaml",
             "RECORD_READY_TOPICS": "/aqua_imu_loc/odometry /mbes_loop_closure/status",
             "PLAY_START_DELAY_S": "7",
+            "PLAY_RATE": "0.5",
+            "PLAY_READ_AHEAD_QUEUE_SIZE": "10000",
+            "PLAY_START_OFFSET_S": "1.5",
+            "PLAY_WAIT_FOR_ALL_ACKED_MS": "250",
+            "PLAY_DISABLE_KEYBOARD_CONTROLS": "0",
+            "PLAY_TIMEOUT_MARGIN_S": "9",
             "NOTE": "dry run",
             "MBES_LOOP_MIN_POINTS": "120",
             "MBES_LOOP_VOXEL_LEAF_M": "0.25",
@@ -139,6 +145,12 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     )
     assert "RECORD_READY_TOPICS=/aqua_imu_loc/odometry\\ /mbes_loop_closure/status" in proc.stdout
     assert "PLAY_START_DELAY_S=7" in proc.stdout
+    assert "PLAY_RATE=0.5" in proc.stdout
+    assert "PLAY_READ_AHEAD_QUEUE_SIZE=10000" in proc.stdout
+    assert "PLAY_START_OFFSET_S=1.5" in proc.stdout
+    assert "PLAY_WAIT_FOR_ALL_ACKED_MS=250" in proc.stdout
+    assert "PLAY_DISABLE_KEYBOARD_CONTROLS=0" in proc.stdout
+    assert "PLAY_TIMEOUT_MARGIN_S=9" in proc.stdout
     assert "--max-rotation-rad 0.4" in proc.stdout
     assert "--descriptor-extent-warn 5.0" in proc.stdout
     assert "--consistency-min-support-count 2" in proc.stdout

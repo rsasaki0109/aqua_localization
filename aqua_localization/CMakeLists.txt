@@ -210,6 +210,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_check_mbes_loop_audit_decisions test/test_check_mbes_loop_audit_decisions.py)
   ament_add_pytest_test(test_publish_mbes_loop_audit_markers test/test_publish_mbes_loop_audit_markers.py)
   ament_add_pytest_test(test_plot_mbes_loop_audit test/test_plot_mbes_loop_audit.py)
+  ament_add_pytest_test(test_record_mbes_demo test/test_record_mbes_demo.py)
   ament_add_pytest_test(test_run_mbes_loop_benchmark test/test_run_mbes_loop_benchmark.py)
   ament_add_pytest_test(
     test_run_mbes_candidate_descriptor_weight_sweep

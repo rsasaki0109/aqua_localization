@@ -486,7 +486,10 @@ before playback starts (`RECORD_READY_TIMEOUT_S=75` by default; override
 `RECORD_READY_TOPICS` to tune the set). Playback also starts with
 `PLAY_START_DELAY_S=25` so rosbag2 can discover source input publishers before
 messages flow. Keep both waits enabled for paired comparisons so normal and
-selected runs start with similar topic coverage.
+selected runs start with similar topic coverage. For repeatability probes,
+also slow playback and enlarge rosbag2's read-ahead queue, for example
+`PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000`; the recorder adjusts its
+playback timeout from the configured rate.
 
 Useful live checks while tuning:
 
