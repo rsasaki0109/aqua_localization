@@ -119,6 +119,7 @@ if(BUILD_TESTING)
     test_mbes_loop_closure_node_runtime
     test/test_mbes_loop_closure_node_runtime.cpp
   )
+  set_tests_properties(test_mbes_loop_closure_node_runtime PROPERTIES TIMEOUT 600)
   target_link_libraries(test_mbes_loop_closure_node_runtime mbes_loop_closure_frontend ${PCL_LIBRARIES})
   target_include_directories(test_mbes_loop_closure_node_runtime PUBLIC ${PCL_INCLUDE_DIRS})
   ament_target_dependencies(

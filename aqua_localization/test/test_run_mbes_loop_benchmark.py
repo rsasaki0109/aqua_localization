@@ -26,6 +26,10 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
             "NOTE": "dry run",
             "MBES_LOOP_MIN_POINTS": "120",
             "MBES_LOOP_VOXEL_LEAF_M": "0.25",
+            "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT": "0.5",
+            "MBES_LOOP_CANDIDATE_DESCRIPTOR_CENTROID_SCALE_M": "0.6",
+            "MBES_LOOP_CANDIDATE_DESCRIPTOR_EXTENT_SCALE": "0.15",
+            "MBES_LOOP_CANDIDATE_DESCRIPTOR_POINT_RATIO_SCALE": "0.10",
             "POSE_GRAPH_ODOMETRY_TOPIC": "/nav/processed/odometry",
             "POSE_GRAPH_KEYFRAME_TRANSLATION_M": "1.0",
             "POSE_GRAPH_OPTIMIZATION_ITERATIONS": "35",
@@ -82,6 +86,10 @@ def test_dry_run_prints_pipeline_commands(tmp_path):
     assert "--note dry\\ run" in proc.stdout
     assert "MBES_LOOP_MIN_POINTS=120" in proc.stdout
     assert "MBES_LOOP_VOXEL_LEAF_M=0.25" in proc.stdout
+    assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT=0.5" in proc.stdout
+    assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_CENTROID_SCALE_M=0.6" in proc.stdout
+    assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_EXTENT_SCALE=0.15" in proc.stdout
+    assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_POINT_RATIO_SCALE=0.10" in proc.stdout
     assert "POSE_GRAPH_ODOMETRY_TOPIC=/nav/processed/odometry" in proc.stdout
     assert "POSE_GRAPH_KEYFRAME_TRANSLATION_M=1.0" in proc.stdout
     assert "POSE_GRAPH_OPTIMIZATION_ITERATIONS=35" in proc.stdout

@@ -200,6 +200,14 @@ private:
       declare_parameter<double>("candidates.max_distance_m", 15.0);
     candidate_options_.max_per_keyframe =
       declare_parameter<int>("candidates.max_per_keyframe", 5);
+    candidate_options_.descriptor_weight =
+      declare_parameter<double>("candidates.descriptor_weight", 0.0);
+    candidate_options_.descriptor_centroid_scale_m =
+      declare_parameter<double>("candidates.descriptor_centroid_scale_m", 0.6);
+    candidate_options_.descriptor_extent_scale =
+      declare_parameter<double>("candidates.descriptor_extent_scale", 0.15);
+    candidate_options_.descriptor_point_count_ratio_scale =
+      declare_parameter<double>("candidates.descriptor_point_count_ratio_scale", 0.10);
 
     registration_options_.backend = declare_parameter<std::string>("registration.backend", "gicp");
     registration_options_.max_iterations =

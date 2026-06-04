@@ -50,6 +50,52 @@ double plan_view_distance_m(const Eigen::Isometry3d & transform)
   return std::hypot(translation.x(), translation.y());
 }
 
+double positive_or_infinity(double value)
+{
+  return value > 0.0 ? value : std::numeric_limits<double>::infinity();
+}
+
+double descriptor_mismatch_score(
+  const SubmapDescriptor & candidate,
+  const SubmapDescriptor & current,
+  const CandidateSelectionOptions & options)
+{
+  if (!candidate.valid || !current.valid) {
+    return std::numeric_limits<double>::infinity();
+  }
+  const auto min_points = std::min(candidate.point_count, current.point_count);
+  const auto max_points = std::max(candidate.point_count, current.point_count);
+  if (max_points == 0U) {
+    return std::numeric_limits<double>::infinity();
+  }
+
+  const double centroid_score =
+    (candidate.centroid - current.centroid).norm() /
+    positive_or_infinity(options.descriptor_centroid_scale_m);
+  const double extent_ratio = std::max({
+    ratio_or_infinity(candidate.extent.x(), current.extent.x()),
+    ratio_or_infinity(candidate.extent.y(), current.extent.y()),
+    ratio_or_infinity(candidate.extent.z(), current.extent.z())});
+  const double extent_score =
+    std::max(0.0, extent_ratio - 1.0) /
+    positive_or_infinity(options.descriptor_extent_scale);
+  const double point_count_ratio =
+    static_cast<double>(min_points) / static_cast<double>(max_points);
+  const double point_count_score =
+    std::max(0.0, 1.0 - point_count_ratio) /
+    positive_or_infinity(options.descriptor_point_count_ratio_scale);
+
+  return centroid_score + extent_score + point_count_score;
+}
+
+double candidate_distance_score(double distance_m, const CandidateSelectionOptions & options)
+{
+  if (options.max_distance_m > 0.0) {
+    return distance_m / options.max_distance_m;
+  }
+  return distance_m;
+}
+
 Eigen::Isometry3d loop_correction(
   const Eigen::Isometry3d & guess,
   const Eigen::Isometry3d & candidate_to_current)
@@ -281,6 +327,14 @@ std::vector<Submap> LoopCandidateSelector::ranked_candidates(
   const std::deque<Submap> & submaps,
   const Submap & current) const
 {
+  struct RankedCandidate
+  {
+    Submap submap;
+    double distance_m{0.0};
+    double score{0.0};
+  };
+
+  std::vector<RankedCandidate> ranked;
   std::vector<Submap> candidates;
   for (const auto & candidate : submaps) {
     if (current.id <= candidate.id + static_cast<std::uint32_t>(options_.min_keyframe_separation)) {
@@ -291,13 +345,27 @@ std::vector<Submap> LoopCandidateSelector::ranked_candidates(
     if (options_.max_distance_m > 0.0 && distance > options_.max_distance_m) {
       continue;
     }
-    candidates.push_back(candidate);
+    double score = candidate_distance_score(distance, options_);
+    if (options_.descriptor_weight > 0.0) {
+      score += options_.descriptor_weight *
+        descriptor_mismatch_score(candidate.descriptor, current.descriptor, options_);
+    }
+    ranked.push_back(RankedCandidate{candidate, distance, score});
   }
-  std::sort(candidates.begin(), candidates.end(), [&current](const Submap & a, const Submap & b) {
-    const double da = (current.pose.translation() - a.pose.translation()).squaredNorm();
-    const double db = (current.pose.translation() - b.pose.translation()).squaredNorm();
-    return da < db;
+  std::sort(ranked.begin(), ranked.end(), [](const RankedCandidate & a, const RankedCandidate & b) {
+    if (std::abs(a.score - b.score) > 1.0e-12) {
+      return a.score < b.score;
+    }
+    if (std::abs(a.distance_m - b.distance_m) > 1.0e-12) {
+      return a.distance_m < b.distance_m;
+    }
+    return a.submap.id < b.submap.id;
   });
+
+  candidates.reserve(ranked.size());
+  for (const auto & candidate : ranked) {
+    candidates.push_back(candidate.submap);
+  }
   return candidates;
 }
 

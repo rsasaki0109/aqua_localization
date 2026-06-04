@@ -30,6 +30,10 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
             "MBES_LOOP_MIN_POINTS": "120",
             "MBES_LOOP_VOXEL_LEAF_M": "0.25",
             "MBES_LOOP_MIN_KEYFRAME_SEPARATION": "40",
+            "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT": "0.5",
+            "MBES_LOOP_CANDIDATE_DESCRIPTOR_CENTROID_SCALE_M": "0.6",
+            "MBES_LOOP_CANDIDATE_DESCRIPTOR_EXTENT_SCALE": "0.15",
+            "MBES_LOOP_CANDIDATE_DESCRIPTOR_POINT_RATIO_SCALE": "0.10",
             "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD": "0.4",
             "MBES_LOOP_MIN_PLAN_VIEW_SEPARATION_M": "1.0",
             "MBES_LOOP_MAX_SHORT_PLAN_VIEW_ROTATION_RAD": "0.2",
@@ -71,6 +75,10 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert "MBES_LOOP_MIN_POINTS=120" in proc.stdout
     assert "MBES_LOOP_VOXEL_LEAF_M=0.25" in proc.stdout
     assert "MBES_LOOP_MIN_KEYFRAME_SEPARATION=40" in proc.stdout
+    assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT=0.5" in proc.stdout
+    assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_CENTROID_SCALE_M=0.6" in proc.stdout
+    assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_EXTENT_SCALE=0.15" in proc.stdout
+    assert "MBES_LOOP_CANDIDATE_DESCRIPTOR_POINT_RATIO_SCALE=0.10" in proc.stdout
     assert "MBES_LOOP_MAX_CORRECTION_ROTATION_RAD=0.4" in proc.stdout
     assert "MBES_LOOP_MIN_PLAN_VIEW_SEPARATION_M=1.0" in proc.stdout
     assert "MBES_LOOP_MAX_SHORT_PLAN_VIEW_ROTATION_RAD=0.2" in proc.stdout

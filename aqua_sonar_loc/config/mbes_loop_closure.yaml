@@ -24,6 +24,13 @@ mbes_loop_closure:
       # Search only odometry-near historical submaps. Set <= 0 to disable this gate.
       max_distance_m: 15.0
       max_per_keyframe: 5
+      # Optional pre-registration descriptor ranking. Disabled by default so
+      # candidates remain odometry-distance ranked. Set descriptor_weight > 0
+      # to spend max_per_keyframe budget on shape-similar bathymetric submaps.
+      descriptor_weight: 0.0
+      descriptor_centroid_scale_m: 0.6
+      descriptor_extent_scale: 0.15
+      descriptor_point_count_ratio_scale: 0.10
 
     registration:
       backend: gicp

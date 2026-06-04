@@ -29,6 +29,15 @@ aqua_sonar_loc::PointCloud make_cloud(int points)
   return cloud;
 }
 
+aqua_sonar_loc::PointCloud make_shifted_cloud(int points, float x_offset)
+{
+  aqua_sonar_loc::PointCloud cloud;
+  for (int i = 0; i < points; ++i) {
+    cloud.push_back(pcl::PointXYZ(static_cast<float>(i) + x_offset, 0.0F, 0.0F));
+  }
+  return cloud;
+}
+
 aqua_sonar_loc::Submap make_described_submap(
   std::uint32_t id,
   const aqua_sonar_loc::PointCloud & cloud)
@@ -54,6 +63,31 @@ TEST(MbesLoopClosureFrontendTest, CandidateSelectorFiltersAndRanksByDistance)
   history.push_back(make_submap(2, 20.0));
   history.push_back(make_submap(9, 1.0));
   const auto current = make_submap(10, 0.0);
+
+  const auto candidates = selector.ranked_candidates(history, current);
+
+  ASSERT_EQ(candidates.size(), 2U);
+  EXPECT_EQ(candidates[0].id, 1U);
+  EXPECT_EQ(candidates[1].id, 0U);
+}
+
+TEST(MbesLoopClosureFrontendTest, CandidateSelectorCanRankByDescriptorSimilarity)
+{
+  aqua_sonar_loc::CandidateSelectionOptions options;
+  options.min_keyframe_separation = 0;
+  options.max_distance_m = 10.0;
+  options.descriptor_weight = 1.0;
+  aqua_sonar_loc::LoopCandidateSelector selector(options);
+
+  auto near_mismatch = make_described_submap(0, make_shifted_cloud(10, 100.0F));
+  near_mismatch.pose.translation().x() = 1.0;
+  auto far_match = make_described_submap(1, make_cloud(10));
+  far_match.pose.translation().x() = 8.0;
+
+  std::deque<aqua_sonar_loc::Submap> history;
+  history.push_back(near_mismatch);
+  history.push_back(far_match);
+  auto current = make_described_submap(10, make_cloud(10));
 
   const auto candidates = selector.ranked_candidates(history, current);
 

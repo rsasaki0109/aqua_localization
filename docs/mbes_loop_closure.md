@@ -106,21 +106,28 @@ Tune in this order:
    enough but not too slow.
 2. `candidates.max_distance_m` and `candidates.min_keyframe_separation` until
    plausible revisits are tested.
-3. `descriptor.max_centroid_distance_m`, `descriptor.max_extent_ratio`, and
+3. `candidates.descriptor_weight` with
+   `candidates.descriptor_centroid_scale_m`,
+   `candidates.descriptor_extent_scale`, and
+   `candidates.descriptor_point_count_ratio_scale` when
+   `candidates.max_per_keyframe` is too small to test every plausible revisit.
+   This only moves shape-similar bathymetric submaps earlier in the
+   pre-registration queue; it does not accept or reject loops by itself.
+4. `descriptor.max_centroid_distance_m`, `descriptor.max_extent_ratio`, and
    `descriptor.min_point_count_ratio` after collecting descriptor distributions
    from a replay. Leave these disabled until real-bag ranges are understood.
-4. `gates.max_fitness_score`, `gates.max_correction_translation_m`, and
+5. `gates.max_fitness_score`, `gates.max_correction_translation_m`, and
    `gates.max_correction_rotation_rad` until false positives are rejected.
-5. `gates.min_plan_view_separation_m` with
+6. `gates.min_plan_view_separation_m` with
    `gates.max_short_plan_view_rotation_rad` when accepted-loop geometry shows
    nearly co-located plan-view endpoints getting large rotation corrections.
    Both values are disabled by default; when both are positive, a candidate is
    rejected as `short plan-view rotation gate rejected` if its odometry-derived
    plan-view separation is below the configured distance and its registration
    correction rotation exceeds the configured short-edge rotation cap.
-6. `loop.min_repeat_keyframe_gap` to suppress near-duplicate accepted loops
+7. `loop.min_repeat_keyframe_gap` to suppress near-duplicate accepted loops
    while preserving distinct revisits.
-7. `loop.consistency.max_correction_translation_delta_m`,
+8. `loop.consistency.max_correction_translation_delta_m`,
    `loop.consistency.max_correction_rotation_delta_rad`, and optionally
    `loop.consistency.min_support_count` after trusted accepted loops exist.
    Positive delta values reject new accepted-looking candidates whose
@@ -179,6 +186,14 @@ threshold grids and reports how many tested candidates would pass each
 combination. The consistency sweep report uses recorded correction poses when
 available, with scalar correction-magnitude fallback for older bags, to mirror
 the accepted-loop consistency guard and propose initial threshold values.
+Candidate descriptor ranking is a weaker pre-registration retrieval knob. Set
+`candidates.descriptor_weight` positive to combine normalized pose distance with
+centroid, extent, and point-count descriptor mismatch before the
+`candidates.max_per_keyframe` budget is applied. The matching scales default to
+the same order used by descriptor-signature replay probes (`0.6 m`, `0.15`, and
+`0.10`). Keep the weight at `0.0` for baseline runs; increase it only in paired
+normal/selected comparisons where `mbes_descriptor_retrieval.md` shows that the
+desired endpoint appears in the replay candidate pool but is ranked too low.
 The consistency rejection audit lists actual `loop consistency rejected`
 samples by support deficit and nearest correction delta after replaying with
 positive consistency thresholds. Inspect loop geometry before enabling positive

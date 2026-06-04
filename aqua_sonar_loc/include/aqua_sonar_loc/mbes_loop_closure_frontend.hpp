@@ -96,6 +96,10 @@ struct CandidateSelectionOptions
   int min_keyframe_separation{20};
   double max_distance_m{15.0};
   int max_per_keyframe{5};
+  double descriptor_weight{0.0};
+  double descriptor_centroid_scale_m{0.6};
+  double descriptor_extent_scale{0.15};
+  double descriptor_point_count_ratio_scale{0.10};
 };
 
 struct RegistrationOptions
