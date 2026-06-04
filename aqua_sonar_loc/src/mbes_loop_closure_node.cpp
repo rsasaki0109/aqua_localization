@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <deque>
 #include <fstream>
 #include <limits>
 #include <memory>
@@ -141,6 +142,19 @@ struct LoadedLoopSelection
   std::vector<SelectedLoopSignature> signatures;
 };
 
+struct KeyframeRecord
+{
+  std::uint32_t id{0};
+  rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
+  Eigen::Isometry3d pose{Eigen::Isometry3d::Identity()};
+};
+
+struct BufferedCloud
+{
+  rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
+  PointCloud::Ptr cloud{std::make_shared<PointCloud>()};
+};
+
 class MbesLoopClosureNode : public rclcpp::Node
 {
 public:
@@ -193,6 +207,8 @@ private:
     submap_options_.min_points_per_submap = declare_parameter<int>("submaps.min_points", 300);
     submap_options_.max_points_per_submap = declare_parameter<int>("submaps.max_points", 20000);
     submap_options_.voxel_leaf_m = declare_parameter<double>("submaps.voxel_leaf_m", 0.5);
+    submap_finalize_delay_keyframes_ = static_cast<int>(
+      std::max<long>(0, declare_parameter<long>("submaps.finalize_delay_keyframes", 0)));
 
     candidate_options_.min_keyframe_separation =
       declare_parameter<int>("candidates.min_keyframe_separation", 20);
@@ -315,12 +331,9 @@ private:
 
   void on_keyframe(const aqua_msgs::msg::PoseGraphKeyframe & msg)
   {
-    if (submap_manager_.has_active_points()) {
-      finalize_current_submap();
-    }
-
-    submap_manager_.start_submap(
-      msg.id, rclcpp::Time(msg.header.stamp), pose_to_isometry(msg.pose));
+    keyframe_buffer_.push_back(
+      KeyframeRecord{msg.id, rclcpp::Time(msg.header.stamp), pose_to_isometry(msg.pose)});
+    process_ready_submaps();
   }
 
   void on_points(const sensor_msgs::msg::PointCloud2 & msg)
@@ -329,7 +342,48 @@ private:
     if (!cloud || cloud->empty()) {
       return;
     }
-    submap_manager_.append_points(*cloud);
+    point_buffer_.push_back(BufferedCloud{rclcpp::Time(msg.header.stamp), cloud});
+  }
+
+  void process_ready_submaps()
+  {
+    const auto required_keyframes =
+      static_cast<std::size_t>(submap_finalize_delay_keyframes_ + 2);
+    while (keyframe_buffer_.size() >= required_keyframes) {
+      finalize_keyframe_interval(keyframe_buffer_[0], keyframe_buffer_[1]);
+      keyframe_buffer_.pop_front();
+    }
+  }
+
+  void finalize_keyframe_interval(
+    const KeyframeRecord & start,
+    const KeyframeRecord & end)
+  {
+    submap_manager_.start_submap(start.id, start.stamp, start.pose);
+
+    std::vector<BufferedCloud> selected;
+    selected.reserve(point_buffer_.size());
+    std::deque<BufferedCloud> remaining;
+    for (const auto & buffered : point_buffer_) {
+      if (buffered.stamp >= start.stamp && buffered.stamp < end.stamp) {
+        selected.push_back(buffered);
+      } else if (buffered.stamp >= end.stamp) {
+        remaining.push_back(buffered);
+      }
+    }
+    point_buffer_ = std::move(remaining);
+
+    std::stable_sort(
+      selected.begin(), selected.end(),
+      [](const BufferedCloud & a, const BufferedCloud & b) {
+        return a.stamp < b.stamp;
+      });
+    for (const auto & buffered : selected) {
+      if (buffered.cloud && !buffered.cloud->empty()) {
+        submap_manager_.append_points(*buffered.cloud);
+      }
+    }
+    finalize_current_submap();
   }
 
   void finalize_current_submap()
@@ -884,6 +938,7 @@ private:
   double loop_translation_sigma_m_{2.0};
   double loop_rotation_sigma_rad_{0.35};
   bool optimize_after_insert_{true};
+  int submap_finalize_delay_keyframes_{0};
   std::uint32_t marker_sequence_{0};
   std::string loop_selection_allowlist_csv_;
   double loop_selection_match_timestamp_window_s_{0.0};
@@ -897,6 +952,8 @@ private:
   bool loop_selection_enabled_{false};
   std::unordered_set<std::uint64_t> selected_loop_pairs_;
   std::vector<SelectedLoopSignature> selected_loop_signatures_;
+  std::deque<KeyframeRecord> keyframe_buffer_;
+  std::deque<BufferedCloud> point_buffer_;
 
   SubmapManager submap_manager_{submap_options_};
   AcceptedLoopTracker accepted_loop_tracker_{loop_suppression_options_};

@@ -17,6 +17,10 @@ mbes_loop_closure:
       # Voxel filtering keeps submap-vs-submap registration tractable.
       voxel_leaf_m: 0.5
       max_submaps: 200
+      # Finalize each keyframe interval after one additional keyframe arrives.
+      # Points are assigned by message stamp, not callback arrival order, so
+      # this delay reduces replay variance from keyframe/point DDS scheduling.
+      finalize_delay_keyframes: 1
 
     candidates:
       # Skip recent keyframes so scan-to-scan overlap is not misclassified as loop closure.

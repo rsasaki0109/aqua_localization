@@ -29,7 +29,10 @@ front end so the next implementation can stay small and measurable.
 ## Target MBES Pipeline
 
 1. Subscribe to accepted MBES fans and pose-graph keyframes.
-2. Accumulate a local bathymetric submap for each keyframe interval.
+2. Buffer MBES fans by message stamp and accumulate a local bathymetric submap
+   for each keyframe interval. The MBES profile finalizes one keyframe late
+   (`submaps.finalize_delay_keyframes=1`) so point/keyframe callback ordering
+   has less effect on repeated replay runs.
 3. Keep a searchable index of older submaps.
 4. Reject candidates inside a temporal/keyframe exclusion window.
 5. Run submap-vs-submap GICP, ICP, or NDT with the odometry relative
@@ -102,7 +105,8 @@ ros2 launch aqua_localization replay.launch.py \
 
 Tune in this order:
 
-1. `submaps.voxel_leaf_m` and `submaps.min_points` until submaps are dense
+1. `submaps.voxel_leaf_m`, `submaps.min_points`, and
+   `submaps.finalize_delay_keyframes` until submaps are dense and repeatable
    enough but not too slow.
 2. `candidates.max_distance_m` and `candidates.min_keyframe_separation` until
    plausible revisits are tested.

@@ -188,13 +188,41 @@ from the status message. This does not solve replay variance by itself. The
 remaining spread points at candidate evaluation and registration scheduling
 rather than missing output-topic recording or missing endpoint identity.
 
+### Timestamp-Buffered Submap Probe
+
+After changing MBES loop-closure submap assembly to buffer point clouds by
+message stamp and finalize each MBES-profile submap one keyframe late
+(`submaps.finalize_delay_keyframes=1`), the repeated baseline was rerun with
+the same shallow queue and slow playback controls:
+
+`/tmp/aqua_mbes_candidate_descriptor_weight_repeat_timestamp_delay_wip_115937`
+
+| Weight | Status | Input RMSE m | Pose graph RMSE m | Graph vs input m | Graph vs baseline m | Matched s | Accepted | Rejected | No candidate |
+|-------:|--------|-------------:|------------------:|-----------------:|--------------------:|----------:|---------:|---------:|-------------:|
+| 0.0000 | baseline, best | 59.0207 | 64.9449 | -5.9242 | 0.0000 | 119.64 | 13 | 237 | 103 |
+| 0.0000 | baseline repeat | 59.0437 | 69.5286 | -10.4849 | -4.5837 | 119.66 | 9 | 292 | 172 |
+
+Baseline repeat spread:
+
+- Input RMSE: `59.0207..59.0437` m, spread `0.0230` m.
+- Pose graph RMSE: `64.9449..69.5286` m, spread `4.5837` m.
+- Accepted loops: `9..13`, spread `4`.
+
+This is a useful determinism improvement versus the endpoint-stamp probe
+(`7.4646` m input RMSE spread, `22.5625` m pose-graph RMSE spread, accepted-loop
+spread `9`). It does not make the loop set deterministic: the two accepted-loop
+endpoint timestamp sets had zero shared pairs. Keep the timestamp-buffered
+submaps, then target candidate/registration ordering before descriptor-weight
+tuning.
+
 ## Follow-Up
 
 - Use strict recorder readiness, endpoint-stamp status messages, and
   `PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000` for the next descriptor
   sweep, with repeated baselines included.
 - Pin node-side candidate evaluation and registration scheduling determinism
-  before tuning descriptor weights again.
+  before tuning descriptor weights again; timestamp-buffered submaps reduce
+  RMSE variance but do not align accepted-loop identity yet.
 - Keep repeated `0.0` baseline cases in every weight sweep; duplicate weights
   keep the first output name and add `_run2`, for example `weight_0` and
   `weight_0_run2`.
