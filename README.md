@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/aqualoc_harbor_hero.gif" alt="Real AQUALOC harbor_07 underwater ROV camera footage with the aqua_localization estimated depth overlaid as a live HUD" width="86%">
+  <img src="docs/media/aqualoc_harbor_hero.gif" alt="Real AQUALOC harbor_07 underwater ROV camera footage on the left and the monocular visual-odometry trajectory recovered from that same camera on the right" width="86%">
 </p>
 
 Ocean localization is hard in specific ways: GNSS disappears at the surface,
