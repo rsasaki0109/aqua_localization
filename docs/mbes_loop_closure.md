@@ -364,6 +364,18 @@ Use the matching `check_mbes_loop_allowlist_replay.py --signature-*` options
 when auditing a signature replay; exact-ID-only strict audits are still useful
 for integrity probes that should not accept drifted IDs.
 
+The 2026-06-05 Humble sqlite diagnostic at
+`/tmp/aqua_mbes_selected_loop_compare_priority_rot02` used
+`submaps.min_points=120`, `submaps.voxel_leaf_m=0.25`,
+`gates.max_correction_rotation_rad=0.2`, DCS delta `0.1`, endpoint signatures,
+and allowlist-aware candidate prioritization. It accepted 1 selected loop,
+matched it by endpoint signature with 0 off-allowlist accepted loops, and
+improved selected pose-graph RMSE by 7.25 m versus normal replay. It is still
+not claimable trajectory evidence because the selected pose graph was worse
+than its own input odometry by 4.83 m and only one selected endpoint survived.
+The next front-end step is descriptor-level loop identity/retrieval rather than
+only broader timestamp tolerances.
+
 To run the normal replay, selected-loop replay, and metric comparison as one
 artifact bundle:
 

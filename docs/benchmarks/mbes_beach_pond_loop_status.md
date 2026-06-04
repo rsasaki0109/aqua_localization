@@ -244,6 +244,8 @@ completed.
 | MBES-SLAM | `beach_pond` | 120 | 277 | 35 | 178 | 64 | 163 | 0.1930 | 3.7891 | unaudited tuning run, `min_points=120`, `voxel=0.25`, Humble sqlite |
 | MBES-SLAM | `beach_pond` | 120 | 338 | 35 | 194 | 109 | 133 | 0.9520 | 2.9900 | unaudited stricter candidate run, `min_points=120`, `voxel=0.25`, `min_keyframe_separation=40`, Humble sqlite |
 | MBES-SLAM | `beach_pond` | 120 | 405 | 44 | 233 | 128 | 155 | 1.4038 | 4.0682 | unaudited prepared-source strict gate run, `min_points=120`, `voxel=0.25`, `min_keyframe_separation=40`, `max_rotation=0.4`, `descriptor_extent=5.0`, complete geometry required |
+| MBES-SLAM | `beach_pond` | 100 | 350 | 16 | 280 | 54 | 144 | 4.3151 | 4.4944 | normal replay for selected-loop comparison, `min_points=120`, `voxel=0.25`, `max_rotation=0.2`, DCS delta `0.1`, Humble sqlite |
+| MBES-SLAM | `beach_pond` | 100 | 242 | 1 | 207 | 34 | 174 | 0.1106 | 3.2977 | selected-loop replay with endpoint signature audit PASS, candidate prioritization, `min_points=120`, `voxel=0.25`, `max_rotation=0.2`, DCS delta `0.1`, Humble sqlite |
 
 ## Tuning Summary
 
