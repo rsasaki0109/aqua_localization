@@ -11,10 +11,11 @@ aqua_sonar_loc:
       status: /aqua_sonar_loc/status
 
     qos:
-      # Deepen the best-effort point-cloud queue for benchmark replays. This
-      # reduces burst sensitivity when rosbag2 publishes MBES fans faster than
-      # scan matching can process individual callbacks.
-      sensor_depth: 1000
+      # Keep the best-effort point-cloud queue shallow for replay benchmarks.
+      # A deep 1000-sample queue increased callback backlog on beach_pond and
+      # sharply reduced accepted loops; use SONAR_QOS_SENSOR_DEPTH only as a
+      # diagnostic override when isolating queue pressure.
+      sensor_depth: 5
 
     frames:
       map: map

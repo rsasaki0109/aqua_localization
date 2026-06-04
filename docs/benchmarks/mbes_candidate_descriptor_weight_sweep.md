@@ -138,6 +138,29 @@ should use these playback controls. Input odometry and loop-status counts still
 drift enough to keep rows marked `check coverage`; the next target is
 node-side input processing determinism and loop identity stability.
 
+### Queue-Depth Probe
+
+After adding `qos.sensor_depth` overrides, the repeated baseline was rerun with
+the same slow playback controls but with both MBES profiles using
+`qos.sensor_depth=1000`:
+
+`/tmp/aqua_mbes_candidate_descriptor_weight_repeat_qos_55ebc9e`
+
+| Weight | Status | Input RMSE m | Pose graph RMSE m | Graph vs input m | Graph vs baseline m | Matched s | Accepted | Rejected | No candidate |
+|-------:|--------|-------------:|------------------:|-----------------:|--------------------:|----------:|---------:|---------:|-------------:|
+| 0.0000 | baseline, best | 1848.3796 | 1684.8987 | +163.4809 | 0.0000 | 119.40 | 6 | 87 | 270 |
+| 0.0000 | baseline repeat, check coverage | 1899.0143 | 1795.0178 | +103.9965 | -110.1191 | 119.66 | 1 | 13 | 316 |
+
+Baseline repeat spread:
+
+- Input RMSE: `1848.3796..1899.0143` m, spread `50.6347` m.
+- Pose graph RMSE: `1684.8987..1795.0178` m, spread `110.1191` m.
+- Accepted loops: `1..6`, spread `5`.
+
+This rejects a deep sensor queue as the default replay setting. Keep
+`qos.sensor_depth=5` in MBES profiles and use the environment overrides only as
+diagnostics when testing callback pressure.
+
 ## Follow-Up
 
 - Use `PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000` for the next descriptor

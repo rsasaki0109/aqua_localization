@@ -23,10 +23,11 @@ aqua_imu_loc:
       status: /aqua_imu_loc/status
 
     qos:
-      # MBES replay can burst high-rate IMU and sonar feedback messages through
-      # rosbag2. Keep a deeper best-effort sensor queue than the ROS 2 default
-      # so repeated benchmark runs are less sensitive to callback scheduling.
-      sensor_depth: 1000
+      # Keep the best-effort sensor queue shallow for replay benchmarks. A
+      # deep 1000-sample queue increased callback backlog on beach_pond and
+      # made repeated runs diverge badly; use IMU_QOS_SENSOR_DEPTH only as a
+      # diagnostic override when isolating queue pressure.
+      sensor_depth: 5
 
     frames:
       map: map
