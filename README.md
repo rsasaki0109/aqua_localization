@@ -18,87 +18,29 @@
   <img src="docs/media/mbes_slam_beach_pond.gif" alt="MBES-SLAM beach_pond multibeam sonar replay in rerun.io" width="86%">
 </p>
 
-This repository is shaped around the parts that make ocean localization hard:
-GNSS disappears at the surface boundary, pressure becomes a primary depth
-measurement, DVL arrives in the vehicle frame, and sonar returns can be sparse
-or geometrically ambiguous. The stack combines a 15-state additive UKF,
-pressure-depth updates, DVL velocity updates, PCL-based sonar registration, a
-g2o SE(3) pose graph backend, and an experimental MBES submap loop-closure
-front end.
-
-The main story is intentionally public-data first: four underwater datasets,
-four [rerun.io](https://rerun.io) renderings, no synthetic bag or
-simulator-only demo as the headline result. Targets BlueROV2-class ROVs,
-custom AUVs, and `uuv_simulator`. ROS 2 Humble and Jazzy are supported.
+Ocean localization is hard in specific ways: GNSS disappears at the surface,
+pressure becomes the primary depth measurement, DVL arrives in the vehicle
+frame, and sonar returns are sparse or geometrically ambiguous. This stack
+keeps those underwater-specific paths explicit and testable — a 15-state
+additive UKF, pressure-depth and DVL-velocity updates, PCL-based sonar
+registration, a g2o SE(3) pose-graph backend, and an experimental MBES
+submap loop-closure front end. The headline results are **public-data first**:
+four real underwater datasets, four [rerun.io](https://rerun.io) renderings,
+no synthetic-bag or simulator-only demo. Targets BlueROV2-class ROVs, custom
+AUVs, and `uuv_simulator`, on ROS 2 Humble and Jazzy.
 
 Latest release: **[v0.5](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.5)**.
-
-Public goal: make the project useful enough to earn **10 GitHub stars** through
-reproducible public-data demos, honest limitations, and small contribution
-paths.
-
-## First-Time Visitor Path
-
-| Time | Open this | What you get |
-|------|-----------|--------------|
-| **30 seconds** | [GitHub Pages overview](https://rsasaki0109.github.io/aqua_localization/) | A playable underwater 3DGS sample and visual entry point. |
-| **2 minutes** | [Public-data results](#public-data-results) | The current replayable Tank, MBES-SLAM, NTNU, and AQUALOC artifacts. |
-| **10 minutes** | [Tank Dataset demo](datasets/tank_dataset_demo.md) | The shortest real-bag localization path with DVL + pressure + GT. |
-| **Next contribution** | [Issue templates](.github/ISSUE_TEMPLATE) and [CONTRIBUTING.md](CONTRIBUTING.md) | A place to submit a dataset, bug, or benchmark result with enough context to reproduce it. |
-
 If this saves bring-up time or gives your AUV/ROV project a useful baseline,
-a GitHub star helps other ROS and underwater-robotics users find the repo and
-signals which demo track to push next.
-
-## Results Snapshot
-
-| Track | Current artifact | Status |
-|-------|------------------|--------|
-| **Tank Dataset localization** | `short_test` DVL fusion: **0.43 m APE RMSE**; visual-aided fusion: **0.37 m** with same-sequence scale fit | Replayable public-data result |
-| **MBES bathymetry replay** | MBES-SLAM `beach_pond` multibeam fans exported to rerun and RViz tuning views | Working sonar visualization and registration path |
-| **Pose graph loop closure** | No-bag smoke demo plus experimental MBES loop-candidate markers and status diagnostics | Backend shipped, real-bag tuning still in progress |
-| **Underwater 3DGS** | v0.3 Tank 20-frame nerfstudio-style input pack with an interactive playback viewer and readiness gate | Input artifact published, training smoke test next |
-| **OSS comparison** | AQUA-SLAM Docker anchor recorded on Tank `short_test`; comparison plan and tables live in `docs/benchmarks` | Accuracy target identified, no superiority claim yet |
-
-<p align="center">
-  <img src="docs/media/aqua_pipeline.svg" alt="aqua_localization pipeline from underwater sensors to filtering, sonar registration, pose graph loop closure, and visualization" width="92%">
-</p>
-
-## Quick Links
-
-| Path | Start here |
-|------|------------|
-| **Visual overview** | [GitHub Pages](https://rsasaki0109.github.io/aqua_localization/) and [public-data results](#public-data-results) |
-| **Run the ROS stack** | [Build and launch](#run-it), then follow the [Tank Dataset demo](datasets/tank_dataset_demo.md) |
-| **Loop-closure demo** | [No-bag smoke test](#loop-closure-smoke-test) or [real-bag MBES tuning](#experimental-mbes-loop-closure) |
-| **Underwater 3DGS track** | [Play the sample viewer](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html), [open the demo page](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_demo.html), or download the [v0.3 pack](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
-| **Architecture and status** | [Stack map](#stack-map), [project status](#project-status), and [benchmark plans](docs/benchmarks/) |
-
-## What It Does
-
-| Signal | Why it matters underwater |
-|--------|---------------------------|
-| **Pressure depth** | Keeps the vertical axis observable below the surface. |
-| **DVL velocity** | Provides vehicle-frame motion constraints for AUV/ROV dead reckoning. |
-| **Stereo camera** | Experimental ORB + PnP visual odometry for Tank-style underwater stereo bags. |
-| **Multibeam sonar** | Turns acoustic fans into bathymetric structure for registration. |
-| **Pose graph edges** | Keeps long seafloor replays inspectable through keyframes and loop constraints. |
-| **rerun / RViz views** | Shows trajectories, sonar clouds, loop candidates, and tuning diagnostics. |
-
-Underwater localization usually needs more than a generic planar robot
-stack: pressure/depth is a first-class measurement, DVL velocity arrives
-in the vehicle frame, sonar geometry can be degenerate, and public
-benchmarks often use ROS bags with dataset-specific topics. This repository
-keeps those underwater-specific paths explicit and testable.
+a ⭐ helps other underwater-robotics users find it — the public goal is
+**10 GitHub stars** through reproducible demos and honest limitations.
 
 ## Public-Data Results
 
-Each row has a one-shot recorder and rerun export script. The images below are
-generated from recorded demo bags, so the README is tied to replayable data
-instead of hand-captured screenshots.
+Each row has a one-shot recorder and rerun export script, so the images below
+are generated from recorded demo bags rather than hand-captured screenshots.
 
-| Dataset | What it shows | rerun screenshot |
-|---------|---------------|------------------|
+| Dataset | What it shows | rerun view |
+|---------|---------------|------------|
 | **Tank Dataset `short_test`** | DVL fusion **0.43 m APE RMSE**; experimental visual-aided fusion **0.37 m** with same-sequence scale fit | [`tank_dataset_rerun.png`](docs/media/tank_dataset_rerun.png) |
 | **MBES-SLAM `beach_pond`** | Multibeam fans accumulated into a depth-coloured bathymetric scan | [`mbes_slam_rerun.png`](docs/media/mbes_slam_rerun.png) |
 | **NTNU `subset-fjord/fjord_1`** | Dataset SLAM baseline through a 7 m fjord dive | [`ntnu_fjord_1_rerun.png`](docs/media/ntnu_fjord_1_rerun.png) |
@@ -111,47 +53,45 @@ instead of hand-captured screenshots.
   <img src="docs/media/aqualoc_harbor_07_rerun.png" alt="aqua_localization on AQUALOC harbor_07 in rerun.io" width="49%">
 </p>
 
+<p align="center">
+  <img src="docs/media/aqua_pipeline.svg" alt="aqua_localization pipeline from underwater sensors to filtering, sonar registration, pose graph loop closure, and visualization" width="92%">
+</p>
+
+## Start Here
+
+| Goal | Go to |
+|------|-------|
+| **30-second visual overview** | [GitHub Pages](https://rsasaki0109.github.io/aqua_localization/) |
+| **Run the smallest real-bag demo** | [Tank Dataset demo](datasets/tank_dataset_demo.md) — DVL + pressure + AprilTag GT |
+| **Loop-closure demo** | [No-bag smoke test](#loop-closure-smoke-test) or [real-bag MBES tuning](#experimental-mbes-loop-closure) |
+| **Underwater 3DGS track** | [Play the sample viewer](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html) or [download the v0.3 pack](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
+| **Contribute** | [Issue templates](.github/ISSUE_TEMPLATE) and [CONTRIBUTING.md](CONTRIBUTING.md) |
+
+## What It Does
+
+| Signal | Why it matters underwater |
+|--------|---------------------------|
+| **Pressure depth** | Keeps the vertical axis observable below the surface. |
+| **DVL velocity** | Provides vehicle-frame motion constraints for AUV/ROV dead reckoning. |
+| **Stereo camera** | Experimental ORB + PnP visual odometry for Tank-style underwater stereo bags. |
+| **Multibeam sonar** | Turns acoustic fans into bathymetric structure for registration. |
+| **Pose graph edges** | Keeps long seafloor replays inspectable through keyframes and loop constraints. |
+| **rerun / RViz views** | Shows trajectories, sonar clouds, loop candidates, and tuning diagnostics. |
+
 ## Underwater 3DGS Sample Pack
 
-The first public 3DGS input artifact is a small Tank Dataset `short_test`
-pack for quick inspection and external reconstruction experiments:
+The first public 3DGS input artifact is a small Tank Dataset `short_test` pack
+for quick inspection and external reconstruction experiments: 20 PNG frames, 20
+matched `/apriltag_slam/GT` poses, manual Tank stereo intrinsics, and a
+nerfstudio-style `transforms.json`. The readiness gate passes with
+`check_3dgs_training_ready.py`. This is an input-pack artifact, not a trained
+Gaussian Splatting result.
 
 | Item | Link |
 |------|------|
-| Release | [`v0.3`](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3) |
-| Download | [`tank_short_test_3dgs_pack_20frames.zip`](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
+| Release / download | [`v0.3`](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.3) · [`tank_short_test_3dgs_pack_20frames.zip`](https://github.com/rsasaki0109/aqua_localization/releases/download/v0.3/tank_short_test_3dgs_pack_20frames.zip) |
 | Play before downloading | [Interactive frame + 3D camera-path viewer](https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html) |
 | Rebuild the artifact | [3DGS sample pack workflow](docs/experiments/underwater_3dgs_sample_pack.md) |
-
-<p align="center">
-  <a href="https://rsasaki0109.github.io/aqua_localization/experiments/underwater_3dgs_pack_viewer.html">
-    <img src="docs/media/3dgs_pack_inspector.png" alt="aqua_localization 3DGS sample viewer showing Tank frames, trajectory metadata, and download link" width="92%">
-  </a>
-</p>
-
-Contents: 20 PNG frames, 20 matched `/apriltag_slam/GT` poses, manual Tank
-stereo intrinsics, and a nerfstudio-style `transforms.json`. The training
-readiness gate passes with `check_3dgs_training_ready.py`. This is an
-input-pack artifact, not a trained Gaussian Splatting result.
-
-## Next Milestones
-
-| Milestone | Why it matters |
-|-----------|----------------|
-| **3DGS training smoke test** | Prove the published Tank sample pack can run through a small nerfstudio/gsplat-style training path, with a report template for the exact command and result. |
-| **MBES threshold sweep** | Turn experimental loop-closure tuning into accepted/rejected/false-positive summaries on a real bag. |
-| **AQUA-SLAM comparison run** | Keep the benchmark story reproducible by filling comparison tables from scripts instead of hand-written claims. |
-
-Start the 3DGS training path with the local readiness check:
-
-```bash
-ros2 run aqua_localization check_3dgs_training_ready.py \
-  --pack /tmp/tank_short_test_3dgs_pack_20frames
-```
-
-Training smoke-test docs:
-[`plan`](docs/experiments/underwater_3dgs_training_smoke.md) and
-[`report template`](docs/experiments/underwater_3dgs_training_smoke_report.md).
 
 ## Run It
 
@@ -171,9 +111,9 @@ ros2 launch aqua_localization aqua_localization.launch.py
 
 ### Public Demo
 
-The smallest validated path is the Tank Dataset `short_test` sequence:
-about 15 seconds of real underwater motion with IMU, pressure-derived
-depth, DVL, and AprilTag ground truth.
+The smallest validated path is the Tank Dataset `short_test` sequence: about
+15 seconds of real underwater motion with IMU, pressure-derived depth, DVL,
+and AprilTag ground truth.
 
 ```bash
 # After following datasets/tank_dataset_demo.md to download and convert
@@ -187,14 +127,12 @@ ros2 run aqua_localization rerun_export.py \
 rerun /tmp/tank.rrd
 ```
 
-Per-dataset bring-up notes include download size, conversion steps,
-dataset-specific calibration, and replay commands:
-
-- [`datasets/tank_dataset_demo.md`](datasets/tank_dataset_demo.md)
-- [`datasets/mbes_slam_demo.md`](datasets/mbes_slam_demo.md)
-- [`datasets/mbes_slam_beach_pond_acquisition.md`](datasets/mbes_slam_beach_pond_acquisition.md)
-- [`datasets/ntnu_demo.md`](datasets/ntnu_demo.md)
-- [`datasets/aqualoc_demo.md`](datasets/aqualoc_demo.md)
+Per-dataset bring-up notes (download size, conversion, calibration, replay):
+[`tank`](datasets/tank_dataset_demo.md) ·
+[`mbes_slam`](datasets/mbes_slam_demo.md) ·
+[`beach_pond acquisition`](datasets/mbes_slam_beach_pond_acquisition.md) ·
+[`ntnu`](datasets/ntnu_demo.md) ·
+[`aqualoc`](datasets/aqualoc_demo.md).
 
 ### Loop-Closure Smoke Test
 
@@ -225,11 +163,11 @@ Detailed architecture per package: [`docs/architecture.md`](docs/architecture.md
 
 ## Experimental MBES Loop Closure
 
-The MBES path now includes an experimental submap-vs-submap loop-closure
-front end. It accumulates bathymetric submaps between pose-graph keyframes,
-tests odometry-near historical candidates with ICP/GICP/NDT, publishes
-accepted constraints to `/aqua_pose_graph/loop_constraint`, and exposes
-tuning diagnostics on `/mbes_loop_closure/status` plus RViz markers on
+The MBES path includes an experimental submap-vs-submap loop-closure front end.
+It accumulates bathymetric submaps between pose-graph keyframes, tests
+odometry-near historical candidates with ICP/GICP/NDT, publishes accepted
+constraints to `/aqua_pose_graph/loop_constraint`, and exposes tuning
+diagnostics on `/mbes_loop_closure/status` plus RViz markers on
 `/mbes_loop_closure/markers`.
 
 Use the dedicated RViz view while tuning real bags:
@@ -254,56 +192,50 @@ real-bag status export, threshold sweeps, and false-positive analysis.
 Two browser-friendly paths run on the same self-contained demo bag:
 
 - **rerun.io** — the recommended default. Use
-  [`rerun_export*.py`](aqua_localization/scripts) to write a `.rrd` with
-  a curated 3D + plots blueprint, then open it locally with
-  `rerun some.rrd`. Headless `--screenshot-to` produces the README
-  thumbnails.
-- **Lichtblick** (Apache-2.0 fork of Foxglove Studio) — drag the
-  `.mcap` onto <https://lichtblick-suite.github.io/lichtblick/> and
-  import [`docs/foxglove/aqua_tank_demo.json`](docs/foxglove/aqua_tank_demo.json).
-  The accompanying [`lichtblick_screenshot.py`](aqua_localization/scripts/lichtblick_screenshot.py)
+  [`rerun_export*.py`](aqua_localization/scripts) to write a `.rrd` with a
+  curated 3D + plots blueprint, then open it locally with `rerun some.rrd`.
+  Headless `--screenshot-to` produces the README thumbnails.
+- **Lichtblick** (Apache-2.0 fork of Foxglove Studio) — drag the `.mcap` onto
+  <https://lichtblick-suite.github.io/lichtblick/> and import
+  [`docs/foxglove/aqua_tank_demo.json`](docs/foxglove/aqua_tank_demo.json).
+  [`lichtblick_screenshot.py`](aqua_localization/scripts/lichtblick_screenshot.py)
   drives the same flow headlessly via Playwright.
 
 Bag-recording recipe: [`docs/foxglove/README.md`](docs/foxglove/README.md).
 
 ## Project Status
 
-### Roadmap
-
 The headline next milestone is **reliable real-data loop closure**. The
 pose-graph backend and an experimental MBES front end are in place; the
-remaining work is threshold tuning, candidate reliability, information
-matrix calibration, and eventually visual loop closure for AQUALOC. ESKF
-backend, magnetometer fusion, and acoustic positioning are also on the list.
+remaining work is threshold tuning, candidate reliability, information-matrix
+calibration, and eventually visual loop closure for AQUALOC. An ESKF backend,
+magnetometer fusion, and acoustic positioning are also on the list. The nearest
+concrete steps are a **3DGS training smoke test** on the published Tank pack, an
+**MBES threshold sweep** turning loop-closure tuning into accepted/rejected
+summaries, and a reproducible **AQUA-SLAM comparison run**.
 
-Planning and validation references:
-
-| Area | Link |
-|------|------|
-| Overall plan | [`PLAN.md`](PLAN.md) |
-| Verified features | [`docs/mvp_checklist.md`](docs/mvp_checklist.md) |
-| Benchmarks | [`docs/benchmarks/`](docs/benchmarks) |
-| Real-bag evaluation sheet | [`real_bag_evaluation.md`](docs/benchmarks/real_bag_evaluation.md) |
-| SOTA gap analysis | [`sota_gap_analysis.md`](docs/benchmarks/sota_gap_analysis.md) |
-| OSS comparison | [`oss_comparison.md`](docs/benchmarks/oss_comparison.md) |
-| AQUA-SLAM comparison | [`aqua_slam_comparison.md`](docs/benchmarks/aqua_slam_comparison.md) and [`tank_aqua_slam.md`](docs/benchmarks/tank_aqua_slam.md) |
-| MBES loop closure | [`docs/mbes_loop_closure.md`](docs/mbes_loop_closure.md) |
-| Public launch | [`docs/public_launch_checklist.md`](docs/public_launch_checklist.md) |
+Planning and validation references: [`PLAN.md`](PLAN.md) ·
+[`mvp_checklist`](docs/mvp_checklist.md) ·
+[`benchmarks/`](docs/benchmarks) ·
+[`real_bag_evaluation`](docs/benchmarks/real_bag_evaluation.md) ·
+[`sota_gap_analysis`](docs/benchmarks/sota_gap_analysis.md) ·
+[`oss_comparison`](docs/benchmarks/oss_comparison.md) ·
+[`aqua_slam_comparison`](docs/benchmarks/aqua_slam_comparison.md) ·
+[`mbes_loop_closure`](docs/mbes_loop_closure.md) ·
+[`public_launch_checklist`](docs/public_launch_checklist.md).
 
 ### Honest Limitations
 
-- IMU-only dead reckoning drifts roughly an order of magnitude on bags
-  without DVL/visual aiding (NTNU `fjord_1`, AQUALOC `harbor_07` show
-  hundreds of meters of XY drift; depth `z(t)` tracks well via the
-  pressure update).
+- IMU-only dead reckoning drifts roughly an order of magnitude on bags without
+  DVL/visual aiding (NTNU `fjord_1`, AQUALOC `harbor_07` show hundreds of meters
+  of XY drift; depth `z(t)` tracks well via the pressure update).
 - Single-fan multibeam registration is geometrically degenerate.
-  Tightly-coupled sonar feedback narrows MBES-SLAM `beach_pond` fusion
-  drift from ±40 m to ~17 m, but per-fan residuals are still ~10 m
-  magnitude. The pose graph backend and experimental MBES loop-closure
-  front end ship, but the loop-closure thresholds and information matrix
-  are not yet calibrated on a full real-bag tuning run.
-- `aqua_fusion` has unit + runtime tests but no per-platform benchmark
-  history yet.
+  Tightly-coupled sonar feedback narrows MBES-SLAM `beach_pond` fusion drift
+  from ±40 m to ~17 m, but per-fan residuals are still ~10 m magnitude. The
+  loop-closure thresholds and information matrix are not yet calibrated on a
+  full real-bag tuning run.
+- `aqua_fusion` has unit + runtime tests but no per-platform benchmark history
+  yet.
 
 ## Testing
 
@@ -314,16 +246,16 @@ colcon test --packages-select \
 ```
 
 Run `colcon test-result --verbose` after testing for the current count; the
-latest local validation before this README refresh reported 92 tests with
-zero failures.
+latest local validation before this README refresh reported 92 tests with zero
+failures.
 
 ## Contributing
 
 Bug reports, dataset bring-up notes, benchmark results, and focused pull
-requests are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md)
-for the expected build/test commands and issue templates.
+requests are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) for the
+expected build/test commands and issue templates.
 
 ## License
 
-Apache-2.0. See [`LICENSE`](LICENSE) and individual `package.xml` files
-for per-package maintainer info.
+Apache-2.0. See [`LICENSE`](LICENSE) and individual `package.xml` files for
+per-package maintainer info.
