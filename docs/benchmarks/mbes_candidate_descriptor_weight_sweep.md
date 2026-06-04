@@ -114,11 +114,36 @@ This invalidates the earlier apparent `2.0` improvement as a descriptor-weight
 claim. The next useful work is to reduce replay/pose-graph nondeterminism and
 then rerun the same repeated-baseline protocol.
 
+### Slower Playback Probe
+
+After exposing playback controls, the repeated baseline was rerun with
+`PLAY_RATE=0.5`, `PLAY_READ_AHEAD_QUEUE_SIZE=10000`, and exact timeout margin
+`PLAY_TIMEOUT_MARGIN_S=0`:
+
+`/tmp/aqua_mbes_candidate_descriptor_weight_repeat_slow_exact_a27db0c`
+
+| Weight | Status | Input RMSE m | Pose graph RMSE m | Graph vs input m | Graph vs baseline m | Matched s | Accepted | Rejected | No candidate |
+|-------:|--------|-------------:|------------------:|-----------------:|--------------------:|----------:|---------:|---------:|-------------:|
+| 0.0000 | baseline, best | 62.7736 | 75.8263 | -13.0527 | 0.0000 | 119.65 | 16 | 595 | 259 |
+| 0.0000 | baseline repeat, check coverage | 58.6803 | 75.9117 | -17.2314 | -0.0854 | 119.60 | 10 | 408 | 261 |
+
+Baseline repeat spread:
+
+- Input RMSE: `58.6803..62.7736` m, spread `4.0933` m.
+- Pose graph RMSE: `75.8263..75.9117` m, spread `0.0854` m.
+- Accepted loops: `10..16`, spread `6`.
+
+Slower playback largely stabilizes pose-graph RMSE, so future descriptor sweeps
+should use these playback controls. Input odometry and loop-status counts still
+drift enough to keep rows marked `check coverage`; the next target is
+node-side input processing determinism and loop identity stability.
+
 ## Follow-Up
 
-- Pin replay startup and node readiness before tuning descriptor weights again.
-- Probe replay overload by rerunning repeated baselines with
-  `PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000`.
+- Use `PLAY_RATE=0.5 PLAY_READ_AHEAD_QUEUE_SIZE=10000` for the next descriptor
+  sweep, with repeated baselines included.
+- Pin node-side input processing determinism before tuning descriptor weights
+  again.
 - Keep repeated `0.0` baseline cases in every weight sweep; duplicate weights
   keep the first output name and add `_run2`, for example `weight_0` and
   `weight_0_run2`.
