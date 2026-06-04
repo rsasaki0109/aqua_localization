@@ -79,6 +79,10 @@ class DemoGifRecorder(Node):
         self.first_frame_time: float | None = None
         self.start_wall = time.monotonic()
         self.skipped_until_first_odom = True
+        # Count of accepted point clouds; used with --frame-stride so the map keeps
+        # accumulating from every fan while we only render 1-in-N as GIF frames. This
+        # lets a short GIF span the whole dive instead of just its first seconds.
+        self.points_seen = 0
 
         sensor_qos = QoSProfile(depth=20)
         sensor_qos.reliability = ReliabilityPolicy.BEST_EFFORT
@@ -193,6 +197,13 @@ class DemoGifRecorder(Node):
         # for the lever arm, so we treat them as identity.
         fan_odom = self._transform_to_odom(fan_local)
         self._accumulate_points(fan_odom)
+
+        # Always accumulate the map above, but only render every Nth fan as a frame
+        # so a long dive collapses into a compact, full-coverage GIF.
+        self.points_seen += 1
+        stride = max(1, int(self.args.frame_stride))
+        if (self.points_seen - 1) % stride != 0:
+            return
 
         elapsed = stamp_to_seconds(msg.header.stamp) - self.first_frame_time
         self.render_frame(elapsed)
@@ -387,6 +398,13 @@ def parse_args(argv) -> argparse.Namespace:
         help="Hard cap on number of frames recorded.",
     )
     parser.add_argument("--fps", type=float, default=10.0, help="Output GIF frames per second.")
+    parser.add_argument(
+        "--frame-stride",
+        type=int,
+        default=1,
+        help="Render 1-in-N point clouds as GIF frames (the map still accumulates "
+        "from every fan). Use >1 to make a short GIF span a long dive.",
+    )
     parser.add_argument("--width", type=int, default=960)
     parser.add_argument("--height", type=int, default=540)
     parser.add_argument("--dpi", type=int, default=120)
