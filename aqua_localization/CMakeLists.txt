@@ -25,6 +25,7 @@ install(PROGRAMS
   scripts/compare_mbes_loop_metric_reports.py
   scripts/check_mbes_loop_allowlist_replay.py
   scripts/diagnose_mbes_selected_loop_coverage.py
+  scripts/evaluate_mbes_descriptor_retrieval.py
   scripts/remap_mbes_selected_loop_allowlist.py
   scripts/check_tank_aqua_slam_baseline_ready.py
   scripts/summarize_tank_aqua_slam_baseline_todos.py
@@ -129,6 +130,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_diagnose_mbes_selected_loop_coverage
     test/test_diagnose_mbes_selected_loop_coverage.py
+  )
+  ament_add_pytest_test(
+    test_evaluate_mbes_descriptor_retrieval
+    test/test_evaluate_mbes_descriptor_retrieval.py
   )
   ament_add_pytest_test(
     test_remap_mbes_selected_loop_allowlist

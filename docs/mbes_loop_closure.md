@@ -393,9 +393,13 @@ only broader timestamp tolerances.
 A follow-up descriptor-refined signature replay at
 `/tmp/aqua_mbes_selected_loop_compare_descriptor_sig_w5` widened the timestamp
 window to 5 s and bounded descriptor deltas, but accepted 0 selected loops. The
-audit still passed because no off-allowlist loops were accepted; the useful
-finding is that offline selection can prefer replay-brittle or weak loop
-registrations unless candidate quality is filtered before clique selection.
+audit still passed because no off-allowlist loops were accepted. The descriptor
+retrieval report from the same bundle ranked 5 descriptor signatures against
+the selected replay status rows; endpoint-timestamp recall was 0/5 through
+top 5 and 1/5 at top 10. The useful finding is that offline selection can
+prefer replay-brittle or weak loop registrations unless candidate quality is
+filtered before clique selection, and that scalar descriptor similarity is not
+yet a robust loop-proposal stage.
 
 To run the normal replay, selected-loop replay, and metric comparison as one
 artifact bundle:
@@ -412,17 +416,20 @@ The wrapper writes separate normal/selected benchmark directories,
 `mbes_selected_loop_coverage.md` before the strict allowlist audit so failed
 selected replays still explain whether selected IDs were replayed, missed by
 timestamp coverage, or replaced by accepted-looking candidates with different
-IDs. It also writes `mbes_selected_loop_remapped_allowlist.csv` and
-`mbes_selected_loop_remap.md`, which map normal selected loop rows onto
-accepted-looking target replay rows inside a timestamp window. Use that
-remapped CSV only as a diagnostic second-pass allowlist; it is not a substitute
-for a stable loop identity or false-positive review. The comparison report
-checks pose-graph RMSE from the two `mbes_loop_trajectory_metrics.py` reports;
-the allowlist audit checks that a selected replay did not accept loop IDs
-outside the CSV used for `loop.selection.allowlist_csv`. The wrapper exits
-before the selected replay if the normal replay writes only a CSV header and no
-selected loop rows. By default the wrapper also exits non-zero when the
-allowlist audit finds off-allowlist accepted loops. Set
+IDs. It writes `mbes_descriptor_retrieval.md`, which scores selected-loop
+descriptor signatures against replay candidate rows and reports exact-ID and
+endpoint-timestamp recall@k. It also writes
+`mbes_selected_loop_remapped_allowlist.csv` and `mbes_selected_loop_remap.md`,
+which map normal selected loop rows onto accepted-looking target replay rows
+inside a timestamp window. Use that remapped CSV only as a diagnostic second-pass
+allowlist; it is not a substitute for a stable loop identity or false-positive
+review. The comparison report checks pose-graph RMSE from the two
+`mbes_loop_trajectory_metrics.py` reports; the allowlist audit checks that a
+selected replay did not accept loop IDs outside the CSV used for
+`loop.selection.allowlist_csv`. The wrapper exits before the selected replay if
+the normal replay writes only a CSV header and no selected loop rows. By default
+the wrapper also exits non-zero when the allowlist audit finds off-allowlist
+accepted loops. Set
 `ALLOWLIST_AUDIT_STRICT=0` only when you need to preserve a diagnostic replay
 bundle despite that failure.
 

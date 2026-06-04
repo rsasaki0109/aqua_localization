@@ -42,6 +42,9 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
             "MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA": "0.02",
             "MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M": "0.4",
             "MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD": "0.05",
+            "MBES_LOOP_SELECTION_MATCH_MAX_DESCRIPTOR_CENTROID_DELTA_M": "0.6",
+            "MBES_LOOP_SELECTION_MATCH_MAX_DESCRIPTOR_EXTENT_RATIO_DELTA": "0.15",
+            "MBES_LOOP_SELECTION_MATCH_MAX_DESCRIPTOR_POINT_COUNT_RATIO_DELTA": "0.10",
             "MBES_LOOP_SELECTION_PRIORITIZE_CANDIDATES": "false",
         }
     )
@@ -93,6 +96,13 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert "diagnose_mbes_selected_loop_coverage.py" in proc.stdout
     assert "--timestamp-window-s 1.0" in proc.stdout
     assert "mbes_selected_loop_coverage.md" in proc.stdout
+    assert "evaluate_mbes_descriptor_retrieval.py" in proc.stdout
+    assert "--current-timestamp-window-s 0.25" in proc.stdout
+    assert "--candidate-timestamp-window-s 1.0" in proc.stdout
+    assert "--descriptor-centroid-scale-m 0.6" in proc.stdout
+    assert "--descriptor-extent-scale 0.15" in proc.stdout
+    assert "--descriptor-point-ratio-scale 0.10" in proc.stdout
+    assert "mbes_descriptor_retrieval.md" in proc.stdout
     assert "remap_mbes_selected_loop_allowlist.py" in proc.stdout
     assert "mbes_selected_loop_remapped_allowlist.csv" in proc.stdout
     assert "mbes_selected_loop_remap.md" in proc.stdout
@@ -103,10 +113,14 @@ def test_dry_run_prints_normal_selected_and_comparison_commands(tmp_path):
     assert "--signature-max-fitness-delta 0.02" in proc.stdout
     assert "--signature-max-translation-delta-m 0.4" in proc.stdout
     assert "--signature-max-rotation-delta-rad 0.05" in proc.stdout
+    assert "--signature-max-descriptor-centroid-delta-m 0.6" in proc.stdout
+    assert "--signature-max-descriptor-extent-ratio-delta 0.15" in proc.stdout
+    assert "--signature-max-descriptor-point-count-ratio-delta 0.10" in proc.stdout
     assert "mbes_selected_loop_allowlist_audit.md" in proc.stdout
     assert "normal ROS_DOMAIN_ID: 31" in proc.stdout
     assert "selected ROS_DOMAIN_ID: 131" in proc.stdout
     assert "remapped allowlist:" in proc.stdout
+    assert "descriptor retrieval:" in proc.stdout
     assert "remap report:" in proc.stdout
     assert "MBES selected-loop replay comparison artifacts:" in proc.stdout
 
