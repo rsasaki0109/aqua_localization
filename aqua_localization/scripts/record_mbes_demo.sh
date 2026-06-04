@@ -76,6 +76,26 @@ MBES_LOOP_SELECTION_MATCH_MAX_DESCRIPTOR_EXTENT_RATIO_DELTA="${MBES_LOOP_SELECTI
 MBES_LOOP_SELECTION_MATCH_MAX_DESCRIPTOR_POINT_COUNT_RATIO_DELTA="${MBES_LOOP_SELECTION_MATCH_MAX_DESCRIPTOR_POINT_COUNT_RATIO_DELTA:-}"
 MBES_LOOP_SELECTION_PRIORITIZE_CANDIDATES="${MBES_LOOP_SELECTION_PRIORITIZE_CANDIDATES:-}"
 
+PIDS_TO_CLEAN=()
+CLEANED_UP=0
+
+cleanup_processes() {
+  if [[ "$CLEANED_UP" == "1" ]]; then
+    return 0
+  fi
+  CLEANED_UP=1
+  if [[ "${#PIDS_TO_CLEAN[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  kill -INT "${PIDS_TO_CLEAN[@]}" 2>/dev/null || true
+  sleep 4
+  kill -TERM "${PIDS_TO_CLEAN[@]}" 2>/dev/null || true
+  sleep 1
+}
+
+trap cleanup_processes EXIT
+
 validate_ros_domain_id() {
   if [[ -z "${ROS_DOMAIN_ID:-}" ]]; then
     return 0
@@ -287,6 +307,7 @@ ros2 run aqua_imu_loc imu_loc_node --ros-args \
   -p use_sim_time:=true \
   > /tmp/aqua_record_mbes_imu.log 2>&1 &
 IMU_PID=$!
+PIDS_TO_CLEAN+=("$IMU_PID")
 
 ros2 run aqua_sonar_loc sonar_loc_node --ros-args \
   --params-file "$SONAR_PROFILE" \
@@ -294,6 +315,7 @@ ros2 run aqua_sonar_loc sonar_loc_node --ros-args \
   -p use_sim_time:=true \
   > /tmp/aqua_record_mbes_sonar.log 2>&1 &
 SON_PID=$!
+PIDS_TO_CLEAN+=("$SON_PID")
 
 ros2 run aqua_pose_graph pose_graph_node --ros-args \
   --params-file "$POSE_GRAPH_PROFILE" \
@@ -301,6 +323,7 @@ ros2 run aqua_pose_graph pose_graph_node --ros-args \
   -p use_sim_time:=true \
   > /tmp/aqua_record_mbes_pose_graph.log 2>&1 &
 PG_PID=$!
+PIDS_TO_CLEAN+=("$PG_PID")
 
 ros2 run aqua_sonar_loc mbes_loop_closure_node --ros-args \
   --params-file "$MBES_LOOP_PROFILE" \
@@ -308,6 +331,7 @@ ros2 run aqua_sonar_loc mbes_loop_closure_node --ros-args \
   -p use_sim_time:=true \
   > /tmp/aqua_record_mbes_loop_closure.log 2>&1 &
 LOOP_PID=$!
+PIDS_TO_CLEAN+=("$LOOP_PID")
 
 sleep 3
 
@@ -327,6 +351,7 @@ ros2 bag record -s "$RECORD_STORAGE" -o "$MBES_OUT" \
            /tf /tf_static \
   > /tmp/aqua_record_mbes_bag.log 2>&1 &
 REC_PID=$!
+PIDS_TO_CLEAN+=("$REC_PID")
 
 wait_for_recorder_ready
 
@@ -368,11 +393,7 @@ else
 fi
 
 sleep 3
-
-kill -INT "$REC_PID" "$IMU_PID" "$SON_PID" "$PG_PID" "$LOOP_PID" 2>/dev/null || true
-sleep 4
-kill -TERM "$REC_PID" "$IMU_PID" "$SON_PID" "$PG_PID" "$LOOP_PID" 2>/dev/null || true
-sleep 1
+cleanup_processes
 
 ls -la "$MBES_OUT"
 echo "MBES demo bag recorded to $MBES_OUT"
