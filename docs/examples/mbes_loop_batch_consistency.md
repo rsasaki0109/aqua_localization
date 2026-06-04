@@ -76,5 +76,12 @@ MBES_LOOP_SELECTION_MATCH_TIMESTAMP_WINDOW_S=0.25 \
 MBES_LOOP_SELECTION_MATCH_MAX_FITNESS_DELTA=0.05 \
 MBES_LOOP_SELECTION_MATCH_MAX_TRANSLATION_DELTA_M=0.5 \
 MBES_LOOP_SELECTION_MATCH_MAX_ROTATION_DELTA_RAD=0.05 \
+MBES_LOOP_SELECTION_MATCH_MAX_DESCRIPTOR_CENTROID_DELTA_M=0.5 \
+MBES_LOOP_SELECTION_MATCH_MAX_DESCRIPTOR_EXTENT_RATIO_DELTA=0.2 \
+MBES_LOOP_SELECTION_MATCH_MAX_DESCRIPTOR_POINT_COUNT_RATIO_DELTA=0.2 \
 ./aqua_localization/scripts/record_mbes_demo.sh
 ```
+
+Descriptor signature deltas are optional. Use them when the selected CSV was
+exported with descriptor columns and endpoint timestamps alone leave nearby
+candidate distractors inside the replay window.

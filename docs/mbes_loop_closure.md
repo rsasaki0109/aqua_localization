@@ -360,6 +360,15 @@ the current and candidate keyframe timestamps to fall inside the configured
 window. This is stricter than the older status-timestamp-only fallback and can
 turn a diagnostic PASS into a FAIL if the replay accepts a nearby but different
 candidate endpoint.
+Selected CSV rows also carry `descriptor_centroid_distance_m`,
+`descriptor_extent_ratio`, and `descriptor_point_count_ratio`. Set
+`loop.selection.match_max_descriptor_centroid_delta_m`,
+`loop.selection.match_max_descriptor_extent_ratio_delta`, and
+`loop.selection.match_max_descriptor_point_count_ratio_delta` to make signature
+matching and allowlist candidate prioritization descriptor-refined. These
+descriptor deltas are disabled by default and require a selected CSV exported
+after the descriptor columns were added; exact ID matches still bypass the
+signature fallback.
 Use the matching `check_mbes_loop_allowlist_replay.py --signature-*` options
 when auditing a signature replay; exact-ID-only strict audits are still useful
 for integrity probes that should not accept drifted IDs.

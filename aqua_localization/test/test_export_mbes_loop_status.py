@@ -732,7 +732,7 @@ def test_write_batch_consistency_selected_csv_outputs_allowlist_schema(tmp_path)
     samples = [
         module.LoopStatusSample(
             1.0, "map", 1, 0, True, True, 0.1, 1.0, 0.10,
-            math.nan, math.nan, math.nan, "accepted"),
+            0.25, 1.10, 0.80, "accepted"),
         module.LoopStatusSample(
             2.0, "map", 2, 0, True, True, 0.2, 1.1, 0.11,
             math.nan, math.nan, math.nan, "accepted"),
@@ -764,4 +764,7 @@ def test_write_batch_consistency_selected_csv_outputs_allowlist_schema(tmp_path)
     ]
     assert rows[0]["current_keyframe_timestamp"] == "1.000000000"
     assert rows[0]["candidate_keyframe_timestamp"] == "nan"
+    assert rows[0]["descriptor_centroid_distance_m"] == "0.250000000"
+    assert rows[0]["descriptor_extent_ratio"] == "1.100000000"
+    assert rows[0]["descriptor_point_count_ratio"] == "0.800000000"
     assert rows[0]["degree"] == "1"

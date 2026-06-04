@@ -23,6 +23,9 @@ class LoopStatusRow:
     fitness_score: str
     correction_translation_m: str
     correction_rotation_rad: str
+    descriptor_centroid_distance_m: str
+    descriptor_extent_ratio: str
+    descriptor_point_count_ratio: str
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,9 @@ class LoopSignature:
     fitness_score: float | None
     correction_translation_m: float | None
     correction_rotation_rad: float | None
+    descriptor_centroid_distance_m: float | None
+    descriptor_extent_ratio: float | None
+    descriptor_point_count_ratio: float | None
 
 
 @dataclass(frozen=True)
@@ -47,6 +53,9 @@ class SignatureMatchOptions:
     max_fitness_delta: float = 0.0
     max_translation_delta_m: float = 0.0
     max_rotation_delta_rad: float = 0.0
+    max_descriptor_centroid_delta_m: float = 0.0
+    max_descriptor_extent_ratio_delta: float = 0.0
+    max_descriptor_point_count_ratio_delta: float = 0.0
 
 
 def truthy(value: str | None) -> bool:
@@ -104,6 +113,15 @@ def read_allowlist(path: Path) -> LoopAllowlist:
                         correction_rotation_rad=parse_optional_float(
                             row.get("correction_rotation_rad")
                         ),
+                        descriptor_centroid_distance_m=parse_optional_float(
+                            row.get("descriptor_centroid_distance_m")
+                        ),
+                        descriptor_extent_ratio=parse_optional_float(
+                            row.get("descriptor_extent_ratio")
+                        ),
+                        descriptor_point_count_ratio=parse_optional_float(
+                            row.get("descriptor_point_count_ratio")
+                        ),
                     )
                 )
     return LoopAllowlist(pairs=pairs, signatures=signatures)
@@ -136,6 +154,13 @@ def read_status_rows(path: Path) -> list[LoopStatusRow]:
                         fitness_score=row.get("fitness_score", ""),
                         correction_translation_m=row.get("correction_translation_m", ""),
                         correction_rotation_rad=row.get("correction_rotation_rad", ""),
+                        descriptor_centroid_distance_m=row.get(
+                            "descriptor_centroid_distance_m", ""
+                        ),
+                        descriptor_extent_ratio=row.get("descriptor_extent_ratio", ""),
+                        descriptor_point_count_ratio=row.get(
+                            "descriptor_point_count_ratio", ""
+                        ),
                     )
                 )
             except (TypeError, ValueError) as exc:
@@ -198,6 +223,21 @@ def signature_matches(
             signature.correction_rotation_rad,
             options.max_rotation_delta_rad,
         )
+        and metric_matches(
+            row.descriptor_centroid_distance_m,
+            signature.descriptor_centroid_distance_m,
+            options.max_descriptor_centroid_delta_m,
+        )
+        and metric_matches(
+            row.descriptor_extent_ratio,
+            signature.descriptor_extent_ratio,
+            options.max_descriptor_extent_ratio_delta,
+        )
+        and metric_matches(
+            row.descriptor_point_count_ratio,
+            signature.descriptor_point_count_ratio,
+            options.max_descriptor_point_count_ratio_delta,
+        )
     )
 
 
@@ -256,6 +296,14 @@ def format_report(
         1 for signature in allowlist.signatures
         if signature.candidate_keyframe_timestamp_s is not None
     )
+    descriptor_signature_count = sum(
+        1 for signature in allowlist.signatures
+        if (
+            signature.descriptor_centroid_distance_m is not None
+            or signature.descriptor_extent_ratio is not None
+            or signature.descriptor_point_count_ratio is not None
+        )
+    )
     lines = [
         "# MBES Selected-Loop Allowlist Replay Audit",
         "",
@@ -264,6 +312,7 @@ def format_report(
         f"- Allowlisted pairs: {len(allowlist.pairs)}",
         f"- Allowlist signatures: {len(allowlist.signatures)}",
         f"- Endpoint timestamp signatures: {endpoint_signature_count}",
+        f"- Descriptor signatures: {descriptor_signature_count}",
         f"- Signature timestamp window: {options.timestamp_window_s:.3f} s",
         f"- Accepted replay loops: {len(accepted)}",
         f"- Accepted allowlisted loops: {allowed_accepted}",
@@ -328,6 +377,24 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="Optional correction-translation tolerance for signature matching")
     parser.add_argument("--signature-max-rotation-delta-rad", type=float, default=0.0,
                         help="Optional correction-rotation tolerance for signature matching")
+    parser.add_argument(
+        "--signature-max-descriptor-centroid-delta-m",
+        type=float,
+        default=0.0,
+        help="Optional descriptor centroid-distance tolerance for signature matching",
+    )
+    parser.add_argument(
+        "--signature-max-descriptor-extent-ratio-delta",
+        type=float,
+        default=0.0,
+        help="Optional descriptor extent-ratio tolerance for signature matching",
+    )
+    parser.add_argument(
+        "--signature-max-descriptor-point-count-ratio-delta",
+        type=float,
+        default=0.0,
+        help="Optional descriptor point-count-ratio tolerance for signature matching",
+    )
     return parser.parse_args(argv)
 
 
@@ -338,6 +405,13 @@ def main(argv: list[str] | None = None) -> int:
         max_fitness_delta=args.signature_max_fitness_delta,
         max_translation_delta_m=args.signature_max_translation_delta_m,
         max_rotation_delta_rad=args.signature_max_rotation_delta_rad,
+        max_descriptor_centroid_delta_m=args.signature_max_descriptor_centroid_delta_m,
+        max_descriptor_extent_ratio_delta=(
+            args.signature_max_descriptor_extent_ratio_delta
+        ),
+        max_descriptor_point_count_ratio_delta=(
+            args.signature_max_descriptor_point_count_ratio_delta
+        ),
     )
     try:
         allowlist = read_allowlist(args.allowlist)

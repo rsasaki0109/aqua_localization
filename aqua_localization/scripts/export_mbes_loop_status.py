@@ -1359,6 +1359,9 @@ def write_batch_consistency_selected_csv(
         "fitness_score",
         "correction_translation_m",
         "correction_rotation_rad",
+        "descriptor_centroid_distance_m",
+        "descriptor_extent_ratio",
+        "descriptor_point_count_ratio",
         "status",
     ]
     sorted_indices = sorted(
@@ -1389,6 +1392,13 @@ def write_batch_consistency_selected_csv(
                 "fitness_score": f"{sample.fitness_score:.9f}",
                 "correction_translation_m": f"{sample.correction_translation_m:.9f}",
                 "correction_rotation_rad": f"{sample.correction_rotation_rad:.9f}",
+                "descriptor_centroid_distance_m": (
+                    f"{sample.descriptor_centroid_distance_m:.9f}"
+                ),
+                "descriptor_extent_ratio": f"{sample.descriptor_extent_ratio:.9f}",
+                "descriptor_point_count_ratio": (
+                    f"{sample.descriptor_point_count_ratio:.9f}"
+                ),
                 "status": sample.status,
             })
 

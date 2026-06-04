@@ -100,6 +100,26 @@ bool metric_within_delta(double observed, double expected, double max_delta)
          std::abs(observed - expected) <= max_delta;
 }
 
+bool add_normalized_metric_delta(
+  double observed,
+  double expected,
+  double max_delta,
+  double & score)
+{
+  if (max_delta <= 0.0) {
+    return true;
+  }
+  if (!std::isfinite(observed) || !std::isfinite(expected)) {
+    return false;
+  }
+  const double delta = std::abs(observed - expected);
+  if (delta > max_delta) {
+    return false;
+  }
+  score += delta / std::max(max_delta, 1.0e-12);
+  return true;
+}
+
 }  // namespace
 
 struct SelectedLoopSignature
@@ -110,6 +130,9 @@ struct SelectedLoopSignature
   double fitness_score{std::numeric_limits<double>::quiet_NaN()};
   double correction_translation_m{std::numeric_limits<double>::quiet_NaN()};
   double correction_rotation_rad{std::numeric_limits<double>::quiet_NaN()};
+  double descriptor_centroid_distance_m{std::numeric_limits<double>::quiet_NaN()};
+  double descriptor_extent_ratio{std::numeric_limits<double>::quiet_NaN()};
+  double descriptor_point_count_ratio{std::numeric_limits<double>::quiet_NaN()};
 };
 
 struct LoadedLoopSelection
@@ -234,6 +257,13 @@ private:
       declare_parameter<double>("loop.selection.match_max_translation_delta_m", 0.0);
     loop_selection_match_max_rotation_delta_rad_ =
       declare_parameter<double>("loop.selection.match_max_rotation_delta_rad", 0.0);
+    loop_selection_match_max_descriptor_centroid_delta_m_ =
+      declare_parameter<double>("loop.selection.match_max_descriptor_centroid_delta_m", 0.0);
+    loop_selection_match_max_descriptor_extent_ratio_delta_ =
+      declare_parameter<double>("loop.selection.match_max_descriptor_extent_ratio_delta", 0.0);
+    loop_selection_match_max_descriptor_point_count_ratio_delta_ =
+      declare_parameter<double>(
+      "loop.selection.match_max_descriptor_point_count_ratio_delta", 0.0);
     loop_selection_prioritize_candidates_ =
       declare_parameter<bool>("loop.selection.prioritize_candidates", true);
     loop_selection_enabled_ = !loop_selection_allowlist_csv_.empty();
@@ -252,11 +282,16 @@ private:
         RCLCPP_INFO(
           get_logger(),
           "MBES selected-loop signature fallback enabled: timestamp_window=%.3fs "
-          "fitness_delta=%.6f translation_delta=%.6f rotation_delta=%.6f",
+          "fitness_delta=%.6f translation_delta=%.6f rotation_delta=%.6f "
+          "descriptor_centroid_delta=%.6f descriptor_extent_delta=%.6f "
+          "descriptor_point_ratio_delta=%.6f",
           loop_selection_match_timestamp_window_s_,
           loop_selection_match_max_fitness_delta_,
           loop_selection_match_max_translation_delta_m_,
-          loop_selection_match_max_rotation_delta_rad_);
+          loop_selection_match_max_rotation_delta_rad_,
+          loop_selection_match_max_descriptor_centroid_delta_m_,
+          loop_selection_match_max_descriptor_extent_ratio_delta_,
+          loop_selection_match_max_descriptor_point_count_ratio_delta_);
       } else if (loop_selection_match_timestamp_window_s_ > 0.0) {
         RCLCPP_WARN(
           get_logger(),
@@ -329,7 +364,7 @@ private:
     const LoopGateEvaluator gate_evaluator(gate_options_);
 
     auto candidates = selector.ranked_candidates(submap_manager_.submaps(), current);
-    prioritize_selected_candidates(candidates, current);
+    prioritize_selected_candidates(candidates, current, descriptor_gate);
     for (const auto & candidate : candidates) {
       if (tested >= candidate_options_.max_per_keyframe) {
         break;
@@ -434,6 +469,11 @@ private:
     const int fitness_column = csv_column_index(header, "fitness_score");
     const int translation_column = csv_column_index(header, "correction_translation_m");
     const int rotation_column = csv_column_index(header, "correction_rotation_rad");
+    const int descriptor_centroid_column =
+      csv_column_index(header, "descriptor_centroid_distance_m");
+    const int descriptor_extent_column = csv_column_index(header, "descriptor_extent_ratio");
+    const int descriptor_point_ratio_column =
+      csv_column_index(header, "descriptor_point_count_ratio");
     if (current_column < 0 || candidate_column < 0) {
       throw std::runtime_error(
         "MBES loop selection allowlist CSV must contain current_id and candidate_id columns: " +
@@ -477,6 +517,14 @@ private:
           parse_csv_double_field(
             fields, translation_column, signature.correction_translation_m);
           parse_csv_double_field(fields, rotation_column, signature.correction_rotation_rad);
+          parse_csv_double_field(
+            fields, descriptor_centroid_column,
+            signature.descriptor_centroid_distance_m);
+          parse_csv_double_field(
+            fields, descriptor_extent_column, signature.descriptor_extent_ratio);
+          parse_csv_double_field(
+            fields, descriptor_point_ratio_column,
+            signature.descriptor_point_count_ratio);
           selection.signatures.push_back(signature);
         }
       } catch (const std::exception &) {
@@ -499,9 +547,17 @@ private:
            !selected_loop_signatures_.empty();
   }
 
+  bool loop_selection_descriptor_signature_enabled() const
+  {
+    return loop_selection_match_max_descriptor_centroid_delta_m_ > 0.0 ||
+           loop_selection_match_max_descriptor_extent_ratio_delta_ > 0.0 ||
+           loop_selection_match_max_descriptor_point_count_ratio_delta_ > 0.0;
+  }
+
   double selection_candidate_score(
     const Submap & candidate,
-    const Submap & current) const
+    const Submap & current,
+    const DescriptorGateEvaluator & descriptor_gate) const
   {
     const double infinity = std::numeric_limits<double>::infinity();
     if (!loop_selection_enabled()) {
@@ -514,6 +570,15 @@ private:
     }
     if (!loop_selection_signature_enabled()) {
       return infinity;
+    }
+
+    GateResult descriptor_result;
+    const bool descriptor_signature_enabled = loop_selection_descriptor_signature_enabled();
+    if (descriptor_signature_enabled) {
+      descriptor_result = descriptor_gate.evaluate(candidate, current);
+      if (!descriptor_result.accepted) {
+        return infinity;
+      }
     }
 
     const double window_s = std::max(loop_selection_match_timestamp_window_s_, 1.0e-9);
@@ -548,6 +613,29 @@ private:
         // Prefer endpoint-aware signatures over older current-timestamp-only rows.
         score += 1.0;
       }
+      if (descriptor_signature_enabled) {
+        if (!add_normalized_metric_delta(
+            descriptor_result.descriptor_centroid_distance_m,
+            signature.descriptor_centroid_distance_m,
+            loop_selection_match_max_descriptor_centroid_delta_m_, score))
+        {
+          continue;
+        }
+        if (!add_normalized_metric_delta(
+            descriptor_result.descriptor_extent_ratio,
+            signature.descriptor_extent_ratio,
+            loop_selection_match_max_descriptor_extent_ratio_delta_, score))
+        {
+          continue;
+        }
+        if (!add_normalized_metric_delta(
+            descriptor_result.descriptor_point_count_ratio,
+            signature.descriptor_point_count_ratio,
+            loop_selection_match_max_descriptor_point_count_ratio_delta_, score))
+        {
+          continue;
+        }
+      }
       best_score = std::min(best_score, score);
     }
     return best_score;
@@ -555,7 +643,8 @@ private:
 
   void prioritize_selected_candidates(
     std::vector<Submap> & candidates,
-    const Submap & current) const
+    const Submap & current,
+    const DescriptorGateEvaluator & descriptor_gate) const
   {
     if (!loop_selection_enabled() || !loop_selection_prioritize_candidates_ ||
       candidates.size() < 2)
@@ -564,9 +653,9 @@ private:
     }
     std::stable_sort(
       candidates.begin(), candidates.end(),
-      [this, &current](const Submap & a, const Submap & b) {
-        const double a_score = selection_candidate_score(a, current);
-        const double b_score = selection_candidate_score(b, current);
+      [this, &current, &descriptor_gate](const Submap & a, const Submap & b) {
+        const double a_score = selection_candidate_score(a, current, descriptor_gate);
+        const double b_score = selection_candidate_score(b, current, descriptor_gate);
         const bool a_selected = std::isfinite(a_score);
         const bool b_selected = std::isfinite(b_score);
         if (a_selected != b_selected) {
@@ -628,6 +717,26 @@ private:
       if (!metric_within_delta(
           gate.correction_rotation_rad, signature.correction_rotation_rad,
           loop_selection_match_max_rotation_delta_rad_))
+      {
+        continue;
+      }
+      if (!metric_within_delta(
+          gate.descriptor_centroid_distance_m,
+          signature.descriptor_centroid_distance_m,
+          loop_selection_match_max_descriptor_centroid_delta_m_))
+      {
+        continue;
+      }
+      if (!metric_within_delta(
+          gate.descriptor_extent_ratio, signature.descriptor_extent_ratio,
+          loop_selection_match_max_descriptor_extent_ratio_delta_))
+      {
+        continue;
+      }
+      if (!metric_within_delta(
+          gate.descriptor_point_count_ratio,
+          signature.descriptor_point_count_ratio,
+          loop_selection_match_max_descriptor_point_count_ratio_delta_))
       {
         continue;
       }
@@ -770,6 +879,9 @@ private:
   double loop_selection_match_max_fitness_delta_{0.0};
   double loop_selection_match_max_translation_delta_m_{0.0};
   double loop_selection_match_max_rotation_delta_rad_{0.0};
+  double loop_selection_match_max_descriptor_centroid_delta_m_{0.0};
+  double loop_selection_match_max_descriptor_extent_ratio_delta_{0.0};
+  double loop_selection_match_max_descriptor_point_count_ratio_delta_{0.0};
   bool loop_selection_prioritize_candidates_{true};
   bool loop_selection_enabled_{false};
   std::unordered_set<std::uint64_t> selected_loop_pairs_;
