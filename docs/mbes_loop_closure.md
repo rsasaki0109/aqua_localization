@@ -301,6 +301,10 @@ configured thresholds. If
 `--batch-consistency-translation-threshold-m` or
 `--batch-consistency-rotation-threshold-rad` is omitted, the exporter uses the
 configured auto quantile from the candidate pairwise delta distribution.
+Use `--batch-consistency-max-fitness-score` when the maximum clique prefers
+geometrically consistent but weak registrations. This filters candidate loops
+before clique search, and the benchmark wrapper forwards it as
+`MBES_LOOP_BATCH_CONSISTENCY_MAX_FITNESS_SCORE`.
 
 Example with explicit thresholds:
 
@@ -311,7 +315,8 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --batch-consistency-out /tmp/mbes_loop_batch_consistency.md \
   --batch-consistency-selected-csv-out /tmp/mbes_loop_batch_selected_loops.csv \
   --batch-consistency-translation-threshold-m 1.3 \
-  --batch-consistency-rotation-threshold-rad 0.16
+  --batch-consistency-rotation-threshold-rad 0.16 \
+  --batch-consistency-max-fitness-score 0.2
 ```
 
 The selected set is not a full SOTA claim. Treat it as a replay/audit input:
@@ -384,6 +389,13 @@ not claimable trajectory evidence because the selected pose graph was worse
 than its own input odometry by 4.83 m and only one selected endpoint survived.
 The next front-end step is descriptor-level loop identity/retrieval rather than
 only broader timestamp tolerances.
+
+A follow-up descriptor-refined signature replay at
+`/tmp/aqua_mbes_selected_loop_compare_descriptor_sig_w5` widened the timestamp
+window to 5 s and bounded descriptor deltas, but accepted 0 selected loops. The
+audit still passed because no off-allowlist loops were accepted; the useful
+finding is that offline selection can prefer replay-brittle or weak loop
+registrations unless candidate quality is filtered before clique selection.
 
 To run the normal replay, selected-loop replay, and metric comparison as one
 artifact bundle:

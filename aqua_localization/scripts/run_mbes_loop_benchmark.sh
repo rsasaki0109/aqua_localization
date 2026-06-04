@@ -151,6 +151,12 @@ if [[ -n "${MBES_LOOP_BATCH_CONSISTENCY_AUTO_QUANTILE+x}" ]]; then
     "$MBES_LOOP_BATCH_CONSISTENCY_AUTO_QUANTILE"
   )
 fi
+if [[ -n "${MBES_LOOP_BATCH_CONSISTENCY_MAX_FITNESS_SCORE+x}" ]]; then
+  BATCH_CONSISTENCY_ARGS+=(
+    "--batch-consistency-max-fitness-score"
+    "$MBES_LOOP_BATCH_CONSISTENCY_MAX_FITNESS_SCORE"
+  )
+fi
 if [[ -n "${MBES_LOOP_BATCH_CONSISTENCY_EXACT_LIMIT+x}" ]]; then
   BATCH_CONSISTENCY_ARGS+=(
     "--batch-consistency-exact-limit"

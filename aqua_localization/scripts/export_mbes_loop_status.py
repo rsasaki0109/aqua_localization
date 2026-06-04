@@ -620,13 +620,21 @@ def consistency_rejection_samples(
 
 def batch_consistency_candidates(
     samples: list[LoopStatusSample],
+    max_fitness_score: float = math.nan,
 ) -> list[LoopStatusSample]:
+    fitness_limit = explicit_batch_threshold(max_fitness_score)
     return [
         sample for sample in samples
         if (
             has_finite_correction_magnitudes(sample) and
             not is_no_candidate(sample) and
-            (sample.accepted or is_consistency_rejection(sample))
+            (sample.accepted or is_consistency_rejection(sample)) and
+            (
+                fitness_limit is None or (
+                    math.isfinite(sample.fitness_score) and
+                    sample.fitness_score <= fitness_limit
+                )
+            )
         )
     ]
 
@@ -785,8 +793,9 @@ def batch_consistency_selection(
     rotation_threshold_rad: float = math.nan,
     auto_quantile: float = 0.95,
     exact_limit: int = 64,
+    max_fitness_score: float = math.nan,
 ) -> BatchConsistencyResult:
-    candidates = batch_consistency_candidates(samples)
+    candidates = batch_consistency_candidates(samples, max_fitness_score)
     deltas = [
         correction_delta_between(anchor, sample)
         for index, sample in enumerate(candidates)
@@ -1080,6 +1089,7 @@ def format_batch_consistency_markdown(
     auto_quantile: float = 0.95,
     exact_limit: int = 64,
     limit: int = 100,
+    max_fitness_score: float = math.nan,
 ) -> str:
     result = batch_consistency_selection(
         samples,
@@ -1087,6 +1097,7 @@ def format_batch_consistency_markdown(
         rotation_threshold_rad,
         auto_quantile,
         exact_limit,
+        max_fitness_score,
     )
     selected = selected_index_set(result)
     rejected_indices = [
@@ -1097,6 +1108,7 @@ def format_batch_consistency_markdown(
     candidate_count = len(result.candidates)
     selected_count = len(result.selected_indices)
     rejected_count = len(rejected_indices)
+    fitness_limit = explicit_batch_threshold(max_fitness_score)
     edge_pct = 100.0 * result.edge_count / result.pair_count if result.pair_count else 0.0
     lines = [
         "# MBES Loop Closure Batch Consistency Selection",
@@ -1110,6 +1122,8 @@ def format_batch_consistency_markdown(
         f"({result.translation_threshold_source})",
         f"- Rotation threshold rad: {format_float(result.rotation_threshold_rad)} "
         f"({result.rotation_threshold_source})",
+        "- Max candidate fitness score: "
+        f"{format_float(fitness_limit) if fitness_limit is not None else 'disabled'}",
         f"- Algorithm: {result.algorithm}",
         f"- Pairwise consistent edges: {result.edge_count}/{result.pair_count} "
         f"({edge_pct:.1f}%)",
@@ -1339,6 +1353,7 @@ def write_batch_consistency_selected_csv(
     rotation_threshold_rad: float = math.nan,
     auto_quantile: float = 0.95,
     exact_limit: int = 64,
+    max_fitness_score: float = math.nan,
 ) -> None:
     result = batch_consistency_selection(
         samples,
@@ -1346,6 +1361,7 @@ def write_batch_consistency_selected_csv(
         rotation_threshold_rad,
         auto_quantile,
         exact_limit,
+        max_fitness_score,
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     fields = [
@@ -1653,6 +1669,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         type=float, default=math.nan,
                         help="Pairwise rotation threshold for batch consistency; "
                         "omit to use the auto quantile")
+    parser.add_argument("--batch-consistency-max-fitness-score",
+                        type=float, default=math.nan,
+                        help="Optional max fitness score for candidates considered by "
+                        "batch consistency selection")
     parser.add_argument("--batch-consistency-auto-quantile",
                         type=float, default=0.95,
                         help="Delta quantile used when a batch consistency threshold is omitted")
@@ -1726,6 +1746,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.batch_consistency_auto_quantile,
                 args.batch_consistency_exact_limit,
                 args.batch_consistency_limit,
+                args.batch_consistency_max_fitness_score,
             ),
             encoding="utf-8",
         )
@@ -1737,6 +1758,7 @@ def main(argv: list[str] | None = None) -> int:
             args.batch_consistency_rotation_threshold_rad,
             args.batch_consistency_auto_quantile,
             args.batch_consistency_exact_limit,
+            args.batch_consistency_max_fitness_score,
         )
     print(summary_text)
     print(f"wrote {len(samples)} samples to {args.out}", file=sys.stderr)

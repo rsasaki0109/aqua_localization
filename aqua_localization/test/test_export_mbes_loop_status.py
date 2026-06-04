@@ -681,6 +681,31 @@ def test_batch_consistency_selection_picks_largest_pose_clique():
     assert result.algorithm == "exact maximum clique"
 
 
+def test_batch_consistency_selection_filters_high_fitness_candidates():
+    module = load_module()
+    samples = [
+        module.LoopStatusSample(
+            1.0, "map", 1, 0, True, True, 0.1, 0.0, 0.0,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            2.0, "map", 2, 0, True, True, 0.9, 0.1, 0.0,
+            math.nan, math.nan, math.nan, "accepted"),
+        module.LoopStatusSample(
+            3.0, "map", 3, 0, False, True, 0.2, 0.2, 0.0,
+            math.nan, math.nan, math.nan, "loop consistency rejected"),
+    ]
+
+    result = module.batch_consistency_selection(
+        samples,
+        translation_threshold_m=0.5,
+        rotation_threshold_rad=0.0,
+        max_fitness_score=0.3,
+    )
+
+    candidate_ids = {sample.current_id for sample in result.candidates}
+    assert candidate_ids == {1, 3}
+
+
 def test_batch_consistency_markdown_lists_selected_and_rejected_candidates():
     module = load_module()
     samples = [
@@ -707,6 +732,7 @@ def test_batch_consistency_markdown_lists_selected_and_rejected_candidates():
     assert "Selected consistent set: 2/3" in text
     assert "Batch-rejected candidates: 1" in text
     assert "Translation threshold m: 0.2 (explicit)" in text
+    assert "Max candidate fitness score: disabled" in text
     assert "## Selected Loop IDs" in text
     assert "## Batch-Rejected Candidates" in text
     assert "| 1 | 3 | 3 | 0 | 0 | 0 |" in text

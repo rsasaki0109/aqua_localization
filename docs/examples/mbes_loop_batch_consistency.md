@@ -9,12 +9,16 @@ ros2 run aqua_localization export_mbes_loop_status.py \
   --batch-consistency-out /tmp/mbes_loop_batch_consistency.md \
   --batch-consistency-selected-csv-out /tmp/mbes_loop_batch_selected_loops.csv \
   --batch-consistency-translation-threshold-m 1.3 \
-  --batch-consistency-rotation-threshold-rad 0.16
+  --batch-consistency-rotation-threshold-rad 0.16 \
+  --batch-consistency-max-fitness-score 0.2
 ```
 
 Use this report after the descriptor and runtime consistency sweeps. It is an
 offline PCM-like selector over finite corrections that were accepted, or that
 were rejected only by the runtime consistency guard.
+The optional max-fitness filter removes weak registrations before clique
+selection so a large but low-quality consistent set does not dominate the
+selected replay allowlist.
 
 ## Input
 
