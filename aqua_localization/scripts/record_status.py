@@ -21,7 +21,9 @@ CSV_HEADER = (
     "last_prediction_dt,position_covariance_trace,orientation_covariance_trace,status,"
     "accel_bias_x,accel_bias_y,accel_bias_z,"
     "gyro_bias_x,gyro_bias_y,gyro_bias_z,"
-    "ahrs_gyro_bias_z_enabled,ahrs_gyro_bias_z_active,ahrs_gyro_bias_z_last_observed\n"
+    "ahrs_gyro_bias_z_enabled,ahrs_gyro_bias_z_active,ahrs_gyro_bias_z_last_observed,"
+    "sonar_feedback_received,sonar_feedback_applied,sonar_feedback_skipped_stale,"
+    "sonar_feedback_skipped_nonfinite,sonar_feedback_pending\n"
 )
 
 
@@ -40,7 +42,14 @@ def format_csv_line(msg: EstimatorStatus) -> str:
         f"{msg.accel_bias[0]:.9f},{msg.accel_bias[1]:.9f},{msg.accel_bias[2]:.9f},"
         f"{msg.gyro_bias[0]:.9f},{msg.gyro_bias[1]:.9f},{msg.gyro_bias[2]:.9f},"
         f"{int(msg.ahrs_gyro_bias_z_enabled)},{int(msg.ahrs_gyro_bias_z_active)},"
-        f"{msg.ahrs_gyro_bias_z_last_observed:.9f}\n"
+        f"{msg.ahrs_gyro_bias_z_last_observed:.9f},"
+        # getattr fallbacks keep the recorder usable against nodes built with
+        # the pre-counter EstimatorStatus definition.
+        f"{int(getattr(msg, 'sonar_feedback_received', 0))},"
+        f"{int(getattr(msg, 'sonar_feedback_applied', 0))},"
+        f"{int(getattr(msg, 'sonar_feedback_skipped_stale', 0))},"
+        f"{int(getattr(msg, 'sonar_feedback_skipped_nonfinite', 0))},"
+        f"{int(getattr(msg, 'sonar_feedback_pending', 0))}\n"
     )
 
 
