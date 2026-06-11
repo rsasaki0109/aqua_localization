@@ -41,6 +41,22 @@ target_include_directories(imu_preprocessor PUBLIC
 )
 target_link_libraries(imu_preprocessor additive_ukf)
 
+add_library(position_history_buffer src/position_history_buffer.cpp)
+target_compile_features(position_history_buffer PUBLIC cxx_std_17)
+target_include_directories(position_history_buffer PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${EIGEN3_INCLUDE_DIRS}
+)
+
+add_library(feedback_odometry_buffer src/feedback_odometry_buffer.cpp)
+target_compile_features(feedback_odometry_buffer PUBLIC cxx_std_17)
+target_include_directories(feedback_odometry_buffer PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${EIGEN3_INCLUDE_DIRS}
+)
+
 add_library(static_bias_initializer src/static_bias_initializer.cpp)
 target_compile_features(static_bias_initializer PUBLIC cxx_std_17)
 target_include_directories(static_bias_initializer PUBLIC
@@ -52,7 +68,7 @@ target_link_libraries(static_bias_initializer additive_ukf)
 
 add_executable(imu_loc_node src/imu_loc_node.cpp)
 target_compile_features(imu_loc_node PUBLIC cxx_std_17)
-target_link_libraries(imu_loc_node additive_ukf pressure_depth_converter imu_preprocessor static_bias_initializer)
+target_link_libraries(imu_loc_node additive_ukf pressure_depth_converter imu_preprocessor static_bias_initializer position_history_buffer feedback_odometry_buffer)
 ament_target_dependencies(imu_loc_node
   aqua_msgs
   geometry_msgs
@@ -73,7 +89,7 @@ add_executable(scalar_to_pressure_node src/scalar_to_pressure_node.cpp)
 target_compile_features(scalar_to_pressure_node PUBLIC cxx_std_17)
 ament_target_dependencies(scalar_to_pressure_node rclcpp sensor_msgs std_msgs)
 
-install(TARGETS additive_ukf pressure_depth_converter imu_preprocessor static_bias_initializer
+install(TARGETS additive_ukf pressure_depth_converter imu_preprocessor static_bias_initializer position_history_buffer feedback_odometry_buffer
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -111,6 +127,14 @@ if(BUILD_TESTING)
   target_link_libraries(test_static_bias_initializer static_bias_initializer)
   target_include_directories(test_static_bias_initializer PRIVATE ${EIGEN3_INCLUDE_DIRS})
 
+  ament_add_gtest(test_position_history_buffer test/test_position_history_buffer.cpp)
+  target_link_libraries(test_position_history_buffer position_history_buffer)
+  target_include_directories(test_position_history_buffer PRIVATE ${EIGEN3_INCLUDE_DIRS})
+
+  ament_add_gtest(test_feedback_odometry_buffer test/test_feedback_odometry_buffer.cpp)
+  target_link_libraries(test_feedback_odometry_buffer feedback_odometry_buffer)
+  target_include_directories(test_feedback_odometry_buffer PRIVATE ${EIGEN3_INCLUDE_DIRS})
+
   ament_add_gtest(test_imu_loc_node_runtime test/test_imu_loc_node_runtime.cpp TIMEOUT 120)
   target_link_libraries(
     test_imu_loc_node_runtime
@@ -118,6 +142,8 @@ if(BUILD_TESTING)
     pressure_depth_converter
     imu_preprocessor
     static_bias_initializer
+    position_history_buffer
+    feedback_odometry_buffer
   )
   target_include_directories(test_imu_loc_node_runtime PRIVATE ${EIGEN3_INCLUDE_DIRS})
   ament_target_dependencies(

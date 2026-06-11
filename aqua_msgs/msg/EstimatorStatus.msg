@@ -20,3 +20,14 @@ bool ahrs_gyro_bias_z_enabled
 bool ahrs_gyro_bias_z_active
 # Last bz observation value supplied to the UKF [rad/s]. NaN before first observation.
 float64 ahrs_gyro_bias_z_last_observed
+
+# Sonar odometry feedback accounting (topics.sonar_odometry). `received` counts
+# every subscription callback; `applied` counts measurement updates actually
+# fed to the UKF; the skipped counters split the rejects by cause; `pending`
+# is the current depth of the stamp-ordered feedback buffer
+# (imu.sonar.buffer_by_stamp). received == applied + skipped_* + pending.
+uint64 sonar_feedback_received
+uint64 sonar_feedback_applied
+uint64 sonar_feedback_skipped_stale
+uint64 sonar_feedback_skipped_nonfinite
+uint64 sonar_feedback_pending
