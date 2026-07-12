@@ -1,0 +1,20 @@
+services:
+  # Define base image service to build the Docker image
+  base_image:
+    build: 
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile_tank_ukf_experiment
+    image: aqua_localization_base:latest
+    command: echo "Base image build."
+
+  exp_tank_ukf:
+    image: aqua_localization_base:latest
+    depends_on:
+      - base_image
+    environment:
+      OUT_DIR: /root/tank_dataset/results
+    volumes:
+      - ./experiments/tank_ukf_evaluation/results:/root/tank_dataset/results
+      - ./scripts/run_experiment_tank_ukf.sh:/root/run_experiment_tank_ukf.sh
+    
+    command: bash /root/run_experiment_tank_ukf.sh
