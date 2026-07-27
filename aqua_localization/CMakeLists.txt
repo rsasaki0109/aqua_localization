@@ -17,6 +17,9 @@ install(PROGRAMS
   scripts/record_status.py
   scripts/export_estimator_status.py
   scripts/compare_mbes_repeat_probe.py
+  scripts/acquire_mbes_beach_pond.py
+  scripts/setup_nested_workspace_env.sh
+  scripts/probe_sonar_feedback_repeatability.sh
   scripts/compare_trajectories.py
   scripts/trajectory_benchmark_row.py
   scripts/benchmark_manifest_report.py
@@ -206,6 +209,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_record_status_format test/test_record_status_format.py)
   ament_add_pytest_test(test_export_estimator_status test/test_export_estimator_status.py)
   ament_add_pytest_test(test_compare_mbes_repeat_probe test/test_compare_mbes_repeat_probe.py)
+  ament_add_pytest_test(test_acquire_mbes_beach_pond test/test_acquire_mbes_beach_pond.py)
   ament_add_pytest_test(test_make_synthetic_sonar_bag test/test_make_synthetic_sonar_bag.py)
   ament_add_pytest_test(test_rerun_export_mbes_helpers test/test_rerun_export_mbes_helpers.py)
   ament_add_pytest_test(test_export_mbes_loop_status test/test_export_mbes_loop_status.py)
