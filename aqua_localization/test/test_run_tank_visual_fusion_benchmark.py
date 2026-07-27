@@ -26,6 +26,7 @@ def test_default_paths_use_sequence_stem(tmp_path):
     paths = module.default_paths(tmp_path, "short/test visual")
 
     assert paths.fused_tum == tmp_path / "short_test_visual_visual_fused.tum"
+    assert paths.visual_input_tum == tmp_path / "short_test_visual_visual_input.tum"
     assert paths.visual_status_csv == tmp_path / "short_test_visual_visual_status.csv"
     assert paths.visual_coverage_report == tmp_path / "short_test_visual_visual_coverage.md"
     assert paths.benchmark_row == tmp_path / "short_test_visual_visual_fusion_benchmark.md"
@@ -33,6 +34,10 @@ def test_default_paths_use_sequence_stem(tmp_path):
     assert paths.visual_log == tmp_path / "short_test_visual_visual_frontend.log"
     assert paths.imu_log == tmp_path / "short_test_visual_imu_loc.log"
     assert paths.record_log == tmp_path / "short_test_visual_record_odometry.log"
+    assert (
+        paths.visual_record_log
+        == tmp_path / "short_test_visual_record_visual_input.log"
+    )
     assert paths.bag_play_log == tmp_path / "short_test_visual_bag_play.log"
 
 
@@ -74,7 +79,7 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
     ])
     paths = module.default_paths(tmp_path, args.sequence)
 
-    visual, imu, recorder, bag = module.build_commands(args, paths)
+    visual, imu, recorder, visual_recorder, bag = module.build_commands(args, paths)
 
     assert "topics.odometry:=/visual/fusion/odometry" in visual
     assert "tracking.translation_scale:=0.169623465" in visual
@@ -95,6 +100,8 @@ def test_build_commands_wire_visual_topic_and_extrinsics(tmp_path):
     assert args.visual_ready_poll_s == 0.1
     assert recorder[:3] == ["ros2", "run", "aqua_localization"]
     assert str(paths.fused_tum) in recorder
+    assert args.visual_odom_topic in visual_recorder
+    assert str(paths.visual_input_tum) in visual_recorder
     assert bag == ["ros2", "bag", "play", "/tmp/tank_bag", "--clock"]
 
 
@@ -162,12 +169,14 @@ def test_clear_stale_run_outputs_removes_readiness_and_estimate_files(tmp_path):
     paths = module.default_paths(tmp_path, "short_test")
     paths.visual_status_csv.write_text("timestamp,frame_index,\n", encoding="utf-8")
     paths.fused_tum.write_text("1 0 0 0 0 0 0 1\n", encoding="utf-8")
+    paths.visual_input_tum.write_text("1 0 0 0 0 0 0 1\n", encoding="utf-8")
     paths.benchmark_row.write_text("keep\n", encoding="utf-8")
 
     module.clear_stale_run_outputs(paths)
 
     assert not paths.visual_status_csv.exists()
     assert not paths.fused_tum.exists()
+    assert not paths.visual_input_tum.exists()
     assert paths.benchmark_row.exists()
 
 
@@ -206,7 +215,7 @@ fusion:
         "/tmp/ref.tum",
     ])
     paths = module.default_paths(tmp_path, args.sequence)
-    visual, imu, _recorder, _bag = module.build_commands(args, paths)
+    visual, imu, _recorder, _visual_recorder, _bag = module.build_commands(args, paths)
 
     assert args.translation_scale == 0.2
     assert args.base_from_camera_x_m == -0.25
@@ -214,6 +223,35 @@ fusion:
     assert "tracking.translation_scale:=0.2" in visual
     assert "matching.max_temporal_descriptor_distance:=72" in visual
     assert "imu.visual.position_variance_floor:=0.01" in imu
+
+
+def test_regression_gate_uses_same_run_by_default_and_can_be_disabled(tmp_path):
+    module = load_module()
+    args = module.parse_args(
+        [
+            "--bag",
+            "/tmp/tank_bag",
+            "--reference",
+            "/tmp/ref.tum",
+        ]
+    )
+
+    assert args.standalone_visual_rmse_m is None
+    assert module.regression_gate_label(0.19, 0.20) == "PASS"
+    assert module.regression_gate_label(0.21, 0.20) == "FAIL"
+    assert module.regression_gate_label(0.21, None) == "DISABLED"
+
+    disabled = module.parse_args(
+        [
+            "--bag",
+            "/tmp/tank_bag",
+            "--reference",
+            "/tmp/ref.tum",
+            "--standalone-visual-rmse-m",
+            "-1",
+        ]
+    )
+    assert disabled.standalone_visual_rmse_m == -1.0
 
 
 def test_visual_coverage_counts_status_rows_and_formats_note(tmp_path):

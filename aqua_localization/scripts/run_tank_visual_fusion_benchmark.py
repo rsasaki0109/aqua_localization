@@ -37,6 +37,7 @@ VISUAL_STATUS_HEADER_PREFIX = "timestamp,frame_index,"
 @dataclass(frozen=True)
 class FusionBenchmarkPaths:
     fused_tum: Path
+    visual_input_tum: Path
     visual_status_csv: Path
     visual_coverage_report: Path
     benchmark_row: Path
@@ -44,6 +45,7 @@ class FusionBenchmarkPaths:
     visual_log: Path
     imu_log: Path
     record_log: Path
+    visual_record_log: Path
     bag_play_log: Path
 
 
@@ -51,6 +53,7 @@ def default_paths(out_dir: Path, sequence: str) -> FusionBenchmarkPaths:
     stem = run_tank_visual_benchmark.sanitize_name(sequence)
     return FusionBenchmarkPaths(
         fused_tum=out_dir / f"{stem}_visual_fused.tum",
+        visual_input_tum=out_dir / f"{stem}_visual_input.tum",
         visual_status_csv=out_dir / f"{stem}_visual_status.csv",
         visual_coverage_report=out_dir / f"{stem}_visual_coverage.md",
         benchmark_row=out_dir / f"{stem}_visual_fusion_benchmark.md",
@@ -58,6 +61,7 @@ def default_paths(out_dir: Path, sequence: str) -> FusionBenchmarkPaths:
         visual_log=out_dir / f"{stem}_visual_frontend.log",
         imu_log=out_dir / f"{stem}_imu_loc.log",
         record_log=out_dir / f"{stem}_record_odometry.log",
+        visual_record_log=out_dir / f"{stem}_record_visual_input.log",
         bag_play_log=out_dir / f"{stem}_bag_play.log",
     )
 
@@ -143,7 +147,7 @@ def wait_for_visual_frontend_ready(
 
 
 def clear_stale_run_outputs(paths: FusionBenchmarkPaths) -> None:
-    for path in (paths.visual_status_csv, paths.fused_tum):
+    for path in (paths.visual_status_csv, paths.fused_tum, paths.visual_input_tum):
         if path.exists():
             path.unlink()
 
@@ -347,6 +351,9 @@ def build_commands(args, paths: FusionBenchmarkPaths) -> list[list[str]]:
         build_visual_command(args, paths),
         build_imu_command(args),
         run_tank_visual_benchmark.build_record_command(args.fused_odom_topic, paths.fused_tum),
+        run_tank_visual_benchmark.build_record_command(
+            args.visual_odom_topic, paths.visual_input_tum
+        ),
         run_tank_visual_benchmark.build_bag_play_command(args),
     ]
 
@@ -359,6 +366,7 @@ def run_recording(args, paths: FusionBenchmarkPaths):
     with paths.visual_log.open("w", encoding="utf-8") as visual_log, \
             paths.imu_log.open("w", encoding="utf-8") as imu_log, \
             paths.record_log.open("w", encoding="utf-8") as record_log, \
+            paths.visual_record_log.open("w", encoding="utf-8") as visual_record_log, \
             paths.bag_play_log.open("w", encoding="utf-8") as bag_log:
         visual = subprocess.Popen(
             commands[0], stdout=visual_log, stderr=subprocess.STDOUT, start_new_session=True
@@ -382,19 +390,49 @@ def run_recording(args, paths: FusionBenchmarkPaths):
         recorder = subprocess.Popen(
             commands[2], stdout=record_log, stderr=subprocess.STDOUT, start_new_session=True
         )
+        visual_recorder = subprocess.Popen(
+            commands[3],
+            stdout=visual_record_log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
         time.sleep(args.startup_delay)
         try:
-            subprocess.run(commands[3], check=True, stdout=bag_log, stderr=subprocess.STDOUT)
+            subprocess.run(commands[4], check=True, stdout=bag_log, stderr=subprocess.STDOUT)
             time.sleep(args.post_play_delay)
         finally:
+            run_tank_visual_benchmark.terminate_process(
+                visual_recorder, args.stop_timeout
+            )
             run_tank_visual_benchmark.terminate_process(recorder, args.stop_timeout)
             run_tank_visual_benchmark.terminate_process(imu, args.stop_timeout)
             run_tank_visual_benchmark.terminate_process(visual, args.stop_timeout)
 
 
+def regression_gate_label(fused_rmse_m: float, visual_rmse_m: float | None) -> str:
+    if visual_rmse_m is None:
+        return "DISABLED"
+    return "PASS" if fused_rmse_m <= visual_rmse_m else "FAIL"
+
+
 def make_benchmark_row(args, paths: FusionBenchmarkPaths, coverage: VisualCoverage) -> str:
     compare_module = trajectory_benchmark_row.load_compare_module()
     stats, _ = compare_module.compare(args.reference, paths.fused_tum, with_scale=False, no_align=False)
+    visual_rmse_m = None
+    visual_source = "disabled"
+    if args.standalone_visual_rmse_m is None:
+        visual_stats, _ = compare_module.compare(
+            args.reference,
+            paths.visual_input_tum,
+            with_scale=False,
+            no_align=False,
+        )
+        visual_rmse_m = float(visual_stats["rmse"])
+        visual_source = "same-run visual input"
+    elif args.standalone_visual_rmse_m >= 0.0:
+        visual_rmse_m = args.standalone_visual_rmse_m
+        visual_source = "CLI override"
+    gate = regression_gate_label(float(stats["rmse"]), visual_rmse_m)
     note = (
         f"visual position update; tracking.translation_scale={args.translation_scale:.9f}; "
         f"base_from_camera=({args.base_from_camera_x_m:g},{args.base_from_camera_y_m:g},"
@@ -407,6 +445,15 @@ def make_benchmark_row(args, paths: FusionBenchmarkPaths, coverage: VisualCovera
         f"replay rate={args.play_rate:g}; "
         f"{format_visual_coverage_note(coverage)}"
     )
+    if visual_rmse_m is not None:
+        gap = float(stats["rmse"]) - visual_rmse_m
+        note += (
+            f"; {visual_source} SE(3) RMSE={visual_rmse_m:.4f} m"
+            f"; fused-minus-visual={gap:+.4f} m"
+            f"; fusion regression gate={gate}"
+        )
+    else:
+        note += "; fusion regression gate=DISABLED"
     if args.visual_calibration_profile:
         label = visual_calibration_profile.profile_label(
             args.visual_calibration_profile,
@@ -434,6 +481,7 @@ def evaluate(args, paths: FusionBenchmarkPaths) -> str:
     paths.benchmark_row.write_text(row + "\n", encoding="utf-8")
     lines = [
         f"fused estimate: {paths.fused_tum}",
+        f"same-run visual input: {paths.visual_input_tum}",
         f"visual status csv: {paths.visual_status_csv}",
         f"visual coverage report: {paths.visual_coverage_report}",
         f"benchmark row: {paths.benchmark_row}",
@@ -447,6 +495,11 @@ def evaluate(args, paths: FusionBenchmarkPaths) -> str:
                 "WARNING: visual frame coverage is below the configured gate; "
                 "this run is throughput-limited."
             ),
+        ])
+    if "fusion regression gate=FAIL" in row:
+        lines.extend([
+            "",
+            "WARNING: fused RMSE is worse than the visual input regression baseline.",
         ])
     return "\n".join(lines)
 
@@ -470,6 +523,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--system", default="aqua_localization+visual")
     parser.add_argument("--visual-odom-topic", default=DEFAULT_VISUAL_TOPIC)
     parser.add_argument("--fused-odom-topic", default=DEFAULT_FUSED_TOPIC)
+    parser.add_argument(
+        "--standalone-visual-rmse-m",
+        type=float,
+        default=None,
+        help=(
+            "Visual RMSE regression baseline override. By default the visual "
+            "input is recorded and measured during this replay; a negative "
+            "value disables the regression gate."
+        ),
+    )
     parser.add_argument("--translation-scale", type=float, default=1.0)
     parser.add_argument("--min-pnp-inliers", type=int, default=12)
     parser.add_argument("--min-inlier-ratio", type=float, default=0.25)
@@ -592,6 +655,10 @@ def main(argv=None) -> int:
     run_recording(args, paths)
     if not paths.fused_tum.exists():
         raise FileNotFoundError(f"fused TUM was not created: {paths.fused_tum}")
+    if args.standalone_visual_rmse_m is None and not paths.visual_input_tum.exists():
+        raise FileNotFoundError(
+            f"same-run visual input TUM was not created: {paths.visual_input_tum}"
+        )
     print(evaluate(args, paths))
     return 0
 
