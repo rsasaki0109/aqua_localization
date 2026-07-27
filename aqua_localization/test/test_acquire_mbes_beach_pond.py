@@ -26,7 +26,8 @@ def test_dry_run_prints_resumable_download_and_conversion(tmp_path, capsys):
 
     assert archive == tmp_path / "beach_pond.tar.gz"
     assert result == tmp_path / "beach_pond_ros2"
-    assert "--continue" in output
+    assert "--continue-at -" in output
+    assert "--retry 5" in output
     assert module.DEFAULT_URL in output
     assert "tar xzf" in output
     assert "rosbags-convert" in output
@@ -43,4 +44,3 @@ def test_no_convert_stops_after_extract_plan(tmp_path, capsys):
     assert result is None
     assert "tar xzf" in output
     assert "rosbags-convert" not in output
-

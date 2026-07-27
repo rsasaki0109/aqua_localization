@@ -56,15 +56,23 @@ def acquire(
     destination.mkdir(parents=True, exist_ok=True)
 
     if not archive.exists() or archive.stat().st_size != EXPECTED_ARCHIVE_BYTES:
-        wget = shutil.which("wget")
-        if wget is None:
-            raise RuntimeError("wget is required")
+        curl = shutil.which("curl")
+        if curl is None:
+            raise RuntimeError("curl is required")
         run(
             [
-                wget,
-                "--continue",
-                "--no-check-certificate",
-                "--output-document",
+                curl,
+                "--location",
+                "--fail",
+                "--insecure",
+                "--continue-at",
+                "-",
+                "--retry",
+                "5",
+                "--retry-all-errors",
+                "--connect-timeout",
+                "20",
+                "--output",
                 str(archive),
                 url,
             ],
@@ -166,4 +174,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
