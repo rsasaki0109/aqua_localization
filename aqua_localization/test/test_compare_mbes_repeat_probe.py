@@ -11,6 +11,10 @@ SCRIPT_PATH = (
 )
 
 
+def test_script_is_executable_for_ros2_run():
+    assert SCRIPT_PATH.stat().st_mode & 0o111
+
+
 def load_module():
     spec = importlib.util.spec_from_file_location("compare_mbes_repeat_probe", SCRIPT_PATH)
     module = importlib.util.module_from_spec(spec)
@@ -185,4 +189,3 @@ def test_required_window_gate_returns_failure(tmp_path):
 
     assert result == 1
     assert "FAIL" in out.read_text(encoding="utf-8")
-
