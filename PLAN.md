@@ -5,7 +5,7 @@ This is the canonical "where we are, where we are going" document for
 what is already solid, what is still experimental, and what the next useful
 engineering move is.
 
-Current date: 2026-06-11.
+Current date: 2026-07-28.
 Latest release: [v0.5](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.5).
 Current public goal: make the project useful enough to earn 10 GitHub stars
 through reproducible public-data demos, honest limits, and small contribution
@@ -36,8 +36,8 @@ The project identity remains:
 - g2o pose graph loop closure is present but still experimental on real MBES;
 - public demos and benchmark artifacts must be reproducible from commands.
 
-ROS 2 Humble and Jazzy are the supported targets. Humble is currently the main
-local replay/benchmark environment for MBES determinism work.
+ROS 2 Humble and Jazzy are the supported targets. Jazzy is the current local
+replay/benchmark environment for MBES determinism work.
 
 ## Current Snapshot
 
@@ -54,14 +54,158 @@ The repository is no longer at "MVP only" stage. It now has:
 - status exports, audit plots, geometry review tables, and benchmark rows;
 - SOTA gap analysis and OSS comparison docs.
 
-The strongest claimable result is the Tank Dataset visual-aided fusion row:
-IMU + pressure + DVL + stereo-ORB visual position updates on `short_test` at
-**0.2140 m APE RMSE** (realtime 1.0x replay, 300/300 visual coverage,
-2026-06-11; supersedes the 0.2175 m row and the older 0.43 m DVL+pressure
-headline). A 0.0154 m diagnostic row (`aqua_dvl_prior_visual`, beats
+The strongest current result is the revalidated Tank Dataset visual-aided
+fusion row: IMU + pressure + DVL + stereo-ORB visual position updates on
+`short_test` at **0.1843 m APE RMSE** (realtime 1.0x replay, 300/300 visual
+coverage, same-run visual regression gate PASS, 2026-07-28). It supersedes the
+historical 0.2140 m reconstruction target, but remains same-sequence-calibrated
+and is not held-out evidence. A 0.0154 m diagnostic row
+(`aqua_dvl_prior_visual`, beats
 AQUA-SLAM's 0.0194 m) exists but is same-sequence-tuned and stays
 non-claimable until held-out sequences arrive. The MBES path is a working
 research track, not a SOTA claim.
+
+## 2026-06-11 Work-Loss Incident and Reconstruction (READ FIRST)
+
+**What happened.** A session on 2026-06-11 (afternoon) discovered that the
+entire "Since v0.5 (in-tree)" code described below — the `shift_from` lag
+compensation, the stamp-ordered sonar feedback buffer, the EstimatorStatus
+counters, `compare_mbes_repeat_probe.py`, the recorder hardening, the tank
+config changes — was **never committed to git**. Only this PLAN.md (commit
+`bce0292`) made it into the repository. The implementation lived as
+uncommitted working-tree state in the previous dev workspace at
+`/media/sasaki/aiueo/ai_coding_ws/aqua_loc_ws`, and that volume is no longer
+mounted (`/media/sasaki/` is empty; last mount activity March 2026 per
+directory mtime). The current canonical checkout is
+`/home/sasaki/workspace/aqua_loc_ws/aqua_localization`, synced with
+`origin/main`, and it contained none of the described code. Every claim in
+this document that says "done (in-tree)" was, at that point, documentation of
+lost work.
+
+Evidence trail, for the record:
+
+- `grep -rln "PositionHistoryBuffer|buffer_by_stamp|sonar_feedback_received|
+  snap_first_update"` over the repo matched **only PLAN.md**;
+- `git log --all` had no commit touching `compare_mbes_repeat_probe.py`,
+  `setup_nested_workspace_env.sh`, or `shift_from`;
+- `aqua_msgs/msg/EstimatorStatus.msg` had no sonar feedback counters;
+- `imu_loc_node.cpp` was at the pre-fix state the "Original Diagnosis"
+  section describes (no history buffer, no snap, no caps, direct
+  `update_position` in the subscription callback);
+- the v0.5-era `record_mbes_demo.sh` has a `cleanup_processes()` and
+  `resolve_profile()`, but the pre-hardening versions (no child-PID KILL
+  escalation, no readability re-check, no overlay preference, no
+  `ROS_DOMAIN_ID`/startup-delay defaults).
+
+**Lesson (process change, mandatory).** Commit after every validated step.
+The reconstruction below exists because PLAN.md recorded the design in
+enough detail to rebuild from; artifacts (/tmp probe dirs, benchmark rows)
+were NOT recoverable. "In-tree" is not a state — committed or lost.
+
+### Reconstructed and verified (committed)
+
+Commit `4cea97a` "Reconstruct lag-compensated position fusion and
+stamp-ordered sonar feedback" rebuilds the C++ core from this document's
+design notes, on ROS 2 Jazzy (`/opt/ros/jazzy`), with the nested-workspace
+build inside the repo (`colcon build --packages-select aqua_msgs
+aqua_imu_loc --symlink-install`; `build/`/`install/`/`log/` at repo root).
+All 9 `aqua_imu_loc` ctest targets pass, including the new ones.
+
+- `aqua_imu_loc/include/aqua_imu_loc/position_history_buffer.hpp` + `src/`:
+  per-IMU-step `(stamp, position)` deque with `configure(horizon_s)`,
+  interpolating `lookup()` (exact / interpolated / clamp-to-newest /
+  nullopt-when-older-than-buffer), and `shift_from(stamp, delta)` folding
+  applied corrections into entries at/after the measurement stamp.
+- `aqua_imu_loc/include/aqua_imu_loc/feedback_odometry_buffer.hpp` + `src/`:
+  stamp-ordered staging buffer (`push` keeps ascending stamp order, stable
+  for equal stamps; `drain_through(stamp)` pops everything at/before).
+- `imu_loc_node.cpp`: subscription callbacks reduced to
+  `to_observation()`; one shared `apply_position_observation()` does
+  nonfinite/stale gating, floor + cap on the covariance diagonal, lag
+  compensation (`z' = x_now + (z - x(t_m))` when the history lookup
+  succeeds, uncompensated fallback otherwise), the update, then
+  `shift_from`. Sonar path: `imu.sonar.buffer_by_stamp` (default true)
+  stages observations and the IMU step drains them after prediction +
+  history push. Visual path: `imu.visual.snap_first_update` (default
+  false) applies the first visual fix with ~1e-9 covariance.
+- New parameters: `imu.position_history.horizon_s` (2.0),
+  `imu.visual.max_position_variance` / `imu.sonar.max_position_variance`
+  (0.0 = disabled), `imu.visual.snap_first_update` (false),
+  `imu.sonar.buffer_by_stamp` (true).
+- `EstimatorStatus.msg`: `sonar_feedback_received / applied /
+  skipped_stale / skipped_nonfinite / pending` (received == applied +
+  skipped_* + pending).
+- `tank_dataset.yaml`: visual `max_position_variance: 0.005`,
+  `snap_first_update: true` per the best validated row's config.
+- Tests: `test_position_history_buffer.cpp` (8, incl.
+  `ShiftFromAppliesCorrectionToTailOnly`,
+  `ShiftFromStopsDelayedMeasurementReapplication`),
+  `test_feedback_odometry_buffer.cpp` (5, incl. shuffled-arrival
+  determinism), runtime additions
+  `SnapFirstVisualUpdateJumpsToMeasurement` and
+  `SonarFeedbackBufferAppliesByStampAndReportsCounters`.
+
+Tooling reconstructed in the same session (this commit):
+
+- `record_status.py`: CSV header + row extended with the five sonar
+  feedback counters (getattr fallback keeps it usable against pre-counter
+  nodes); `test_record_status_format.py` extended, 6/6 pass.
+- `compare_mbes_repeat_probe.py`: rebuilt with input-odometry SHA256 /
+  sample-count / duplicate-stamp diff (duplicate stamps trigger the
+  leaked-node warning in the report), the "Windowed inter-run agreement"
+  section (raw common-window diff, no alignment;
+  `--window-agreement-mean-max-m` default 1.0, `--require-window-agreement`
+  exit code), accepted endpoint-pair overlap from `mbes_loop_status.csv`,
+  and estimator-status tail counters. Smoke-tested end to end (hash
+  mismatch, duplicate-stamp flag, gate FAIL exit 1 all verified); its
+  dedicated pytest file is still to be rewritten (below).
+
+### Reconstruction completed and revalidated (2026-07-28)
+
+The previously lost items above are now committed:
+
+1. `test/test_compare_mbes_repeat_probe.py` is restored, including an
+   executable-bit regression check.
+2. `record_mbes_demo.sh` hardening v2 and benchmark environment forwarding are
+   restored.
+3. `run_tank_visual_fusion_benchmark.py` again records and gates against the
+   same-run visual input.
+4. `acquire_mbes_beach_pond.py`, `probe_sonar_feedback_repeatability.sh`,
+   `setup_nested_workspace_env.sh`, and `export_estimator_status.py` are
+   restored and installed.
+5. Tank and MBES data were reacquired, converted, and kept on the external SSD;
+   `datasets/public/` contains lightweight symlinks.
+
+Relevant reconstruction commits are `f449c4e`, `45d02a9`, `603b3db`,
+`8c9e051`, and `98a117c`. The full six-package workspace test run reports
+703 tests, 0 errors, 0 failures, and 0 skipped. Exact data checksums, commands,
+and results are recorded in
+[`docs/benchmarks/revalidation_20260728.md`](docs/benchmarks/revalidation_20260728.md).
+
+### Consequences for results and claims
+
+- The 0.2140 m row and probes #1–#5 below remain historical, but are no longer
+  the only evidence. The reconstructed Tank pipeline produced 0.1843 m fused
+  APE RMSE, versus 0.1959 m for the visual input from the same replay, so its
+  regression gate passes.
+- The current clean MBES repeat probe still fails: 184.4686 m mean raw
+  inter-run position difference over the common 119.5-second window. This
+  confirms that reconstruction did not solve the E2E timing/order defect.
+- Tank and MBES data are present on the external SSD, with repository symlinks
+  under `datasets/public/`.
+- Findings that survive regardless (they are conclusions, not artifacts):
+  leaked-node hygiene, shallow-QoS-for-accuracy, deep-queues-fix-counts-
+  but-worsen-determinism, sonar-feedback-is-order-sensitive, and the
+  per-axis error decomposition pointing at DVL x bias.
+
+### Environment facts (current machine)
+
+- Canonical checkout: `/home/sasaki/workspace/aqua_loc_ws/aqua_localization`.
+- External data root: `/media/sasaki/aiueo/datasets/aqua_localization`
+  (about 760 GiB free after acquisition and benchmark artifacts).
+- ROS 2: Jazzy (`/opt/ros/jazzy`).
+- Repository dataset symlinks point to the external SSD; do not copy the
+  multi-gigabyte MBES data back into git.
 
 ## Release History
 
@@ -114,7 +258,11 @@ research track, not a SOTA claim.
 - `IMU_SONAR_ODOMETRY_TOPIC` is exposed as a diagnostic override so replay
   runs can disable sonar feedback into the IMU UKF without editing YAML.
 
-### Since v0.5 (in-tree, 2026-06-10 to 2026-06-11)
+### Since v0.5 (2026-06-10 to 2026-07-28; reconstructed and revalidated)
+
+> NOTE: the original work in this section was lost with the previous
+> workspace. The implementation has since been reconstructed, committed, and
+> revalidated as described above; historical measurements remain labeled.
 
 **Sonar feedback determinism (C++ / messages):**
 
@@ -160,7 +308,8 @@ research track, not a SOTA claim.
 - Tank config: `imu.visual.max_position_variance` capped at 0.005 (the
   frontend publishes pessimistic 0.04 m² covariance; the variance *floor* is
   inert — only the cap changes the weighting).
-- New valid 1.0x rows; best fused 0.2140 m retires the 0.2175 m public row.
+- The reconstructed 2026-07-28 1.0x row reaches 0.1843 m, with 300/300 visual
+  coverage and a same-run visual regression PASS.
 
 **Replay hygiene + determinism tooling (2026-06-11):**
 
@@ -183,10 +332,8 @@ research track, not a SOTA claim.
   `scripts/setup_nested_workspace_env.sh` with `AQUA_LOC_WS` pointing at the
   parent `aqua_loc_ws`. Using only the outer install tree can miss
   `mbes_loop_closure_node` or an outdated `mbes_loop_closure.yaml`.
-- Post-probe comparison still requires extracting `EstimatorStatus` from
-  recorded bags (no `export_estimator_status.py` yet); use bag replay or a
-  short `rosbag2_py` script and symlink `input_odometry.tum` /
-  `mbes_loop_status.csv` into the probe directory for `compare_mbes_repeat_probe.py`.
+- `probe_sonar_feedback_repeatability.sh` extracts input odometry, loop status,
+  and `EstimatorStatus` from each recorded bag before running the comparator.
 - Before ANY replay run: verify no stale aqua nodes are alive
   (`pgrep -af "imu_loc_node|sonar_loc_node|pose_graph_node|mbes_loop_closure_node"`).
   `pkill -f` from an agent shell can silently fail on orphaned nodes; use
@@ -238,9 +385,11 @@ Status: strongest public localization result.
 - Dataset: Tank Dataset `short_test`.
 - Sensors: IMU, depth/pressure-derived z, DVL, stereo camera (ORB frontend),
   AprilTag ground truth.
-- Current headline: **0.2140 m APE RMSE** for IMU+pressure+DVL+visual fusion
-  (1.0x replay, 300/300 coverage, shift fix + first-visual snap, 2026-06-11).
-  DVL+pressure-only baseline remains 0.43 m.
+- Current revalidated result: **0.1843 m APE RMSE** for
+  IMU+pressure+DVL+visual fusion (1.0x replay, 300/300 coverage, same-run
+  visual RMSE 0.1959 m, regression gate PASS, 2026-07-28).
+  DVL+pressure-only baseline remains 0.43 m. The visual calibration is still
+  same-sequence, so this is not a held-out or SOTA claim.
 - Per-axis state: fused wins z (0.037 vs visual 0.175, pressure anchor),
   matches y, loses only x (0.205 vs 0.082) — a DVL x scale/extrinsic bias is
   the dominant remaining error and the main lever toward AQUA-SLAM's 0.0194 m.
@@ -272,7 +421,21 @@ What works:
 - Strict recorder readiness prevents source-only false benchmark bags.
 - Timestamp-buffered submaps reduce replay variance.
 
-Most recent determinism results (historical probes):
+Current clean repeat probe (2026-07-28):
+
+- Two consecutive 120-second runs, identical `ROS_DOMAIN_ID=42`, same source
+  and config, clean process table, and no duplicate odometry stamps.
+- Input odometry samples: 11,964 vs 11,955; APE RMSE: 120.0266 m vs
+  204.7904 m.
+- Raw common-window position difference: mean 184.4686 m, max 967.2658 m;
+  the required mean <= 1 m gate **FAILS**.
+- Sonar feedback received/applied/stale: 25/24/1 vs 28/24/4.
+- Loop status: 1,102 vs 1,064 rows, all rejected at the configured
+  300-point minimum; zero accepted-loop overlap is vacuous.
+- Full report and artifact layout:
+  [`docs/benchmarks/revalidation_20260728.md`](docs/benchmarks/revalidation_20260728.md).
+
+Earlier determinism results (historical probes):
 
 - Endpoint-stamp probe:
   - input RMSE spread: 7.4646 m;
@@ -429,13 +592,13 @@ Next work on this track (ordered):
    application step idempotent w.r.t. arrival order (apply strictly on IMU
    stamp boundaries from the stamp-ordered buffer, which was the Phase 1
    design intent — verify it actually drains that way under replay).
-2. Phase 2 gate decision: exact hash equality is demonstrably unattainable;
+2. Phase 2 gate decision: exact hash equality is not currently attainable;
    adopt the windowed gate once a defensible threshold is met (current
-   distance: mean 26.9 m at depth 5 — three orders of magnitude away, so the
-   gate change alone does not unblock Phase 2).
-3. Add `export_estimator_status.py` (bag → CSV) and wire into benchmark wrapper.
-4. Optional CMake: install `mbes_loop_closure.yaml` from `aqua_sonar_loc`;
-   install `compare_mbes_repeat_probe.py` for `ros2 run`.
+   clean result: mean 184.4686 m at depth 5, so the gate change alone does not
+   unblock Phase 2).
+3. Log first/last applied sonar-feedback source stamps and the IMU drain stamp
+   so the first divergence can be attributed to a concrete callback boundary.
+4. Optional CMake: install `mbes_loop_closure.yaml` from `aqua_sonar_loc`.
 
 Probe hygiene (mandatory from now on): before ANY replay probe/benchmark run,
 `pgrep -af "imu_loc_node|sonar_loc_node|pose_graph_node|mbes_loop_closure_node"`
@@ -522,8 +685,9 @@ and determinism.
 
 ## Visual Fusion Regression - RESOLVED ROOT CAUSE (2026-06-11)
 
-**Status: fixed in-tree AND validated at 1.0x on a quiet machine (see "1.0x
-validation" below); the 0.2175 m public row is retired by 0.2140 m.**
+**Status: fixed, committed, and revalidated at 1.0x. The 2026-07-28 row is
+0.1843 m with a same-run visual regression PASS; see
+`docs/benchmarks/revalidation_20260728.md`.**
 
 ### What was actually wrong (beyond the 2026-06-10 diagnosis)
 
@@ -762,7 +926,9 @@ Infrastructure done:
 - unit-test repeatability for buffer logic: done;
 - `compare_mbes_repeat_probe.py`: done;
 - `acquire_mbes_beach_pond.py` + local `beach_pond_ros2` mcap: done;
-- first full E2E repeat probe executed: done (shows failure);
+- `export_estimator_status.py` bag-side status export: done;
+- executable two-run probe with stale-process guard: done;
+- reconstructed full E2E repeat probe executed: done (shows failure);
 - tightened-replay isolation probe: run1 done, run2 interrupted.
 
 Still open (Phase 1):
@@ -772,18 +938,16 @@ Still open (Phase 1):
   same play rate/delay/ack settings).
 - Decide whether delayed sonar observations beyond the buffer horizon should
   carry an explicit status reason beyond `skipped_stale` (currently 0 in probes).
-- Add bag-side export for `EstimatorStatus` and keyframe endpoint stamp sets
-  (compare script exists for directories; bag export still manual).
+- Add keyframe endpoint stamp-set export from recorded bags.
 - Extend compare script to pose-graph keyframe chain and optimization count.
 - Keep `IMU_SONAR_ODOMETRY_TOPIC=` as a diagnostic only, not a default.
 - ~~Implement measurement-time state lookup for sonar (and visual) position
   updates.~~ done, **including the retroactive history correction
   (`shift_from`)** that the first implementation was missing — delayed
   feedback no longer re-applies absorbed corrections (was a positive feedback
-  that destroyed trajectories at `max_age_s=1.0`). Re-run the MBES repeat
-  probe with the shift-fixed node before further timing work: the same flaw
-  applied to sonar feedback and plausibly amplified replay-order sensitivity
-  into kilometer-scale divergence.
+  that destroyed trajectories at `max_age_s=1.0`). The 2026-07-28 clean
+  shift-fixed rerun still fails the repeatability gate, so further work must
+  target end-to-end timing/order sensitivity.
 
 Definition of done:
 
@@ -927,15 +1091,22 @@ MBES_LOOP_CANDIDATE_DESCRIPTOR_WEIGHT=0.0 \
 bash aqua_localization/scripts/run_mbes_loop_benchmark.sh
 ```
 
-**Compare two probe directories** (after symlinking `input_odometry.tum`,
-`mbes_loop_status.csv`, and `estimator_status.csv` into each run dir):
+**Run and compare two probe directories** (the driver records and exports all
+three comparison inputs automatically):
 
 ```bash
-python3 aqua_localization/scripts/compare_mbes_repeat_probe.py \
-  /tmp/aqua_mbes_repeat_det/weight_0_run1 \
-  /tmp/aqua_mbes_repeat_det/weight_0_run2 \
-  --out /tmp/aqua_mbes_repeat_det/mbes_repeat_probe_compare.md
+PROBE_OUT=/path/on/external/ssd/mbes_repeat \
+WORKSPACE="$PWD" \
+MBES_SRC="$PWD/datasets/public/mbes_slam/beach_pond_ros2" \
+MBES_DURATION=120 \
+ROS_DOMAIN_ID=42 \
+GEOMETRY_AUDIT_REQUIRE_COMPLETE=0 \
+bash aqua_localization/scripts/probe_sonar_feedback_repeatability.sh
 ```
+
+The current expected outcome is a nonzero exit at the 1 m mean
+common-window agreement gate; treat a zero exit as a material regression fix
+that needs artifact review, not as an automatic claim.
 
 **Two-run sweep** (uses incrementing `ROS_DOMAIN_ID`; prefer identical domain
 for strict repeatability — run the single benchmark command twice instead):
@@ -1015,13 +1186,15 @@ Good first technical issues:
 
 - ~~Add a script that compares accepted endpoint pairs between two MBES status
   CSVs and reports overlap.~~ done (`compare_mbes_repeat_probe.py`).
-- Add `export_estimator_status.py` (rosbag2 → CSV, mirrors `record_status.py` columns).
+- ~~Add `export_estimator_status.py` (rosbag2 → CSV, mirrors
+  `record_status.py` columns).~~ done.
 - Add a script that compares `/aqua_pose_graph/keyframe` endpoint timestamp
   sets between two recorded bags.
 - ~~Add `aqua_imu_loc` status counters for sonar feedback accepted/skipped.~~ done.
 - Add markdown generation for the open-loop sonar-feedback diagnostic table.
 - ~~Add a small synthetic test for out-of-order sonar feedback observations.~~ done (`test_feedback_odometry_buffer`).
-- Install `compare_mbes_repeat_probe.py` via CMake so `ros2 run` works.
+- ~~Install `compare_mbes_repeat_probe.py` via CMake and make it executable so
+  `ros2 run` works.~~ done.
 - Install `mbes_loop_closure.yaml` via `aqua_sonar_loc` CMake install rules.
 
 Medium issues:
@@ -1050,23 +1223,11 @@ Large issues:
 
 ## One-Sentence Handover
 
-The visual-fusion thread is now fully validated at 1.0x on a quiet machine:
-`shift_from` + `snap_first_update` (snap verified absorbing the 0.516 m warmup
-transient in one step) produced four valid full-coverage realtime rows, best
-**0.2140 m** (visual variance cap 0.005, retires the 0.2175 m public row;
-`tank_dataset.yaml` updated), and offline analysis shows the filter tracks
-its visual input in XY at 3.7-5.7 cm with the remaining gap **entirely on the
-x axis** (fused x=0.205 vs visual x=0.082; fused wins z 0.037 vs 0.175) — the
-same DVL x-bias the `aqua_dvl_prior_visual` diagnostic (0.0154 m) fixes by
-prior tuning. MBES Phase 1: leaked-node cross-talk was found and eliminated
-(hardened cleanup v2, pre-flight guards), the det2 pose-graph blow-up was that
-artifact, QoS depth 5 vs 50 A/B showed deep queues fix sample-count gaps but
-worsen both determinism and accuracy, and `compare_mbes_repeat_probe.py` now
-has a windowed inter-run agreement gate (current distance: mean 26.9 m at
-depth 5). Next: (1) attack the DVL x-axis scale/extrinsic bias in the fused
-path *without* same-sequence tuning (held-out-transferable: physical mount
-angle / per-axis DVL variance / lever arm) — this is the main lever toward
-AQUA-SLAM 0.0194; (2) MBES — instrument sonar feedback stamps and node-ready
-waits to chase the in-flight divergence (keep depth 5); (3) claim path —
-held-out `Medium.bag`/`Structure_Easy.bag` still awaited by email (user has
-deprioritized actively waiting on this).
+The lost implementation and tooling are now reconstructed, committed, tested,
+and backed by external-SSD public data: Tank `short_test` revalidates at
+0.1843 m APE RMSE with its same-run visual gate passing, while the clean MBES
+120-second two-run probe still fails badly (184.4686 m mean raw inter-run
+difference), so the next engineering priority is instrumenting the exact
+sonar-feedback callback/drain boundary before any descriptor tuning or MBES
+claim; held-out Tank bags are still awaited, and every validated step must
+continue to be committed.

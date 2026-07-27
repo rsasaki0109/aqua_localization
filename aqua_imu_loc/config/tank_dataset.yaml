@@ -89,6 +89,15 @@ aqua_imu_loc:
       visual:
         position_variance_floor: 0.04
         max_age_s: 1.0
+        # The frontend publishes a pessimistic 0.04 m^2 covariance; capping at
+        # 0.005 restores real weight to the visual track (best validated 1.0x
+        # row: 0.2140 m fused vs 0.2169 m uncapped). The floor is inert here —
+        # the published covariance already sits above any sensible floor.
+        max_position_variance: 0.005
+        # Absorb the frontend-warmup dead-reckoning transient in one step on
+        # the first absolute visual fix instead of bleeding it in over many
+        # over-corrected updates.
+        snap_first_update: true
 
       # WaterLinked A50 DVL bottom-track. The Tank Dataset paper provides the
       # extrinsic between the DVL and the camera; the IMU↔DVL relative

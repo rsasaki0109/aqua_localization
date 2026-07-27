@@ -7,7 +7,9 @@
 #include <Eigen/Dense>
 
 #include "aqua_imu_loc/additive_ukf.hpp"
+#include "aqua_imu_loc/feedback_odometry_buffer.hpp"
 #include "aqua_imu_loc/imu_preprocessor.hpp"
+#include "aqua_imu_loc/position_history_buffer.hpp"
 #include "aqua_imu_loc/pressure_depth_converter.hpp"
 #include "aqua_imu_loc/static_bias_initializer.hpp"
 #include "aqua_msgs/msg/estimator_status.hpp"
@@ -226,11 +228,31 @@ private:
       declare_parameter<double>("imu.sonar.position_variance_floor", 0.04);
     sonar_max_age_s_ =
       declare_parameter<double>("imu.sonar.max_age_s", 1.0);
+    // Cap (<= 0 disables) bounds how pessimistic an external covariance can
+    // be before it stops influencing the filter at all.
+    sonar_max_position_variance_ =
+      declare_parameter<double>("imu.sonar.max_position_variance", 0.0);
+    // Stage sonar feedback in a stamp-ordered buffer drained on each IMU step
+    // so the update sequence does not depend on DDS callback arrival order.
+    sonar_buffer_by_stamp_ =
+      declare_parameter<bool>("imu.sonar.buffer_by_stamp", true);
 
     visual_position_variance_floor_ =
       declare_parameter<double>("imu.visual.position_variance_floor", 0.04);
     visual_max_age_s_ =
       declare_parameter<double>("imu.visual.max_age_s", 1.0);
+    visual_max_position_variance_ =
+      declare_parameter<double>("imu.visual.max_position_variance", 0.0);
+    // Trust the first visual update near-fully so the dead-reckoning drift
+    // accumulated while the visual frontend warms up is absorbed in one step
+    // instead of bleeding in over many over-corrected updates.
+    visual_snap_first_update_ =
+      declare_parameter<bool>("imu.visual.snap_first_update", false);
+
+    // History horizon for evaluating delayed position measurements at their
+    // measurement time (visual and sonar paths share the buffer).
+    position_history_.configure(
+      declare_parameter<double>("imu.position_history.horizon_s", 2.0));
 
     // DVL velocity observation knobs. mount.rotation_rpy_rad pre-rotates the
     // raw DVL sample into base_link before the body-frame measurement update.
@@ -283,59 +305,147 @@ private:
     ++update_count_;
   }
 
+  static FeedbackObservation to_observation(const nav_msgs::msg::Odometry & msg)
+  {
+    FeedbackObservation observation;
+    observation.stamp_s = rclcpp::Time(msg.header.stamp).seconds();
+    observation.position = Eigen::Vector3d(
+      msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z);
+    // Read the 3x3 position block from the 6x6 row-major pose covariance.
+    observation.covariance(0, 0) = msg.pose.covariance[0];
+    observation.covariance(0, 1) = msg.pose.covariance[1];
+    observation.covariance(0, 2) = msg.pose.covariance[2];
+    observation.covariance(1, 0) = msg.pose.covariance[6];
+    observation.covariance(1, 1) = msg.pose.covariance[7];
+    observation.covariance(1, 2) = msg.pose.covariance[8];
+    observation.covariance(2, 0) = msg.pose.covariance[12];
+    observation.covariance(2, 1) = msg.pose.covariance[13];
+    observation.covariance(2, 2) = msg.pose.covariance[14];
+    return observation;
+  }
+
   void on_sonar_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
   {
-    apply_position_odometry(
-      *msg, "sonar", sonar_position_variance_floor_, sonar_max_age_s_);
+    ++sonar_feedback_received_;
+    const auto observation = to_observation(*msg);
+    if (!observation.position.allFinite()) {
+      ++sonar_feedback_skipped_nonfinite_;
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000, "Rejected non-finite sonar position.");
+      return;
+    }
+    if (!sonar_buffer_by_stamp_) {
+      apply_sonar_observation(observation);
+      return;
+    }
+    sonar_feedback_buffer_.push(observation);
+  }
+
+  // Drain buffered sonar feedback at or before the current IMU stamp, in
+  // message-stamp order, so callback arrival order cannot reorder updates.
+  void drain_sonar_feedback(const rclcpp::Time & imu_stamp)
+  {
+    for (const auto & observation : sonar_feedback_buffer_.drain_through(imu_stamp.seconds())) {
+      apply_sonar_observation(observation);
+    }
+  }
+
+  void apply_sonar_observation(const FeedbackObservation & observation)
+  {
+    switch (apply_position_observation(
+        observation, "sonar", sonar_position_variance_floor_,
+        sonar_max_position_variance_, sonar_max_age_s_, false))
+    {
+      case PositionUpdateResult::kApplied:
+        ++sonar_feedback_applied_;
+        break;
+      case PositionUpdateResult::kSkippedStale:
+        ++sonar_feedback_skipped_stale_;
+        break;
+      case PositionUpdateResult::kSkippedNonFinite:
+        ++sonar_feedback_skipped_nonfinite_;
+        break;
+    }
   }
 
   void on_visual_odometry(const nav_msgs::msg::Odometry::SharedPtr msg)
   {
-    apply_position_odometry(
-      *msg, "visual", visual_position_variance_floor_, visual_max_age_s_);
+    const bool snap = visual_snap_first_update_ && !visual_first_update_done_;
+    const auto result = apply_position_observation(
+      to_observation(*msg), "visual", visual_position_variance_floor_,
+      visual_max_position_variance_, visual_max_age_s_, snap);
+    if (result == PositionUpdateResult::kApplied) {
+      visual_first_update_done_ = true;
+    }
   }
 
-  void apply_position_odometry(
-    const nav_msgs::msg::Odometry & msg, const char * source_name,
-    double position_variance_floor, double max_age_s)
+  enum class PositionUpdateResult
   {
-    const Eigen::Vector3d position(
-      msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z);
-    if (!position.allFinite()) {
+    kApplied,
+    kSkippedStale,
+    kSkippedNonFinite,
+  };
+
+  PositionUpdateResult apply_position_observation(
+    const FeedbackObservation & observation, const char * source_name,
+    double position_variance_floor, double max_position_variance,
+    double max_age_s, bool snap)
+  {
+    if (!observation.position.allFinite()) {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 2000, "Rejected non-finite %s position.", source_name);
-      return;
+      return PositionUpdateResult::kSkippedNonFinite;
     }
     // Reject stale samples relative to the latest IMU stamp; this keeps
     // external-position observations from leaking across long bag pauses.
     if (last_imu_stamp_valid_) {
-      const rclcpp::Time stamp(msg.header.stamp);
-      const double age = (last_imu_stamp_ - stamp).seconds();
+      const double age = last_imu_stamp_.seconds() - observation.stamp_s;
       if (age > max_age_s) {
         RCLCPP_DEBUG(
           get_logger(), "Skipping %s pose: %.3fs older than latest IMU sample",
           source_name, age);
-        return;
+        return PositionUpdateResult::kSkippedStale;
       }
     }
-    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
-    // Read the 3x3 position block from the 6x6 row-major pose covariance.
-    cov(0, 0) = msg.pose.covariance[0];
-    cov(0, 1) = msg.pose.covariance[1];
-    cov(0, 2) = msg.pose.covariance[2];
-    cov(1, 0) = msg.pose.covariance[6];
-    cov(1, 1) = msg.pose.covariance[7];
-    cov(1, 2) = msg.pose.covariance[8];
-    cov(2, 0) = msg.pose.covariance[12];
-    cov(2, 1) = msg.pose.covariance[13];
-    cov(2, 2) = msg.pose.covariance[14];
+    Eigen::Matrix3d cov = observation.covariance;
     // Ensure the diagonal stays at or above the configured floor so an
-    // overconfident external source cannot collapse the UKF position uncertainty.
+    // overconfident external source cannot collapse the UKF position
+    // uncertainty; the cap (when set) bounds a pessimistic published
+    // covariance so the observation keeps real weight.
     for (int i = 0; i < 3; ++i) {
       cov(i, i) = std::max(cov(i, i), position_variance_floor);
+      if (max_position_variance > 0.0) {
+        cov(i, i) = std::min(cov(i, i), max_position_variance);
+      }
     }
-    filter_.update_position(position, cov);
+
+    // Lag compensation: evaluate the innovation against the filter position
+    // at measurement time, then re-anchor it on the current state. Without
+    // this, a measurement that is `age` seconds old drags the estimate
+    // backward along the trajectory.
+    const Eigen::Vector3d position_before = filter_.state().head<3>();
+    Eigen::Vector3d measurement = observation.position;
+    if (const auto history = position_history_.lookup(observation.stamp_s)) {
+      measurement = position_before + (observation.position - *history);
+    }
+
+    if (snap) {
+      cov = Eigen::Matrix3d::Identity() * 1.0e-9;
+      RCLCPP_INFO(
+        get_logger(),
+        "Snapping to first %s update: moved_xy=%.4f",
+        source_name, (measurement - position_before).head<2>().norm());
+    }
+
+    filter_.update_position(measurement, cov);
+    // Fold the applied correction back into the stored history so a later
+    // delayed measurement does not re-measure (and re-apply) an error the
+    // filter already absorbed.
+    const Eigen::Vector3d applied_delta =
+      Eigen::Vector3d(filter_.state().head<3>()) - position_before;
+    position_history_.shift_from(observation.stamp_s, applied_delta);
     ++update_count_;
+    return PositionUpdateResult::kApplied;
   }
 
   std::vector<double> vector_parameter(
@@ -389,6 +499,13 @@ private:
     last_prediction_dt_ = 0.0;
     update_count_ = 0;
     surface_assumption_sample_count_ = 0;
+    position_history_.clear();
+    sonar_feedback_buffer_.clear();
+    sonar_feedback_received_ = 0;
+    sonar_feedback_applied_ = 0;
+    sonar_feedback_skipped_stale_ = 0;
+    sonar_feedback_skipped_nonfinite_ = 0;
+    visual_first_update_done_ = false;
   }
 
   void on_imu(const sensor_msgs::msg::Imu::SharedPtr msg)
@@ -435,6 +552,9 @@ private:
     maybe_apply_ahrs_gyro_bias_z(stamp, *msg);
     maybe_apply_ahrs_gyro_bias_xyz(stamp, *msg, sample);
     maybe_apply_surface_assumption();
+
+    position_history_.push(stamp.seconds(), filter_.state().head<3>());
+    drain_sonar_feedback(stamp);
 
     publish(stamp);
   }
@@ -771,6 +891,11 @@ private:
     status.ahrs_gyro_bias_z_enabled = use_ahrs_gyro_bias_z_;
     status.ahrs_gyro_bias_z_active = ahrs_gyro_bias_z_observation_active_;
     status.ahrs_gyro_bias_z_last_observed = ahrs_gyro_bias_z_last_observed_;
+    status.sonar_feedback_received = sonar_feedback_received_;
+    status.sonar_feedback_applied = sonar_feedback_applied_;
+    status.sonar_feedback_skipped_stale = sonar_feedback_skipped_stale_;
+    status.sonar_feedback_skipped_nonfinite = sonar_feedback_skipped_nonfinite_;
+    status.sonar_feedback_pending = sonar_feedback_buffer_.pending();
     return status;
   }
 
@@ -836,9 +961,20 @@ private:
   size_t sensor_qos_depth_{5};
   double sonar_position_variance_floor_{0.04};
   double sonar_max_age_s_{1.0};
+  double sonar_max_position_variance_{0.0};
+  bool sonar_buffer_by_stamp_{true};
   std::string visual_odometry_topic_;
   double visual_position_variance_floor_{0.04};
   double visual_max_age_s_{1.0};
+  double visual_max_position_variance_{0.0};
+  bool visual_snap_first_update_{false};
+  bool visual_first_update_done_{false};
+  PositionHistoryBuffer position_history_;
+  FeedbackOdometryBuffer sonar_feedback_buffer_;
+  uint64_t sonar_feedback_received_{0};
+  uint64_t sonar_feedback_applied_{0};
+  uint64_t sonar_feedback_skipped_stale_{0};
+  uint64_t sonar_feedback_skipped_nonfinite_{0};
   std::string dvl_velocity_topic_;
   Eigen::Matrix3d dvl_mount_rotation_{Eigen::Matrix3d::Identity()};
   double dvl_velocity_variance_floor_{0.01};

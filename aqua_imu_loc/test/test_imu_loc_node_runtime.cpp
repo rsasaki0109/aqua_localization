@@ -264,4 +264,139 @@ TEST_F(ImuLocNodeRuntimeTest, VisualOdometryPullsPositionState)
   EXPECT_NEAR(odometry_messages.back().pose.pose.position.x, 2.0, 0.5);
 }
 
+TEST_F(ImuLocNodeRuntimeTest, SnapFirstVisualUpdateJumpsToMeasurement)
+{
+  constexpr auto kImuTopic = "/aqua_imu_snap_runtime_test/imu";
+  constexpr auto kVisualTopic = "/aqua_imu_snap_runtime_test/visual_odom";
+  constexpr auto kOdometryTopic = "/aqua_imu_snap_runtime_test/odometry";
+  constexpr auto kStatusTopic = "/aqua_imu_snap_runtime_test/status";
+
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({
+    rclcpp::Parameter("topics.imu", std::string(kImuTopic)),
+    rclcpp::Parameter("topics.pressure", std::string("")),
+    rclcpp::Parameter("topics.visual_odometry", std::string(kVisualTopic)),
+    rclcpp::Parameter("topics.odometry", std::string(kOdometryTopic)),
+    rclcpp::Parameter("topics.status", std::string(kStatusTopic)),
+    rclcpp::Parameter("publish.tf", false),
+    rclcpp::Parameter("init.static_bias.enable", false),
+    rclcpp::Parameter("imu.visual.snap_first_update", true),
+    // Pessimistic published covariance: without the snap this first update
+    // would pull the estimate only a fraction of the way to the measurement.
+    rclcpp::Parameter("imu.visual.position_variance_floor", 0.04),
+    rclcpp::Parameter("dynamics.enable_linear_drag", false),
+  });
+
+  auto imu_node = std::make_shared<aqua_imu_loc::ImuLocNode>(options);
+  auto test_node = std::make_shared<rclcpp::Node>("aqua_imu_snap_runtime_test");
+
+  std::vector<nav_msgs::msg::Odometry> odometry_messages;
+  auto imu_pub =
+    test_node->create_publisher<sensor_msgs::msg::Imu>(kImuTopic, rclcpp::SensorDataQoS());
+  auto visual_pub =
+    test_node->create_publisher<nav_msgs::msg::Odometry>(kVisualTopic, rclcpp::SensorDataQoS());
+  auto odometry_sub = test_node->create_subscription<nav_msgs::msg::Odometry>(
+    kOdometryTopic, 10,
+    [&odometry_messages](const nav_msgs::msg::Odometry::SharedPtr msg) {
+      odometry_messages.push_back(*msg);
+    });
+
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(imu_node);
+  executor.add_node(test_node);
+
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    return imu_pub->get_subscription_count() > 0 &&
+           visual_pub->get_subscription_count() > 0;
+  }));
+
+  const auto start = test_node->now();
+
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    imu_pub->publish(make_stationary_imu(start));
+    imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.01)));
+    visual_pub->publish(make_position_odometry(
+      start + rclcpp::Duration::from_seconds(0.01), 2.0, 0.0, 0.0, 0.04));
+    imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.02)));
+    return !odometry_messages.empty() &&
+           odometry_messages.back().pose.pose.position.x > 1.5;
+  }, 10s));
+
+  // Snap absorbs the full first innovation in one step.
+  EXPECT_NEAR(odometry_messages.back().pose.pose.position.x, 2.0, 0.1);
+}
+
+TEST_F(ImuLocNodeRuntimeTest, SonarFeedbackBufferAppliesByStampAndReportsCounters)
+{
+  constexpr auto kImuTopic = "/aqua_imu_sonar_runtime_test/imu";
+  constexpr auto kSonarTopic = "/aqua_imu_sonar_runtime_test/sonar_odom";
+  constexpr auto kOdometryTopic = "/aqua_imu_sonar_runtime_test/odometry";
+  constexpr auto kStatusTopic = "/aqua_imu_sonar_runtime_test/status";
+
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({
+    rclcpp::Parameter("topics.imu", std::string(kImuTopic)),
+    rclcpp::Parameter("topics.pressure", std::string("")),
+    rclcpp::Parameter("topics.sonar_odometry", std::string(kSonarTopic)),
+    rclcpp::Parameter("topics.odometry", std::string(kOdometryTopic)),
+    rclcpp::Parameter("topics.status", std::string(kStatusTopic)),
+    rclcpp::Parameter("publish.tf", false),
+    rclcpp::Parameter("init.static_bias.enable", false),
+    rclcpp::Parameter("imu.sonar.buffer_by_stamp", true),
+    rclcpp::Parameter("imu.sonar.position_variance_floor", 0.01),
+    rclcpp::Parameter("dynamics.enable_linear_drag", false),
+  });
+
+  auto imu_node = std::make_shared<aqua_imu_loc::ImuLocNode>(options);
+  auto test_node = std::make_shared<rclcpp::Node>("aqua_imu_sonar_runtime_test");
+
+  std::vector<nav_msgs::msg::Odometry> odometry_messages;
+  std::vector<aqua_msgs::msg::EstimatorStatus> status_messages;
+  auto imu_pub =
+    test_node->create_publisher<sensor_msgs::msg::Imu>(kImuTopic, rclcpp::SensorDataQoS());
+  auto sonar_pub =
+    test_node->create_publisher<nav_msgs::msg::Odometry>(kSonarTopic, rclcpp::SensorDataQoS());
+  auto odometry_sub = test_node->create_subscription<nav_msgs::msg::Odometry>(
+    kOdometryTopic, 10,
+    [&odometry_messages](const nav_msgs::msg::Odometry::SharedPtr msg) {
+      odometry_messages.push_back(*msg);
+    });
+  auto status_sub = test_node->create_subscription<aqua_msgs::msg::EstimatorStatus>(
+    kStatusTopic, 10,
+    [&status_messages](const aqua_msgs::msg::EstimatorStatus::SharedPtr msg) {
+      status_messages.push_back(*msg);
+    });
+
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(imu_node);
+  executor.add_node(test_node);
+
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    return imu_pub->get_subscription_count() > 0 &&
+           sonar_pub->get_subscription_count() > 0;
+  }));
+
+  const auto start = test_node->now();
+
+  ASSERT_TRUE(spin_until(executor, [&]() {
+    imu_pub->publish(make_stationary_imu(start));
+    imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.01)));
+    sonar_pub->publish(make_position_odometry(
+      start + rclcpp::Duration::from_seconds(0.01), 1.5, 0.0, 0.0, 0.01));
+    // The buffered observation is applied on the next IMU step at or after
+    // its stamp, not in the subscription callback.
+    imu_pub->publish(make_stationary_imu(start + rclcpp::Duration::from_seconds(0.02)));
+    return !odometry_messages.empty() &&
+           odometry_messages.back().pose.pose.position.x > 0.5 &&
+           !status_messages.empty() &&
+           status_messages.back().sonar_feedback_applied >= 1U;
+  }, 10s));
+
+  const auto & status = status_messages.back();
+  EXPECT_GE(status.sonar_feedback_received, status.sonar_feedback_applied);
+  EXPECT_EQ(status.sonar_feedback_skipped_stale, 0U);
+  EXPECT_EQ(status.sonar_feedback_skipped_nonfinite, 0U);
+  EXPECT_NEAR(odometry_messages.back().pose.pose.position.x, 1.5, 0.7);
+}
+
 }  // namespace

@@ -12,9 +12,13 @@
 
 set -euo pipefail
 
-WORKSPACE="${WORKSPACE:-aqua_loc_ws}"
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+WORKSPACE="${WORKSPACE:-$(cd -- "$SCRIPT_DIR/../.." && pwd)}"
 ROS_SETUP="${ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
 LOCAL_SETUP="${LOCAL_SETUP:-install/setup.bash}"
+ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
+NODE_STARTUP_DELAY_S="${NODE_STARTUP_DELAY_S:-5}"
+POST_PLAY_SLEEP_S="${POST_PLAY_SLEEP_S:-3}"
 MBES_SRC="${MBES_SRC:-$WORKSPACE/aqua_localization/datasets/public/mbes_slam/beach_pond_ros2}"
 MBES_OUT="${MBES_OUT:-$WORKSPACE/aqua_localization/datasets/public/mbes_slam/demo_with_estimate}"
 IMU_PROFILE="${IMU_PROFILE:-}"
@@ -95,10 +99,38 @@ cleanup_processes() {
     return 0
   fi
 
-  kill -INT "${PIDS_TO_CLEAN[@]}" 2>/dev/null || true
-  sleep 4
-  kill -TERM "${PIDS_TO_CLEAN[@]}" 2>/dev/null || true
+  local -a child_pids=()
+  local pid child
+  for pid in "${PIDS_TO_CLEAN[@]}"; do
+    while read -r child; do
+      if [[ -n "$child" ]]; then
+        child_pids+=("$child")
+      fi
+    done < <(pgrep -P "$pid" 2>/dev/null || true)
+  done
+
+  kill -INT "${PIDS_TO_CLEAN[@]}" "${child_pids[@]}" 2>/dev/null || true
+  local deadline=$((SECONDS + 8))
+  while (( SECONDS < deadline )); do
+    local alive=0
+    for pid in "${PIDS_TO_CLEAN[@]}" "${child_pids[@]}"; do
+      if kill -0 "$pid" 2>/dev/null; then
+        alive=1
+        break
+      fi
+    done
+    if [[ "$alive" == "0" ]]; then
+      return 0
+    fi
+    sleep 0.2
+  done
+
+  kill -TERM "${PIDS_TO_CLEAN[@]}" "${child_pids[@]}" 2>/dev/null || true
   sleep 1
+  for pid in "${PIDS_TO_CLEAN[@]}"; do
+    pkill -KILL -P "$pid" 2>/dev/null || true
+  done
+  kill -KILL "${PIDS_TO_CLEAN[@]}" "${child_pids[@]}" 2>/dev/null || true
 }
 
 trap cleanup_processes EXIT
@@ -126,10 +158,39 @@ resolve_profile() {
   fi
   local prefix
   if prefix=$(ros2 pkg prefix "$package" 2>/dev/null); then
-    printf '%s/share/%s/%s\n' "$prefix" "$package" "$relative_path"
-    return 0
+    local installed="$prefix/share/$package/$relative_path"
+    if [[ -r "$installed" ]]; then
+      printf '%s\n' "$installed"
+      return 0
+    fi
   fi
   printf '%s\n' "$fallback"
+}
+
+prepend_path_once() {
+  local name="$1"
+  local value="$2"
+  local current="${!name:-}"
+  case ":$current:" in
+    *":$value:"*) ;;
+    *) printf -v "$name" '%s%s%s' "$value" "${current:+:}" "$current" ;;
+  esac
+  export "$name"
+}
+
+prefer_workspace_install_overlays() {
+  local prefix
+  shopt -s nullglob
+  for prefix in "$WORKSPACE"/install/*; do
+    if [[ ! -d "$prefix" ]]; then
+      continue
+    fi
+    prepend_path_once AMENT_PREFIX_PATH "$prefix"
+    if [[ -d "$prefix/lib" ]]; then
+      prepend_path_once LD_LIBRARY_PATH "$prefix/lib"
+    fi
+  done
+  shopt -u nullglob
 }
 
 require_readable_file() {
@@ -331,11 +392,13 @@ compute_play_timeout_s() {
 }
 
 validate_ros_domain_id
+export ROS_DOMAIN_ID
 
 cd "$WORKSPACE"
 # shellcheck disable=SC1091
 set +u
 source "$ROS_SETUP"
+prefer_workspace_install_overlays
 if [[ -n "$LOCAL_SETUP" ]]; then
   # shellcheck disable=SC1091
   source "$LOCAL_SETUP"
@@ -394,7 +457,7 @@ ros2 run aqua_sonar_loc mbes_loop_closure_node --ros-args \
 LOOP_PID=$!
 PIDS_TO_CLEAN+=("$LOOP_PID")
 
-sleep 3
+sleep "$NODE_STARTUP_DELAY_S"
 
 ros2 bag record -s "$RECORD_STORAGE" -o "$MBES_OUT" \
   ${RECORD_TOPIC_FLAG:+$RECORD_TOPIC_FLAG} /norbit/detections /nav/processed/odometry \
@@ -453,7 +516,7 @@ else
     > /tmp/aqua_record_mbes_play.log 2>&1 || true
 fi
 
-sleep 3
+sleep "$POST_PLAY_SLEEP_S"
 cleanup_processes
 
 ls -la "$MBES_OUT"

@@ -114,6 +114,11 @@ class _EstimatorStatus:
         self.ahrs_gyro_bias_z_enabled = kwargs.get("ahrs_enabled", True)
         self.ahrs_gyro_bias_z_active = kwargs.get("ahrs_active", True)
         self.ahrs_gyro_bias_z_last_observed = kwargs.get("ahrs_last", 0.0067)
+        self.sonar_feedback_received = kwargs.get("sonar_received", 218)
+        self.sonar_feedback_applied = kwargs.get("sonar_applied", 218)
+        self.sonar_feedback_skipped_stale = kwargs.get("sonar_stale", 0)
+        self.sonar_feedback_skipped_nonfinite = kwargs.get("sonar_nonfinite", 0)
+        self.sonar_feedback_pending = kwargs.get("sonar_pending", 0)
 
 
 def test_csv_header_lists_expected_fields():
@@ -124,6 +129,37 @@ def test_csv_header_lists_expected_fields():
     assert "ahrs_gyro_bias_z_active" in headers
     assert "ahrs_gyro_bias_z_last_observed" in headers
     assert "accel_bias_z" in headers
+    assert "sonar_feedback_received" in headers
+    assert "sonar_feedback_applied" in headers
+    assert "sonar_feedback_pending" in headers
+
+
+def test_csv_line_serializes_sonar_feedback_counters():
+    module = load_module()
+    msg = _EstimatorStatus(sonar_received=200, sonar_applied=198, sonar_stale=2, sonar_pending=3)
+    headers = module.CSV_HEADER.strip().split(",")
+    line = module.format_csv_line(msg).strip().split(",")
+    assert int(line[headers.index("sonar_feedback_received")]) == 200
+    assert int(line[headers.index("sonar_feedback_applied")]) == 198
+    assert int(line[headers.index("sonar_feedback_skipped_stale")]) == 2
+    assert int(line[headers.index("sonar_feedback_pending")]) == 3
+
+
+def test_csv_line_defaults_missing_sonar_counters_to_zero():
+    module = load_module()
+    msg = _EstimatorStatus()
+    for attr in (
+        "sonar_feedback_received",
+        "sonar_feedback_applied",
+        "sonar_feedback_skipped_stale",
+        "sonar_feedback_skipped_nonfinite",
+        "sonar_feedback_pending",
+    ):
+        delattr(msg, attr)
+    headers = module.CSV_HEADER.strip().split(",")
+    line = module.format_csv_line(msg).strip().split(",")
+    assert len(line) == len(headers)
+    assert int(line[headers.index("sonar_feedback_received")]) == 0
 
 
 def test_csv_line_field_count_matches_header():
