@@ -1,5 +1,30 @@
 # SOTA Gap Analysis
 
+## Active priority, 2026-10-10
+
+The current handover prioritizes harbor_05 VIO/pressure comparison and its native
+IMU support boundary. See [recovery and input contract](aqualoc_vio_pressure.md)
+and [freeze-gated scoring](aqualoc_vio_scoring.md). Old local commit `51cea95`,
+pressure implementation, frozen calibration and registrations were unavailable
+in the restored/public history. A new input contract explicitly accounts for the
+early image; estimator comparison remains blocked until the fixed method is
+recovered or a separately registered replacement is complete. No harbor_05
+reference has been acquired/read, estimator outputs frozen, or metrics scored.
+
+The Tank application was skipped by the user. The older Tank-first recommendation
+below is historical and does not authorize any application/contact. After the
+harbor_05 comparison, independent hardware ground truth and competitive methods
+remain necessary for a SoTA claim. The user-reported harbor_06 ~4.3% improvement
+is development evidence only; AQUALOC COLMAP/depth reference is not independent
+hardware truth.
+
+During native-mirror discovery, the public
+[LBL-AQUALOC README](https://github.com/SYSU-CPNTLab/LBL-AQUALOC-Dataset)
+was checked. It describes semi-physical simulated LBL measurements generated from
+the COLMAP trajectory, rather than independently measured hardware truth. It is
+neither a mirror of harbor_05 nor a way to satisfy the independent-truth gate.
+Only metadata were read; no sequences or reference trajectories were acquired.
+
 Checked on 2026-06-04. This page records the paper-backed gap between
 `aqua_localization` and current underwater SLAM / sonar SLAM systems. Treat it
 as a development gate, not as a marketing page.

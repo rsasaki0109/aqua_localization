@@ -1,0 +1,65 @@
+{
+  "schema": "active-real-data-evaluation-v2",
+  "updated_date_utc": "2026-10-10",
+  "repository_recovery": {
+    "available_head": "5bb429de1402be9c385507556a0a910c890bf673",
+    "working_branch": "codex/harbor05-input-support",
+    "old_user_reported_head": "51cea95",
+    "old_head_status": "unavailable_in_local_objects_and_public_remote_heads_or_pull_requests",
+    "old_method_and_calibration": "missing",
+    "old_registration_and_failure_artifacts": "not_restored",
+    "old_failure_messages_user_reported": {
+      "openvins_stream.py": "camera has no initial IMU support",
+      "openvins_pressure_stream.py": "observation before native IMU support"
+    },
+    "new_sources_are_original_method": false
+  },
+  "priority": "harbor_05 native support boundary, then registered real-data VIO/pressure comparison",
+  "dataset": {
+    "sequence": "AQUALOC harbor_05",
+    "root": "/workspace/aqua-data/independent/aqualoc_harbor_05",
+    "acquisition_status": "in_progress",
+    "native_readiness": "not_yet_verified",
+    "expected_archive_bytes": 793867402,
+    "expected_archive_sha256": "b62c4075cfe7f53757c491a73cf2f6b5fb061a28b5fd01f2c1bb7096c252cc47",
+    "expected_bag_bytes": 1155720393,
+    "expected_bag_sha256": "109c97c1d1b655226b9ca1da312c154b28b3cc8464d58150b7cd4d91e6ba3ecb",
+    "hash_provenance": "user-reported old observations; not publisher checksums",
+    "expected_all_ros_messages": 86126,
+    "expected_native_counts": {"imu": 34576, "camera": 3458, "pressure": 1650}
+  },
+  "input_contract": {
+    "policy": "native-imu-support-v2",
+    "camera_offset_ns": -40380655,
+    "expected_excluded_camera_ordinal": 0,
+    "expected_before_imu_ns": 6537851,
+    "native_bag_and_all_observations_retained": true,
+    "derived_camera_mask_shared": true,
+    "actual_data_conversion": "not_executed",
+    "source_contract_tests": "50 passed; synthetic integrity/contract fixtures, not accuracy evidence"
+  },
+  "upstream_openvins": {
+    "commit": "69488123ed9362dd44b6f28e7f4680abbff1442b",
+    "standalone_library_build": "passed",
+    "dynamic_loading": "passed",
+    "original_pressure_extension": "missing"
+  },
+  "comparison": {
+    "status": "blocked_missing_frozen_method",
+    "registration": "new v2 input/scoring contract pending complete native verification",
+    "planned_trials": ["vio-1", "vio-2", "pressure_vio-1", "pressure_vio-2"],
+    "executed_trials": [],
+    "estimator_freeze": "not_created",
+    "reference_acquired": false,
+    "reference_read": false,
+    "scoring": "not_executed",
+    "metrics": null
+  },
+  "claim": {
+    "sota_achieved": false,
+    "harbor_06": "reference-informed development; old reported ~4.3% improvement not replicated here",
+    "aqualoc_reference": "same-image COLMAP and depth-based scale, not independent hardware truth",
+    "next_after_harbor_05": "independent hardware ground truth and competitive methods",
+    "tank_application": "skipped_by_user; no contact or application"
+  }
+}
