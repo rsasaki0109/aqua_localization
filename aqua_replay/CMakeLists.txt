@@ -71,14 +71,21 @@ if(BUILD_TESTING)
   target_include_directories(test_reorder_buffer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-  ament_add_pytest_test(test_offline_replay_determinism
-    test/test_offline_replay_determinism.py
-    TIMEOUT 600
-    ENV
-      AQUA_REPLAY_BIN=$<TARGET_FILE:offline_replay>
-      AQUA_REPLAY_SCRIPTS=${CMAKE_CURRENT_SOURCE_DIR}/scripts
-      AQUA_REPLAY_SCENARIOS=${CMAKE_CURRENT_SOURCE_DIR}/scenarios
-  )
+  # Humble's rclcpp (16.x) rejects intra-process publishers with
+  # transient_local durability, which the pose graph and MBES loop-closure
+  # nodes use, so the full-pipeline replay needs Iron or newer.
+  if(rclcpp_VERSION VERSION_GREATER_EQUAL "21.0.0")
+    ament_add_pytest_test(test_offline_replay_determinism
+      test/test_offline_replay_determinism.py
+      TIMEOUT 600
+      ENV
+        AQUA_REPLAY_BIN=$<TARGET_FILE:offline_replay>
+        AQUA_REPLAY_SCRIPTS=${CMAKE_CURRENT_SOURCE_DIR}/scripts
+        AQUA_REPLAY_SCENARIOS=${CMAKE_CURRENT_SOURCE_DIR}/scenarios
+    )
+  else()
+    message(STATUS "rclcpp ${rclcpp_VERSION}: skipping full-pipeline replay determinism test")
+  endif()
 endif()
 
 ament_package()
