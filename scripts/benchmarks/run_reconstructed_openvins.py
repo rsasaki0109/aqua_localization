@@ -59,6 +59,8 @@ def check_registration(plan_path):
         plan.get('upstream_commit') != OPENVINS_COMMIT or plan.get('trials') != expected_trials or
         set(plan.get('source_sha256', {})) != set(METHOD_SOURCES)):
         raise ValueError('complete new method/source/four-trial registration required')
+    if sha256(plan_path.with_name('pressure_quality.json')) != plan['pressure_quality_sha256']:
+        raise ValueError('registered pressure quality ledger changed')
     repo = Path(__file__).resolve().parents[2]
     for name, digest in plan['source_sha256'].items():
         if sha256(repo / name) != digest or sha256(plan_path.parent / 'source' / name) != digest:
@@ -118,6 +120,7 @@ def run_all(plan_path):
             processed_observation_counts=processed,
             native_counts={'imu': input_audit['native_imu_count'], **input_audit['native_observation_counts']},
             support_boundary_exclusions=input_audit['excluded_observation_counts'],
+            pressure_quality_exclusions=plan['pressure_quality_summary'],
             initialization_and_missing_state_exclusions=excluded,
             pressure_event_status_counts={s: sum(r['sensor'] == 'pressure' and r['status'] == s for r in event_rows)
                 for s in sorted({r['status'] for r in event_rows if r['sensor'] == 'pressure'})},

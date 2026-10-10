@@ -18,7 +18,7 @@ synthetic-bag demo as the primary `aqua_sonar_loc` bringup story.
 ```bash
 mkdir -p aqua_localization/datasets/public/mbes_slam
 cd aqua_localization/datasets/public/mbes_slam
-wget --no-check-certificate https://seaward.science/files/pos-datasets/bag/beach_pond.tar.gz
+wget https://seaward.science/files/pos-datasets/bag/beach_pond.tar.gz
 tar xzf beach_pond.tar.gz
 ```
 

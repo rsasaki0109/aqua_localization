@@ -29,12 +29,12 @@ not an executed evaluation.
    metrics with the primary scorer, and preserve disagreement as a failure.
 
 The registration utility saves `scoring-plan.json` and its SHA-256 in the new
-comparison plan. There is no estimator freeze or scored harbor_05 metric yet.
+comparison plan. The original method remains unavailable. The separately reconstructed v4 has now completed freeze-gated scoring; see the results below.
 
-The new executable reconstruction uses its own `vio-comparison-v3` registration
+The new executable reconstruction uses its own versioned comparison registration
 and four-trial freeze. Its initial scoring plan explicitly blocks reference
 acquisition until the image-number adapter is fixed. `prepare_vio_scoring.py`
-then creates a separate exclusive `vio-scoring-v3` version bound to those
+then creates a separate exclusive `vio-scoring-v4` version bound to those
 unchanged outcomes. It requires independent evidence for zero-based image
 positions from the already reference-used harbor_06 development format. It
 does not select a numbering origin from harbor_05 errors. Every reference image
@@ -62,3 +62,18 @@ boundary and no extrapolation. Mutating a frozen trajectory or removing one
 trial blocks reference access. These tests provide no localization accuracy
 evidence. The original frozen method remains unavailable; new results must be
 attributed to the separately registered reconstruction.
+
+
+The completed v4 run froze all four successful outcomes (SHA-256
+`02a3368b49d02e7db93542f8209612dcffd06db2e6beb5a336c1d81dacbaaa75`).
+Only afterward was zero-based numbering confirmed from harbor_06 development
+format and a separate scoring registration bound to that proof and freeze.
+Harbor_05 reference was then acquired (100668 bytes, locally observed SHA-256
+`960dab529942875ed25f9d2b6dbde2adf34f86a12adf7d9b07459cf5fb9ec846`).
+All four own/common comparisons passed independent correspondence and Horn
+verification, using 674 matched positions. Scores SHA-256 is
+`43ba265ff3ebf3d988645a67b45421fd7f064dc1c7483a4eaf611daa4fe67505`.
+See [numeric results and complete outcome metadata](harbor05_reconstruction_v4_results.json).
+No registered method/input/scoring source was changed after harbor_05 reference
+access. Keep archived pre-reference freeze fields unchanged: their reference
+status describes the freeze instant, while this report describes later scoring.

@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
     bool pressure = std::string(argv[1]) == "pressure";
     if (!pressure && std::string(argv[1]) != "vio") throw std::runtime_error("unknown arm");
     char magic[8]; std::cin.read(magic, 8);
-    if (std::string(magic, 8) != "AQUAVIO3") throw std::runtime_error("wrong sensor stream version");
+    if (!std::cin || std::string(magic, 8) != "AQUAVIO3") throw std::runtime_error("wrong sensor stream version");
     auto origin = read<int64_t>(); auto count = read<uint32_t>();
     std::vector<int64_t> stamps; std::vector<ov_core::ImuData> imus;
     for (uint32_t i=0; i<count; ++i) {
@@ -164,19 +164,19 @@ int main(int argc, char** argv) {
         events<<"camera,"<<ordinal<<','<<ns<<",estimated\n";
       } else if (type=='P') {
         const double pa=read<double>();
-        if (pressure && (!std::isfinite(pa) || pa<80000 || pa>1e8))
-          throw std::runtime_error("registered FluidPressure Pa range violated; no unit guessing");
+        const bool valid_pressure=HydrostaticPressure::valid(pa);
         if (!manager.initialized()) { events<<"pressure,"<<ordinal<<','<<ns<<",pre_initialization\n"; continue; }
         auto state=manager.get_state(); bool temporary=t>state->_timestamp;
         if (t<state->_timestamp) throw std::runtime_error("pressure precedes current estimator state");
         // Both arms share this propagation schedule; baseline ignores the value.
         if (temporary) manager.get_propagator()->propagate_and_clone(state,t);
-        if (pressure) model.update(state,pa);
+        if (pressure && valid_pressure) model.update(state,pa);
         if (temporary) {
           auto clone=state->_clones_IMU.at(t);
           ov_msckf::StateHelper::marginalize(state,clone); state->_clones_IMU.erase(t);
         }
-        events<<"pressure,"<<ordinal<<','<<ns<<','<<(pressure?"updated":"value_ignored")<<'\n';
+        events<<"pressure,"<<ordinal<<','<<ns<<','
+          <<(!valid_pressure?"invalid_pressure_measurement_excluded":pressure?"updated":"value_ignored")<<'\n';
       } else throw std::runtime_error("unknown sensor record");
     }
     trajectory.flush(); events.flush();

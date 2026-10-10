@@ -1,5 +1,5 @@
 {
-  "schema": "active-real-data-evaluation-v2",
+  "schema": "active-real-data-evaluation-v3",
   "updated_date_utc": "2026-10-10",
   "repository_recovery": {
     "available_head": "5bb429de1402be9c385507556a0a910c890bf673",
@@ -14,12 +14,12 @@
     },
     "new_sources_are_original_method": false
   },
-  "priority": "harbor_05 native support boundary, then registered real-data VIO/pressure comparison",
+  "priority": "independent hardware truth and competitive methods after completed harbor_05 reconstruction comparison",
   "dataset": {
     "sequence": "AQUALOC harbor_05",
     "root": "/workspace/aqua-data/independent/aqualoc_harbor_05",
-    "acquisition_status": "in_progress",
-    "native_readiness": "not_yet_verified",
+    "acquisition_status": "complete",
+    "native_readiness": "fully_verified",
     "expected_archive_bytes": 793867402,
     "expected_archive_sha256": "b62c4075cfe7f53757c491a73cf2f6b5fb061a28b5fd01f2c1bb7096c252cc47",
     "expected_bag_bytes": 1155720393,
@@ -30,7 +30,8 @@
       "imu": 34576,
       "camera": 3458,
       "pressure": 1650
-    }
+    },
+    "snapshot_ready_sha256": "e68d5015ec71b2ecfd549e785cdb048b8cd23112a0296588d5d65d0956b0da31"
   },
   "input_contract": {
     "policy": "native-imu-support-v2",
@@ -39,8 +40,8 @@
     "expected_before_imu_ns": 6537851,
     "native_bag_and_all_observations_retained": true,
     "derived_camera_mask_shared": true,
-    "actual_data_conversion": "not_executed",
-    "source_contract_tests": "60 passed; synthetic integrity, wire protocol, Gaussian and scoring mathematics checks; not accuracy evidence"
+    "actual_data_conversion": "complete_and_independently_byte_verified",
+    "source_contract_tests": "69 passed; integrity, wire, pressure quality, Gaussian and scoring checks; not accuracy evidence"
   },
   "upstream_openvins": {
     "commit": "69488123ed9362dd44b6f28e7f4680abbff1442b",
@@ -49,20 +50,53 @@
     "original_pressure_extension": "missing"
   },
   "comparison": {
-    "status": "blocked_missing_frozen_method",
-    "registration": "new v2 input/scoring contract pending complete native verification",
+    "status": "new_reconstruction_v4_scored_and_independently_verified",
+    "registration": "vio-comparison-v4 and separate vio-scoring-v4, all before harbor_05 reference access",
     "planned_trials": [
       "vio-1",
       "vio-2",
       "pressure_vio-1",
       "pressure_vio-2"
     ],
-    "executed_trials": [],
-    "estimator_freeze": "not_created",
-    "reference_acquired": false,
-    "reference_read": false,
-    "scoring": "not_executed",
-    "metrics": null
+    "executed_trials": [
+      {
+        "id": "vio-1",
+        "status": "success",
+        "runtime_seconds": 23.92535695799961
+      },
+      {
+        "id": "vio-2",
+        "status": "success",
+        "runtime_seconds": 23.176696102998903
+      },
+      {
+        "id": "pressure-1",
+        "status": "success",
+        "runtime_seconds": 23.64948899099909
+      },
+      {
+        "id": "pressure-2",
+        "status": "success",
+        "runtime_seconds": 23.641189337999094
+      }
+    ],
+    "estimator_freeze": "02a3368b49d02e7db93542f8209612dcffd06db2e6beb5a336c1d81dacbaaa75",
+    "reference_acquired": true,
+    "reference_read": true,
+    "scoring": "complete_with_independent_correspondence_and_Horn_verification",
+    "metrics": {
+      "baseline_mean_rmse_m": 2.3847767219449962,
+      "count": 674,
+      "improvement_percent": 10.559860457329782,
+      "pressure_mean_rmse_m": 2.132947627888721,
+      "status": "scored_and_independently_verified",
+      "support_ns": [
+        1523969523870594996,
+        1523969692192498082
+      ]
+    },
+    "original_method_status": "unavailable_and_unexecuted",
+    "result_summary": "harbor05_reconstruction_v4_results.json"
   },
   "claim": {
     "sota_achieved": false,
@@ -72,13 +106,69 @@
     "tank_application": "skipped_by_user; no contact or application"
   },
   "reconstructed_method": {
-    "status": "built_and_mathematically_verified; awaiting full native input verification before v3 registration",
+    "status": "v4_complete; v3 pressure trials failed and retained",
     "original_method_reproduced": false,
     "official_calibration_executable_check": "passed",
     "pressure_units": "Pa; fail rather than guess units",
     "offset_state": "constant uncertain hydrostatic offset with joint cross-covariance",
-    "new_trials": [],
-    "reference_acquired": false,
-    "scoring_registration": "pending independent zero-based format evidence and four-outcome freeze"
+    "new_trials": [
+      {
+        "id": "vio-1",
+        "status": "success",
+        "runtime_seconds": 23.92535695799961
+      },
+      {
+        "id": "vio-2",
+        "status": "success",
+        "runtime_seconds": 23.176696102998903
+      },
+      {
+        "id": "pressure-1",
+        "status": "success",
+        "runtime_seconds": 23.64948899099909
+      },
+      {
+        "id": "pressure-2",
+        "status": "success",
+        "runtime_seconds": 23.641189337999094
+      }
+    ],
+    "reference_acquired": true,
+    "scoring_registration": "vio-scoring-v4; bound to all four frozen successful v4 trials and independent zero-based format proof",
+    "preserved_v3_outcomes": [
+      {
+        "id": "vio-1",
+        "status": "success",
+        "exit_code": 0,
+        "runtime_seconds": 23.333224269999846
+      },
+      {
+        "id": "vio-2",
+        "status": "success",
+        "exit_code": 0,
+        "runtime_seconds": 23.465669628998512
+      },
+      {
+        "id": "pressure-1",
+        "status": "failed",
+        "exit_code": 2,
+        "runtime_seconds": 20.012871116998213
+      },
+      {
+        "id": "pressure-2",
+        "status": "failed",
+        "exit_code": 2,
+        "runtime_seconds": 20.049253310000495
+      }
+    ],
+    "pressure_quality_exclusion": {
+      "native_ordinal": 1401,
+      "timestamp_ns": 1523969666297104665,
+      "value_pa": -2585590.0,
+      "reason": "negative_absolute_pressure",
+      "eligible_measurements": 1649,
+      "all_native_pressure_bytes_retained": true,
+      "both_arms_propagate_at_excluded_pressure_time": true
+    }
   }
 }

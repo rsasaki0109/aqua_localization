@@ -1,0 +1,832 @@
+{
+  "schema": "aqualoc-harbor05-reconstruction-v4-summary-v1",
+  "date_utc": "2026-10-10",
+  "method_version": "vio-comparison-v4",
+  "scoring_version": "vio-scoring-v4",
+  "original_method_reproduced": false,
+  "alignment": "rigid SE(3)",
+  "scale": 1,
+  "max_interpolation_interval_ns": 100000000,
+  "freeze_sha256": "02a3368b49d02e7db93542f8209612dcffd06db2e6beb5a336c1d81dacbaaa75",
+  "scores_sha256": "43ba265ff3ebf3d988645a67b45421fd7f064dc1c7483a4eaf611daa4fe67505",
+  "scoring_registration_sha256": "f91162cbbdd8001dafdb8591b0dd4ef1444dcc18a4739ac47ba3e39ec573dbe1",
+  "reference_acquisition": {
+    "bytes": 100668,
+    "etag": "e6b02250303631b407e71baa0a4e4a3493a39183",
+    "freeze_sha256": "02a3368b49d02e7db93542f8209612dcffd06db2e6beb5a336c1d81dacbaaa75",
+    "hash_provenance": "this verified TLS download; not a publisher checksum",
+    "scoring_registration_sha256": "021e3d86430149df6b157e3631f0c4463322b3b2255449f7a81b05f28fe360cc",
+    "sha256": "960dab529942875ed25f9d2b6dbde2adf34f86a12adf7d9b07459cf5fb9ec846",
+    "source": "https://seafile.lirmm.fr/d/79b03788f29148ca84e5/files/?p=%2FHarbor_sites_sequences%2Fharbor_groundtruth_files%2Fnew_harbor_colmap_traj_sequence_05.txt&dl=1"
+  },
+  "trials": [
+    {
+      "arm": "vio",
+      "estimated_camera_count": 3371,
+      "estimator_status": "success",
+      "id": "vio-1",
+      "independent_score": {
+        "count": 674,
+        "rmse_m": 2.384776721944998,
+        "rotation": [
+          [
+            -0.7631351151056605,
+            -0.6460949874116628,
+            -0.013640503443550746
+          ],
+          [
+            -0.645744606842199,
+            0.7632069024626154,
+            -0.023002755653047116
+          ],
+          [
+            0.025272491505272037,
+            -0.008745929049750155,
+            -0.9996423409891022
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.58124404161908,
+          -3.9595368885618965,
+          0.2538378021097912
+        ]
+      },
+      "matched_support_ns": [
+        1523969523870594996,
+        1523969692192498082
+      ],
+      "reference_matched_count": 674,
+      "runtime_seconds": 23.92535695799961,
+      "score": {
+        "count": 674,
+        "maximum_m": 4.421204333216448,
+        "mean_m": 2.123172658203126,
+        "median_m": 2.194192288573095,
+        "rmse_m": 2.3847767219449962,
+        "rotation": [
+          [
+            -0.7631351151056607,
+            -0.6460949874116625,
+            -0.013640503443549808
+          ],
+          [
+            -0.6457446068421988,
+            0.7632069024626152,
+            -0.02300275565304501
+          ],
+          [
+            0.025272491505269955,
+            -0.008745929049749164,
+            -0.9996423409891021
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.581244041619077,
+          -3.9595368885618965,
+          0.25383780210978896
+        ]
+      },
+      "scoring_status": "scored_and_independently_verified",
+      "trial_support_ns": [
+        1523969523721984421,
+        1523969692291098643
+      ],
+      "initialization_and_missing_state_excluded_count": 86,
+      "interpolation_excluded_count": 2697,
+      "output_artifacts": {
+        "output_sha256": {
+          "events.csv": "462a0760287d5a0e2de5b013e895d4cae52887fcb4eb94ca073fb56eea52af24",
+          "run.log": "15b1d00f578ef38b921efc2de235a1ab462ccd027a67d50c43e60f8352b9313c",
+          "trajectory.csv": "e6bf08bd247ee69b54f2f5aa734671f0e441170d2f3e9aa0949c6227d828e372"
+        },
+        "result_sha256": "44c4c98d726cc4d942d7ef93160c3bca3ca068f265e545ae9c85f0fcbe6700b4"
+      },
+      "frozen_trial_metadata": {
+        "arm": "vio",
+        "exit_code": 0,
+        "feeder_error": null,
+        "id": "vio-1",
+        "native_counts": {
+          "camera": 3458,
+          "imu": 34576,
+          "pressure": 1650
+        },
+        "output_camera_count": 3371,
+        "output_sha256": {
+          "events.csv": "462a0760287d5a0e2de5b013e895d4cae52887fcb4eb94ca073fb56eea52af24",
+          "run.log": "15b1d00f578ef38b921efc2de235a1ab462ccd027a67d50c43e60f8352b9313c",
+          "trajectory.csv": "e6bf08bd247ee69b54f2f5aa734671f0e441170d2f3e9aa0949c6227d828e372"
+        },
+        "pressure_event_status_counts": {
+          "invalid_pressure_measurement_excluded": 1,
+          "pre_initialization": 41,
+          "value_ignored": 1608
+        },
+        "pressure_quality_exclusions": {
+          "measurement_eligible_count": 1649,
+          "measurement_excluded_count": 1,
+          "native_pressure_count": 1650,
+          "policy": "finite absolute pressure in Pa within [80000,100000000]; no unit guessing"
+        },
+        "processed_observation_counts": {
+          "camera": 3457,
+          "pressure": 1650
+        },
+        "reference_access": "not_performed",
+        "repeat": 1,
+        "result_sha256": "44c4c98d726cc4d942d7ef93160c3bca3ca068f265e545ae9c85f0fcbe6700b4",
+        "runtime_seconds": 23.92535695799961,
+        "status": "success",
+        "support_boundary_exclusions": {
+          "camera": 1,
+          "pressure": 0
+        },
+        "support_ns": [
+          1523969523721984421,
+          1523969692291098643
+        ]
+      }
+    },
+    {
+      "arm": "vio",
+      "estimated_camera_count": 3371,
+      "estimator_status": "success",
+      "id": "vio-2",
+      "independent_score": {
+        "count": 674,
+        "rmse_m": 2.384776721944998,
+        "rotation": [
+          [
+            -0.7631351151056605,
+            -0.6460949874116628,
+            -0.013640503443550746
+          ],
+          [
+            -0.645744606842199,
+            0.7632069024626154,
+            -0.023002755653047116
+          ],
+          [
+            0.025272491505272037,
+            -0.008745929049750155,
+            -0.9996423409891022
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.58124404161908,
+          -3.9595368885618965,
+          0.2538378021097912
+        ]
+      },
+      "matched_support_ns": [
+        1523969523870594996,
+        1523969692192498082
+      ],
+      "reference_matched_count": 674,
+      "runtime_seconds": 23.176696102998903,
+      "score": {
+        "count": 674,
+        "maximum_m": 4.421204333216448,
+        "mean_m": 2.123172658203126,
+        "median_m": 2.194192288573095,
+        "rmse_m": 2.3847767219449962,
+        "rotation": [
+          [
+            -0.7631351151056607,
+            -0.6460949874116625,
+            -0.013640503443549808
+          ],
+          [
+            -0.6457446068421988,
+            0.7632069024626152,
+            -0.02300275565304501
+          ],
+          [
+            0.025272491505269955,
+            -0.008745929049749164,
+            -0.9996423409891021
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.581244041619077,
+          -3.9595368885618965,
+          0.25383780210978896
+        ]
+      },
+      "scoring_status": "scored_and_independently_verified",
+      "trial_support_ns": [
+        1523969523721984421,
+        1523969692291098643
+      ],
+      "initialization_and_missing_state_excluded_count": 86,
+      "interpolation_excluded_count": 2697,
+      "output_artifacts": {
+        "output_sha256": {
+          "events.csv": "462a0760287d5a0e2de5b013e895d4cae52887fcb4eb94ca073fb56eea52af24",
+          "run.log": "9ad6b72b44ffdcb240874333711bad0b212ff887533268df53ad46d29cea88d1",
+          "trajectory.csv": "e6bf08bd247ee69b54f2f5aa734671f0e441170d2f3e9aa0949c6227d828e372"
+        },
+        "result_sha256": "d80226b0edcc2df623dbaeb85b2037a8cad5f0610abec4adebfd7e53dc3f721c"
+      },
+      "frozen_trial_metadata": {
+        "arm": "vio",
+        "exit_code": 0,
+        "feeder_error": null,
+        "id": "vio-2",
+        "native_counts": {
+          "camera": 3458,
+          "imu": 34576,
+          "pressure": 1650
+        },
+        "output_camera_count": 3371,
+        "output_sha256": {
+          "events.csv": "462a0760287d5a0e2de5b013e895d4cae52887fcb4eb94ca073fb56eea52af24",
+          "run.log": "9ad6b72b44ffdcb240874333711bad0b212ff887533268df53ad46d29cea88d1",
+          "trajectory.csv": "e6bf08bd247ee69b54f2f5aa734671f0e441170d2f3e9aa0949c6227d828e372"
+        },
+        "pressure_event_status_counts": {
+          "invalid_pressure_measurement_excluded": 1,
+          "pre_initialization": 41,
+          "value_ignored": 1608
+        },
+        "pressure_quality_exclusions": {
+          "measurement_eligible_count": 1649,
+          "measurement_excluded_count": 1,
+          "native_pressure_count": 1650,
+          "policy": "finite absolute pressure in Pa within [80000,100000000]; no unit guessing"
+        },
+        "processed_observation_counts": {
+          "camera": 3457,
+          "pressure": 1650
+        },
+        "reference_access": "not_performed",
+        "repeat": 2,
+        "result_sha256": "d80226b0edcc2df623dbaeb85b2037a8cad5f0610abec4adebfd7e53dc3f721c",
+        "runtime_seconds": 23.176696102998903,
+        "status": "success",
+        "support_boundary_exclusions": {
+          "camera": 1,
+          "pressure": 0
+        },
+        "support_ns": [
+          1523969523721984421,
+          1523969692291098643
+        ]
+      }
+    },
+    {
+      "arm": "pressure",
+      "estimated_camera_count": 3371,
+      "estimator_status": "success",
+      "id": "pressure-1",
+      "independent_score": {
+        "count": 674,
+        "rmse_m": 2.1329476278887216,
+        "rotation": [
+          [
+            -0.7522669752199471,
+            -0.6584782964491204,
+            -0.022377021671699443
+          ],
+          [
+            -0.6573356745769624,
+            0.7524031215921578,
+            -0.04241878766332425
+          ],
+          [
+            0.044768391995704745,
+            -0.017201038452396282,
+            -0.9988492956168504
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.369986901466629,
+          -3.7699746611673555,
+          0.19665384105059447
+        ]
+      },
+      "matched_support_ns": [
+        1523969523870594996,
+        1523969692192498082
+      ],
+      "reference_matched_count": 674,
+      "runtime_seconds": 23.64948899099909,
+      "score": {
+        "count": 674,
+        "maximum_m": 4.045347503828108,
+        "mean_m": 1.8908925106847827,
+        "median_m": 1.9445882748199823,
+        "rmse_m": 2.132947627888721,
+        "rotation": [
+          [
+            -0.7522669752199476,
+            -0.6584782964491201,
+            -0.022377021671699422
+          ],
+          [
+            -0.6573356745769624,
+            0.7524031215921582,
+            -0.04241878766332464
+          ],
+          [
+            0.044768391995704954,
+            -0.017201038452396584,
+            -0.9988492956168509
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.369986901466628,
+          -3.769974661167358,
+          0.19665384105059622
+        ]
+      },
+      "scoring_status": "scored_and_independently_verified",
+      "trial_support_ns": [
+        1523969523721984421,
+        1523969692291098643
+      ],
+      "initialization_and_missing_state_excluded_count": 86,
+      "interpolation_excluded_count": 2697,
+      "output_artifacts": {
+        "output_sha256": {
+          "events.csv": "0c8416fa88274dc58928bffaf7fecb97deac48d6d94f8a71de74927bf8f84f0d",
+          "run.log": "44463755ed7566fd607a128fce87701eec1a85b45d528efc12388d7a43f48d22",
+          "trajectory.csv": "84cd6b650c14f9a130815120b58be79a1c9a1207d8bcc095b9466cf09101dd05"
+        },
+        "result_sha256": "446bb3e438e8678a7dd1b6e7b2fb93479c94e43be6249f69560d3597f060aceb"
+      },
+      "frozen_trial_metadata": {
+        "arm": "pressure",
+        "exit_code": 0,
+        "feeder_error": null,
+        "id": "pressure-1",
+        "native_counts": {
+          "camera": 3458,
+          "imu": 34576,
+          "pressure": 1650
+        },
+        "output_camera_count": 3371,
+        "output_sha256": {
+          "events.csv": "0c8416fa88274dc58928bffaf7fecb97deac48d6d94f8a71de74927bf8f84f0d",
+          "run.log": "44463755ed7566fd607a128fce87701eec1a85b45d528efc12388d7a43f48d22",
+          "trajectory.csv": "84cd6b650c14f9a130815120b58be79a1c9a1207d8bcc095b9466cf09101dd05"
+        },
+        "pressure_event_status_counts": {
+          "invalid_pressure_measurement_excluded": 1,
+          "pre_initialization": 41,
+          "updated": 1608
+        },
+        "pressure_quality_exclusions": {
+          "measurement_eligible_count": 1649,
+          "measurement_excluded_count": 1,
+          "native_pressure_count": 1650,
+          "policy": "finite absolute pressure in Pa within [80000,100000000]; no unit guessing"
+        },
+        "processed_observation_counts": {
+          "camera": 3457,
+          "pressure": 1650
+        },
+        "reference_access": "not_performed",
+        "repeat": 1,
+        "result_sha256": "446bb3e438e8678a7dd1b6e7b2fb93479c94e43be6249f69560d3597f060aceb",
+        "runtime_seconds": 23.64948899099909,
+        "status": "success",
+        "support_boundary_exclusions": {
+          "camera": 1,
+          "pressure": 0
+        },
+        "support_ns": [
+          1523969523721984421,
+          1523969692291098643
+        ]
+      }
+    },
+    {
+      "arm": "pressure",
+      "estimated_camera_count": 3371,
+      "estimator_status": "success",
+      "id": "pressure-2",
+      "independent_score": {
+        "count": 674,
+        "rmse_m": 2.1329476278887216,
+        "rotation": [
+          [
+            -0.7522669752199471,
+            -0.6584782964491204,
+            -0.022377021671699443
+          ],
+          [
+            -0.6573356745769624,
+            0.7524031215921578,
+            -0.04241878766332425
+          ],
+          [
+            0.044768391995704745,
+            -0.017201038452396282,
+            -0.9988492956168504
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.369986901466629,
+          -3.7699746611673555,
+          0.19665384105059447
+        ]
+      },
+      "matched_support_ns": [
+        1523969523870594996,
+        1523969692192498082
+      ],
+      "reference_matched_count": 674,
+      "runtime_seconds": 23.641189337999094,
+      "score": {
+        "count": 674,
+        "maximum_m": 4.045347503828108,
+        "mean_m": 1.8908925106847827,
+        "median_m": 1.9445882748199823,
+        "rmse_m": 2.132947627888721,
+        "rotation": [
+          [
+            -0.7522669752199476,
+            -0.6584782964491201,
+            -0.022377021671699422
+          ],
+          [
+            -0.6573356745769624,
+            0.7524031215921582,
+            -0.04241878766332464
+          ],
+          [
+            0.044768391995704954,
+            -0.017201038452396584,
+            -0.9988492956168509
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.369986901466628,
+          -3.769974661167358,
+          0.19665384105059622
+        ]
+      },
+      "scoring_status": "scored_and_independently_verified",
+      "trial_support_ns": [
+        1523969523721984421,
+        1523969692291098643
+      ],
+      "initialization_and_missing_state_excluded_count": 86,
+      "interpolation_excluded_count": 2697,
+      "output_artifacts": {
+        "output_sha256": {
+          "events.csv": "0c8416fa88274dc58928bffaf7fecb97deac48d6d94f8a71de74927bf8f84f0d",
+          "run.log": "8b58059c9563b5988714085977f2c4e1a0d5bdb4b4f25d468f59c53d7eb2a825",
+          "trajectory.csv": "84cd6b650c14f9a130815120b58be79a1c9a1207d8bcc095b9466cf09101dd05"
+        },
+        "result_sha256": "6f12b3db2f88675e689e4145dadc816ec7620a8b631009a18661a265b4ca9811"
+      },
+      "frozen_trial_metadata": {
+        "arm": "pressure",
+        "exit_code": 0,
+        "feeder_error": null,
+        "id": "pressure-2",
+        "native_counts": {
+          "camera": 3458,
+          "imu": 34576,
+          "pressure": 1650
+        },
+        "output_camera_count": 3371,
+        "output_sha256": {
+          "events.csv": "0c8416fa88274dc58928bffaf7fecb97deac48d6d94f8a71de74927bf8f84f0d",
+          "run.log": "8b58059c9563b5988714085977f2c4e1a0d5bdb4b4f25d468f59c53d7eb2a825",
+          "trajectory.csv": "84cd6b650c14f9a130815120b58be79a1c9a1207d8bcc095b9466cf09101dd05"
+        },
+        "pressure_event_status_counts": {
+          "invalid_pressure_measurement_excluded": 1,
+          "pre_initialization": 41,
+          "updated": 1608
+        },
+        "pressure_quality_exclusions": {
+          "measurement_eligible_count": 1649,
+          "measurement_excluded_count": 1,
+          "native_pressure_count": 1650,
+          "policy": "finite absolute pressure in Pa within [80000,100000000]; no unit guessing"
+        },
+        "processed_observation_counts": {
+          "camera": 3457,
+          "pressure": 1650
+        },
+        "reference_access": "not_performed",
+        "repeat": 2,
+        "result_sha256": "6f12b3db2f88675e689e4145dadc816ec7620a8b631009a18661a265b4ca9811",
+        "runtime_seconds": 23.641189337999094,
+        "status": "success",
+        "support_boundary_exclusions": {
+          "camera": 1,
+          "pressure": 0
+        },
+        "support_ns": [
+          1523969523721984421,
+          1523969692291098643
+        ]
+      }
+    }
+  ],
+  "common_all_four": {
+    "baseline_mean_rmse_m": 2.3847767219449962,
+    "count": 674,
+    "improvement_percent": 10.559860457329782,
+    "pressure_mean_rmse_m": 2.132947627888721,
+    "scores": {
+      "pressure-1": {
+        "count": 674,
+        "independent_horn": {
+          "count": 674,
+          "rmse_m": 2.1329476278887216,
+          "rotation": [
+            [
+              -0.7522669752199471,
+              -0.6584782964491204,
+              -0.022377021671699443
+            ],
+            [
+              -0.6573356745769624,
+              0.7524031215921578,
+              -0.04241878766332425
+            ],
+            [
+              0.044768391995704745,
+              -0.017201038452396282,
+              -0.9988492956168504
+            ]
+          ],
+          "scale": 1.0,
+          "translation_m": [
+            6.369986901466629,
+            -3.7699746611673555,
+            0.19665384105059447
+          ]
+        },
+        "maximum_m": 4.045347503828108,
+        "mean_m": 1.8908925106847827,
+        "median_m": 1.9445882748199823,
+        "rmse_m": 2.132947627888721,
+        "rotation": [
+          [
+            -0.7522669752199476,
+            -0.6584782964491201,
+            -0.022377021671699422
+          ],
+          [
+            -0.6573356745769624,
+            0.7524031215921582,
+            -0.04241878766332464
+          ],
+          [
+            0.044768391995704954,
+            -0.017201038452396584,
+            -0.9988492956168509
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.369986901466628,
+          -3.769974661167358,
+          0.19665384105059622
+        ]
+      },
+      "pressure-2": {
+        "count": 674,
+        "independent_horn": {
+          "count": 674,
+          "rmse_m": 2.1329476278887216,
+          "rotation": [
+            [
+              -0.7522669752199471,
+              -0.6584782964491204,
+              -0.022377021671699443
+            ],
+            [
+              -0.6573356745769624,
+              0.7524031215921578,
+              -0.04241878766332425
+            ],
+            [
+              0.044768391995704745,
+              -0.017201038452396282,
+              -0.9988492956168504
+            ]
+          ],
+          "scale": 1.0,
+          "translation_m": [
+            6.369986901466629,
+            -3.7699746611673555,
+            0.19665384105059447
+          ]
+        },
+        "maximum_m": 4.045347503828108,
+        "mean_m": 1.8908925106847827,
+        "median_m": 1.9445882748199823,
+        "rmse_m": 2.132947627888721,
+        "rotation": [
+          [
+            -0.7522669752199476,
+            -0.6584782964491201,
+            -0.022377021671699422
+          ],
+          [
+            -0.6573356745769624,
+            0.7524031215921582,
+            -0.04241878766332464
+          ],
+          [
+            0.044768391995704954,
+            -0.017201038452396584,
+            -0.9988492956168509
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.369986901466628,
+          -3.769974661167358,
+          0.19665384105059622
+        ]
+      },
+      "vio-1": {
+        "count": 674,
+        "independent_horn": {
+          "count": 674,
+          "rmse_m": 2.384776721944998,
+          "rotation": [
+            [
+              -0.7631351151056605,
+              -0.6460949874116628,
+              -0.013640503443550746
+            ],
+            [
+              -0.645744606842199,
+              0.7632069024626154,
+              -0.023002755653047116
+            ],
+            [
+              0.025272491505272037,
+              -0.008745929049750155,
+              -0.9996423409891022
+            ]
+          ],
+          "scale": 1.0,
+          "translation_m": [
+            6.58124404161908,
+            -3.9595368885618965,
+            0.2538378021097912
+          ]
+        },
+        "maximum_m": 4.421204333216448,
+        "mean_m": 2.123172658203126,
+        "median_m": 2.194192288573095,
+        "rmse_m": 2.3847767219449962,
+        "rotation": [
+          [
+            -0.7631351151056607,
+            -0.6460949874116625,
+            -0.013640503443549808
+          ],
+          [
+            -0.6457446068421988,
+            0.7632069024626152,
+            -0.02300275565304501
+          ],
+          [
+            0.025272491505269955,
+            -0.008745929049749164,
+            -0.9996423409891021
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.581244041619077,
+          -3.9595368885618965,
+          0.25383780210978896
+        ]
+      },
+      "vio-2": {
+        "count": 674,
+        "independent_horn": {
+          "count": 674,
+          "rmse_m": 2.384776721944998,
+          "rotation": [
+            [
+              -0.7631351151056605,
+              -0.6460949874116628,
+              -0.013640503443550746
+            ],
+            [
+              -0.645744606842199,
+              0.7632069024626154,
+              -0.023002755653047116
+            ],
+            [
+              0.025272491505272037,
+              -0.008745929049750155,
+              -0.9996423409891022
+            ]
+          ],
+          "scale": 1.0,
+          "translation_m": [
+            6.58124404161908,
+            -3.9595368885618965,
+            0.2538378021097912
+          ]
+        },
+        "maximum_m": 4.421204333216448,
+        "mean_m": 2.123172658203126,
+        "median_m": 2.194192288573095,
+        "rmse_m": 2.3847767219449962,
+        "rotation": [
+          [
+            -0.7631351151056607,
+            -0.6460949874116625,
+            -0.013640503443549808
+          ],
+          [
+            -0.6457446068421988,
+            0.7632069024626152,
+            -0.02300275565304501
+          ],
+          [
+            0.025272491505269955,
+            -0.008745929049749164,
+            -0.9996423409891021
+          ]
+        ],
+        "scale": 1.0,
+        "translation_m": [
+          6.581244041619077,
+          -3.9595368885618965,
+          0.25383780210978896
+        ]
+      }
+    },
+    "status": "scored_and_independently_verified",
+    "support_ns": [
+      1523969523870594996,
+      1523969692192498082
+    ]
+  },
+  "preserved_v3_outcomes": [
+    {
+      "id": "vio-1",
+      "status": "success",
+      "exit_code": 0,
+      "runtime_seconds": 23.333224269999846
+    },
+    {
+      "id": "vio-2",
+      "status": "success",
+      "exit_code": 0,
+      "runtime_seconds": 23.465669628998512
+    },
+    {
+      "id": "pressure-1",
+      "status": "failed",
+      "exit_code": 2,
+      "runtime_seconds": 20.012871116998213
+    },
+    {
+      "id": "pressure-2",
+      "status": "failed",
+      "exit_code": 2,
+      "runtime_seconds": 20.049253310000495
+    }
+  ],
+  "v3_freeze_sha256": "51eea43f89e7bdf2b596aaf04c7b9271c9db34082efbc8a9c877b0a357f0f405",
+  "native_sensor_counts": {
+    "imu": 34576,
+    "camera": 3458,
+    "pressure": 1650,
+    "all_ros_messages": 86126
+  },
+  "support_exclusion": {
+    "camera_native_ordinal": 0,
+    "camera_offset_ns": -40380655,
+    "before_first_imu_ns": 6537851,
+    "eligible_camera_count": 3457,
+    "pressure_support_exclusions": 0
+  },
+  "pressure_quality_exclusion": {
+    "native_ordinal": 1401,
+    "timestamp_ns": 1523969666297104665,
+    "value_pa": -2585590.0,
+    "reason": "negative_absolute_pressure",
+    "eligible_measurements": 1649,
+    "all_native_pressure_bytes_retained": true,
+    "both_arms_propagate_at_excluded_pressure_time": true
+  },
+  "reference_limitation": "same-image COLMAP and pressure/depth scale; not independent hardware truth",
+  "sota_achieved": false
+}

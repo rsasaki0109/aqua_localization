@@ -13,11 +13,12 @@ METHOD_SOURCES = SOURCE_FILES + ['scripts/benchmarks/' + name for name in (
     'prepare_reconstructed_comparison.py')] + ['aqua_imu_loc/config/aqualoc.yaml']
 METHOD_SOURCES += ['scripts/benchmarks/build_reconstructed_openvins.bash']
 METHOD_SOURCES += ['scripts/benchmarks/check_reconstructed_calibration.py']
+METHOD_SOURCES += ['scripts/benchmarks/audit_pressure_quality.py']
 METHOD_SOURCES += ['docs/benchmarks/calibration/' + n for n in (
     'harbor_camera_calib.yaml', 'harbor_imu_camera_calib.yaml', 'harbor_imu_noises.yaml')]
 
 
-def register(root, executable, version='vio-comparison-v3'):
+def register(root, executable, version='vio-comparison-v4'):
     root, executable = Path(root), Path(executable)
     repo = Path(__file__).resolve().parents[2]
     previous = root / 'vio-comparison-v2'
@@ -49,6 +50,12 @@ def register(root, executable, version='vio-comparison-v3'):
     if target.parent != root or not version.startswith('vio-comparison-v'):
         raise ValueError('use a new version below the data root')
     target.mkdir(exist_ok=False)
+    from audit_pressure_quality import audit_pressure_quality
+    quality = audit_pressure_quality(supported)
+    if (quality['native_pressure_count'] != 1650 or
+        [r['native_pressure_ordinal'] for r in quality['records'] if not r['measurement_eligible']] != [1401]):
+        raise ValueError('pressure quality differs from pre-reference inspection; new registration required')
+    write_new_json(target / 'pressure_quality.json', quality)
     source_hashes = {name: sha256(repo / name) for name in METHOD_SOURCES}
     artifacts = [executable, build_manifest, supported, previous / 'input/input_audit.json',
                  previous / 'input/independent-verification.json',
@@ -60,6 +67,8 @@ def register(root, executable, version='vio-comparison-v3'):
         runtime_artifact_sha256={str(p): sha256(p) for p in artifacts},
         executable=str(executable), supported_bag=str(supported),
         input_audit=str(previous / 'input/input_audit.json'),
+        pressure_quality_sha256=sha256(target / 'pressure_quality.json'),
+        pressure_quality_summary={k: quality[k] for k in ('native_pressure_count', 'measurement_eligible_count', 'measurement_excluded_count', 'policy')},
         previous_input_registration_sha256=sha256(previous / 'registration.json'),
         input_contract=native_plan['input_contract'],
         calibration_provenance={'source': 'official LIRMM Seafile harbor_calibration_files',
@@ -75,6 +84,7 @@ def register(root, executable, version='vio-comparison-v3'):
             'pressure_topic': '/barometer_node/pressure', 'pressure_units': 'Pa; no magnitude-driven conversion',
             'density_kg_m3': 1025, 'gravity_m_s2': 9.80665, 'depth_sigma_m': .2,
             'pressure_model': 'z plus constant offset = -P/(rho*g); augment uncertain offset with full cross-covariance at first post-init sample',
+            'invalid_pressure': 'retain every native packet and pressure timestamp; propagate both arms; skip only the invalid pressure measurement update, with ordinal/hash/value/reason ledger and event status',
             'pressure_lever_arm': 'assumed co-located with IMU; not recovered calibration',
             'pressure_propagation': 'both arms propagate at pressure timestamps and remove temporary clones; baseline ignores pressure values',
             'camera_offset_additional_ns': 0, 'online_time_intrinsic_extrinsic_calibration': False,
@@ -110,6 +120,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--executable', type=Path, required=True)
-    parser.add_argument('--version', default='vio-comparison-v3')
+    parser.add_argument('--version', default='vio-comparison-v4')
     args = parser.parse_args()
     print(register(args.root, args.executable, args.version))

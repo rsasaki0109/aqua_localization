@@ -193,14 +193,67 @@ checker compares actual executable values to the official YAML, including
 transform direction and the fixed timestamp correction. These are mathematical
 and integration checks, not accuracy evidence. Python contract tests additionally
 check exact wire timestamps/ordinals/image bytes and incomplete registration
-rejection (60 tests passed, including scoring/freeze gates).
+rejection (69 tests passed after the v4 quality audit, including scoring/freeze gates).
 
-`prepare_reconstructed_comparison.py` creates exclusive `vio-comparison-v3`
+`prepare_reconstructed_comparison.py` creates exclusive versioned comparison
 comparison/scoring plans and source snapshots after complete v2 input verification.
 `run_reconstructed_openvins.py` runs both arms twice, retains every failure and
 output hash, and writes `freeze.json` only after all four outcomes. Source/input/
 executable hashes are rechecked between trials and before freeze. No reference
 is acquired by these scripts. The reference image-number adapter must be
-registered separately before reference acquisition; it is not yet available.
+registered separately before reference acquisition; it was separately registered as described below.
 Results from this reconstruction must never be described as replication of the
 old ~4.3% development improvement or as independent hardware/SoTA evidence.
+
+
+## Completed real-data reconstruction v4, 2026-10-10
+
+Native reacquisition completed with both expected hashes, gzip footer validation,
+safe TAR paths, member-to-native byte equality and all 86126 decoded messages.
+The v2 input ledger preserves all 3458 native images, 34576 IMUs and 1650 pressure
+measurements. Only camera ordinal 0 is ineligible for estimation because its
+fixed corrected time is 6537851 ns before the first IMU; the common derived bag
+contains 3457 images and all native IMU/pressure packets. An independent checker
+verified every eligible image after reversing only the registered header offset.
+
+The first reconstruction v3 ran all four trials: both VIO trials succeeded and
+both pressure trials failed on native pressure ordinal 1401, -2585590 Pa, an
+impossible absolute pressure. Its plans, sources, binary, failure logs, outputs
+and four-outcome freeze remain retained. This is a sensor-quality failure, not an
+IMU-support exclusion. Before harbor_05 reference acquisition, v4 registered a
+finite absolute-pressure range [80000, 100000000] Pa and a ledger for every
+pressure packet. Exactly that one negative sample is ineligible for measurement
+updates. Its bytes/time/value remain present; both arms still propagate at its
+time. No pressure time shifts, repaired values or reference-selected thresholds
+were introduced. v4 has a separate binary/build manifest and exclusive plans.
+
+All four v4 trials succeeded and their outputs were frozen before the separate
+reference adapter/scoring registration and reference access. Each emitted 3371
+camera states, with 86 initialization/missing-state exclusions in addition to
+the one common IMU-support exclusion. The scorer used rigid SE(3), scale 1 and
+maximum interpolation interval 0.1 s. Both repeats have identical trajectory
+metrics; repeats do not constitute independent datasets or statistical evidence.
+
+| Trial | Runtime (s) | Matched positions | RMSE (m) |
+|---|---:|---:|---:|
+| VIO 1 | 23.925 | 674 | 2.384777 |
+| VIO 2 | 23.177 | 674 | 2.384777 |
+| Pressure 1 | 23.649 | 674 | 2.132948 |
+| Pressure 2 | 23.641 | 674 | 2.132948 |
+
+All four state supports are [1523969523721984421, 1523969692291098643] ns;
+matched/common supports are [1523969523870594996, 1523969692192498082] ns.
+Only 674/3371 emitted states (19.9941%) are scored: 2695 have reference
+brackets longer than 0.1 s and 2 are outside reference support. This limited
+coverage must accompany the accuracy result. Common-support mean RMSE improves by 10.559860%, from 2.384777 to 2.132948 m.
+Independent time correspondence and Horn alignment agree with the primary
+scorer. The machine-readable [result and artifact hashes](harbor05_reconstruction_v4_results.json)
+record per-trial support, exclusions, runtimes, output hashes and v3 failures.
+Full immutable artifacts remain under the dataset's `vio-comparison-v2`,
+`vio-comparison-v3`, `vio-comparison-v4` and `vio-scoring-v4` directories.
+
+This is a separately registered reconstruction, not recovery of `51cea95` or
+replication of the old harbor_06 result. AQUALOC reference uses the same images
+and depth/pressure for scale: pressure-assisted improvement against it can share
+sensor information with the reference. It is not independent hardware truth,
+and this single-sequence result establishes neither SoTA nor generalization.

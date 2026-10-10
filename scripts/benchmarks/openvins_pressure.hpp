@@ -9,11 +9,14 @@
 class HydrostaticPressure {
 public:
   static constexpr double density = 1025.0, gravity = 9.80665, sigma_depth = 0.2;
+  static bool valid(double pressure_pa) {
+    return std::isfinite(pressure_pa) && pressure_pa >= 80000 && pressure_pa <= 1e8;
+  }
   std::shared_ptr<ov_type::Vec> offset;
   // World z is up. A constant unknown offset absorbs atmospheric pressure and
   // the VIO translation gauge. Sensor is assumed co-located with the IMU.
   void update(const std::shared_ptr<ov_msckf::State>& state, double pressure_pa) {
-    if (!std::isfinite(pressure_pa) || pressure_pa < 80000 || pressure_pa > 1e8)
+    if (!valid(pressure_pa))
       throw std::runtime_error("registered FluidPressure Pa range violated; no unit guessing");
     double observation = -pressure_pa / (density * gravity);
     Eigen::MatrixXd H = Eigen::MatrixXd::Zero(1, 3), R(1, 1);

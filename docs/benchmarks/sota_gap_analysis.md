@@ -2,14 +2,21 @@
 
 ## Active priority, 2026-10-10
 
-The current handover prioritizes harbor_05 VIO/pressure comparison and its native
-IMU support boundary. See [recovery and input contract](aqualoc_vio_pressure.md)
-and [freeze-gated scoring](aqualoc_vio_scoring.md). Old local commit `51cea95`,
-pressure implementation, frozen calibration and registrations were unavailable
-in the restored/public history. A new input contract explicitly accounts for the
-early image; estimator comparison remains blocked until the fixed method is
-recovered or a separately registered replacement is complete. No harbor_05
-reference has been acquired/read, estimator outputs frozen, or metrics scored.
+The harbor_05 boundary and real-data reconstruction comparison are complete.
+The native dataset was fully reacquired and verified. Old local commit `51cea95`
+and its fixed method/plans remain unavailable; the newly registered v4 is a
+separate implementation. All four v4 trials succeeded and were frozen before
+reference access, with independent score verification: common-support RMSE
+2.384777 m baseline versus 2.132948 m pressure (10.559860% improvement, 674
+positions). Both preceding v3 pressure failures remain reported, and the v4
+negative-pressure quality exclusion was registered before reference access.
+See [input/method details](aqualoc_vio_pressure.md), [scoring](aqualoc_vio_scoring.md)
+and [artifact-backed results](harbor05_reconstruction_v4_results.json).
+
+This does not establish SoTA. Shared-image COLMAP and depth/pressure scale make
+AQUALOC especially limited for independent assessment of pressure fusion.
+Independent hardware truth, multiple held-out sequences and competitive
+implementations remain unexecuted gates; do not tune v4 against harbor_05 scores.
 
 The Tank application was skipped by the user. The older Tank-first recommendation
 below is historical and does not authorize any application/contact. After the
@@ -24,6 +31,35 @@ was checked. It describes semi-physical simulated LBL measurements generated fro
 the COLMAP trajectory, rather than independently measured hardware truth. It is
 neither a mirror of harbor_05 nor a way to satisfy the independent-truth gate.
 Only metadata were read; no sequences or reference trajectories were acquired.
+
+### Next hardware-reference gate
+
+The existing MBES `beach_pond` candidate is a separate sensor/task benchmark,
+not a substitute visual-pressure test. On 2026-10-10, neither its native nor
+converted dataset existed in this workspace. TLS-preserving HEAD requests to
+`https://seaward.science/files/pos-datasets/bag/beach_pond.tar.gz` and the public
+landing page both failed at the network proxy with `403 Forbidden`; no bytes
+were acquired. Current free space is about 1.9 GB, below even the historically
+reported 2584672367-byte archive and roughly 6.8 GB extraction. Do not reuse the
+older dated size as a current verified object identity or claim a replay here.
+
+Before this hardware benchmark can run, provision sufficient storage and verify
+current source size/ETag, distribution terms, archive integrity and raw sensor
+coverage. Inspect RTK fix quality, covariance, clock and antenna-to-sonar/body
+lever arm. `/nav/processed/odometry` fuses IMU/GPS/DVL; it is a dependent navigation
+estimate and must not silently serve as independent hardware truth for a method
+using those same sensors. Reserve raw, withheld hardware RTK positions as the
+candidate independent reference only after quality/frame/time checks establish
+that contract; report surface-vessel/depth limitations explicitly.
+
+Register held-out sequence selection and source/config/input hashes for the
+repository method, odometry-only ablation and a published MBES competitor before
+reference access. Use identical windows/sensors and fixed SE(3)/scale/time rules,
+freeze all outcomes, then evaluate accuracy, coverage, runtime and loop false
+positives. A competitive MBES result would apply to bathymetric localization,
+not establish visual-inertial-pressure SoTA across underwater tasks. For that
+claim, an additional accessible dataset with independent hardware truth and
+matching visual/IMU/pressure modalities remains necessary. Tank remains skipped.
 
 Checked on 2026-06-04. This page records the paper-backed gap between
 `aqua_localization` and current underwater SLAM / sonar SLAM systems. Treat it

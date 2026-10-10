@@ -43,7 +43,7 @@ datasets/public/mbes_slam/beach_pond_ros2
 mkdir -p datasets/public/mbes_slam
 cd datasets/public/mbes_slam
 
-wget --no-check-certificate \
+wget \
   https://seaward.science/files/pos-datasets/bag/beach_pond.tar.gz
 
 tar xzf beach_pond.tar.gz
