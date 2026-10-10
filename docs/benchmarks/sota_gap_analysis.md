@@ -244,3 +244,43 @@ publisher's -(value-2660)/241 depth mapping; do not assume SI Pa or silently
 reuse AQUALOC's units/calibration/time correction.
 
 See ntnu_mocap_postpublish.json for hashes, exact readiness and limitations.
+
+## Pressure adapter development after environment recovery
+
+The environment finally started with published HEAD b00d3a5. Box's redirect
+host is now reachable: all six official subset-3 sensor shares return HTTP404,
+so the previously proposed independent MoCap comparison is still unavailable.
+The current pinned Hugging Face native fjord_1 object redirects to
+`us.aws.cdn.hf.co` and that request fails proxy CONNECT403. This exact observed
+CDN host was added to the draft. No NTNU native bag was acquired and no MoCap
+coordinates were read. Publisher Git LFS metadata supplies an expected SHA256,
+which must be verified against all native bytes before conversion.
+
+New, separate sources implement stereo/IMU/pressure input isolation and a
+pressure event adapter without editing frozen harbor_05/MBES sources. Six
+isolation tests pass: all selected raw bytes/time/order/counts survive and
+reference/navigation topics are excluded; missing, empty or wrongly typed
+pressure blocks conversion. Native connections/counts and exclusion reasons
+are reported; native data remains unchanged. This is fixture validation only,
+not completed native conversion or estimator registration.
+
+The pressure event adapter enforces every ordinal, exact native epochs and
+strictly increasing pressure timestamps. It reports support/initialization/
+finite-value exclusions and fixes its anchor at the first eligible sample.
+The publisher's raw profile2660/241 is explicit, not assumed SI Pa. Contract
+checks pass. A separate integration fixture actually executed two upstream
+SDK BaroUpdates after one anchor, checked their processed count, finite
+covariance and negative-z response to increasing pressure. Initial failed
+checks remain in logs. The fixture sets positive update noise/zero offsets
+and feeds beyond the upstream0.1s missing-image wait; these are synthetic
+fixture settings, not a reference-tuned dataset method. Upstream source remains
+unchanged, including its three constructor property-handler warnings and
+six-entry unregister loop despite three-dimensional pressure noise. No full
+visual/pressure replay or real-data accuracy result is claimed.
+
+Current DeepVL metadata labels ReAqROVIO estimates as supervision. ROVTIO uses
+LOAM near-ground-truth and ballast tank data is aerial/handheld inspection;
+these metadata screens do not supply independent underwater hardware truth.
+No Tank application/contact was made. Existing harbor_05 and North River
+frozen source/native/runtime/output bindings were revalidated. See
+ntnu_pressure_adapter_readiness.json for exact tested/unexecuted status.

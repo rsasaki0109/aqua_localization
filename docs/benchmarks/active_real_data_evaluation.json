@@ -180,10 +180,10 @@
     "sota_achieved": false
   },
   "independent_underwater_vio_next": {
-    "report": "ntnu_mocap_postpublish.json",
-    "status": "published snapshot restored; HF metadata/calibration and ReAqROVIO core prepared; official MoCap sensor-bag GET redirects to disallowed ntnu.app.box.com",
+    "report": "ntnu_pressure_adapter_readiness.json",
+    "status": "pressure event/SDK integration and sensor isolation fixture validated; Box subset3 unavailable404; current HF native object blocked403 at observed CDN",
     "reference_values_read": false,
     "native_data_acquired": false,
-    "required_domain": "ntnu.app.box.com"
+    "required_domain": "us.aws.cdn.hf.co"
   }
 }

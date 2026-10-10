@@ -1,0 +1,87 @@
+{
+  "schema": "ntnu-pressure-adapter-readiness-v1",
+  "native_ntnu_data_acquired": false,
+  "reference_coordinates_read": false,
+  "actual_native_estimator_trials": "not_executed",
+  "sota_achieved": false,
+  "box_subset3_sensor_shares": "all six GETs now reached official Box host and returned HTTP404; prior403 proxy gate resolved",
+  "sensor_share_receipt_sha256": "154560c04b503ea13d312ef2ef6e7b78f40c2697061af94f0c2ea55624ca2fac",
+  "hf_sensor_probe": {
+    "error": "<urlopen error Tunnel connection failed: 403 Forbidden>",
+    "redirects": [
+      {
+        "status": 302,
+        "host": "us.aws.cdn.hf.co",
+        "tls": true
+      }
+    ]
+  },
+  "required_host": "us.aws.cdn.hf.co",
+  "hf_native_candidate": {
+    "path": "subset-fjord/fjord_1/fjord_1.bag",
+    "commit": "d79489fc4742ebe66f872d1b195d9f0a249925da",
+    "bytes": 12456215809,
+    "sha256": "b0f2a43d049efcc139b7629fc813a14460fb3e3090a1fa6cff3af8135a3aaa6d",
+    "hash_provenance": "publisher Hugging Face Git LFS object identity at pinned revision; native bytes not yet verified",
+    "reference_role": "publisher ReAqROVIO estimate, not independent hardware truth"
+  },
+  "sensor_adapter": {
+    "source": "scripts/benchmarks/ntnu_sensor_only.py",
+    "tests_passed": 6,
+    "preserves": "all registered cam0/cam1/IMU/FluidPressure raw bytes, native bag/header clocks and order; reports every included/excluded topic and native counts; exclusive new plan/source snapshot",
+    "failure_gates": [
+      "missing/empty pressure or any required sensor",
+      "type mismatch",
+      "withheld reference/navigation leakage",
+      "byte/time/order/count disagreement",
+      "existing registration"
+    ],
+    "readiness": "fixture validated only; no native conversion executed"
+  },
+  "pressure_events": {
+    "source": "scripts/benchmarks/reaq_pressure_events.hpp",
+    "profile": "explicit raw_offset/raw_units_per_meter; publisher candidate2660/241; not guessed SI Pa",
+    "packet_accounting": "every ordinal and native epoch; no silent skip or duplicate epoch overwrite; returned dispositions must be persisted by production runner",
+    "first_eligible_event": "anchor estimator z, no measurement update, matches upstream convention",
+    "explicit_reasons": [
+      "nonfinite_raw_pressure",
+      "outside_available_imu_support",
+      "estimator_not_initialized",
+      "initial_pressure_anchor_no_update",
+      "nonfinite_converted_depth",
+      "submitted_pressure_update"
+    ],
+    "synthetic_contract_test": "passed: support/initialization, sign/units, fixed anchor, exact epoch, counts, ordinal/clock and finite gates",
+    "sdk_integration": "passed and repeated: three pressure events, one anchor and two actually executed SDK updates; safe_time0.06s; finite covariance; z=-0.150336m",
+    "accuracy_claim": false
+  },
+  "sdk_fixture": {
+    "source": "scripts/benchmarks/reaq_pressure_probe.cpp",
+    "upstream_modified": false,
+    "explicit_settings": "unit initial covariance, zero fixed pressure/world offsets, positive0.01m2 update covariance; stationary IMU and increasing raw pressure; sufficient prediction horizon beyond upstream0.1s wait",
+    "earlier_failures": "two failed integration attempts preserved before explicit fixture settings; no reference used",
+    "remaining_limitations": "no visual frames or dataset run; original upstream constructor still emits three property-handler warnings, loops6 while noise dimension3, and defaults pressure noise to zero; do not infer fully validated official pressure baseline"
+  },
+  "source_sha256": {
+    "scripts/benchmarks/ntnu_sensor_only.py": "99effe36c160fb02870b8c1682c6c1fd709f364dc32d84e4646729de2d47abd9",
+    "scripts/benchmarks/reaq_pressure_events.hpp": "1b9cccea322846a801c9cd6cfed3f3153b89cf17187cc253a0f3c72e68d960c4",
+    "scripts/benchmarks/reaq_pressure_probe.cpp": "9de0ff3c45d5c37c94b820253e015a875bb9eb7f29ca159d0f9fe5c2a2e3f604",
+    "tests/benchmarks/test_ntnu_sensor_only.py": "f5469bf8c67d41d7a5bf8ab9b4689e6c34aa2c342c8ea09ec31f5c2c788328b2",
+    "tests/benchmarks/test_reaq_pressure_events.cpp": "143bc6bb631c554cee20aa267d5ea465e1841faf30cf088b7890556e495da97a"
+  },
+  "independent_reference_screen": {
+    "deepvl_training": "ReAqROVIO supervision, not hardware ground truth",
+    "rovtio": "visual/thermal VIO with LOAM near-ground-truth, not matching underwater MoCap evaluation",
+    "ballast_water_tank": "aerial/handheld inspection, not underwater VIO; metadata only; no Tank application/contact"
+  },
+  "old_frozen_artifacts": "harbor05 SDK/source/calibration checks and North River full frozen bindings passed in restored environment; no overwrite",
+  "required_next": "apply saved CDN access, verify complete native object against publisher LFS hash; convert and verify all registered sensor bytes; register clocks/calibration/pressure profile/full runners/scoring before independent truth access; freeze every success/failure; obtain available independent hardware truth before SoTA claim",
+  "artifact_sha256": {
+    "pressure-sdk-build/reaq_pressure_probe": "b48a29bcb4eeb05c636f701677a740c88d22137fcc2019772e5cf077ed7270fa",
+    "pressure-sdk-source/CMakeLists.txt": "7be1668eab7a56aa792aa5653a0673b9b0e107d96fd5204ee53635476f43f9ac",
+    "pressure-events-test": "1a0675ace7f188179ac6942fe01b8ab55cbfa54cde45923c5c0453889f984192",
+    "check_ntnu_pressure.bash": "bfb7878127c38ee682f628194c4b794112705cb4fd683461dfe204521d74387f",
+    "pressure-sdk-integration-attempt-3.log": "8d89cf63f13449045f57d6f45a74aa168cfa5d4b9f3e91bdcb8625f9be526132",
+    "pressure-check-repeatability.log": "b89a743e6f7c4d39916fa72cc1a70233e1f0b654f3fb2966eb9a06ab7c536ab8"
+  }
+}
