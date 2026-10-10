@@ -56,6 +56,7 @@ install(TARGETS offline_replay
 install(PROGRAMS
   scripts/make_synthetic_mbes_bag.py
   scripts/compare_replay_summaries.py
+  scripts/evaluate_replay_trajectories.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

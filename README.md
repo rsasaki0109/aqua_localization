@@ -156,6 +156,8 @@ The same lower-level publisher is available as
 | [`aqua_sonar_loc`](aqua_sonar_loc) | PointCloud2 preprocessing and PCL ICP/GICP/NDT registration with a submap front end |
 | [`aqua_fusion`](aqua_fusion) | Loose-coupling fusion of IMU/depth and sonar odometry |
 | [`aqua_pose_graph`](aqua_pose_graph) | g2o SE(3) keyframe graph with external loop-constraint input |
+| [`aqua_graph`](aqua_graph) | Experimental GTSAM fixed-lag smoother: IMU preintegration + DVL + pressure (+ position) factors in one optimizer |
+| [`aqua_replay`](aqua_replay) | Deterministic offline replay: runs the nodes as components in one process, bag fed in stamp order, bit-identical repeat runs |
 | [`aqua_msgs`](aqua_msgs) | Diagnostic and fusion-input message types |
 | [`aqua_localization`](aqua_localization) | Metapackage, top-level launches, dataset scripts, and replay exports |
 
@@ -241,13 +243,21 @@ Planning and validation references: [`PLAN.md`](PLAN.md) ·
 
 ```bash
 colcon test --packages-select \
-  aqua_imu_loc aqua_sonar_loc aqua_fusion aqua_pose_graph aqua_localization \
-  --event-handlers console_direct+
+  aqua_imu_loc aqua_sonar_loc aqua_fusion aqua_pose_graph aqua_graph aqua_replay \
+  aqua_localization --event-handlers console_direct+
 ```
 
 Run `colcon test-result --verbose` after testing for the current count; the
-latest local validation before this README refresh reported 92 tests with zero
-failures.
+latest local Jazzy validation (2026-10-10) reported 722 tests with zero
+failures. CI runs the same build and tests on Humble and Jazzy.
+
+For repeatable experiments, replay bags through the deterministic harness
+instead of `ros2 bag play` (see [`aqua_replay/scenarios`](aqua_replay/scenarios)):
+
+```bash
+ros2 run aqua_replay offline_replay --scenario <scenario.yaml> --bag <in> --out <out>
+ros2 run aqua_replay compare_replay_summaries.py <out_a> <out_b>   # repeatability
+```
 
 ## Contributing
 
