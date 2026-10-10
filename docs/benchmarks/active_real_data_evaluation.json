@@ -210,5 +210,20 @@
     "common_support_seconds": 318.246877804,
     "independent_accuracy_scoring": "blocked_missing_hardware_truth",
     "sota_achieved": false
+  },
+  "ntnu_openvins_competitive_development": {
+    "successes": 0,
+    "failures": 12,
+    "reference_coordinates_read": false,
+    "independent_accuracy_scoring": "unexecuted_missing_hardware_truth_and_successful_competitive_baseline",
+    "sota_achieved": false,
+    "details": "ntnu_openvins_development_results.json",
+    "latest_freeze_sha256": "e218541c9971dd7eb55b22f9c578b6f23ee18e48a13c445318afaa66cd605c61"
+  },
+  "hardware_truth_discovery": {
+    "details": "hardware_truth_discovery.json",
+    "status": "metadata_search_complete_no_new_qualified_hardware_reference",
+    "required_host": "bat.sjtu.edu.cn",
+    "official_HAUD_provenance": "unconfirmed_proxy_CONNECT403"
   }
 }

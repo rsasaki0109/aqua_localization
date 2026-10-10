@@ -326,3 +326,27 @@ This extends execution coverage, not accuracy evidence. The full sequence is
 development data with no independent hardware reference acquired or read; the
 modified mono adapter has not been evaluated against competitive methods with
 independent underwater truth. No SoTA result follows from these runs.
+
+## Full native OpenVINS baseline and hardware-truth discovery
+
+A pinned standard mono OpenVINS adapter now replays the same full verified NTNU
+cam0 stream. Six separately registered development profiles each ran twice;
+all twelve trials failed initialization and retain empty trajectories, complete
+camera/pressure event ledgers, diagnostics and frozen hashes. The latest profile
+raises the initial feature budget from50 to200, but still retains only6
+triangulated features against the unchanged SDK minimum8. Earlier profiles
+reached optimizer iteration limits or failed covariance recovery. An actual
+Ceres observability fixture passes; it does not establish native-data accuracy.
+The existing four successful ReAqROVIO full trials remain intact. See
+`ntnu_openvins_development.md` and its results JSON. No competitive RMSE or SoTA
+result is available.
+
+A metadata-only search records ten hardware-truth candidates. NTNU official
+MoCap share metadata returns404; available mirrors contain estimated trajectories.
+AquaTriV motion-capture downloads are not released. HAUD's official page is
+blocked by the environment proxy; a secondary source identifies MoCap but
+publisher provenance and pressure availability remain unconfirmed. Exact
+additional host `bat.sjtu.edu.cn` is needed to verify official metadata before
+registering another dataset. See `hardware_truth_discovery.md` and its receipt
+JSON. No new reference coordinates were downloaded or read; Tank applications
+remain skipped.

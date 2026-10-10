@@ -1,0 +1,443 @@
+{
+  "schema": "ntnu-openvins-development-results-v1",
+  "dataset": "NTNU fjord1 full native cam0 development sequence",
+  "upstream_commit": "69488123ed9362dd44b6f28e7f4680abbff1442b",
+  "method": "standalone standard mono OpenVINS; no depth updates",
+  "input_sha256": "43dfbe9698e68f7be2686af358e026a4c25d6eb738807269f8bfec2215194c00",
+  "native_counts": {
+    "imu": 63698,
+    "cam0": 6368,
+    "cam1": 6367,
+    "pressure": 15926
+  },
+  "cam1_policy": "all retained natively; excluded by previously registered mono input profile",
+  "old_full_four_trial_freeze_sha256": "c6d359fa008151b8b23687de11f17149fc0bf0e1349d1c4268086e9bbb013929",
+  "versions": [
+    {
+      "version": "v1",
+      "registration": "/workspace/aqua-data/development/ntnu_fjord_01/openvins-comparison-v1/plan.json",
+      "plan_sha256": "fa01aa81f3f19591db4526f8dfda7f28942b8825e3536eb5a29ca50ee9565f5b",
+      "freeze_sha256": "72a1aadbbcd72792911ee384e1fb9c489be0d97aaab432315833cc553d4cf75a",
+      "initialization_window_seconds": 1,
+      "maximum_iterations": 20,
+      "initial_feature_budget": 50,
+      "diagnostic": "SDK optimizer iteration limit20 reached",
+      "trials": [
+        {
+          "name": "openvins-1",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 20.658122076999916,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "3e4b5f429cbd5d718710bd3fc91102216a0ccc82ffe5ba590257c6aea5a572ae"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        },
+        {
+          "name": "openvins-2",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 19.429039280000097,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "3e4b5f429cbd5d718710bd3fc91102216a0ccc82ffe5ba590257c6aea5a572ae"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        }
+      ],
+      "common_six_trial_support_ns": null,
+      "integrity": "verified"
+    },
+    {
+      "version": "v2",
+      "registration": "/workspace/aqua-data/development/ntnu_fjord_01/openvins-comparison-v2/plan.json",
+      "plan_sha256": "2504f893d7339428ed72a051d3c3bd72c9b6da6fb28f5af538182186ede3f2fb",
+      "freeze_sha256": "0520f4a5c81f7cc6729606db903ddc255299ac89c41ce344b3090e36d94b3d2b",
+      "initialization_window_seconds": 1,
+      "maximum_iterations": 100,
+      "initial_feature_budget": 50,
+      "diagnostic": "SDK optimizer iteration limit100 reached",
+      "trials": [
+        {
+          "name": "openvins-1",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 18.944971717000044,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "b1fa0b56cb0a5786c64cdfcef723af1c046f2c53edeb0c622bc7ef8abeef7e7e"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        },
+        {
+          "name": "openvins-2",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 20.08837454699983,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "b1fa0b56cb0a5786c64cdfcef723af1c046f2c53edeb0c622bc7ef8abeef7e7e"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        }
+      ],
+      "common_six_trial_support_ns": null,
+      "integrity": "verified"
+    },
+    {
+      "version": "v3",
+      "registration": "/workspace/aqua-data/development/ntnu_fjord_01/openvins-comparison-v3/plan.json",
+      "plan_sha256": "442f4eb327d4594e93a10410e77d822a55cc51b2039d98c04538ce732a8afa97",
+      "freeze_sha256": "19443ccd7c4eda585132206f35e71954906a86824c1e1315ac2cae321ee671e8",
+      "initialization_window_seconds": 1,
+      "maximum_iterations": 1000,
+      "initial_feature_budget": 50,
+      "diagnostic": "Optimizer converged; SDK covariance recovery failed",
+      "trials": [
+        {
+          "name": "openvins-1",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 16.71548171900008,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "1c3d558dc8ce4949562341514b8597a9dc4a1238bff023eaaaa6c2fea67030e3"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        },
+        {
+          "name": "openvins-2",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 15.461371704000157,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "6e2a7aa4ed3c3e7000b4259ce2f4a4e93827223f76cf1b161c4c4da4caed8edb"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        }
+      ],
+      "common_six_trial_support_ns": null,
+      "integrity": "verified"
+    },
+    {
+      "version": "v4",
+      "registration": "/workspace/aqua-data/development/ntnu_fjord_01/openvins-comparison-v4/plan.json",
+      "plan_sha256": "e73214bb147cc6e8f3de8a24b5ed412997e17da2f2e59e1a7bf7a2750f6017e8",
+      "freeze_sha256": "fc2f44e781711b9f5d01ea78780ffdd7c695deec631a9ea27b995cf5bb8372d7",
+      "initialization_window_seconds": 4,
+      "maximum_iterations": 1000,
+      "initial_feature_budget": 50,
+      "diagnostic": "No initialized trajectory; no final MLE diagnostic in log",
+      "trials": [
+        {
+          "name": "openvins-1",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 16.910146962,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "b7723dfe43ebb81102f735f11b6f302bb674b7173e060e0a9da0c122a6e3fbef"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        },
+        {
+          "name": "openvins-2",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 16.61639297099987,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "b7723dfe43ebb81102f735f11b6f302bb674b7173e060e0a9da0c122a6e3fbef"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        }
+      ],
+      "common_six_trial_support_ns": null,
+      "integrity": "verified"
+    },
+    {
+      "version": "v5",
+      "registration": "/workspace/aqua-data/development/ntnu_fjord_01/openvins-comparison-v5/plan.json",
+      "plan_sha256": "a88fdff89802b2d77af2164e9a096418f05880a9c21bcf77a4bae641ab480424",
+      "freeze_sha256": "68fd7776b06a976fe7abfc96c251fa32682e39ceceec618234388104fde591cf",
+      "initialization_window_seconds": 2,
+      "maximum_iterations": 1000,
+      "initial_feature_budget": 50,
+      "diagnostic": "SDK MLE rejected2 triangulated features against minimum8",
+      "trials": [
+        {
+          "name": "openvins-1",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 21.237060989999918,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "c6cdb2a2d9e0c88de8ee9092eae14deb4dfe63fb2bd6f5193a4cafa4411e1912"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        },
+        {
+          "name": "openvins-2",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 18.299597631000097,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "c6cdb2a2d9e0c88de8ee9092eae14deb4dfe63fb2bd6f5193a4cafa4411e1912"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        }
+      ],
+      "common_six_trial_support_ns": null,
+      "integrity": "verified"
+    },
+    {
+      "version": "v6",
+      "registration": "/workspace/aqua-data/development/ntnu_fjord_01/openvins-comparison-v6/plan.json",
+      "plan_sha256": "d6bd48448d7825cea44663060d9cbd4e2fa2e733489e4b6ee54c7b38bcab7e43",
+      "freeze_sha256": "e218541c9971dd7eb55b22f9c578b6f23ee18e48a13c445318afaa66cd605c61",
+      "initialization_window_seconds": 2,
+      "maximum_iterations": 1000,
+      "initial_feature_budget": 200,
+      "diagnostic": "SDK MLE rejected6 triangulated features against minimum8",
+      "trials": [
+        {
+          "name": "openvins-1",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 39.56953023400001,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "e8cf914fce86567ec2b934541dba020527a164d733dcfabbbc687748e44d6f09"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        },
+        {
+          "name": "openvins-2",
+          "status": "failed",
+          "exit_code": 2,
+          "error": "estimator exit 2",
+          "wall_seconds": 37.91225038699986,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "4a2fe00c94c60a4a2a4f67e686ade13d4b84c3af7c564d79a47c83f7343246ab",
+            "estimate.tum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "run.log": "e8cf914fce86567ec2b934541dba020527a164d733dcfabbbc687748e44d6f09"
+          },
+          "native_events": {
+            "C": 6368,
+            "P": 15926
+          },
+          "retained_pose_count": 0,
+          "initialization_or_no_state_camera_exclusions": 6368,
+          "pressure_outside_imu_support": [
+            {
+              "type": "P",
+              "ordinal": "15925",
+              "native_effective_ns": "1700605095194369664",
+              "disposition": "outside_available_imu_support"
+            }
+          ]
+        }
+      ],
+      "common_six_trial_support_ns": null,
+      "integrity": "verified"
+    }
+  ],
+  "successes": 0,
+  "failures": 12,
+  "reference_coordinates_acquired": false,
+  "reference_coordinates_read": false,
+  "independent_accuracy_scoring": "unexecuted_missing_hardware_truth_and_successful_competitive_baseline",
+  "rmse": null,
+  "sota_achieved": false,
+  "observability_test": {
+    "status": "passed_actual_installed_Ceres",
+    "scope": "rank2 single-view depth covariance rejected; rank3 translated two-view covariance recovered",
+    "does_not_prove_native_failure_cause": true,
+    "does_not_measure_accuracy": true
+  },
+  "retained_build_failures": [
+    "openvins-native-build-v1: missing explicit Boost filesystem/system linkage; corrected in isolated later build",
+    "openvins-observability-test-compile-error: ambiguous covariance overload; corrected explicit block vector"
+  ],
+  "snapshot_gate": "scripts/benchmarks/check_ntnu_openvins.bash; integrity verification is distinct from estimator success"
+}

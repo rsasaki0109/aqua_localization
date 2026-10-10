@@ -1,0 +1,121 @@
+{
+  "schema": "underwater-hardware-truth-discovery-v1",
+  "recorded_at_utc": "2026-10-10T20:31:12.673190+00:00",
+  "candidates": [
+    {
+      "id": "ntnu-original-mocap",
+      "source": "https://github.com/ntnu-arl/underwater-datasets",
+      "reference": "publisher motion capture subset3",
+      "status": "three official ground-truth share metadata GETs returned404; no coordinates fetched"
+    },
+    {
+      "id": "ntnu-hf",
+      "source": "https://huggingface.co/datasets/ntnu-arl/underwater-datasets",
+      "revision": "d79489fc4742ebe66f872d1b195d9f0a249925da",
+      "reference": "ReAqROVIO estimate",
+      "status": "not independent hardware truth"
+    },
+    {
+      "id": "Voxel51/NTNU-Underwater-Multicam",
+      "revision": "a732cf655b0f35e1789854a77a05288da0b52063",
+      "reference": "converted ReAqROVIO estimate",
+      "status": "not independent hardware truth"
+    },
+    {
+      "id": "afrl-uw/stereo-vi-underwater-dataset",
+      "revision": "bdb079e7fef85b1f956f3469bd4cc1c521f25772",
+      "reference": "COLMAP; scale from stereo baseline",
+      "status": "not independent hardware truth"
+    },
+    {
+      "id": "afrl-uw/Pamir_Visual-Inertial_Data",
+      "revision": "7138521317575a41f9cbf84edee1561685ea288f",
+      "reference": "README COLMAP/SVIn2 trajectories and water-depth profiles; no external hardware pose truth established",
+      "status": "not qualified for independent hardware scoring"
+    },
+    {
+      "id": "OsloMet-OceanLab/underwater_event_dataset",
+      "revision": "d025e16ee511a960d36711c45823ab19abd04d1b",
+      "reference": "DVL reference; accumulated navigation is not drift-free external pose truth",
+      "status": "different reference scope; could support velocity validation, not validated as full6DOF hardware truth here"
+    },
+    {
+      "id": "African-Robotics-Unit/Ship-Hull-Vinyl-Dataset",
+      "revision": "9a48b232750aed63a1a8391948b6a2e89ee3489e",
+      "reference": "controlled manual PVC-pipe motion; no externally measured6DOF trajectory documented",
+      "status": "not qualified; no data downloaded"
+    },
+    {
+      "id": "zhu-chengdong/York-Tank",
+      "revision": "185254ff2bd4b0ba0523f0cc0253c2453cbdde9d",
+      "reference": "York-Tank-GT source unspecified in README; preview lists COLMAP files",
+      "status": "independent hardware provenance unestablished; only preview released"
+    },
+    {
+      "id": "Water-Scanner/AquaTriV-Kit",
+      "revision": "870bee3d2185dee2d15526dab192d2c0ecf39c2f",
+      "project_revision": "29997e46b3dd7383a6aaa985573fbd4b504056b8",
+      "reference": "publisher states indoor motion capture; outdoor INS+COLMAP",
+      "status": "download coming soon; pinned project buttons say Will be released soon"
+    },
+    {
+      "id": "HAUD",
+      "source": "https://bat.sjtu.edu.cn/zh/haud-dataset/",
+      "reference": "AquaTriV table identifies stereo/IMU and MCS; official confirmation pending",
+      "status": "official metadata request blocked at proxy CONNECT403; no HTTP response from site, no calibration/sensor/reference data downloaded",
+      "required_host": "bat.sjtu.edu.cn",
+      "pressure_available": "unconfirmed"
+    }
+  ],
+  "metadata_receipts_root": "/workspace/aqua-next/truth-search-20261010",
+  "metadata_sha256": {
+    "Voxel51--NTNU-Underwater-Multicam-README.md": "1029497f2fcbe6e64c4bfc4bc19c5dc9980c64edf0db93e4e968a699bb344ecd",
+    "box-1os6cn7pso6oezheuywimcdze2gdz1g6.html": "49eb3723b0fabed6e03797e665e31ea6616619b50807d958926c13997f0d2b46",
+    "github-haud-readme.txt": "0b68a7f823388c0d202dcf7d73653fc533287408f62d3b97d43193b83d2e0011",
+    "jclboeng--underwater-img-imu-sonar-datasets.json": "12b8a328af67bad47cf9e7474166e33ec2c20cad32be126257425a3a8a8f6998",
+    "bharatjoshi1--underwater_stereo_vi_dataset.json": "688fc5dc84123529eb536ad975ab7c3ed444bbdc1ada752eab221163c1c81d6e",
+    "afrl-uw--stereo-vi-underwater-dataset-README.md": "372450be8e61e4def5807c86e917096dd45f161c0127bd42252641f016bae48d",
+    "github-underwater-mocap.txt": "81a726447f8b6c62f57806678f6d7a6b8f1232b6e66424304a64f71f0c74f7f8",
+    "github-underwater-vicon.txt": "647f31b171d74df21df5fa9033c34e5b23f316deafb8a9c4976a02139494e404",
+    "aquatriv.txt": "04066f315ccf5c076c50c921694d9f2c470fc13d61cb0795bf7abed9600aeacf",
+    "aquatriv-project-pinned.html": "8bc173886f7f0a1d3071e2232dda6b566c5962683e85bf3eca8dcb651d912d59",
+    "box-1os6cn7pso6oezheuywimcdze2gdz1g6.headers": "ee252d5378e77cee99c913410322e9559b1216b48812d0a7411ffd1e8be72292",
+    "African-Robotics-Unit--Ship-Hull-Vinyl-Dataset-README.md": "0410668caf97adac0a738f40e865e979d956ebeb34ffe01eb83edd8e7b802e57",
+    "github-ntnu-forks.txt": "7b03a25fd5cabc804494178bd92b4a56484a780c7ac0aec76a3e139bba3730c8",
+    "oslo-dataset.txt": "67e2eb14da48adaee2f632a3901522ae78152f3d8129ba6afc09da94518e654d",
+    "hf-turbid.txt": "a5b774591aa0bef5ba0ceff69e6ce8ee3727b5cd36b5c00d6c513f06948ec7ec",
+    "sonar-awesome.txt": "5865313caf48642b2de3303e0ef3c9bf2a2b2d7088c76a757b8357fb3dea7620",
+    "github-underwater-slam-data.txt": "03e767d19332c22808e148c9186bd5e1c1287fac8b719b04bead7b21198a31d7",
+    "ntnu-current-README.md": "f7a4af42c4c2a603700fae7595b813bb63c264de8f855e286e62bf2072ddb16e",
+    "afrl-uw--stereo-vi-underwater-dataset.json": "e124521c910f55fe1b4d924c41f3b64c1c3fb25438e333a215f9893a55304e3d",
+    "github-underwater-mocap-readme.txt": "cc373ecd85afe1c98daae1af5339d79b4f76a8012372154cbd3edcdda1a35cec",
+    "github-haud.txt": "597330a11ba8267676068ac03e1753f0f40538a9704dfbc7d9fc9b24df1a6d7d",
+    "Voxel51--NTNU-Underwater-Multicam.json": "ba3f1ac105a1a81b0e87bdb387ef420614f26873ccd33bb66f36758db4af4dfb",
+    "aquatriv-pinned-README.md": "04066f315ccf5c076c50c921694d9f2c470fc13d61cb0795bf7abed9600aeacf",
+    "hf-aqua.txt": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "github-underwater-datasets.txt": "615ef69b9a78dce8866da5c95ec9154b62b64250d02b98a961eb178eff0ec07e",
+    "OsloMet-OceanLab--underwater_event_dataset-README.md": "39c4eddb83f1adb21b52f364ce550ea2c9e6474115f2fd3b4fb0c53a80382bd4",
+    "hf-haud.txt": "7afc1923b74bad6de755eebafef085b840eeed6d847c67b9a260a5d0ec8d4fa7",
+    "hf-mocap.txt": "3eb97e0ba6ca8b12af3e5381213bf7aee4503f4955e4174d4c0986373230ecbe",
+    "hf-pamir.json": "46280c2ec8c11a0a177c4bf5699f734480d711e66e4a0a6f5da2801bb2e9e24a",
+    "hf-aquatriv.txt": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "pamir-pinned-README.md": "22165ad9b45561ed42a2c0ee56aa4cce3e86076ea8c350c670b1627b8a5895b2",
+    "box-ycbyp2etzmo3a96idbvulut2pkwllnet.headers": "1e4811acfcb273d7014997f605276eafd8ee2b2aa379cf00411cc8638c8f8959",
+    "github-underwater-truth.txt": "c228796fbe572efd883b085a5bf805fc6596349bfb74f7bc2c56e590e7508398",
+    "ntnu-arl--underwater-datasets-README.md": "09d7b5c0d95a986971aa04ed5d001f896157c454a971b75350b18e5658a670d5",
+    "hf-underwater.json": "5a6c6ec3fe81c4ac348c2d988aacc84b5d4a2be9183be49434ea2504d66615a1",
+    "box-tv1j25lai9salrl48w1fd8c4b6a3ya58.html": "2a0c3e655db9f8dec3fd22ba3f15010801b5e4be3cb1debd693886ceb7516c32",
+    "github-underwater-groundtruth-readme.txt": "f54061381cb5fae0137bd811368acf650fee82353ece030c77a3652a9e511e2d",
+    "box-tv1j25lai9salrl48w1fd8c4b6a3ya58.headers": "8d9be0f1548e903dda171332764d997a02d85eac70ad4da7a2d9466b850f3190",
+    "box-ycbyp2etzmo3a96idbvulut2pkwllnet.html": "30ea42730ee07dbd90155679099a22026f7690d2befc0d1f9172259c1bfdfb8a",
+    "zhu-chengdong--York-Tank-README.md": "c0ea3383513c842832d88dca7c03d02b784500b45405e8df64d23af1b22cf135"
+  },
+  "vslam_lab_inspected_commit": "ef80105861e51ae9fc6c48501cddf88887734360",
+  "vslam_lab_finding": "ariel adapter reads publisher baseline.tum into groundtruth.csv; naming does not make it independent hardware truth",
+  "coordinates_acquired": false,
+  "coordinates_read": false,
+  "native_sensor_data_acquired_this_search": false,
+  "qualified_new_independent_hardware_dataset": false,
+  "not_exhaustive_search": true,
+  "tank_application": "skipped; no contact or application"
+}
