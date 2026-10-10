@@ -8,6 +8,7 @@
 
 #include "aqua_msgs/msg/estimator_status.hpp"
 #include "aqua_msgs/msg/fusion_status.hpp"
+#include "aqua_msgs/msg/graph_estimator_status.hpp"
 #include "aqua_msgs/msg/loop_closure_status.hpp"
 #include "aqua_msgs/msg/pose_graph_keyframe.hpp"
 #include "aqua_msgs/msg/pose_graph_loop_constraint.hpp"
@@ -129,6 +130,8 @@ const std::map<std::string, TypeSupport> & registry()
         };
       add(make_support<aqua_msgs::msg::EstimatorStatus>("aqua_msgs/msg/EstimatorStatus"));
       add(make_support<aqua_msgs::msg::FusionStatus>("aqua_msgs/msg/FusionStatus"));
+      add(make_support<aqua_msgs::msg::GraphEstimatorStatus>(
+          "aqua_msgs/msg/GraphEstimatorStatus"));
       add(make_support<aqua_msgs::msg::LoopClosureStatus>("aqua_msgs/msg/LoopClosureStatus"));
       add(make_support<aqua_msgs::msg::PoseGraphKeyframe>("aqua_msgs/msg/PoseGraphKeyframe"));
       add(make_support<aqua_msgs::msg::PoseGraphLoopConstraint>(
@@ -199,6 +202,8 @@ std::optional<std::string> default_type_for_topic(const std::string & topic)
     {"/mbes_loop_closure/status", "aqua_msgs/msg/LoopClosureStatus"},
     {"/mbes_loop_closure/markers", "visualization_msgs/msg/MarkerArray"},
     {"/aqua_graph/odometry", "nav_msgs/msg/Odometry"},
+    {"/aqua_graph/status", "aqua_msgs/msg/GraphEstimatorStatus"},
+    {"/ground_truth/odometry", "nav_msgs/msg/Odometry"},
     {"/tf", "tf2_msgs/msg/TFMessage"},
   };
   const auto it = defaults.find(topic);

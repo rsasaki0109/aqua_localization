@@ -31,6 +31,7 @@
   <depend>yaml_cpp_vendor</depend>
 
   <!-- Components loaded by the bundled scenarios. -->
+  <exec_depend>aqua_graph</exec_depend>
   <exec_depend>aqua_imu_loc</exec_depend>
   <exec_depend>aqua_pose_graph</exec_depend>
   <exec_depend>aqua_sonar_loc</exec_depend>
@@ -38,6 +39,7 @@
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>aqua_graph</test_depend>
   <test_depend>aqua_imu_loc</test_depend>
   <test_depend>aqua_pose_graph</test_depend>
   <test_depend>aqua_sonar_loc</test_depend>

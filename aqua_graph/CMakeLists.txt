@@ -14,6 +14,13 @@ find_package(ament_cmake REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(GTSAM_UNSTABLE REQUIRED)
+find_package(aqua_imu_loc REQUIRED)
+find_package(aqua_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 add_library(aqua_graph_core
   src/factors.cpp
@@ -28,10 +35,36 @@ target_include_directories(aqua_graph_core PUBLIC
 target_link_libraries(aqua_graph_core gtsam gtsam_unstable Eigen3::Eigen)
 set_target_properties(aqua_graph_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+add_library(aqua_graph_component SHARED src/aqua_graph_node.cpp)
+target_compile_features(aqua_graph_component PUBLIC cxx_std_17)
+target_link_libraries(aqua_graph_component aqua_graph_core aqua_imu_loc::pressure_depth_converter)
+ament_target_dependencies(aqua_graph_component
+  aqua_msgs
+  geometry_msgs
+  nav_msgs
+  rclcpp
+  rclcpp_components
+  sensor_msgs
+)
+rclcpp_components_register_node(aqua_graph_component
+  PLUGIN "aqua_graph::AquaGraphNode"
+  EXECUTABLE aqua_graph_node
+)
+
 install(TARGETS aqua_graph_core
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
+)
+
+install(TARGETS aqua_graph_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(DIRECTORY config launch
+  DESTINATION share/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/

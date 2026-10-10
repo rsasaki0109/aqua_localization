@@ -9,7 +9,9 @@ a circle over a bumpy seabed (long runs complete a lap and revisit the start). T
 - ``/pressure`` (sensor_msgs/FluidPressure, 10 Hz): fresh-water pressure;
 - ``/dvl/twist`` (geometry_msgs/TwistStamped, 5 Hz): body-frame velocity;
 - ``/sonar/points`` (sensor_msgs/PointCloud2, 5 Hz): a 96-beam multibeam fan
-  ray-cast against the seabed, in the body frame.
+  ray-cast against the seabed, in the body frame;
+- ``/ground_truth/odometry`` (nav_msgs/Odometry, 20 Hz): the true pose in the
+  start-anchored map frame (origin and heading of the first pose), for APE.
 
 Frames follow the stack: world z-up, body x-forward / z-up. Sonar messages
 are written with a small receive delay after their header stamp, so the
@@ -150,6 +152,11 @@ def generate(args) -> int:
     FluidPressure = ts.types["sensor_msgs/msg/FluidPressure"]
     TwistStamped = ts.types["geometry_msgs/msg/TwistStamped"]
     Twist = ts.types["geometry_msgs/msg/Twist"]
+    Odometry = ts.types["nav_msgs/msg/Odometry"]
+    PoseWithCovariance = ts.types["geometry_msgs/msg/PoseWithCovariance"]
+    TwistWithCovariance = ts.types["geometry_msgs/msg/TwistWithCovariance"]
+    Pose = ts.types["geometry_msgs/msg/Pose"]
+    Point = ts.types["geometry_msgs/msg/Point"]
 
     accel_bias = np.array([0.02, -0.015, 0.01])
     gyro_bias = np.array([0.0008, -0.0005, 0.0006])
@@ -175,6 +182,23 @@ def generate(args) -> int:
             linear_acceleration=vector3(ts, f_body),
             linear_acceleration_covariance=np.full(9, 0.0, dtype=np.float64))
         records.append((t_ns, "/imu/data", "sensor_msgs/msg/Imu", msg))
+        if i % max(1, round(args.imu_rate_hz / 20.0)) == 0:
+            # Express truth in the frame of the first pose, which is where the
+            # estimators start (origin, zero yaw).
+            p0, _, _, yaw0, _ = truth(0.0, args.radius, args.speed, args.depth, args.static_s,
+                                      args.ramp_s)
+            rel = rot_z(yaw0).T @ (position - p0)
+            gt = Odometry(
+                header=header(ts, t_ns, "map"), child_frame_id="base_link",
+                pose=PoseWithCovariance(
+                    pose=Pose(position=Point(x=float(rel[0]), y=float(rel[1]), z=float(rel[2])),
+                              orientation=quaternion_from_yaw(ts, yaw - yaw0)),
+                    covariance=np.zeros(36, dtype=np.float64)),
+                twist=TwistWithCovariance(
+                    twist=Twist(linear=vector3(ts, R.T @ velocity),
+                                angular=vector3(ts, np.array([0.0, 0.0, w]))),
+                    covariance=np.zeros(36, dtype=np.float64)))
+            records.append((t_ns, "/ground_truth/odometry", "nav_msgs/msg/Odometry", gt))
 
     for i in range(1, int(args.duration_s * 10.0) + 1):
         t = i / 10.0

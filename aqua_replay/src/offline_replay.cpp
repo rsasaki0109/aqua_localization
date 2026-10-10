@@ -124,7 +124,22 @@ std::string resolve_path(const std::string & raw, const fs::path & base_dir)
 
 std::string yaml_value_string(const YAML::Node & node)
 {
+  if (node.IsNull()) {
+    return "''";
+  }
   if (node.IsScalar()) {
+    // Quoted YAML scalars (tag "!") and empty strings must stay strings when
+    // rcl re-parses "-p name:=value" as YAML.
+    if (node.Tag() == "!" || node.Scalar().empty()) {
+      std::string quoted = "'";
+      for (const char c : node.Scalar()) {
+        quoted += c;
+        if (c == '\'') {
+          quoted += '\'';
+        }
+      }
+      return quoted + "'";
+    }
     return node.Scalar();
   }
   YAML::Emitter emitter;
