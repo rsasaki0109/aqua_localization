@@ -12,6 +12,9 @@ import math
 
 import numpy as np
 
+# numpy >= 2.0 renamed trapz to trapezoid; Humble and Jazzy ship numpy 1.x.
+_trapezoid = getattr(np, "trapezoid", None) or np.trapz
+
 
 @dataclass(frozen=True)
 class DvlRecord:
@@ -274,7 +277,7 @@ def integrate_dvl_step(
             velocities,
             np.full(sample_times.shape[0], dvl_frame_yaw_offset_rad, dtype=np.float64),
         )
-    delta = np.trapezoid(velocities, sample_times, axis=0)
+    delta = _trapezoid(velocities, sample_times, axis=0)
     return np.asarray(delta, dtype=np.float64), True, int(sample_times.shape[0])
 
 
