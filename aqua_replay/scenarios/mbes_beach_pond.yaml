@@ -1,0 +1,52 @@
+# MBES-SLAM beach_pond through the same node set and profiles as
+# aqua_localization/scripts/record_mbes_demo.sh, but replayed
+# deterministically in one process instead of `ros2 bag play` + separate
+# node processes. The output bag carries the same topics the recorder wrote
+# (including the /nav/processed/odometry reference), so the existing
+# export / metric scripts work on it unchanged.
+#
+#   ros2 run aqua_replay offline_replay \
+#     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/mbes_beach_pond.yaml \
+#     --bag aqua_localization/datasets/public/mbes_slam/beach_pond_ros2 \
+#     --out /tmp/mbes_replay_a --duration 120
+#
+# Run twice and compare with compare_replay_summaries.py; parameters can be
+# swept with --param NODE:NAME:=VALUE (NODE is the node name or plugin).
+input:
+  topics:
+    - /nav/processed/microstrain/imu/madgwick
+    - /norbit/detections
+    - /nav/processed/odometry
+  order: header
+  reorder_window_s: 0.5
+
+nodes:
+  - plugin: aqua_imu_loc::ImuLocNode
+    name: aqua_imu_loc
+    params_files: [$(find-pkg-share aqua_imu_loc)/config/mbes_slam.yaml]
+  - plugin: aqua_sonar_loc::SonarLocNode
+    name: aqua_sonar_loc
+    params_files: [$(find-pkg-share aqua_sonar_loc)/config/mbes_slam.yaml]
+  - plugin: aqua_pose_graph::PoseGraphNode
+    name: aqua_pose_graph
+    params_files: [$(find-pkg-share aqua_pose_graph)/config/params.yaml]
+  - plugin: aqua_sonar_loc::MbesLoopClosureNode
+    name: mbes_loop_closure
+    params_files: [$(find-pkg-share aqua_sonar_loc)/config/mbes_loop_closure.yaml]
+
+output:
+  storage_id: mcap
+  topics:
+    - {topic: /nav/processed/odometry, type: nav_msgs/msg/Odometry}
+    - /aqua_imu_loc/odometry
+    - /aqua_imu_loc/status
+    - /aqua_sonar_loc/odometry
+    - /aqua_sonar_loc/status
+    - /aqua_pose_graph/path
+    - /aqua_pose_graph/keyframe
+    - /aqua_pose_graph/keyframe_count
+    - /aqua_pose_graph/loop_constraint
+    - /aqua_pose_graph/loop_constraint_count
+    - /aqua_pose_graph/optimization_count
+    - /aqua_pose_graph/optimization_chi2
+    - /mbes_loop_closure/status

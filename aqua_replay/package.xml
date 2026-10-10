@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>aqua_replay</name>
+  <version>0.0.1</version>
+  <description>
+    Deterministic offline replay harness for aqua_localization. Loads the
+    stack's nodes as components into one process and feeds a rosbag2 to them
+    in measurement-stamp order with simulated time, so repeated runs on the
+    same bag and scenario produce bit-identical outputs.
+  </description>
+  <maintainer email="rsasaki0109@gmail.com">Ryohei Sasaki</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>ament_index_cpp</depend>
+  <depend>aqua_msgs</depend>
+  <depend>class_loader</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>rosbag2_cpp</depend>
+  <depend>rosbag2_storage</depend>
+  <depend>rosgraph_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>yaml_cpp_vendor</depend>
+
+  <!-- Components loaded by the bundled scenarios. -->
+  <exec_depend>aqua_imu_loc</exec_depend>
+  <exec_depend>aqua_pose_graph</exec_depend>
+  <exec_depend>aqua_sonar_loc</exec_depend>
+  <exec_depend>rosbag2_storage_mcap</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>aqua_imu_loc</test_depend>
+  <test_depend>aqua_pose_graph</test_depend>
+  <test_depend>aqua_sonar_loc</test_depend>
+  <test_depend>python3-numpy</test_depend>
+  <test_depend>python3-yaml</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
