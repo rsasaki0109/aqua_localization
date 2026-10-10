@@ -28,6 +28,7 @@ def test_dry_run_prints_resumable_download_and_conversion(tmp_path, capsys):
     assert result == tmp_path / "beach_pond_ros2"
     assert "--continue-at -" in output
     assert "--retry 5" in output
+    assert "--insecure" not in output
     assert module.DEFAULT_URL in output
     assert "tar xzf" in output
     assert "rosbags-convert" in output

@@ -34,6 +34,14 @@ Only metadata were read; no sequences or reference trajectories were acquired.
 
 ### Next hardware-reference gate
 
+Subsequent work resolved access through the verified-TLS `www` distribution
+host and sufficient fresh storage. Beach Pond native acquisition and an exclusive
+GNSS-free raw-sensor input now completed, with 1072947 packets independently
+byte-verified. See [current preparation](mbes_hardware_reference.md). The earlier
+403/storage observations below describe the preceding environment. No hardware
+reference values, RTK quality metrics, competitor result or held-out score have
+yet been read/computed in this stage.
+
 The existing MBES `beach_pond` candidate is a separate sensor/task benchmark,
 not a substitute visual-pressure test. On 2026-10-10, neither its native nor
 converted dataset existed in this workspace. TLS-preserving HEAD requests to

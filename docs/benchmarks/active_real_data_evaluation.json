@@ -170,5 +170,13 @@
       "all_native_pressure_bytes_retained": true,
       "both_arms_propagate_at_excluded_pressure_time": true
     }
+  },
+  "next_evaluation_preparation": {
+    "status": "mbes_native_and_sensor_isolation_complete; hardware scoring and competitors not executed",
+    "report": "mbes_hardware_reference_preparation.json",
+    "reference_values_read": false,
+    "selected_packets_byte_verified": 1072947,
+    "sequence_role": "development, not held-out",
+    "sota_achieved": false
   }
 }

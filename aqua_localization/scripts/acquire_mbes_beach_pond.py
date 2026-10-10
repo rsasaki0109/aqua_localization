@@ -64,7 +64,6 @@ def acquire(
                 curl,
                 "--location",
                 "--fail",
-                "--insecure",
                 "--continue-at",
                 "-",
                 "--retry",

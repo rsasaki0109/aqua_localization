@@ -1,0 +1,122 @@
+{
+  "schema": "mbes-hardware-reference-preparation-v1",
+  "date_utc": "2026-10-10",
+  "sequence": "beach_pond",
+  "sequence_role": "previously reference-used development; not held-out",
+  "acquisition": {
+    "schema": "mbes-native-acquisition-v1",
+    "identity": {
+      "source": "https://www.seaward.science/files/pos-datasets/bag/beach_pond.tar.gz",
+      "bytes": 2584672367,
+      "etag": "\"9a0ef86f-5c573e9a1d5bc\"",
+      "tls_verified": true
+    },
+    "archive_sha256": "c68d9448502aab9d436e4784453bf07f11663f6719678b01751e4992bfe111c8",
+    "members": [
+      {
+        "name": "beach_pond/ctd/CC1716006_20200717_211548.csv",
+        "bytes": 9457,
+        "sha256": "475542be1d633354c3bc72017cc8eccfa87bb2ae74450f54bd492d88b9f7758a"
+      },
+      {
+        "name": "beach_pond/beach_pond.bag",
+        "bytes": 7269784465,
+        "sha256": "75ba10f2c0c7f3c31d29115f9ffbaf120c61c52495660de58b2fa6033ea30206"
+      },
+      {
+        "name": "beach_pond/20200717_beach_pond.surv",
+        "bytes": 73,
+        "sha256": "5ba5fa378a7e3546ac03b9c694c7b5968e4227ac5cb0e1273640ed03e6f7f6b3"
+      },
+      {
+        "name": "beach_pond/ctd/CC1716006_20200717_211309.csv",
+        "bytes": 9402,
+        "sha256": "25c9f8733aca7b2e19fcdd24f08c18d9fac4e185914d5b4f2bad930b44a8880f"
+      }
+    ],
+    "hash_provenance": "local TLS/range/gzip/native verification; not publisher checksum",
+    "reference_values_read": false,
+    "sensor_messages_decoded": false
+  },
+  "native_message_count_metadata": 14612478,
+  "native_message_bodies_all_decoded": false,
+  "sensor_input": {
+    "registration_sha256": "45d11663a5a8c0fbe58450de3c1f1f8dc9f82250698530293a6803c93ceb35f7",
+    "result_sha256": "0eb2062b865d9bd3d2993f580336069686ac47be7865028fb9e7f554e6c882bc",
+    "selected_counts": {
+      "/nav/sensors/microstrain/imu/raw": 947459,
+      "/norbit/detections": 125488
+    },
+    "verification": {
+      "status": "every_selected_packet_byte_verified",
+      "count": 1072947,
+      "withheld_values_read": false
+    },
+    "derived_sha256": "e8f67b7da3c2e11dd73ddc166b112449f0f17145c1881543cf0169415dfdad1c"
+  },
+  "publisher_processing_code": {
+    "remote": "https://bitbucket.org/croman_and_the_barbarians/pos_dataset.git",
+    "commit": "8d99818e7b275983c8d7513fb0d6c56d98d2a45d",
+    "is_slam_competitor": false
+  },
+  "reference_candidate": {
+    "position_topic": "/nav/sensors/navsat/ubx_pos/fix",
+    "quality_topic": "/nav/sensors/navsat/ubx_pos/raw/pvt",
+    "position_count_metadata": 47369,
+    "quality_count_metadata": 47354,
+    "fusion_odometry_independent_truth": false,
+    "quality_fields_confirmed_from_schema": [
+      "gnssFixOK",
+      "carrSoln",
+      "invalidLlh",
+      "hAcc",
+      "vAcc",
+      "validTime",
+      "fullyResolved"
+    ],
+    "body_values_read": false,
+    "hardware_truth_validated": false
+  },
+  "source_integrity_tests": "12 passed; no accuracy evidence",
+  "estimator_trials": [],
+  "competitive_methods_executed": [],
+  "scores": null,
+  "sota_achieved": false,
+  "remaining_gates": [
+    "extrinsic/frame/clock provenance",
+    "hardware RTK quality and antenna lever arm",
+    "competitive method registration",
+    "new held-out sequence"
+  ],
+  "ros2_input": {
+    "schema": "mbes-isolated-ros2-conversion-v1",
+    "rosbags_version": "0.10.11",
+    "message_count": 1072947,
+    "topics": [
+      {
+        "topic": "/nav/sensors/microstrain/imu/raw",
+        "type": "sensor_msgs/msg/Imu",
+        "count": 947459
+      },
+      {
+        "topic": "/norbit/detections",
+        "type": "sensor_msgs/msg/PointCloud2",
+        "count": 125488
+      }
+    ],
+    "reference_values_read": false,
+    "estimator_runs": "not_executed",
+    "artifacts": [
+      {
+        "name": "metadata.yaml",
+        "bytes": 1142,
+        "sha256": "39ca054a31006ede117d6353e9b86cdecb4f3ca5abdf5ebb0a5a7cd3f555dcb2"
+      },
+      {
+        "name": "sensor_only_ros2.mcap",
+        "bytes": 2427684569,
+        "sha256": "68c282944ad6913baac7bd2ce5f2433fc3c5e68b0772fee50654fad89cbe6240"
+      }
+    ]
+  }
+}
