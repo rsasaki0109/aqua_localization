@@ -1,0 +1,89 @@
+{
+  "schema": "ntnu-postpublication-preparation-v1",
+  "repository_snapshot_restored": "4df25dd746c6d2812bc5d8637b79d506bf2c5648",
+  "harbor05_frozen_method_validation": "passed: source/SDK/binary/calibration/Gaussian checks; no reference reopening",
+  "north_river_frozen_validation": "passed: sources/input/runtime/native bag/all four outputs",
+  "data_access": {
+    "huggingface_metadata": "200 after publication",
+    "official_bag_url": "https://ntnu.box.com/s/ya0v9f6zzfbs84v976d8v5ruq0lcrbf5",
+    "actual_get_redirect": "https://ntnu.app.box.com/s/ya0v9f6zzfbs84v976d8v5ruq0lcrbf5",
+    "redirect_error": "CONNECT tunnel failed, response 403",
+    "head_on_original_share": "404; HEAD does not represent GET redirect",
+    "required_new_host": "ntnu.app.box.com",
+    "native_acquired": false,
+    "mocap_coordinates_read": false
+  },
+  "huggingface": {
+    "commit": "d79489fc4742ebe66f872d1b195d9f0a249925da",
+    "card_sha256": "09d7b5c0d95a986971aa04ed5d001f896157c454a971b75350b18e5658a670d5",
+    "tree_sha256": "f54f36edb25b04ec4dd5f7a0bb0ae96ca81a21cd719e63467ea7562461b409b2",
+    "tree_entries": 70,
+    "reference_type": "ReAqROVIO four-camera/IMU estimates, explicitly NOT independent hardware truth",
+    "moCap_subset3_present_in_current_tree": false,
+    "calibrations": [
+      {
+        "path": "calibrations/cam0_cam1_stereo/extrinsics_air/camchain-imucam-stereo-extrinsics-air.yaml",
+        "sha256": "227d57e4dc0d65c3afe6c896ff79d76128ae8056202cbfda37f3b2d0f5b2dfdd",
+        "bytes": 1980,
+        "source": "https://huggingface.co/datasets/ntnu-arl/underwater-datasets/resolve/d79489fc4742ebe66f872d1b195d9f0a249925da/calibrations/cam0_cam1_stereo/extrinsics_air/camchain-imucam-stereo-extrinsics-air.yaml"
+      },
+      {
+        "path": "calibrations/cam0_cam1_stereo/extrinsics_air/imu-stereo-extrinsics-air.yaml",
+        "sha256": "d2975478298cb99f0a7d59c02f9c92388218666da496d46b76180e82df785eeb",
+        "bytes": 419,
+        "source": "https://huggingface.co/datasets/ntnu-arl/underwater-datasets/resolve/d79489fc4742ebe66f872d1b195d9f0a249925da/calibrations/cam0_cam1_stereo/extrinsics_air/imu-stereo-extrinsics-air.yaml"
+      },
+      {
+        "path": "calibrations/cam0_cam1_stereo/extrinsics_air/imu0_alphasense_noise.yaml",
+        "sha256": "cc9ee4798ac205a654d51984baf13b5efb656f744f491d31696363ba717114ba",
+        "bytes": 457,
+        "source": "https://huggingface.co/datasets/ntnu-arl/underwater-datasets/resolve/d79489fc4742ebe66f872d1b195d9f0a249925da/calibrations/cam0_cam1_stereo/extrinsics_air/imu0_alphasense_noise.yaml"
+      },
+      {
+        "path": "calibrations/cam0_cam1_stereo/intrinsics_air/camchain-stereo-intrinsics-air.yaml",
+        "sha256": "646e43b74fc1ce6afe7ae011bd18202d2da51b478b54053bc0f9a11469f1fcb3",
+        "bytes": 1142,
+        "source": "https://huggingface.co/datasets/ntnu-arl/underwater-datasets/resolve/d79489fc4742ebe66f872d1b195d9f0a249925da/calibrations/cam0_cam1_stereo/intrinsics_air/camchain-stereo-intrinsics-air.yaml"
+      },
+      {
+        "path": "calibrations/cam0_cam1_stereo/intrinsics_water/camchain-stereo-intrinsics-underwater.yaml",
+        "sha256": "87aa66f70ab9db3b8ccb2dd57cb064183dd3f406f03d486576c6a92cbbf33bb2",
+        "bytes": 1125,
+        "source": "https://huggingface.co/datasets/ntnu-arl/underwater-datasets/resolve/d79489fc4742ebe66f872d1b195d9f0a249925da/calibrations/cam0_cam1_stereo/intrinsics_water/camchain-stereo-intrinsics-underwater.yaml"
+      }
+    ],
+    "stereo_transform_consistency": "passed: homogeneous rotations and cam1_T_imu * inverse(cam0_T_imu) == published stereo chain",
+    "old_box_subset_applicability": "not established; do not silently replace calibration or reuse harbor05 offset"
+  },
+  "competitor": {
+    "name": "ReAqROVIO",
+    "commit": "7fc95c1fe97c8a4e89a1477d5699807718f37e43",
+    "lightweight_filtering_commit": "b35bfbf5d2dc9ef91ee877ce50966f34c73c44b7",
+    "kindr_commit": "22a19ddd30ccfeba72bb2c35361e090bca7d16ec",
+    "upstream_sources_modified": false,
+    "core_build": "passed: Camera/FeatureCoordinates/FeatureDistance in retained Jazzy C++ runtime",
+    "stereo_filter_probe": "25 features, 4 pyramid levels, patch8, 2 cameras, 0 external poses; heap allocation as official node; finite initialized covariance; repeated exit0",
+    "initial_probe_failures": [
+      "incorrect namespace in helper; compiler failure retained",
+      "local stack filter object crashed; changed helper to upstream-style heap allocation"
+    ],
+    "remaining_warnings": "three Property Handler Error: Cannot remove variable, does not exist! messages retained; initializer still exits0; full sensor-update correctness not validated",
+    "sdk_source_sha256": {
+      "sdk-source/CMakeLists.txt": "6bf57b063fbe4f90cb9d457f63487cd4f1fd260bec8379d5a4fa317f3164f1c8",
+      "sdk-source/probe.cpp": "a63e1f23d5cfc60c42cdc67425c587047bcb3ac4020ba4e83ce7a2cc85b861b5"
+    },
+    "binary_sha256": "e6b9f7bb5e56f77e2972b8c39d9a91db9c23b4c0e11ff5f61dfbc2e5798012b0",
+    "library_sha256": "de20ace8bf2d4f328e6215758c80e0e70f2eb46169539dec92f33c4af9cec740",
+    "full_ros1_node_built": false,
+    "actual_estimator_trial_run": false,
+    "important_input_findings": [
+      "official launch comments out pressure remap; depth-enabled arm must register and enable it explicitly",
+      "official ROS bag loader selects only IMU/cam0/cam1 and drops pressure; cannot represent pressure-enabled comparison without an explicit adapter",
+      "publisher raw-pressure conversion is depth=-(value-2660)/241; native units must be checked, not assumed SI Pa",
+      "official launch IMU offset -0.00177s and per-camera Kalibr timeshifts are documented calibration candidates; no reference-driven time fitting"
+    ]
+  },
+  "sota_achieved": false,
+  "tank_application": "skipped; no contact/application",
+  "artifacts": "/workspace/aqua-next/ntnu"
+}

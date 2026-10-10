@@ -180,8 +180,10 @@
     "sota_achieved": false
   },
   "independent_underwater_vio_next": {
-    "report": "ntnu_mocap_access.json",
-    "status": "blocked_by_proxy_403_to_official_dataset",
-    "reference_values_read": false
+    "report": "ntnu_mocap_postpublish.json",
+    "status": "published snapshot restored; HF metadata/calibration and ReAqROVIO core prepared; official MoCap sensor-bag GET redirects to disallowed ntnu.app.box.com",
+    "reference_values_read": false,
+    "native_data_acquired": false,
+    "required_domain": "ntnu.app.box.com"
   }
 }

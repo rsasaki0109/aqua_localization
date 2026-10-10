@@ -214,3 +214,33 @@ external MoCap truth, matching the intended evaluation family. The candidate
 403 to ntnu.box.com; Huggingface metadata access also returned 403. Required
 hosts were saved additively to the environment draft; saving has not applied
 or published access. No data/reference values were read, Tank remains skipped.
+
+## Post-publication NTNU access and competitor preparation
+
+The published snapshot restored HEAD 4df25dd and frozen harbor_05/North River
+source/runtime/native/output bindings were validated. Hugging Face metadata
+now returns 200. Its current d79489fc tree supplies fjord/mclab bags and
+ReAqROVIO-generated baseline trajectories, **not MoCap ground truth**. Five
+publisher stereo calibration YAML files were acquired with pinned revision
+and per-file hashes; rigid transform/stereo-chain consistency passed. Their
+applicability to the old Box subset 3 has not been established.
+
+Actual GET to the official subset-3 bag share redirects from ntnu.box.com to
+ntnu.app.box.com, which still fails proxy CONNECT 403. The original share's
+HEAD returned 404 and is not a reliable GET/download check. The exact observed
+redirect hostname has been added to the draft without changing other domains.
+No native NTNU sensor bag or MoCap coordinates have been acquired/read.
+
+Official ReAqROVIO 7fc95c1 and its pinned lightweight_filtering/kindr sources
+were cloned. Its unmodified numeric core and 25-feature stereo filter were
+built in the retained C++ runtime. The probe uses upstream-style heap
+allocation and finite initialization passes repeatedly; initial helper
+compiler/stack failures and three upstream property-handler warnings remain
+in logs. This is SDK readiness only; the ROS1 node, sensor updates and real
+trials have not run. The default launch disables the pressure remap and its
+bag loader selects only IMU and two images, so a pressure-enabled comparison
+requires an explicitly registered adapter. Raw barometer values use the
+publisher's -(value-2660)/241 depth mapping; do not assume SI Pa or silently
+reuse AQUALOC's units/calibration/time correction.
+
+See ntnu_mocap_postpublish.json for hashes, exact readiness and limitations.
