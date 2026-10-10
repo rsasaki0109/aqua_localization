@@ -1,0 +1,635 @@
+{
+  "schema": "ntnu-fjord-development-results-v1",
+  "dataset": "NTNU HF fjord_1",
+  "sequence_role": "development; revisions follow observed execution failures, not a fresh holdout",
+  "native_snapshot_ready": {
+    "schema": "ntnu-native-snapshot-ready-v1",
+    "native_data_complete": true,
+    "archive_provenance": "HF Git LFS publisher SHA256",
+    "native_bytes": 12456215809,
+    "native_sha256": "b0f2a43d049efcc139b7629fc813a14460fb3e3090a1fa6cff3af8135a3aaa6d",
+    "native_ros_records": 292712,
+    "selected_sensor_counts": {
+      "/alphasense_driver_ros/imu": 63698,
+      "/mavros/imu/static_pressure": 15926,
+      "/alphasense_driver_ros/cam0": 6368,
+      "/alphasense_driver_ros/cam1": 6367
+    },
+    "receipts_sha256": {
+      "acquired.json": "2cac7bad183a460734e2c66c0e9ae660d36ae223f8a21336358dcc670a9a88be",
+      "native-record-verification-v1.json": "d429234d058c68421c47be95156b30e842694badeee2fb2b012f74e29bcf38f1",
+      "sensor-input-v1/result.json": "2bd04c2a58753c610544843edbb113998f9c7ad3b112bcda65321a361c11bbbc",
+      "mono-input-v1/wire-verification.json": "b23443f5b1dd07262a64ebfeca8de741469c8d6d5d020d0c256f543fea795b39"
+    },
+    "excluded_position_values_deserialized": false,
+    "reference_values_read": false,
+    "estimation_comparison_readiness": "separate versioned registrations/freezes",
+    "independent_accuracy_evaluation_ready": false
+  },
+  "input_result": {
+    "schema": "ntnu-mono-input-result-v1",
+    "plan_sha256": "947aba47272d2174fb4312179d1886b5b2ca4d1960c1fefc80f5d807e37da58b",
+    "native_sensor_counts": {
+      "/alphasense_driver_ros/imu": 63698,
+      "/mavros/imu/static_pressure": 15926,
+      "/alphasense_driver_ros/cam0": 6368,
+      "/alphasense_driver_ros/cam1": 6367
+    },
+    "native_imu_support_ns": [
+      1700604776664728326,
+      1700605095188237130
+    ],
+    "fixed_prefix_end_ns": 1700604866727344151,
+    "wire_counts": {
+      "I": 18032,
+      "P": 4503,
+      "C": 1800
+    },
+    "reasons": [
+      {
+        "topic": "/alphasense_driver_ros/imu",
+        "reason": "retained_for_replay",
+        "count": 18032
+      },
+      {
+        "topic": "/mavros/imu/static_pressure",
+        "reason": "retained_for_replay",
+        "count": 4503
+      },
+      {
+        "topic": "/alphasense_driver_ros/cam0",
+        "reason": "retained_for_replay",
+        "count": 1800
+      },
+      {
+        "topic": "/alphasense_driver_ros/cam1",
+        "reason": "outside_registered_mono_camera_profile",
+        "count": 6367
+      },
+      {
+        "topic": "/mavros/imu/static_pressure",
+        "reason": "outside_fixed_native_cam0_prefix",
+        "count": 11423
+      },
+      {
+        "topic": "/alphasense_driver_ros/cam0",
+        "reason": "outside_fixed_native_cam0_prefix",
+        "count": 4568
+      },
+      {
+        "topic": "/alphasense_driver_ros/imu",
+        "reason": "outside_fixed_native_cam0_prefix",
+        "count": 45666
+      }
+    ],
+    "wire_sha256": "97abd4109a9d1f6072a4ad6ce7a8eb3635e206a7e0e88c43e82ffb982fa5fc12",
+    "ledger_sha256": "cafe81ffaa6c3b23b8a00e7cd00ae03f21215416148d7c245382008ab9563c26",
+    "reference_values_read": false,
+    "evaluation_ready": false
+  },
+  "final_version": 6,
+  "versions": [
+    {
+      "version": 1,
+      "registration_sha256": "956708f9659c981ea8d7fdd4e93a80f64991b3e61073df6fcd54e51f2c50a7c6",
+      "freeze_sha256": "b11d408614ef00266fdc6da340abfdf15eda598c1e9b36d5f828fc5819dc043d",
+      "common_support_ns": null,
+      "integrity_status": "verified",
+      "trials": [
+        {
+          "name": "vio-1",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 10.869118241000024,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "9f0f8d664619602760017e058ace8f740aafcba642eafbbfb32080aa3b1ec9c9",
+            "estimate.tum": "16d908d27939ad7c66fc08b1ead49e6fb9c833f445fd90ba85647ca6a7e5c45d",
+            "resolved-profile.info": "656ed6f803639a957511fc47bbf1c9904188e51521667a2c135256484a19376c",
+            "run.log": "96d803f023821890fe2dd5f53dc14d12d549866c6f4fba15cf846f5c0fa69d84"
+          }
+        },
+        {
+          "name": "vio-2",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 9.800229900999966,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "9f0f8d664619602760017e058ace8f740aafcba642eafbbfb32080aa3b1ec9c9",
+            "estimate.tum": "16d908d27939ad7c66fc08b1ead49e6fb9c833f445fd90ba85647ca6a7e5c45d",
+            "resolved-profile.info": "656ed6f803639a957511fc47bbf1c9904188e51521667a2c135256484a19376c",
+            "run.log": "96d803f023821890fe2dd5f53dc14d12d549866c6f4fba15cf846f5c0fa69d84"
+          }
+        },
+        {
+          "name": "pressure-1",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 14.439130061000014,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "d07cef50711692dc98f397609ce6a7b1ed4e100dccef86ea90e50aa825461a4c",
+            "estimate.tum": "cd3da998379e0a0d50505e2ec06c7c6f7ea8490f7ebff34c81efcffb2ce3bc77",
+            "resolved-profile.info": "656ed6f803639a957511fc47bbf1c9904188e51521667a2c135256484a19376c",
+            "run.log": "96d803f023821890fe2dd5f53dc14d12d549866c6f4fba15cf846f5c0fa69d84"
+          }
+        },
+        {
+          "name": "pressure-2",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 14.371649342999945,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "d07cef50711692dc98f397609ce6a7b1ed4e100dccef86ea90e50aa825461a4c",
+            "estimate.tum": "cd3da998379e0a0d50505e2ec06c7c6f7ea8490f7ebff34c81efcffb2ce3bc77",
+            "resolved-profile.info": "656ed6f803639a957511fc47bbf1c9904188e51521667a2c135256484a19376c",
+            "run.log": "96d803f023821890fe2dd5f53dc14d12d549866c6f4fba15cf846f5c0fa69d84"
+          }
+        }
+      ]
+    },
+    {
+      "version": 2,
+      "registration_sha256": "cea37db6cb125165d06bdba618d981e5164c20a9f546c69b0d0b242f47b53814",
+      "freeze_sha256": "ddcf3cf7bc20cb8d0f840f43f182213ccd37dd398de0d9acd360e0b86f3ee1f3",
+      "common_support_ns": null,
+      "integrity_status": "verified",
+      "trials": [
+        {
+          "name": "vio-1",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 9.85973712200007,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "60a0021c3b7aa43d077526f9bc8df5bb01a8fe06831c646bf4e111aa08cc2bea",
+            "estimate.tum": "242357c4d735e9eb5e747bf03a7aefce1e41b67d9c7e7c5e404bc5e2d0214048",
+            "resolved-profile.info": "e282277d2724b69f2e93ced0f10d78ff4b6ad3991b299af2369653177dd9d6f2",
+            "run.log": "96d803f023821890fe2dd5f53dc14d12d549866c6f4fba15cf846f5c0fa69d84"
+          }
+        },
+        {
+          "name": "vio-2",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 9.546847036000145,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "60a0021c3b7aa43d077526f9bc8df5bb01a8fe06831c646bf4e111aa08cc2bea",
+            "estimate.tum": "242357c4d735e9eb5e747bf03a7aefce1e41b67d9c7e7c5e404bc5e2d0214048",
+            "resolved-profile.info": "e282277d2724b69f2e93ced0f10d78ff4b6ad3991b299af2369653177dd9d6f2",
+            "run.log": "96d803f023821890fe2dd5f53dc14d12d549866c6f4fba15cf846f5c0fa69d84"
+          }
+        },
+        {
+          "name": "pressure-1",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 14.116387053999915,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "d07cef50711692dc98f397609ce6a7b1ed4e100dccef86ea90e50aa825461a4c",
+            "estimate.tum": "b22eefa0680739730849ed093a68d873f1e90a49a7551aa44fc330ae4a9a81b0",
+            "resolved-profile.info": "e282277d2724b69f2e93ced0f10d78ff4b6ad3991b299af2369653177dd9d6f2",
+            "run.log": "96d803f023821890fe2dd5f53dc14d12d549866c6f4fba15cf846f5c0fa69d84"
+          }
+        },
+        {
+          "name": "pressure-2",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 14.36993319599992,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "d07cef50711692dc98f397609ce6a7b1ed4e100dccef86ea90e50aa825461a4c",
+            "estimate.tum": "b22eefa0680739730849ed093a68d873f1e90a49a7551aa44fc330ae4a9a81b0",
+            "resolved-profile.info": "e282277d2724b69f2e93ced0f10d78ff4b6ad3991b299af2369653177dd9d6f2",
+            "run.log": "96d803f023821890fe2dd5f53dc14d12d549866c6f4fba15cf846f5c0fa69d84"
+          }
+        }
+      ]
+    },
+    {
+      "version": 3,
+      "registration_sha256": "940de7d945a13c071fb3b174d1060a13ed6977de57baff20136686694dcd8564",
+      "freeze_sha256": "8e7b98bd57e1d1a870556e4ec9ac50f0aeae2f38dc3a07728243c4a7d6d3690e",
+      "common_support_ns": null,
+      "integrity_status": "verified",
+      "trials": [
+        {
+          "name": "vio-1",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 8.951279327999828,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "a80d4e20775e684ccd9676f0f45af6a548ba8ebb7eb90afd9c15de6f91e753c5",
+            "estimate.tum": "b574fe5d2433b9c67d80b0b168f3e82f68300ea8b2ae09eea25ee6a6e47e67b3",
+            "resolved-profile.info": "63f120a0f7a0e3ccdd7087105eb51df58a037365daf311a8bf1052edf8eab106",
+            "run.log": "87e2410e7282ed4cdc02692ef8d498aa812d7a762239e9985e7921cf1efaa8cc"
+          }
+        },
+        {
+          "name": "vio-2",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 9.75222273999998,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "a80d4e20775e684ccd9676f0f45af6a548ba8ebb7eb90afd9c15de6f91e753c5",
+            "estimate.tum": "b574fe5d2433b9c67d80b0b168f3e82f68300ea8b2ae09eea25ee6a6e47e67b3",
+            "resolved-profile.info": "63f120a0f7a0e3ccdd7087105eb51df58a037365daf311a8bf1052edf8eab106",
+            "run.log": "87e2410e7282ed4cdc02692ef8d498aa812d7a762239e9985e7921cf1efaa8cc"
+          }
+        },
+        {
+          "name": "pressure-1",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 12.360709595000117,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "9ff02294f816a97c6f2a6a01489306c467f12f857f59f79ae030b621d1cdf322",
+            "estimate.tum": "426317b1c1ac80c6378c375f9dd2be013f96b2ed6cdd3466beddbdf0bf8520ec",
+            "resolved-profile.info": "63f120a0f7a0e3ccdd7087105eb51df58a037365daf311a8bf1052edf8eab106",
+            "run.log": "87e2410e7282ed4cdc02692ef8d498aa812d7a762239e9985e7921cf1efaa8cc"
+          }
+        },
+        {
+          "name": "pressure-2",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 12.107285043000047,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "9ff02294f816a97c6f2a6a01489306c467f12f857f59f79ae030b621d1cdf322",
+            "estimate.tum": "426317b1c1ac80c6378c375f9dd2be013f96b2ed6cdd3466beddbdf0bf8520ec",
+            "resolved-profile.info": "63f120a0f7a0e3ccdd7087105eb51df58a037365daf311a8bf1052edf8eab106",
+            "run.log": "87e2410e7282ed4cdc02692ef8d498aa812d7a762239e9985e7921cf1efaa8cc"
+          }
+        }
+      ]
+    },
+    {
+      "version": 4,
+      "registration_sha256": "9e5630aa384392175ee3088b6934d9a4025d52891f35a774c958ff50865ac170",
+      "freeze_sha256": "2c8e97a735d0cafa5a7ced1a3614f37b302f5974f5c96c8920312516a1e3353e",
+      "common_support_ns": null,
+      "integrity_status": "verified",
+      "trials": [
+        {
+          "name": "vio-1",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 11.698668125999802,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "148f2e04140a5e8bcbf93b586b3bd61a98e4885f5fea0eabfa0ad35b2888bcde",
+            "estimate.tum": "7e0fb743a4964ea5059ea978f8fc1d4daec31851d739d9d845b4f39ea5115aa1",
+            "resolved-profile.info": "63f120a0f7a0e3ccdd7087105eb51df58a037365daf311a8bf1052edf8eab106",
+            "run.log": "87e2410e7282ed4cdc02692ef8d498aa812d7a762239e9985e7921cf1efaa8cc"
+          }
+        },
+        {
+          "name": "vio-2",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 11.251616353000145,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "148f2e04140a5e8bcbf93b586b3bd61a98e4885f5fea0eabfa0ad35b2888bcde",
+            "estimate.tum": "7e0fb743a4964ea5059ea978f8fc1d4daec31851d739d9d845b4f39ea5115aa1",
+            "resolved-profile.info": "63f120a0f7a0e3ccdd7087105eb51df58a037365daf311a8bf1052edf8eab106",
+            "run.log": "87e2410e7282ed4cdc02692ef8d498aa812d7a762239e9985e7921cf1efaa8cc"
+          }
+        },
+        {
+          "name": "pressure-1",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 11.047798028999978,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "1289447f48672827ceb39b0c2c21aafbc501ffe8cbda4dcc1acd03f975e81e93",
+            "estimate.tum": "588a5f9aec905b600d98d3a36c2ebf6ae936fea4dc8c0ac292178b7e95fd6042",
+            "resolved-profile.info": "63f120a0f7a0e3ccdd7087105eb51df58a037365daf311a8bf1052edf8eab106",
+            "run.log": "87e2410e7282ed4cdc02692ef8d498aa812d7a762239e9985e7921cf1efaa8cc"
+          }
+        },
+        {
+          "name": "pressure-2",
+          "status": "failed",
+          "error": "estimator exit 2",
+          "wall_seconds": 10.69801025799984,
+          "output": null,
+          "artifacts_sha256": {
+            "estimate.events.tsv": "1289447f48672827ceb39b0c2c21aafbc501ffe8cbda4dcc1acd03f975e81e93",
+            "estimate.tum": "588a5f9aec905b600d98d3a36c2ebf6ae936fea4dc8c0ac292178b7e95fd6042",
+            "resolved-profile.info": "63f120a0f7a0e3ccdd7087105eb51df58a037365daf311a8bf1052edf8eab106",
+            "run.log": "87e2410e7282ed4cdc02692ef8d498aa812d7a762239e9985e7921cf1efaa8cc"
+          }
+        }
+      ]
+    },
+    {
+      "version": 5,
+      "registration_sha256": "a883b413126ffd0cb20188f7159c4eacee5589ae7755bc2d73caea5ea63d1b59",
+      "freeze_sha256": "b7f98c0f9c44c736d350fb646771c3e41b98d950ea8f98b200b292d089f85e51",
+      "common_support_ns": [
+        1700604776923386496,
+        1700604866677344751
+      ],
+      "integrity_status": "verified",
+      "trials": [
+        {
+          "name": "vio-1",
+          "status": "success",
+          "error": null,
+          "wall_seconds": 11.147217953000109,
+          "output": {
+            "poses": 1800,
+            "full_support_ns": [
+              1700604776664728326,
+              1700604866677344751
+            ],
+            "tracking_start_ns": 1700604776878215326,
+            "scoring_support_ns": [
+              1700604776878215326,
+              1700604866677344751
+            ],
+            "initialization_excluded_pose_count": 3,
+            "native_image_events": 1800,
+            "native_pressure_events": 4503,
+            "event_dispositions": {
+              "depth_ablation_disabled": 4502,
+              "initial_pressure_anchor_no_update": 1,
+              "queued_native_cam0": 1800
+            }
+          },
+          "artifacts_sha256": {
+            "estimate.events.tsv": "e7c46fedeabd430d86dda22dd71c891271801f86119c9b2590dc16ec30923704",
+            "estimate.tum": "7eab9f338b7169196276a1c18d59f878aeda66444c417cc46f0becfb677bf946",
+            "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+            "run.log": "de2a26d47325d6e181267668b9a2d9116f380df88a0121548f39b57250226320"
+          }
+        },
+        {
+          "name": "vio-2",
+          "status": "success",
+          "error": null,
+          "wall_seconds": 11.470555215000104,
+          "output": {
+            "poses": 1800,
+            "full_support_ns": [
+              1700604776664728326,
+              1700604866677344751
+            ],
+            "tracking_start_ns": 1700604776878215326,
+            "scoring_support_ns": [
+              1700604776878215326,
+              1700604866677344751
+            ],
+            "initialization_excluded_pose_count": 3,
+            "native_image_events": 1800,
+            "native_pressure_events": 4503,
+            "event_dispositions": {
+              "depth_ablation_disabled": 4502,
+              "initial_pressure_anchor_no_update": 1,
+              "queued_native_cam0": 1800
+            }
+          },
+          "artifacts_sha256": {
+            "estimate.events.tsv": "e7c46fedeabd430d86dda22dd71c891271801f86119c9b2590dc16ec30923704",
+            "estimate.tum": "7eab9f338b7169196276a1c18d59f878aeda66444c417cc46f0becfb677bf946",
+            "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+            "run.log": "de2a26d47325d6e181267668b9a2d9116f380df88a0121548f39b57250226320"
+          }
+        },
+        {
+          "name": "pressure-1",
+          "status": "success",
+          "error": null,
+          "wall_seconds": 14.114384733999941,
+          "output": {
+            "poses": 6302,
+            "full_support_ns": [
+              1700604776664728326,
+              1700604866724458240
+            ],
+            "tracking_start_ns": 1700604776923386496,
+            "scoring_support_ns": [
+              1700604776923386496,
+              1700604866724458240
+            ],
+            "initialization_excluded_pose_count": 15,
+            "native_image_events": 1800,
+            "native_pressure_events": 4503,
+            "event_dispositions": {
+              "initial_pressure_anchor_no_update": 1,
+              "queued_native_cam0": 1800,
+              "submitted_pressure_update": 4502
+            }
+          },
+          "artifacts_sha256": {
+            "estimate.events.tsv": "096dc2a04d21163f8a8c60c28c031f8e70ccd24dc1df9098117b20b26b43ae8c",
+            "estimate.tum": "08bdbcd4398a92794714ffa32e5d10d4f1cba71ff5dbaacd2564d6e397d19d88",
+            "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+            "run.log": "af39fbc667de409eb3acb2700d2f96a5f8affb0d104a5d76f72e62aeacf38913"
+          }
+        },
+        {
+          "name": "pressure-2",
+          "status": "success",
+          "error": null,
+          "wall_seconds": 13.961766613999998,
+          "output": {
+            "poses": 6302,
+            "full_support_ns": [
+              1700604776664728326,
+              1700604866724458240
+            ],
+            "tracking_start_ns": 1700604776923386496,
+            "scoring_support_ns": [
+              1700604776923386496,
+              1700604866724458240
+            ],
+            "initialization_excluded_pose_count": 15,
+            "native_image_events": 1800,
+            "native_pressure_events": 4503,
+            "event_dispositions": {
+              "initial_pressure_anchor_no_update": 1,
+              "queued_native_cam0": 1800,
+              "submitted_pressure_update": 4502
+            }
+          },
+          "artifacts_sha256": {
+            "estimate.events.tsv": "096dc2a04d21163f8a8c60c28c031f8e70ccd24dc1df9098117b20b26b43ae8c",
+            "estimate.tum": "08bdbcd4398a92794714ffa32e5d10d4f1cba71ff5dbaacd2564d6e397d19d88",
+            "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+            "run.log": "af39fbc667de409eb3acb2700d2f96a5f8affb0d104a5d76f72e62aeacf38913"
+          }
+        }
+      ]
+    },
+    {
+      "version": 6,
+      "registration_sha256": "e1d528e8b45ce6aa84fbf54c46fd77e6850d50c0819a094f5f6ab47c7c47ca93",
+      "freeze_sha256": "e4986d9b4605a959baafadbe148e279a39a22d40e4078f9b9ef3f60aff251e90",
+      "common_support_ns": [
+        1700604776878215326,
+        1700604866727344151
+      ],
+      "integrity_status": "verified",
+      "trials": [
+        {
+          "name": "vio-1",
+          "status": "success",
+          "error": null,
+          "wall_seconds": 16.554415769000116,
+          "output": {
+            "poses": 1801,
+            "full_support_ns": [
+              1700604776664728326,
+              1700604866727344151
+            ],
+            "tracking_start_ns": 1700604776878215326,
+            "scoring_support_ns": [
+              1700604776878215326,
+              1700604866727344151
+            ],
+            "initialization_excluded_pose_count": 3,
+            "native_image_events": 1800,
+            "native_pressure_events": 4503,
+            "event_dispositions": {
+              "depth_ablation_disabled": 4502,
+              "initial_pressure_anchor_no_update": 1,
+              "queued_native_cam0": 1800
+            }
+          },
+          "artifacts_sha256": {
+            "estimate.events.tsv": "515ee4f8fb35fc5621c211cbd21d52b8694058268f5ba009696a5750662a46f1",
+            "estimate.tum": "b8174e903f83c71cd23968eacbd41174745ac5f556e62204b03cec977a17542e",
+            "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+            "run.log": "cf9662ec04a31f5f69e22877e0e902e34370fb99d038ae6119c3886bb5a03981"
+          }
+        },
+        {
+          "name": "vio-2",
+          "status": "success",
+          "error": null,
+          "wall_seconds": 18.740814550999858,
+          "output": {
+            "poses": 1801,
+            "full_support_ns": [
+              1700604776664728326,
+              1700604866727344151
+            ],
+            "tracking_start_ns": 1700604776878215326,
+            "scoring_support_ns": [
+              1700604776878215326,
+              1700604866727344151
+            ],
+            "initialization_excluded_pose_count": 3,
+            "native_image_events": 1800,
+            "native_pressure_events": 4503,
+            "event_dispositions": {
+              "depth_ablation_disabled": 4502,
+              "initial_pressure_anchor_no_update": 1,
+              "queued_native_cam0": 1800
+            }
+          },
+          "artifacts_sha256": {
+            "estimate.events.tsv": "515ee4f8fb35fc5621c211cbd21d52b8694058268f5ba009696a5750662a46f1",
+            "estimate.tum": "b8174e903f83c71cd23968eacbd41174745ac5f556e62204b03cec977a17542e",
+            "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+            "run.log": "cf9662ec04a31f5f69e22877e0e902e34370fb99d038ae6119c3886bb5a03981"
+          }
+        },
+        {
+          "name": "pressure-1",
+          "status": "success",
+          "error": null,
+          "wall_seconds": 20.46577330800028,
+          "output": {
+            "poses": 6300,
+            "full_support_ns": [
+              1700604776664728326,
+              1700604866727344151
+            ],
+            "tracking_start_ns": 1700604776878215326,
+            "scoring_support_ns": [
+              1700604776878215326,
+              1700604866727344151
+            ],
+            "initialization_excluded_pose_count": 12,
+            "native_image_events": 1800,
+            "native_pressure_events": 4503,
+            "event_dispositions": {
+              "initial_pressure_anchor_no_update": 1,
+              "queued_native_cam0": 1800,
+              "submitted_pressure_update": 4502
+            }
+          },
+          "artifacts_sha256": {
+            "estimate.events.tsv": "53e28d90fb9e4797fc043ce847dad4b65e644d790cf8432c43b76e467f826471",
+            "estimate.tum": "de0cbb0cdfe06e56314e0a8356bff964c3d93644cb90a3bfd13c2b7027fb940a",
+            "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+            "run.log": "f5551f7ba74426fc21752416cbe7a29a3c48b79e2d52eb39a557fc07054bfe4b"
+          }
+        },
+        {
+          "name": "pressure-2",
+          "status": "success",
+          "error": null,
+          "wall_seconds": 20.58346790099995,
+          "output": {
+            "poses": 6300,
+            "full_support_ns": [
+              1700604776664728326,
+              1700604866727344151
+            ],
+            "tracking_start_ns": 1700604776878215326,
+            "scoring_support_ns": [
+              1700604776878215326,
+              1700604866727344151
+            ],
+            "initialization_excluded_pose_count": 12,
+            "native_image_events": 1800,
+            "native_pressure_events": 4503,
+            "event_dispositions": {
+              "initial_pressure_anchor_no_update": 1,
+              "queued_native_cam0": 1800,
+              "submitted_pressure_update": 4502
+            }
+          },
+          "artifacts_sha256": {
+            "estimate.events.tsv": "53e28d90fb9e4797fc043ce847dad4b65e644d790cf8432c43b76e467f826471",
+            "estimate.tum": "de0cbb0cdfe06e56314e0a8356bff964c3d93644cb90a3bfd13c2b7027fb940a",
+            "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+            "run.log": "f5551f7ba74426fc21752416cbe7a29a3c48b79e2d52eb39a557fc07054bfe4b"
+          }
+        }
+      ]
+    }
+  ],
+  "reference_values_read": false,
+  "accuracy_scoring": "not_executed",
+  "independent_truth": "unavailable; HF accompanying TUM is ReAqROVIO estimate, legacy MoCap official sensor shares return 404",
+  "sota_achieved": false,
+  "source_changes_during_trials": false,
+  "validation": {
+    "python_contract_tests": "16 passed",
+    "sdk_imu_merge_original": "failed expected independent mean: -0.5 versus 0.5",
+    "sdk_imu_merge_fixed": "passed 0.5 and partial interval 1/3",
+    "sdk_native_endpoint": "passed unchanged 0.04s timestamp, one ULP processing horizon",
+    "existing_harbor05_registered_sources_runtime": "passed unchanged bindings, no reference access"
+  },
+  "limitations": [
+    "cam0 mono profile, not published multi-camera refractive method",
+    "prefix 1800 frames about 90s, not full sequence",
+    "finite state and processed events are execution evidence, not accuracy",
+    "v1-v4: 16 failed trials; v5: 4 finite trials with final camera pending; all preserved"
+  ]
+}

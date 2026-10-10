@@ -180,10 +180,21 @@
     "sota_achieved": false
   },
   "independent_underwater_vio_next": {
-    "report": "ntnu_pressure_adapter_readiness.json",
-    "status": "pressure event/SDK integration and sensor isolation fixture validated; Box subset3 unavailable404; current HF native object blocked403 at observed CDN",
+    "report": "ntnu_fjord_development_results.json",
+    "status": "HF native fjord1 acquired and verified; v6 mono pressure ablation four trials processed and frozen; independent MoCap hardware truth remains unavailable",
     "reference_values_read": false,
-    "native_data_acquired": false,
-    "required_domain": "us.aws.cdn.hf.co"
+    "native_data_acquired": true,
+    "required_domain": "us.aws.cdn.hf.co",
+    "historical_pre_acquisition_report": "ntnu_pressure_adapter_readiness.json",
+    "independent_mocap_native_acquired": false,
+    "cdn_access": "verified TLS 206 and complete publisher LFS SHA256"
+  },
+  "ntnu_fjord_development": {
+    "status": "four_trials_processed_prefix_frozen_reference_unread",
+    "details": "ntnu_fjord_development_results.json",
+    "final_freeze_sha256": "e4986d9b4605a959baafadbe148e279a39a22d40e4078f9b9ef3f60aff251e90",
+    "native_data_complete": true,
+    "independent_accuracy_scoring": "blocked_missing_hardware_truth",
+    "sota_achieved": false
   }
 }

@@ -284,3 +284,28 @@ these metadata screens do not supply independent underwater hardware truth.
 No Tank application/contact was made. Existing harbor_05 and North River
 frozen source/native/runtime/output bindings were revalidated. See
 ntnu_pressure_adapter_readiness.json for exact tested/unexecuted status.
+
+## NTNU native development replay after CDN access
+
+The fixed HF fjord_1 native object now matches the publisher LFS SHA256; all
+292,712 native ROS records and selected sensor bytes/counts were verified.
+A separately registered cam0 mono/depth ablation preserves all native data
+and records each camera-profile/prefix exclusion. The prefix is a preselected
+1,800 native frames (about 90s), not the complete sequence or a fresh holdout.
+
+An SDK regression exposed a reversed merged-IMU mean increment; an isolated
+overlay fixes it without modifying pinned dependency worktrees. Independent
+numeric tests fail before and pass after the correction. Four earlier method
+versions failed all 16 trials; v5 produced finite trajectories but left its
+last camera queued. Those outcomes remain frozen. v6 uses feature reprojection
+EKF, publisher underwater calibration, and a strict-boundary SDK processing
+horizon that leaves native times unchanged. Its four trials process every
+camera update and every eligible pressure update; source/output hashes,
+initialization and common supports are frozen before reference access.
+
+This verifies an executable real-data comparison workflow, not underwater
+accuracy or SoTA. No reference coordinates were read, and no RMSE was computed.
+The available HF `.tum` is a ReAqROVIO estimate; independent hardware truth and
+competitive evaluation remain blocked. See ntnu_fjord_development_results.json
+and ntnu_fjord_development.md for the full provenance and all failed/successful
+outcomes. Tank applications remain skipped.
