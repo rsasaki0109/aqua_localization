@@ -146,11 +146,9 @@ private:
 }  // namespace aqua_fusion
 
 #ifndef AQUA_FUSION_DISABLE_MAIN
-int main(int argc, char ** argv)
-{
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<aqua_fusion::FusionNode>());
-  rclcpp::shutdown();
-  return 0;
-}
+// Registered as a composable node; rclcpp_components generates the
+// standalone executable. Runtime tests include this file directly and
+// define the guard to skip registration.
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(aqua_fusion::FusionNode)
 #endif

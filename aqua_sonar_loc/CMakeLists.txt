@@ -10,6 +10,9 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Static helper libraries are linked into shared component libraries.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 find_package(ament_cmake REQUIRED)
 find_package(aqua_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -17,6 +20,7 @@ find_package(nav_msgs REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common filters registration)
 find_package(pcl_conversions REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 
@@ -54,23 +58,32 @@ ament_target_dependencies(
   sensor_msgs
 )
 
-add_executable(sonar_loc_node src/sonar_loc_node.cpp)
-target_compile_features(sonar_loc_node PUBLIC cxx_std_17)
-target_link_libraries(sonar_loc_node sonar_cloud_preprocessor scan_matcher)
-ament_target_dependencies(sonar_loc_node aqua_msgs nav_msgs rclcpp sensor_msgs)
+add_library(sonar_loc_component SHARED src/sonar_loc_node.cpp)
+target_compile_features(sonar_loc_component PUBLIC cxx_std_17)
+target_link_libraries(sonar_loc_component sonar_cloud_preprocessor scan_matcher)
+ament_target_dependencies(sonar_loc_component aqua_msgs nav_msgs rclcpp rclcpp_components sensor_msgs)
+rclcpp_components_register_node(sonar_loc_component
+  PLUGIN "aqua_sonar_loc::SonarLocNode"
+  EXECUTABLE sonar_loc_node
+)
 
-add_executable(mbes_loop_closure_node src/mbes_loop_closure_node.cpp)
-target_compile_features(mbes_loop_closure_node PUBLIC cxx_std_17)
-target_include_directories(mbes_loop_closure_node PUBLIC ${PCL_INCLUDE_DIRS})
-target_link_libraries(mbes_loop_closure_node mbes_loop_closure_frontend ${PCL_LIBRARIES})
+add_library(mbes_loop_closure_component SHARED src/mbes_loop_closure_node.cpp)
+target_compile_features(mbes_loop_closure_component PUBLIC cxx_std_17)
+target_include_directories(mbes_loop_closure_component PUBLIC ${PCL_INCLUDE_DIRS})
+target_link_libraries(mbes_loop_closure_component mbes_loop_closure_frontend ${PCL_LIBRARIES})
 ament_target_dependencies(
-  mbes_loop_closure_node
+  mbes_loop_closure_component
   aqua_msgs
   geometry_msgs
   pcl_conversions
   rclcpp
+  rclcpp_components
   sensor_msgs
   visualization_msgs
+)
+rclcpp_components_register_node(mbes_loop_closure_component
+  PLUGIN "aqua_sonar_loc::MbesLoopClosureNode"
+  EXECUTABLE mbes_loop_closure_node
 )
 
 install(TARGETS sonar_cloud_preprocessor scan_matcher mbes_loop_closure_frontend
@@ -79,8 +92,10 @@ install(TARGETS sonar_cloud_preprocessor scan_matcher mbes_loop_closure_frontend
   LIBRARY DESTINATION lib
 )
 
-install(TARGETS sonar_loc_node mbes_loop_closure_node
-  DESTINATION lib/${PROJECT_NAME}
+install(TARGETS sonar_loc_component mbes_loop_closure_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
 install(DIRECTORY include/

@@ -5,11 +5,15 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Static helper libraries are linked into shared component libraries.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 find_package(ament_cmake REQUIRED)
 find_package(aqua_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(tf2_ros REQUIRED)
 
 add_library(loosely_coupled_fuser src/loosely_coupled_fuser.cpp)
@@ -20,10 +24,14 @@ target_include_directories(loosely_coupled_fuser PUBLIC
 )
 ament_target_dependencies(loosely_coupled_fuser nav_msgs rclcpp)
 
-add_executable(fusion_node src/fusion_node.cpp)
-target_compile_features(fusion_node PUBLIC cxx_std_17)
-target_link_libraries(fusion_node loosely_coupled_fuser)
-ament_target_dependencies(fusion_node aqua_msgs geometry_msgs nav_msgs rclcpp tf2_ros)
+add_library(fusion_component SHARED src/fusion_node.cpp)
+target_compile_features(fusion_component PUBLIC cxx_std_17)
+target_link_libraries(fusion_component loosely_coupled_fuser)
+ament_target_dependencies(fusion_component aqua_msgs geometry_msgs nav_msgs rclcpp rclcpp_components tf2_ros)
+rclcpp_components_register_node(fusion_component
+  PLUGIN "aqua_fusion::FusionNode"
+  EXECUTABLE fusion_node
+)
 
 install(TARGETS loosely_coupled_fuser
   EXPORT export_${PROJECT_NAME}
@@ -31,8 +39,10 @@ install(TARGETS loosely_coupled_fuser
   LIBRARY DESTINATION lib
 )
 
-install(TARGETS fusion_node
-  DESTINATION lib/${PROJECT_NAME}
+install(TARGETS fusion_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
 install(DIRECTORY include/

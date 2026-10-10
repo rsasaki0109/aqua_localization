@@ -5,12 +5,16 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Static helper libraries are linked into shared component libraries.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 find_package(ament_cmake REQUIRED)
 find_package(aqua_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
@@ -66,28 +70,41 @@ target_include_directories(static_bias_initializer PUBLIC
 )
 target_link_libraries(static_bias_initializer additive_ukf)
 
-add_executable(imu_loc_node src/imu_loc_node.cpp)
-target_compile_features(imu_loc_node PUBLIC cxx_std_17)
-target_link_libraries(imu_loc_node additive_ukf pressure_depth_converter imu_preprocessor static_bias_initializer position_history_buffer feedback_odometry_buffer)
-ament_target_dependencies(imu_loc_node
+add_library(imu_loc_component SHARED src/imu_loc_node.cpp)
+target_compile_features(imu_loc_component PUBLIC cxx_std_17)
+target_link_libraries(imu_loc_component additive_ukf pressure_depth_converter imu_preprocessor static_bias_initializer position_history_buffer feedback_odometry_buffer)
+ament_target_dependencies(imu_loc_component
   aqua_msgs
   geometry_msgs
   nav_msgs
   rclcpp
+  rclcpp_components
   sensor_msgs
   std_msgs
   std_srvs
   tf2
   tf2_ros
 )
+rclcpp_components_register_node(imu_loc_component
+  PLUGIN "aqua_imu_loc::ImuLocNode"
+  EXECUTABLE imu_loc_node
+)
 
-add_executable(depth_to_pressure_node src/depth_to_pressure_node.cpp)
-target_compile_features(depth_to_pressure_node PUBLIC cxx_std_17)
-ament_target_dependencies(depth_to_pressure_node rclcpp sensor_msgs std_msgs)
+add_library(depth_to_pressure_component SHARED src/depth_to_pressure_node.cpp)
+target_compile_features(depth_to_pressure_component PUBLIC cxx_std_17)
+ament_target_dependencies(depth_to_pressure_component rclcpp rclcpp_components sensor_msgs std_msgs)
+rclcpp_components_register_node(depth_to_pressure_component
+  PLUGIN "aqua_imu_loc::DepthToPressureNode"
+  EXECUTABLE depth_to_pressure_node
+)
 
-add_executable(scalar_to_pressure_node src/scalar_to_pressure_node.cpp)
-target_compile_features(scalar_to_pressure_node PUBLIC cxx_std_17)
-ament_target_dependencies(scalar_to_pressure_node rclcpp sensor_msgs std_msgs)
+add_library(scalar_to_pressure_component SHARED src/scalar_to_pressure_node.cpp)
+target_compile_features(scalar_to_pressure_component PUBLIC cxx_std_17)
+ament_target_dependencies(scalar_to_pressure_component rclcpp rclcpp_components sensor_msgs std_msgs)
+rclcpp_components_register_node(scalar_to_pressure_component
+  PLUGIN "aqua_imu_loc::ScalarToPressureNode"
+  EXECUTABLE scalar_to_pressure_node
+)
 
 install(TARGETS additive_ukf pressure_depth_converter imu_preprocessor static_bias_initializer position_history_buffer feedback_odometry_buffer
   EXPORT export_${PROJECT_NAME}
@@ -95,8 +112,10 @@ install(TARGETS additive_ukf pressure_depth_converter imu_preprocessor static_bi
   LIBRARY DESTINATION lib
 )
 
-install(TARGETS imu_loc_node depth_to_pressure_node scalar_to_pressure_node
-  DESTINATION lib/${PROJECT_NAME}
+install(TARGETS imu_loc_component depth_to_pressure_component scalar_to_pressure_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
 install(DIRECTORY include/

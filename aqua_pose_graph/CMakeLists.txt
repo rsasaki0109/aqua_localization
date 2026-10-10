@@ -14,9 +14,13 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Static helper libraries are linked into shared component libraries.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 find_package(ament_cmake REQUIRED)
 find_package(aqua_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -44,13 +48,14 @@ ament_target_dependencies(aqua_pose_graph_lib
   rclcpp
 )
 
-add_executable(pose_graph_node
+add_library(pose_graph_component SHARED
   src/pose_graph_node.cpp
 )
-target_link_libraries(pose_graph_node aqua_pose_graph_lib)
-ament_target_dependencies(pose_graph_node
+target_link_libraries(pose_graph_component aqua_pose_graph_lib)
+ament_target_dependencies(pose_graph_component
   aqua_msgs
   rclcpp
+  rclcpp_components
   nav_msgs
   geometry_msgs
   std_msgs
@@ -59,9 +64,15 @@ ament_target_dependencies(pose_graph_node
   tf2_geometry_msgs
   tf2_ros
 )
+rclcpp_components_register_node(pose_graph_component
+  PLUGIN "aqua_pose_graph::PoseGraphNode"
+  EXECUTABLE pose_graph_node
+)
 
-install(TARGETS pose_graph_node
-  DESTINATION lib/${PROJECT_NAME}
+install(TARGETS pose_graph_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 install(TARGETS aqua_pose_graph_lib
   EXPORT aqua_pose_graph_libExport

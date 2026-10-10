@@ -144,8 +144,8 @@ geometry_msgs::msg::PoseStamped pose_to_msg(
 class PoseGraphNode : public rclcpp::Node
 {
 public:
-  PoseGraphNode()
-  : Node("aqua_pose_graph")
+  explicit PoseGraphNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  : Node("aqua_pose_graph", options)
   {
     PoseGraphConfig cfg;
     cfg.keyframe_translation_m = declare_parameter<double>(
@@ -423,10 +423,10 @@ private:
 
 }  // namespace aqua_pose_graph
 
-int main(int argc, char ** argv)
-{
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<aqua_pose_graph::PoseGraphNode>());
-  rclcpp::shutdown();
-  return 0;
-}
+#ifndef AQUA_POSE_GRAPH_DISABLE_MAIN
+// Registered as a composable node; rclcpp_components generates the
+// standalone executable. Runtime tests include this file directly and
+// define the guard to skip registration.
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(aqua_pose_graph::PoseGraphNode)
+#endif
