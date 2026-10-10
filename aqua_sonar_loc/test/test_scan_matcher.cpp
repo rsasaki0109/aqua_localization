@@ -1,9 +1,11 @@
 #include <array>
 #include <cstring>
+#include <random>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <Eigen/Geometry>
 
 #include "aqua_sonar_loc/scan_matcher.hpp"
 
@@ -67,6 +69,43 @@ aqua_sonar_loc::CloudSummary accepted_summary(size_t points)
 }
 
 }  // namespace
+
+TEST(ScanMatcherPoseConvention, StaticWorldPointsRecoverSensorPoseWithRotation)
+{
+  std::mt19937 generator(31);
+  std::uniform_real_distribution<float> distribution(-2.0F, 2.0F);
+  std::vector<Eigen::Vector3f> landmarks;
+  for (int i=0; i<120; ++i) {
+    landmarks.emplace_back(distribution(generator), distribution(generator), distribution(generator));
+  }
+  for (const std::string backend : {"icp", "gicp"}) {
+    auto matcher=aqua_sonar_loc::create_scan_matcher(backend);
+    aqua_sonar_loc::ScanMatcherConfig config;
+    config.backend=backend; config.max_correspondence_distance=1.0;
+    config.max_iterations=100; config.transformation_epsilon=1.0e-8;
+    matcher->configure(config);
+    for (int step=0; step<3; ++step) {
+      Eigen::Affine3f world_from_sensor=Eigen::Affine3f::Identity();
+      world_from_sensor.translation()=Eigen::Vector3f(0.08F*step,0.04F*step,-0.02F*step);
+      world_from_sensor.linear()=(Eigen::AngleAxisf(-0.03F*step,Eigen::Vector3f::UnitY()) *
+        Eigen::AngleAxisf(0.06F*step,Eigen::Vector3f::UnitZ())).toRotationMatrix();
+      std::vector<std::array<float,3>> observed;
+      for (const auto & world_point : landmarks) {
+        const Eigen::Vector3f point=world_from_sensor.inverse()*world_point;
+        observed.push_back({point.x(),point.y(),point.z()});
+      }
+      const auto result=matcher->match(make_cloud(observed),accepted_summary(observed.size()));
+      ASSERT_TRUE(result.success) << backend << " step " << step << ": " << result.status;
+      const auto & t=result.odom_to_base.translation;
+      const auto & q=result.odom_to_base.rotation;
+      const Eigen::Vector3f actual(t.x,t.y,t.z);
+      EXPECT_LT((actual-world_from_sensor.translation()).norm(),0.005F) << backend << " step " << step;
+      const Eigen::Quaternionf rotation(q.w,q.x,q.y,q.z);
+      EXPECT_LT((rotation.toRotationMatrix()-world_from_sensor.linear()).norm(),0.01F)
+        << backend << " step " << step;
+    }
+  }
+}
 
 TEST(ScanMatcherFactory, CreatesNoopMatcher)
 {
@@ -208,9 +247,9 @@ TEST(IcpScanMatcher, EstimatesTranslationBetweenAcceptedClouds)
   ASSERT_TRUE(shifted_result.success) << shifted_result.status;
   ASSERT_TRUE(shifted_result.converged) << shifted_result.status;
   EXPECT_EQ(shifted_result.status, "icp converged");
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, 0.35, 0.03);
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.y, -0.2, 0.03);
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.z, 0.1, 0.03);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, -0.35, 0.03);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.y, 0.2, 0.03);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.z, -0.1, 0.03);
   EXPECT_LT(shifted_result.fitness_score, 1.0e-4);
 }
 
@@ -366,9 +405,9 @@ TEST(GicpScanMatcher, EstimatesTranslationBetweenAcceptedClouds)
 
   ASSERT_TRUE(shifted_result.success) << shifted_result.status;
   EXPECT_EQ(shifted_result.status, "gicp converged");
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, 0.15, 0.06);
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.y, -0.1, 0.06);
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.z, 0.05, 0.06);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, -0.15, 0.06);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.y, 0.1, 0.06);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.z, -0.05, 0.06);
 }
 
 TEST(GicpScanMatcher, MaxTranslationStepGateRejectsBigJump)
@@ -423,7 +462,7 @@ TEST(IcpScanMatcher, SubmapModeKeepsConsistentTranslationAcrossManySteps)
   ASSERT_TRUE(matcher.match(make_cloud(base_points), accepted_summary(base_points.size())).success);
 
   // Five subsequent fans, each shifted by an additional 0.2 m in -x. The accumulated
-  // transform must reach -1.0 m within the converged ICP residual.
+  // sensor pose must reach +1.0 m because static landmarks move in -x.
   constexpr float step_dx = -0.2F;
   std::array<float, 3> last_translation{};
   for (int step = 1; step <= 5; ++step) {
@@ -436,11 +475,9 @@ TEST(IcpScanMatcher, SubmapModeKeepsConsistentTranslationAcrossManySteps)
                         static_cast<float>(result.odom_to_base.translation.y),
                         static_cast<float>(result.odom_to_base.translation.z)};
   }
-  // accumulated_transform tracks the cumulative cloud offset from the initial frame
-  // (see EstimatesTranslationBetweenAcceptedClouds: a shift of +0.35 m yields x = +0.35).
-  // After 5 steps of -0.2 m each, the total cloud shift is -1.0 m, which is what the
-  // accumulated_transform must report.
-  EXPECT_NEAR(last_translation[0], -1.0F, 0.05F);
+  // Pose maps sensor coordinates into the initial/world frame.
+  // Landmarks shifting -1 m imply the sensor moved +1 m.
+  EXPECT_NEAR(last_translation[0], 1.0F, 0.05F);
   EXPECT_NEAR(last_translation[1], 0.0F, 0.05F);
   EXPECT_NEAR(last_translation[2], 0.0F, 0.05F);
 }
@@ -469,7 +506,7 @@ TEST(IcpScanMatcher, SubmapZeroFallsBackToScanToScan)
   const auto shifted_result =
     matcher.match(make_cloud(shifted), accepted_summary(shifted.size()));
   ASSERT_TRUE(shifted_result.success) << shifted_result.status;
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, 0.3, 0.03);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, -0.3, 0.03);
 }
 
 TEST(NdtScanMatcher, InitializesOnFirstAcceptedCloud)
@@ -516,9 +553,9 @@ TEST(NdtScanMatcher, EstimatesTranslationBetweenAcceptedClouds)
   EXPECT_EQ(shifted_result.status, "ndt converged");
   // NDT recovers translation up to ~0.1 m on this small grid; the bound is
   // looser than ICP/GICP's because the Gaussian fits a coarser geometry.
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, 0.15, 0.10);
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.y, -0.1, 0.10);
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.z, 0.05, 0.10);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, -0.15, 0.10);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.y, 0.1, 0.10);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.z, -0.05, 0.10);
 }
 
 TEST(IcpScanMatcher, ExternalPriorIsConsumedOnce)
@@ -546,13 +583,13 @@ TEST(IcpScanMatcher, ExternalPriorIsConsumedOnce)
 
   // Stage a near-perfect external prior: current_to_previous shifts +0.5 m back.
   Eigen::Matrix4f prior = Eigen::Matrix4f::Identity();
-  prior(0, 3) = -0.5F;  // current frame is 0.5 m ahead of previous; bring it back
+  prior(0, 3) = -0.5F;  // observed coordinates shifted +0.5 m; map them into the previous frame
   matcher.set_external_prior(prior);
 
   const auto shifted_result =
     matcher.match(make_cloud(shifted_points), accepted_summary(shifted_points.size()));
   ASSERT_TRUE(shifted_result.success) << shifted_result.status;
-  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, 0.5, 0.05);
+  EXPECT_NEAR(shifted_result.odom_to_base.translation.x, -0.5, 0.05);
 
   // Prior is consume-once: a second fan at the same location should NOT carry the
   // prior over. Use a fresh fan at the same offset; without a stale prior the
@@ -562,7 +599,7 @@ TEST(IcpScanMatcher, ExternalPriorIsConsumedOnce)
   const auto third_result =
     matcher.match(make_cloud(third_points), accepted_summary(third_points.size()));
   ASSERT_TRUE(third_result.success) << third_result.status;
-  EXPECT_NEAR(third_result.odom_to_base.translation.x, 1.0, 0.05);
+  EXPECT_NEAR(third_result.odom_to_base.translation.x, -1.0, 0.05);
 }
 
 TEST(IcpScanMatcher, ExternalPriorIsClearedAfterRejectedSummary)
@@ -604,7 +641,8 @@ TEST(IcpScanMatcher, ExternalPriorIsClearedAfterRejectedSummary)
   const auto next_result =
     matcher.match(make_cloud(shifted), accepted_summary(shifted.size()));
   ASSERT_TRUE(next_result.success) << next_result.status;
-  EXPECT_NEAR(next_result.odom_to_base.translation.x, 0.2, 0.03);
+  // Static landmarks moving +0.2 m mean the sensor moved -0.2 m.
+  EXPECT_NEAR(next_result.odom_to_base.translation.x, -0.2, 0.03);
 }
 
 TEST(IcpScanMatcher, LegacyCovarianceIsHardcodedDiagonal)

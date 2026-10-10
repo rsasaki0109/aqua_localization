@@ -3,7 +3,7 @@
   "updated_date_utc": "2026-10-10",
   "repository_recovery": {
     "available_head": "5bb429de1402be9c385507556a0a910c890bf673",
-    "working_branch": "codex/harbor05-input-support",
+    "working_branch": "codex/mbes-independent-input",
     "old_user_reported_head": "51cea95",
     "old_head_status": "unavailable_in_local_objects_and_public_remote_heads_or_pull_requests",
     "old_method_and_calibration": "missing",
@@ -172,11 +172,16 @@
     }
   },
   "next_evaluation_preparation": {
-    "status": "mbes_native_and_sensor_isolation_complete; hardware scoring and competitors not executed",
-    "report": "mbes_hardware_reference_preparation.json",
-    "reference_values_read": false,
+    "status": "north_river_four_trials_frozen; RTK_v1_failed; post_access_GPS_clock_repair_v2_scored",
+    "report": "north_river_comparison_results.json",
+    "reference_values_read": true,
     "selected_packets_byte_verified": 1072947,
-    "sequence_role": "development, not held-out",
+    "sequence_role": "North River new to implementation; scoring clock repaired after reference access",
     "sota_achieved": false
+  },
+  "independent_underwater_vio_next": {
+    "report": "ntnu_mocap_access.json",
+    "status": "blocked_by_proxy_403_to_official_dataset",
+    "reference_values_read": false
   }
 }

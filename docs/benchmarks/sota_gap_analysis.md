@@ -193,3 +193,24 @@ Do not use SOTA wording unless all selected claim rows satisfy:
   <https://arxiv.org/abs/1909.08605>
 - Certifiably optimal outlier-robust geometric perception:
   <https://arxiv.org/abs/2109.03349>
+
+## North River and independent underwater VIO follow-up
+
+GICP pose composition was corrected with a physical rotation/translation
+regression (25 C++ tests pass). Four first-1600-packet point-only trials
+(GICP/KISS-ICP twice) were frozen before RTK deserialization. V1 hardware scoring
+failed because it used receive-time quality headers. Separately registered v2
+uses explicit native GPS timestamps, without residual-driven time adjustment;
+it was registered after v1 reference access and is a scoring repair, not a
+new blind protocol. Independent correspondence and Horn checks passed. On 443
+common positions RMSE was GICP 14.140753 m and KISS-ICP 18.048894 m; both repeats
+agreed. These are large short-window surface-vessel errors, not underwater
+VIO/pressure or general SoTA evidence. Complete exclusions, runtimes, failure
+and hashes are in north_river_comparison_results.json and retained artifacts.
+
+The official NTNU underwater dataset subset 3 has cameras, IMU, pressure and
+external MoCap truth, matching the intended evaluation family. The candidate
+11.6 GB sequence and calibration downloads remain blocked by proxy CONNECT
+403 to ntnu.box.com; Huggingface metadata access also returned 403. Required
+hosts were saved additively to the environment draft; saving has not applied
+or published access. No data/reference values were read, Tank remains skipped.

@@ -78,3 +78,37 @@ skipped and no application/contact was sent.
 Full artifacts: `/workspace/aqua-data/independent/mbes_beach_pond`.
 Logs/official source metadata: `/workspace/aqua-next`.
 See [artifact-backed preparation status](mbes_hardware_reference_preparation.json).
+
+## Subsequent North River comparison
+
+The preparation state above is historical. North River Confluence was subsequently
+fully acquired and archive/native bytes verified. Its 8205282288-byte bag has
+local SHA-256 `7ecd240caf879aadfbbdb0bc8dfc7f1bcae1aa94c3618d605bd3be7fc17afbb1`.
+Only native sonar packets were estimator inputs. A physical pose regression
+identified the inverse-registration composition bug; it failed before the fix
+and passed afterwards. PCL maps current points into the previous sensor frame;
+world sensor pose must compose that transform, rather than its inverse.
+
+A new registration fixed the first 1600 packets and ran GICP and official
+KISS-ICP 1.3.0 twice each. All four succeeded and output hashes were frozen
+before RTK values were read. The native archive already contained reference
+bytes; the gate applies to deserialization, not download. All 13 publisher
+physical URDF transforms matched native fixed transforms before position access.
+GICP retained one rejected translation step per run, and 1599 poses; KISS
+produced 1600 poses. All native sensor counts and per-packet exclusion reasons
+remain in the input ledger. No global navigation or processed AHRS was consumed.
+
+V1 scoring failed: all 84838 fixes failed only the quality-clock-gap gate.
+The embedded UBX schema explicitly distinguishes header receive time from GPS
+`timestamp`. First-three diagnostics show GPS timestamps exactly matching fix
+headers; receive timestamps differ by about 83 ms. A separately registered
+scoring-v2 uses native GPS epochs with zero fitted offset and otherwise unchanged
+quality/SE(3)/scale/interpolation/calibration rules. The original plan, scorer,
+failure, ledger and four frozen outputs remain immutable. This repair occurred
+after reference access and cannot be presented as freshly blind scoring.
+
+See [current outcomes](north_river_comparison_results.json). Short surface-vessel
+point-only evidence cannot establish underwater VIO/pressure SoTA. The official
+NTNU underwater dataset subset 3 supplies cameras, IMU, pressure and independent
+external MoCap, but its Box data route returned proxy CONNECT 403.
+See [access evidence and prerequisites](ntnu_mocap_access.json).

@@ -20,7 +20,7 @@ def archive(name='native.bag'):
 
 def fake_remote(monkeypatch, data):
     identity={'source':m.URL,'bytes':len(data),'etag':'"fixture"','tls_verified':True}
-    def get(start,end,expected=None):
+    def get(start,end,expected=None,url=m.URL):
         if expected:assert expected==identity
         return data[start:end+1],identity
     monkeypatch.setattr(m,'request_range',get)

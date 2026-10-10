@@ -227,7 +227,11 @@ ScanMatchResult run_pcl_registration(
     return result;
   }
 
-  accumulated_transform = accumulated_transform * previous_to_current;
+  // Registration maps current sensor coordinates into the previous sensor
+  // frame: T_previous_current. A sensor pose maps sensor coordinates into
+  // odometry, so T_odom_current = T_odom_previous * T_previous_current.
+  // Its inverse is needed only to move cached points into the current frame.
+  accumulated_transform = accumulated_transform * current_to_previous;
   last_current_to_previous = current_to_previous;
 
   // Roll the submap forward: every cached fan was expressed in the previous fan's frame;

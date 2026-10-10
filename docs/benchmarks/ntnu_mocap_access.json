@@ -1,0 +1,20 @@
+{
+  "schema": "independent-underwater-vio-candidate-v1",
+  "official_readme": "https://raw.githubusercontent.com/ntnu-arl/underwater-datasets/main/README.md",
+  "readme_sha256": "f7a4af42c4c2a603700fae7595b813bb63c264de8f855e286e62bf2072ddb16e",
+  "subset": 3,
+  "sensors": "five cameras, IMU, static pressure; external MoCap piecewise-continuous truth",
+  "candidate_sequence": 6,
+  "advertised_size_gb": 11.6,
+  "duration_seconds": 302,
+  "bag_url": "https://ntnu.box.com/s/ya0v9f6zzfbs84v976d8v5ruq0lcrbf5",
+  "reference_url": "https://ntnu.box.com/s/ycbyp2etzmo3a96idbvulut2pkwllnet",
+  "bag_access": "proxy CONNECT 403 Forbidden",
+  "huggingface_metadata_access": "proxy CONNECT 403 Forbidden",
+  "native_data_acquired": false,
+  "reference_values_read": false,
+  "required_before_evaluation": "verify native archive identity/all sensors/calibration and independent MoCap time/body/support contract; register fixed method and competitor before reference access; freeze all outcomes",
+  "configuration": "ntnu.box.com and huggingface.co added to draft, preserving existing custom domains and package presets; runtime propagation/publication unproven",
+  "tank_application": "skipped; no contact or application",
+  "sota_achieved": false
+}

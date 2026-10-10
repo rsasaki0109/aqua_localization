@@ -34,11 +34,11 @@ def new_json(path, value):
     with path.open('x') as f: json.dump(value, f, indent=2); f.write('\n')
 
 
-def request_range(start, end, identity=None):
+def request_range(start, end, identity=None, url=URL):
     headers = {'Range': f'bytes={start}-{end}', 'Accept-Encoding': 'identity'}
     if identity: headers['If-Match'] = identity['etag']
     opener = urllib.request.build_opener(OfficialTLSRedirect())
-    with opener.open(urllib.request.Request(URL, headers=headers), timeout=30) as r:
+    with opener.open(urllib.request.Request(url, headers=headers), timeout=30) as r:
         if not r.url.startswith('https://'): raise ValueError('non-TLS redirect')
         match = re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)', r.headers.get('Content-Range', ''))
         if r.status != 206 or not match or tuple(map(int, match.groups()[:2])) != (start, end):
@@ -49,14 +49,20 @@ def request_range(start, end, identity=None):
             raise ValueError('remote object identity changed')
         b = r.read(end-start+2)
         if len(b) != end-start+1: raise ValueError('range length mismatch')
-        return b, {'source': URL, 'bytes': total, 'etag': etag, 'tls_verified': True}
+        return b, {'source': url, 'bytes': total, 'etag': etag, 'tls_verified': True}
 
 
-def acquire(root):
+def acquire(root, url=URL):
+    parsed = urllib.parse.urlsplit(url)
+    filename = Path(parsed.path).name
+    if (parsed.scheme != 'https' or parsed.hostname not in ('seaward.science','www.seaward.science') or
+        parsed.path != '/files/pos-datasets/bag/'+filename or filename not in (
+            'beach_pond.tar.gz','north_river_confluence.tar.gz','dutch_harbor.tar.gz','wiggles_bank.tar.gz')):
+        raise ValueError('use a registered official survey archive')
     root.mkdir(parents=True, exist_ok=True)
     with (root/'acquisition.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        _, identity = request_range(0, 0)
+        _, identity = request_range(0, 0, url=url)
         ip = root/'identity.json'
         if ip.exists():
             if json.loads(ip.read_text()) != identity: raise ValueError('retained identity mismatch')
@@ -74,7 +80,7 @@ def acquire(root):
             if part.exists() or receipt.exists(): raise ValueError('incomplete range retained; inspect before resuming')
             last = None
             for attempt in range(3):
-                try: b, _ = request_range(start, end, identity); break
+                try: b, _ = request_range(start, end, identity, url=url); break
                 except Exception as exc: last = exc
             else: raise RuntimeError(f'range {start}-{end} failed') from last
             with part.open('xb') as f: f.write(b)
@@ -82,7 +88,7 @@ def acquire(root):
             print(f'verified range {start}-{end}', flush=True)
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             list(pool.map(fetch, range(0, identity['bytes'], CHUNK)))
-        archive = root/'beach_pond.tar.gz'
+        archive = root/filename
         if not archive.exists():
             with archive.open('xb') as out:
                 for start in range(0, identity['bytes'], CHUNK):
@@ -136,4 +142,7 @@ def acquire(root):
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(); p.add_argument('--root', type=Path, required=True)
-    print(json.dumps(acquire(p.parse_args().root), indent=2))
+    p.add_argument('--sequence', choices=['beach_pond','north_river_confluence','dutch_harbor','wiggles_bank'], default='beach_pond')
+    args = p.parse_args()
+    url = 'https://www.seaward.science/files/pos-datasets/bag/'+args.sequence+'.tar.gz'
+    print(json.dumps(acquire(args.root,url), indent=2))

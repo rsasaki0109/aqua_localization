@@ -1,0 +1,214 @@
+{
+  "schema": "north-river-point-comparison-v1",
+  "native_acquisition": {
+    "schema": "mbes-native-acquisition-v1",
+    "identity": {
+      "source": "https://www.seaward.science/files/pos-datasets/bag/north_river_confluence.tar.gz",
+      "bytes": 2604173960,
+      "etag": "\"9b388a88-5c573e67062c1\"",
+      "tls_verified": true
+    },
+    "archive_sha256": "6e8601302ccd40f5f64c7b68d5d19181c8c52390e30940634f6878f2e653ab68",
+    "members": [
+      {
+        "name": "north_river_confluence/north_river_confluence.bag",
+        "bytes": 8205282288,
+        "sha256": "7ecd240caf879aadfbbdb0bc8dfc7f1bcae1aa94c3618d605bd3be7fc17afbb1"
+      },
+      {
+        "name": "north_river_confluence/north_river_confluence.surv",
+        "bytes": 75,
+        "sha256": "3734f5ace6aa7773565dd0897dd98f99e69101278449135d44ac9d7fb274646c"
+      }
+    ],
+    "hash_provenance": "local TLS/range/gzip/native verification; not publisher checksum",
+    "reference_values_read": false,
+    "sensor_messages_decoded": false
+  },
+  "freeze_sha256": "61ae930398022c49c15b1f220552babbb8e75a07b68ff8f281501c0f48b44eaa",
+  "trials": [
+    {
+      "id": "gicp-1",
+      "arm": "gicp",
+      "repeat": 1,
+      "status": "success",
+      "error": null,
+      "runtime_seconds": 3.27656649400069,
+      "output_count": 1599,
+      "event_status_counts": {
+        "gicp initialized": 1,
+        "gicp converged": 1598,
+        "gicp rejected: translation step above max_translation_step_m": 1
+      },
+      "support_ns": [
+        1580658963935998000,
+        1580659065194003000
+      ],
+      "output_sha256": {
+        "trajectory.csv": "218a99644f1afc4d2a92a40fb3e3b1d80f8cb267386b6de20431f0679a6fc2af",
+        "run.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "events.csv": "c635e397f8da322370a41f1e34c1e3544769de44b7e5f7595524f8e5afd340ce"
+      },
+      "reference_values_read": false,
+      "result_sha256": "1b7cc7f7563d2a0e594cfd43f8ce63f848557610c2669fce7f821722504dcc3e"
+    },
+    {
+      "id": "gicp-2",
+      "arm": "gicp",
+      "repeat": 2,
+      "status": "success",
+      "error": null,
+      "runtime_seconds": 3.2717608639995888,
+      "output_count": 1599,
+      "event_status_counts": {
+        "gicp initialized": 1,
+        "gicp converged": 1598,
+        "gicp rejected: translation step above max_translation_step_m": 1
+      },
+      "support_ns": [
+        1580658963935998000,
+        1580659065194003000
+      ],
+      "output_sha256": {
+        "trajectory.csv": "218a99644f1afc4d2a92a40fb3e3b1d80f8cb267386b6de20431f0679a6fc2af",
+        "run.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "events.csv": "c635e397f8da322370a41f1e34c1e3544769de44b7e5f7595524f8e5afd340ce"
+      },
+      "reference_values_read": false,
+      "result_sha256": "924d2f74941e1d3b2f5165b18db82a7403674540f19f56a984a049ecfe05384c"
+    },
+    {
+      "id": "kiss-1",
+      "arm": "kiss",
+      "repeat": 1,
+      "status": "success",
+      "error": null,
+      "runtime_seconds": 1.1855075140001645,
+      "output_count": 1600,
+      "event_status_counts": {
+        "estimated": 1600
+      },
+      "support_ns": [
+        1580658963935998000,
+        1580659065194003000
+      ],
+      "output_sha256": {
+        "trajectory.csv": "53b94f9cadb4ad6baa3ba8182a446f932237ef8eb323befcf48a32b0f09b69b3",
+        "events.csv": "1cfa94b0ee2c583c57caca3cf8e5c04a0d46770beea8543e7e87b76b67101e70"
+      },
+      "reference_values_read": false,
+      "result_sha256": "10c45128d96755438dca13a5257adfe55927b9252ecf8671357bc731325304d0"
+    },
+    {
+      "id": "kiss-2",
+      "arm": "kiss",
+      "repeat": 2,
+      "status": "success",
+      "error": null,
+      "runtime_seconds": 0.8454693959993165,
+      "output_count": 1600,
+      "event_status_counts": {
+        "estimated": 1600
+      },
+      "support_ns": [
+        1580658963935998000,
+        1580659065194003000
+      ],
+      "output_sha256": {
+        "trajectory.csv": "53b94f9cadb4ad6baa3ba8182a446f932237ef8eb323befcf48a32b0f09b69b3",
+        "events.csv": "1cfa94b0ee2c583c57caca3cf8e5c04a0d46770beea8543e7e87b76b67101e70"
+      },
+      "reference_values_read": false,
+      "result_sha256": "2dabc14dd26a8fbe8508bde3049e88f8411ae3f7eb49401c04ad8b8b514b8280"
+    }
+  ],
+  "window": "first 1600 native WASSP packets, 101.258005 seconds; shared finite 0<range<60 m points; no IMU, GNSS, navigation or TF estimator input",
+  "competitor": "official PyPI KISS-ICP 1.3.0; wheel and all installed source/binary hashes in plan",
+  "hardware_scoring_v1": {
+    "status": "failed",
+    "qualified_reference_count": 0,
+    "rejected_reference_count": 84838,
+    "reason": "quality_clock_gap: receive-time PVT header versus GPS-time NavSatFix header"
+  },
+  "hardware_scoring_v2": {
+    "status": "complete_independent_correspondence_and_Horn_verified",
+    "post_reference_access_repair": true,
+    "clock": "native PVT GPS timestamp, zero fitted offset; first three native epochs exactly agree with NavSatFix",
+    "retained_original_plan_and_failure": true,
+    "qualified_reference_count": 84663,
+    "rejected_reference_count": 175,
+    "reasons": {
+      "quality_clock_gap": 175
+    },
+    "scores_sha256": "e1bea9e1d04bf340ae7c7862da3beef154595e7bb72705dbd42f33fbbe83783d",
+    "common_count": 443,
+    "common_support_ns": [
+      1580658965400218390,
+      1580659065000150471
+    ],
+    "common_rmse_m": {
+      "gicp-1": 14.140753335673045,
+      "gicp-2": 14.140753335673045,
+      "kiss-1": 18.048893678741408,
+      "kiss-2": 18.048893678741408
+    },
+    "trials": [
+      {
+        "id": "gicp-1",
+        "matched": 443,
+        "support_ns": [
+          1580658963935998000,
+          1580659065194003000
+        ],
+        "exclusion_counts": {
+          "reference_interpolation_interval_exceeds_0.1_s": 56,
+          "outside_reference_support": 84164
+        }
+      },
+      {
+        "id": "gicp-2",
+        "matched": 443,
+        "support_ns": [
+          1580658963935998000,
+          1580659065194003000
+        ],
+        "exclusion_counts": {
+          "reference_interpolation_interval_exceeds_0.1_s": 56,
+          "outside_reference_support": 84164
+        }
+      },
+      {
+        "id": "kiss-1",
+        "matched": 443,
+        "support_ns": [
+          1580658963935998000,
+          1580659065194003000
+        ],
+        "exclusion_counts": {
+          "reference_interpolation_interval_exceeds_0.1_s": 56,
+          "outside_reference_support": 84164
+        }
+      },
+      {
+        "id": "kiss-2",
+        "matched": 443,
+        "support_ns": [
+          1580658963935998000,
+          1580659065194003000
+        ],
+        "exclusion_counts": {
+          "reference_interpolation_interval_exceeds_0.1_s": 56,
+          "outside_reference_support": 84164
+        }
+      }
+    ]
+  },
+  "sota_achieved": false,
+  "limitation": "short point-only surface-vessel MBES comparison, not underwater visual-inertial-pressure SoTA",
+  "artifact_root": "/workspace/aqua-data/independent/mbes_north_river_confluence/comparison-v1",
+  "tests": {
+    "cpp": 25,
+    "python": 18,
+    "meaning": "pose direction and integrity/clock contracts; synthetic tests are not accuracy evidence"
+  }
+}
