@@ -30,3 +30,35 @@ not an executed evaluation.
 
 The registration utility saves `scoring-plan.json` and its SHA-256 in the new
 comparison plan. There is no estimator freeze or scored harbor_05 metric yet.
+
+The new executable reconstruction uses its own `vio-comparison-v3` registration
+and four-trial freeze. Its initial scoring plan explicitly blocks reference
+acquisition until the image-number adapter is fixed. `prepare_vio_scoring.py`
+then creates a separate exclusive `vio-scoring-v3` version bound to those
+unchanged outcomes. It requires independent evidence for zero-based image
+positions from the already reference-used harbor_06 development format. It
+does not select a numbering origin from harbor_05 errors. Every reference image
+position maps to the full native camera ordinal and its already audited fixed
+corrected header time, including the retained unsupported first image; no
+reference timestamp is optimized.
+
+`score_vio_comparison.py` validates every frozen result/output, method/runtime
+hash and scoring source snapshot before creating a reference network client.
+It downloads only the registered updated official trajectory object, retaining
+the raw bytes, source/size/ETag/SHA-256 receipt and the preceding freeze hash.
+Its checksum is a local verified-download observation, not a publisher checksum.
+The image-position mapping accepts exact integer values (including integral
+scientific notation), rejects duplicates/out-of-sequence indices, and sorts
+by image position without selecting correspondences by error. Primary integer
+bisect matching and Kabsch alignment are independently checked by a forward
+time scan and Horn quaternion alignment. The score reports individual support,
+all-four common timestamps, initialization/missing-state and interpolation
+exclusions, failures and runtimes. Failed scoring preserves the reference,
+access-start marker, acquisition receipt and a failure report.
+
+Synthetic known geometry verifies rigid transforms, reflection rejection,
+scale fixed at one, epoch-nanosecond precision, the exact 0.1 s interpolation
+boundary and no extrapolation. Mutating a frozen trajectory or removing one
+trial blocks reference access. These tests provide no localization accuracy
+evidence. The original frozen method remains unavailable; new results must be
+attributed to the separately registered reconstruction.

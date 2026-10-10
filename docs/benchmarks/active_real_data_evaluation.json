@@ -26,7 +26,11 @@
     "expected_bag_sha256": "109c97c1d1b655226b9ca1da312c154b28b3cc8464d58150b7cd4d91e6ba3ecb",
     "hash_provenance": "user-reported old observations; not publisher checksums",
     "expected_all_ros_messages": 86126,
-    "expected_native_counts": {"imu": 34576, "camera": 3458, "pressure": 1650}
+    "expected_native_counts": {
+      "imu": 34576,
+      "camera": 3458,
+      "pressure": 1650
+    }
   },
   "input_contract": {
     "policy": "native-imu-support-v2",
@@ -36,7 +40,7 @@
     "native_bag_and_all_observations_retained": true,
     "derived_camera_mask_shared": true,
     "actual_data_conversion": "not_executed",
-    "source_contract_tests": "50 passed; synthetic integrity/contract fixtures, not accuracy evidence"
+    "source_contract_tests": "60 passed; synthetic integrity, wire protocol, Gaussian and scoring mathematics checks; not accuracy evidence"
   },
   "upstream_openvins": {
     "commit": "69488123ed9362dd44b6f28e7f4680abbff1442b",
@@ -47,7 +51,12 @@
   "comparison": {
     "status": "blocked_missing_frozen_method",
     "registration": "new v2 input/scoring contract pending complete native verification",
-    "planned_trials": ["vio-1", "vio-2", "pressure_vio-1", "pressure_vio-2"],
+    "planned_trials": [
+      "vio-1",
+      "vio-2",
+      "pressure_vio-1",
+      "pressure_vio-2"
+    ],
     "executed_trials": [],
     "estimator_freeze": "not_created",
     "reference_acquired": false,
@@ -61,5 +70,15 @@
     "aqualoc_reference": "same-image COLMAP and depth-based scale, not independent hardware truth",
     "next_after_harbor_05": "independent hardware ground truth and competitive methods",
     "tank_application": "skipped_by_user; no contact or application"
+  },
+  "reconstructed_method": {
+    "status": "built_and_mathematically_verified; awaiting full native input verification before v3 registration",
+    "original_method_reproduced": false,
+    "official_calibration_executable_check": "passed",
+    "pressure_units": "Pa; fail rather than guess units",
+    "offset_state": "constant uncertain hydrostatic offset with joint cross-covariance",
+    "new_trials": [],
+    "reference_acquired": false,
+    "scoring_registration": "pending independent zero-based format evidence and four-outcome freeze"
   }
 }

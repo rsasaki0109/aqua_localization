@@ -157,3 +157,50 @@ would define a new method, not replicate the missing fixed method. The original
 comparison remains blocked. Any reconstruction needs its own implementation,
 measurement units/sign/frame contract, frozen source/configuration/input hashes,
 four-trial and scoring registration before reference access.
+
+## Separately reconstructed method v3
+
+The old fixed method remains unavailable. A new executable reconstruction uses
+the pinned OpenVINS SDK and the official Seafile harbor calibration files, saved
+under `docs/benchmarks/calibration`. The executable is checked against these
+files before registration. Official `T_cam_imu` maps IMU into camera and is used
+directly in the SDK; the earlier U-VIP-SLAM configuration comment is not used
+to decide transform direction. The camera model is equidistant, 640x512. The
+official IMU noise densities are 0.001 rad/s/sqrt(Hz) and 0.02 m/s²/sqrt(Hz), with
+random walks 0.00005 and 0.001. Additional SDK camera offset and online calibration
+are disabled. Native mono8 pixels are supplied without resizing; the pinned
+SDK's default histogram equalization is used by both arms.
+
+The new pressure model requires native `FluidPressure` in Pa, uses density
+1025 kg/m³, gravity 9.80665 m/s² and 0.2 m depth standard deviation from the
+existing repository configuration. It does not infer units from trajectory
+errors or automatically rescale pressure. A constant offset is augmented at the
+first post-initialization pressure measurement with its uncertainty and full
+state cross-covariance, preserving the vertical translation gauge. Subsequent
+pressure measurements update the complete joint state. Pressure is assumed
+co-located with the IMU; this is an explicit new assumption, not restored old
+calibration. Both arms propagate at pressure times and remove only temporary
+pressure clones; the baseline ignores pressure values. Native IMU is buffered
+through each observation's upper support bracket. Output positions are camera
+centers, with exact corrected native camera nanoseconds restored from the SDK's
+fixed relative clock origin.
+
+`build_reconstructed_openvins.bash` builds and binds source/dependency/executable
+hashes. Its native self-check exercises offset augmentation uncertainty,
+cross-covariance, temporary-clone removal, pressure sign, the joint Gaussian
+covariance update and rejection of unregistered pressure units. The calibration
+checker compares actual executable values to the official YAML, including
+transform direction and the fixed timestamp correction. These are mathematical
+and integration checks, not accuracy evidence. Python contract tests additionally
+check exact wire timestamps/ordinals/image bytes and incomplete registration
+rejection (60 tests passed, including scoring/freeze gates).
+
+`prepare_reconstructed_comparison.py` creates exclusive `vio-comparison-v3`
+comparison/scoring plans and source snapshots after complete v2 input verification.
+`run_reconstructed_openvins.py` runs both arms twice, retains every failure and
+output hash, and writes `freeze.json` only after all four outcomes. Source/input/
+executable hashes are rechecked between trials and before freeze. No reference
+is acquired by these scripts. The reference image-number adapter must be
+registered separately before reference acquisition; it is not yet available.
+Results from this reconstruction must never be described as replication of the
+old ~4.3% development improvement or as independent hardware/SoTA evidence.
