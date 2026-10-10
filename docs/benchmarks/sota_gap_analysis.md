@@ -350,3 +350,16 @@ additional host `bat.sjtu.edu.cn` is needed to verify official metadata before
 registering another dataset. See `hardware_truth_discovery.md` and its receipt
 JSON. No new reference coordinates were downloaded or read; Tank applications
 remain skipped.
+
+## HAUD official provenance confirmed after network activation
+
+The newly published policy permits SJTU official metadata and the actual GET
+now returns200. HAUD uses150Hz MoCap of an above-water marker and a calibrated
+rigid arm to infer submerged camera pose. It is an independent hardware-reference
+candidate; claimed accuracy and native calibration/timing remain unverified.
+The official share is on pan.baidu.com, where metadata access is denied by the
+proxy CONNECT403. No native sensors/calibration values/GT coordinates were
+acquired. A new metadata-stage acquisition embargo is recorded, requiring
+separated raw sensor files and complete frozen trials before GT acquisition.
+There is no pressure sensor in the official topic list. See haud_qualification.md
+and haud_acquisition_embargo_plan_v1.json. No independent accuracy or SoTA result.

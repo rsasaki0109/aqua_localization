@@ -1,0 +1,63 @@
+{
+  "schema": "haud-official-qualification-v1",
+  "recorded_at_utc": "2026-10-10T22:31:52.936604+00:00",
+  "official_url": "https://bat.sjtu.edu.cn/zh/haud-dataset/",
+  "official_http_status": 200,
+  "metadata_only": true,
+  "ground_truth": {
+    "provenance": "Publisher states150Hz motion capture; above-water top marker and fixed arm calibration infer submerged bottom marker6Dpose",
+    "publisher_accuracy_claim": "millimeter-level; not independently verified here",
+    "camera_to_imu_frame_conversion": "Requires marker_calib.yaml and marker_imu_calib.yaml; validate direction and quaternion order before scoring",
+    "independent_of_same_image_reconstruction": true
+  },
+  "native_sensors": {
+    "camera": "ZED2 stereo30Hz672x376",
+    "imu": "400Hz",
+    "pressure": "not listed; availability unestablished"
+  },
+  "sequences": {
+    "publisher_count": 10,
+    "pool_dimensions_m": [
+      4,
+      2
+    ],
+    "role": "candidate independent underwater hardware benchmark, not acquired"
+  },
+  "calibration": {
+    "publisher_lists": [
+      "camera_calib.yaml",
+      "camera_imu_calib.yaml",
+      "imu_calib.yaml",
+      "marker_calib.yaml",
+      "marker_imu_calib.yaml"
+    ],
+    "values_acquired": false,
+    "water_intrinsic_provenance": "needs native calibration qualification"
+  },
+  "distribution": {
+    "url": "https://pan.baidu.com/s/1NPcXUx7oJ8jh0JZtSdjjZA",
+    "public_extraction_code": "batc",
+    "metadata_request": "proxy CONNECT403, no origin HTTP response",
+    "required_host": "pan.baidu.com",
+    "alternative_mirror": "No matching repository in one GitHub search; HF HAUD search only unrelated jegir/hauda; search not exhaustive"
+  },
+  "sensor_files_acquired": false,
+  "reference_coordinates_acquired": false,
+  "reference_coordinates_read": false,
+  "sota_achieved": false,
+  "metadata_sha256": {
+    "/workspace/aqua-next/haud/baidu-share-metadata.error": "115ac061d5c11b9f88bc706341277e549679986ec53ba237026722b790803312",
+    "/workspace/aqua-next/haud/baidu-share-metadata.headers": "0f1ac063beca30b39d128a582e15168c5557908e55d399c1f8ed81a488794660",
+    "/workspace/aqua-next/haud/baidu-share-metadata.request": "945e4893567554e68f6f28d5652917269341a5f3d295a16b7c708c9bfd95dc5d",
+    "/workspace/aqua-next/haud/hf-dataset-search-metadata.json": "7afc1923b74bad6de755eebafef085b840eeed6d847c67b9a260a5d0ec8d4fa7",
+    "/workspace/aqua-next/haud/official-chinese.html": "59cb14a14e01d61fbb677032137ad0a7e349e11f34b5e26d5b2d34b9333cd48c",
+    "/workspace/aqua-next/haud/official-metadata.error": "1a5058fbbd36ca50055530ad0cedb97bfd1118e86fbcd6a4c71d09b766fbfbd2",
+    "/workspace/aqua-next/haud/official-metadata.headers": "3657f188eafd188e87efb870bb3f2b75595f0ff0f750a4ce42f85b5f081c3ea2",
+    "/workspace/aqua-next/haud/official-metadata.html": "82cee9cb7e6cf56ae1cb0a860c7363ebde3f0315da4e47478946829fd0c01aaf",
+    "/workspace/aqua-next/haud/official-metadata.request": "5caf05035450b11e49401e1fa551bcf4174bd938daa3431a13ef5351723ca82f",
+    "/workspace/aqua-next/haud/official-metadata.txt": "2a8a6476b83b8801fc28f27ee88d8c2e0b1c7c773e4e19701efe7d45bfef219b",
+    "/workspace/aqua-next/haud/restored-full-check.log": "636583357272a3f49b5e4245584c7badabaeba66deaf7290bb30fd25efb71100",
+    "/workspace/aqua-next/haud/restored-native-prefix-check.log": "67ec5ad7bb24418b52c38f5584f333d9f5b06c57427602cee78bf237c6c7b62c",
+    "/workspace/aqua-next/haud/restored-openvins-check.log": "2ec14c600fc954ff89f9d912d4fb8e7cd88d47a62e81ecee6b596d26c59f0fcb"
+  }
+}

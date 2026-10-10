@@ -222,8 +222,10 @@
   },
   "hardware_truth_discovery": {
     "details": "hardware_truth_discovery.json",
-    "status": "metadata_search_complete_no_new_qualified_hardware_reference",
-    "required_host": "bat.sjtu.edu.cn",
-    "official_HAUD_provenance": "unconfirmed_proxy_CONNECT403"
+    "status": "HAUD_official_hardware_provenance_confirmed_at_metadata_level; native_acquisition_blocked_by_Baidu_network_policy",
+    "required_host": "pan.baidu.com",
+    "official_HAUD_provenance": "publisher150HzMoCap_above_water_marker_rigid_arm_transform; no coordinates acquired",
+    "qualification": "haud_qualification.json",
+    "metadata_stage_plan": "haud_acquisition_embargo_plan_v1.json"
   }
 }

@@ -1,0 +1,38 @@
+{
+  "schema": "haud-metadata-stage-acquisition-embargo-plan-v1",
+  "registered_at_utc": "2026-10-10T22:31:52.936604+00:00",
+  "qualification_sha256": "6b9f311d96c1f0e03df6a016972e9db22abf7a33c15037737283300d749825c6",
+  "stage": "metadata_only_before_any_native_or_reference_acquisition",
+  "native_input_contract": "pending_file_inventory_and_calibration; not executable_registered_method",
+  "acquisition_order": [
+    "Inspect official shared file listing only",
+    "Select RawDataFiles/RawImage, ImageTimestamp, ImuData and calibration files without GT",
+    "Validate sizes/source identifiers/checksums/native counts/time/calibration; record immutable sensor-only inputs",
+    "Register pinned source/runtime/calibration/input and scoring versions before reference access",
+    "Execute standard competitive VIO and proposed method each twice, preserve all success/failure/runtime/output hashes/support exclusions",
+    "Freeze all trials before fetching RawDataFiles/gt_trajectory and scoring"
+  ],
+  "forbidden_until_trial_freeze": [
+    "RawDataFiles/gt_trajectory coordinate access",
+    "Evaluation TestBag downloads containing /vicon topics; prefer separated raw sensors",
+    "Ground-truth-derived clock/scale/calibration tuning"
+  ],
+  "scoring": {
+    "alignment": "SE3",
+    "scale": 1,
+    "maximum_interpolation_gap_seconds": 0.1,
+    "report": "Each support and all-trial common support, initialization exclusions, failures and runtimes",
+    "independent_verification": "Separate timestamp correspondences and Horn alignment",
+    "frame": "Convert bottom marker truth to registered IMU frame using publisher calibration; no fit of extrinsics to truth"
+  },
+  "method_selection": "pending qualified sensors/calibration; HAUD has no documented pressure, so do not fabricate pressure ablation",
+  "truth_limitations": [
+    "Publisher claimed accuracy not independently measured here",
+    "Rigid arm/marker calibration uncertainty and timing need qualification",
+    "MoCap measures above-water marker during test; submerged marker inferred via fixed rigid transform"
+  ],
+  "tank_application": "skipped; no contact/outreach",
+  "reference_values_read": false,
+  "comparison_executed": false,
+  "sota_achieved": false
+}
