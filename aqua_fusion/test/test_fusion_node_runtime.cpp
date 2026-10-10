@@ -1,5 +1,7 @@
 #include <chrono>
+#include <cmath>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -124,36 +126,53 @@ TEST_F(FusionNodeRuntimeTest, PublishesFusedOdometryStatusAndTf)
     return imu_pub->get_subscription_count() > 0 && sonar_pub->get_subscription_count() > 0;
   }));
 
+  // Each IMU callback publishes exactly one fused odometry and one status, so
+  // the k-th messages on both topics belong together. Which callback runs
+  // first inside one spin (IMU or sonar) is executor-dependent, so the first
+  // outputs may predate the sonar sample; wait for the first sonar-fused one.
+  auto first_sonar_fused = [&]() -> std::optional<size_t> {
+      for (size_t i = 0; i < status_messages.size(); ++i) {
+        if (status_messages[i].used_sonar && fused_messages.size() > i) {
+          return i;
+        }
+      }
+      return std::nullopt;
+    };
   ASSERT_TRUE(spin_until(executor, [&]() {
     const rclcpp::Time stamp = test_node->now();
     const auto sonar = make_odometry(stamp, 2.0, -4.0, 1.0);
     const auto imu = make_odometry(stamp, 0.0, 0.0, 0.0);
     sonar_pub->publish(sonar);
     imu_pub->publish(imu);
-    return !fused_messages.empty() && !status_messages.empty();
+    return first_sonar_fused().has_value();
   }));
 
-  const auto & fused = fused_messages.back();
+  const size_t index = *first_sonar_fused();
+  const auto & fused = fused_messages[index];
   EXPECT_NEAR(fused.pose.pose.position.x, 0.5, 1.0e-6);
   EXPECT_NEAR(fused.pose.pose.position.y, -1.0, 1.0e-6);
   EXPECT_NEAR(fused.pose.pose.position.z, 0.25, 1.0e-6);
 
-  const auto & status = status_messages.back();
+  const auto & status = status_messages[index];
   EXPECT_TRUE(status.used_sonar);
   EXPECT_TRUE(status.sonar_available);
   EXPECT_EQ(status.status, "sonar_fused");
 
-  ASSERT_TRUE(spin_until(executor, [&]() {
+  // The TF buffer may still hold an earlier pre-sonar transform; wait until
+  // the latest odom->base_link is the fused pose.
+  geometry_msgs::msg::TransformStamped transform;
+  const bool tf_fused = spin_until(executor, [&]() {
     try {
-      const auto transform = tf_buffer.lookupTransform("odom", "base_link", tf2::TimePointZero);
-      EXPECT_NEAR(transform.transform.translation.x, 0.5, 1.0e-6);
-      EXPECT_NEAR(transform.transform.translation.y, -1.0, 1.0e-6);
-      EXPECT_NEAR(transform.transform.translation.z, 0.25, 1.0e-6);
-      return true;
+      transform = tf_buffer.lookupTransform("odom", "base_link", tf2::TimePointZero);
+      return std::abs(transform.transform.translation.x - 0.5) < 1.0e-6;
     } catch (const tf2::TransformException &) {
       return false;
     }
-  }));
+  });
+  ASSERT_TRUE(tf_fused);
+  EXPECT_NEAR(transform.transform.translation.x, 0.5, 1.0e-6);
+  EXPECT_NEAR(transform.transform.translation.y, -1.0, 1.0e-6);
+  EXPECT_NEAR(transform.transform.translation.z, 0.25, 1.0e-6);
 }
 
 }  // namespace
