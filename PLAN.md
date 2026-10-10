@@ -5,7 +5,7 @@ This is the canonical "where we are, where we are going" document for
 what is already solid, what is still experimental, and what the next useful
 engineering move is.
 
-Current date: 2026-07-28.
+Current date: 2026-10-10.
 Latest release: [v0.5](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.5).
 Current public goal: make the project useful enough to earn 10 GitHub stars
 through reproducible public-data demos, honest limits, and small contribution
@@ -64,6 +64,93 @@ and is not held-out evidence. A 0.0154 m diagnostic row
 AQUA-SLAM's 0.0194 m) exists but is same-sequence-tuned and stays
 non-claimable until held-out sequences arrive. The MBES path is a working
 research track, not a SOTA claim.
+
+## SOTA Program (started 2026-10-10)
+
+**Decision.** Pursue SOTA on two tracks in parallel, sharing one evaluation
+substrate and one estimator:
+
+- **Track A - Tank / AQUA-SLAM.** Beat AQUA-SLAM on held-out Tank sequences
+  in accuracy and/or robustness (completion rate, visually degraded segments)
+  with a tightly-coupled factor graph. The current loosely-coupled UKF is
+  ~10x behind AQUA-SLAM on `short_test` (0.1843 m vs 0.0194 m); tuning will
+  not close that, a structural change is needed.
+- **Track B - MBES bathymetric SLAM.** Make MBES replay deterministic, then
+  build loop proposal + consistency selection + robust back end on the same
+  graph, and measure against the dataset reference trajectory.
+
+**Phase 0 (done on branch `claude/sota-phase0-aqua-graph`, 2026-10-10).**
+
+- CI: `.github/workflows/ci.yml` runs rosdep + Release `colcon build` +
+  `colcon test` on `ros:humble-ros-base` and `ros:jazzy-ros-base`. Local
+  Jazzy run: 8 packages, 722 tests, 0 failures. (Fixed on the way:
+  `np.trapezoid` does not exist on the numpy 1.x that Humble/Jazzy ship.)
+- All stack nodes are now `rclcpp_components` (same executable names, so
+  launch files and scripts are unchanged; composable launch now possible).
+- `aqua_replay` / `offline_replay`: deterministic offline replay. Components
+  are loaded into one process, the bag is fed in header-stamp order with a
+  bounded reorder window, `/clock` is stepped per message, and a
+  single-threaded executor runs to idle after every message (so the sonar ->
+  UKF feedback chain completes before the next input). DDS discovery is OFF,
+  so leaked nodes cannot cross-talk. Scenario YAML + `--param NODE:NAME:=V`
+  overrides; `replay_summary.yaml` holds per-topic counts and FNV-1a digests
+  of zero-padded CDR (the serializer leaves alignment padding uninitialized,
+  which made identical messages hash differently).
+  - **Result:** two replays of the synthetic MBES survey through the full
+    UKF + sonar feedback + registration + pose graph + MBES loop closure
+    pipeline are bit-identical (CI test). 60 s of data replays in ~4 s.
+  - Humble limitation: rclcpp 16 rejects intra-process + transient_local
+    (pose graph, MBES loop closure), so full-pipeline replay is Iron+/Jazzy.
+- `aqua_graph`: GTSAM `IncrementalFixedLagSmoother` with CombinedImuFactor
+  on a 10 Hz state grid, a body-frame DVL velocity factor (extrinsic
+  rotation, lever arm, gyro-bias coupling), a pressure depth factor (lever
+  arm), and GPS-style absolute position factors. ROS-free core + component
+  node (`aqua_graph_node`) + `GraphEstimatorStatus` msg + params/tank
+  profiles. Jacobians are checked numerically in unit tests.
+  - **Synthetic result (not a claim):** 120 s survey, same IMU + pressure +
+    DVL stream, SE(3)-aligned APE RMSE: `aqua_graph` 0.157 m, UKF 4.43 m
+    (default profile) / 3.08 m (Tank profile). The synthetic world matches
+    the graph's kinematic model; real-data validation is the next step.
+    Replays with GTSAM's TBB threading are bit-identical too (CI test).
+
+**Next steps (in order).**
+
+1. *(needs the external-SSD data)* Run the MBES determinism probe with the
+   new harness and confirm it closes Phase 1:
+   ```bash
+   for r in a b; do
+     ros2 run aqua_replay offline_replay \
+       --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/mbes_beach_pond.yaml \
+       --bag datasets/public/mbes_slam/beach_pond_ros2 --out /tmp/mbes_replay_$r --duration 120
+   done
+   ros2 run aqua_replay compare_replay_summaries.py /tmp/mbes_replay_a /tmp/mbes_replay_b
+   ```
+   The output bags carry the same topics as `record_mbes_demo.sh`, so the
+   existing export/metric scripts apply. Then rebase descriptor sweeps and
+   loop audits on harness runs (one run per setting is now sufficient).
+2. *(needs Tank data)* First real-data row for the graph backend:
+   ```bash
+   ros2 run aqua_replay offline_replay \
+     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/tank_short_test_dvl.yaml \
+     --bag <short_test ros2 bag> --out /tmp/tank_dvl_replay
+   ros2 run aqua_replay evaluate_replay_trajectories.py --bag /tmp/tank_dvl_replay \
+     --reference /apriltag_slam/GT --estimate /aqua_imu_loc/odometry --estimate /aqua_graph/odometry
+   ```
+   Compare with the 0.4291 m IMU+pressure+DVL UKF row. Tune only IMU noise
+   densities and DVL extrinsic/sigma, and record what was tuned.
+3. Visual factors in `aqua_graph`: start with the existing stereo frontend's
+   output as relative-pose (between) factors, then stereo smart factors with
+   online extrinsic refinement. Target: `short_test` < 0.05 m without
+   same-sequence scale fitting, then AQUA-SLAM's 0.0194 m.
+4. Held-out Tank (`Structure_Easy`, `Medium`, `Hard`; still awaiting
+   delivery since June: re-request or find an alternative channel) with
+   AQUA-SLAM run under identical conditions, multiple runs, crash rate.
+5. Track B on the graph: MBES submap loop factors in `aqua_graph`, PCM /
+   group-k consistency selection, switchable or GNC robust back end,
+   registration-derived information matrices, and trajectory metrics against
+   the beach_pond reference.
+6. Robustness/differentiation experiments (visual dropout with DVL+pressure
+   carrying through) and the generated SOTA-readiness evidence packet.
 
 ## 2026-06-11 Work-Loss Incident and Reconstruction (READ FIRST)
 
@@ -911,7 +998,10 @@ Goal: repeated baseline runs on the same MBES source window produce the same
 upstream odometry, same pose-graph keyframe chain, and same accepted loop
 endpoint pairs.
 
-**Status: in progress — E2E not yet deterministic.**
+**Status: in progress — E2E not yet deterministic.** Update 2026-10-10: the
+`aqua_replay` offline harness makes the full feedback pipeline bit-identical
+on synthetic data by construction (see "SOTA Program"); confirming the same
+on beach_pond is SOTA next step 1.
 
 Infrastructure done:
 
@@ -1223,11 +1313,12 @@ Large issues:
 
 ## One-Sentence Handover
 
-The lost implementation and tooling are now reconstructed, committed, tested,
-and backed by external-SSD public data: Tank `short_test` revalidates at
-0.1843 m APE RMSE with its same-run visual gate passing, while the clean MBES
-120-second two-run probe still fails badly (184.4686 m mean raw inter-run
-difference), so the next engineering priority is instrumenting the exact
-sonar-feedback callback/drain boundary before any descriptor tuning or MBES
-claim; held-out Tank bags are still awaited, and every validated step must
-continue to be committed.
+As of 2026-10-10 the project is on an explicit two-track SOTA program (Tank vs
+AQUA-SLAM, and MBES bathymetric SLAM) and Phase 0 is in place on
+`claude/sota-phase0-aqua-graph`: CI on Humble/Jazzy, componentized nodes, a
+deterministic offline replay harness that makes the full MBES feedback
+pipeline bit-identical across runs on synthetic data, and a GTSAM
+tightly-coupled IMU+DVL+pressure backend (`aqua_graph`) that beats the UKF
+20x on a synthetic survey; the next moves are running the harness on the real
+beach_pond and Tank bags (the external-SSD data), then adding visual factors
+to `aqua_graph`. The earlier history below remains accurate for its dates.

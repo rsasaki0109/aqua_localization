@@ -1,0 +1,35 @@
+# Tank Dataset short_test (converted with convert_tank_dataset_bag.py):
+# the UKF with its Tank profile and the aqua_graph factor-graph backend run
+# side by side on the same IMU + pressure + DVL stream, with the AprilTag
+# reference recorded alongside for APE. No visual input yet: this is the
+# sensor-ablation row (IMU + depth + DVL) against which visual factors will
+# be added.
+#
+#   ros2 run aqua_replay offline_replay \
+#     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/tank_short_test_dvl.yaml \
+#     --bag aqua_localization/datasets/public/tank_dataset/short_test_ros2 \
+#     --out /tmp/tank_dvl_replay
+input:
+  topics: [/imu/data, /pressure, /dvl/twist, /apriltag_slam/GT]
+  order: header
+  reorder_window_s: 0.5
+
+nodes:
+  - plugin: aqua_imu_loc::ImuLocNode
+    name: aqua_imu_loc
+    params_files: [$(find-pkg-share aqua_imu_loc)/config/tank_dataset.yaml]
+    parameters:
+      publish:
+        tf: false
+  - plugin: aqua_graph::AquaGraphNode
+    name: aqua_graph
+    params_files: [$(find-pkg-share aqua_graph)/config/tank_dataset.yaml]
+
+output:
+  storage_id: mcap
+  topics:
+    - {topic: /apriltag_slam/GT, type: nav_msgs/msg/Odometry}
+    - /aqua_imu_loc/odometry
+    - /aqua_imu_loc/status
+    - /aqua_graph/odometry
+    - /aqua_graph/status

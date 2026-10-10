@@ -1,0 +1,329 @@
+// SPDX-License-Identifier: Apache-2.0
+// ROS 2 front end for the tightly-coupled factor-graph estimator.
+//
+// Subscribes to IMU, fluid pressure, DVL body velocity, and an optional
+// absolute-position odometry (e.g. a visual frontend), and publishes the
+// estimate as nav_msgs/Odometry plus per-state GraphEstimatorStatus.
+// Measurements can arrive out of order across topics: the estimator attaches
+// each one to its nearest grid state as long as that state is still inside
+// the smoother window. The IMU stream itself must be time-ordered.
+#include <cmath>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "aqua_graph/estimator.hpp"
+#include "aqua_imu_loc/pressure_depth_converter.hpp"
+#include "aqua_msgs/msg/graph_estimator_status.hpp"
+#include "geometry_msgs/msg/twist_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/fluid_pressure.hpp"
+#include "sensor_msgs/msg/imu.hpp"
+
+namespace aqua_graph
+{
+
+namespace
+{
+
+double to_seconds(const builtin_interfaces::msg::Time & stamp)
+{
+  return static_cast<double>(stamp.sec) + 1.0e-9 * static_cast<double>(stamp.nanosec);
+}
+
+builtin_interfaces::msg::Time to_stamp(double seconds)
+{
+  builtin_interfaces::msg::Time stamp;
+  const auto ns = static_cast<int64_t>(std::llround(seconds * 1.0e9));
+  stamp.sec = static_cast<int32_t>(ns / 1000000000LL);
+  stamp.nanosec = static_cast<uint32_t>(ns % 1000000000LL);
+  return stamp;
+}
+
+geometry_msgs::msg::Vector3 to_msg(const gtsam::Vector3 & v)
+{
+  geometry_msgs::msg::Vector3 out;
+  out.x = v.x();
+  out.y = v.y();
+  out.z = v.z();
+  return out;
+}
+
+}  // namespace
+
+class AquaGraphNode : public rclcpp::Node
+{
+public:
+  explicit AquaGraphNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  : Node("aqua_graph", options)
+  {
+    const std::string imu_topic = declare_parameter<std::string>("topics.imu", "/imu/data");
+    const std::string pressure_topic =
+      declare_parameter<std::string>("topics.pressure", "/pressure");
+    const std::string dvl_topic = declare_parameter<std::string>("topics.dvl_velocity", "");
+    const std::string position_topic =
+      declare_parameter<std::string>("topics.position_odometry", "");
+    const std::string odometry_topic =
+      declare_parameter<std::string>("topics.odometry", "/aqua_graph/odometry");
+    const std::string status_topic =
+      declare_parameter<std::string>("topics.status", "/aqua_graph/status");
+    map_frame_ = declare_parameter<std::string>("frames.map", "map");
+    base_frame_ = declare_parameter<std::string>("frames.base_link", "base_link");
+    publish_imu_rate_ = declare_parameter<bool>("publish.imu_rate", true);
+    const int sensor_depth = declare_parameter<int>("qos.sensor_depth", 200);
+
+    EstimatorConfig config;
+    config.state_period_s = declare_parameter<double>("graph.state_period_s", config.state_period_s);
+    config.smoother_lag_s = declare_parameter<double>("graph.smoother_lag_s", config.smoother_lag_s);
+    config.relinearize_threshold =
+      declare_parameter<double>("graph.relinearize_threshold", config.relinearize_threshold);
+    config.relinearize_skip =
+      declare_parameter<int>("graph.relinearize_skip", config.relinearize_skip);
+
+    auto & imu = config.imu;
+    imu.gravity_mps2 = declare_parameter<double>("imu.gravity_mps2", imu.gravity_mps2);
+    imu.accel_noise_density =
+      declare_parameter<double>("imu.accel_noise_density", imu.accel_noise_density);
+    imu.gyro_noise_density =
+      declare_parameter<double>("imu.gyro_noise_density", imu.gyro_noise_density);
+    imu.accel_bias_random_walk =
+      declare_parameter<double>("imu.accel_bias_random_walk", imu.accel_bias_random_walk);
+    imu.gyro_bias_random_walk =
+      declare_parameter<double>("imu.gyro_bias_random_walk", imu.gyro_bias_random_walk);
+    imu.integration_sigma =
+      declare_parameter<double>("imu.integration_sigma", imu.integration_sigma);
+
+    auto & init = config.init;
+    const std::string attitude_source =
+      declare_parameter<std::string>("init.attitude_source", "accelerometer");
+    const auto parsed = parse_attitude_init_source(attitude_source);
+    if (!parsed) {
+      throw std::invalid_argument(
+              "init.attitude_source must be 'accelerometer' or 'imu_orientation'");
+    }
+    init.attitude_source = *parsed;
+    init.static_window_s = declare_parameter<double>("init.static_window_s", init.static_window_s);
+    init.keep_imu_yaw = declare_parameter<bool>("init.keep_imu_yaw", init.keep_imu_yaw);
+    init.position_sigma_m =
+      declare_parameter<double>("init.position_sigma_m", init.position_sigma_m);
+    init.roll_pitch_sigma_rad =
+      declare_parameter<double>("init.roll_pitch_sigma_rad", init.roll_pitch_sigma_rad);
+    init.yaw_sigma_rad = declare_parameter<double>("init.yaw_sigma_rad", init.yaw_sigma_rad);
+    init.velocity_sigma_mps =
+      declare_parameter<double>("init.velocity_sigma_mps", init.velocity_sigma_mps);
+    init.accel_bias_sigma =
+      declare_parameter<double>("init.accel_bias_sigma", init.accel_bias_sigma);
+    init.gyro_bias_sigma = declare_parameter<double>("init.gyro_bias_sigma", init.gyro_bias_sigma);
+
+    auto & dvl = config.dvl;
+    dvl.enabled = !dvl_topic.empty();
+    const auto dvl_rpy = declare_parameter<std::vector<double>>(
+      "dvl.mount.rotation_rpy_rad", {0.0, 0.0, 0.0});
+    const auto dvl_lever = declare_parameter<std::vector<double>>(
+      "dvl.lever_arm_m", {0.0, 0.0, 0.0});
+    dvl.body_R_dvl = rotation_from_rpy(dvl_rpy, "dvl.mount.rotation_rpy_rad");
+    dvl.lever_arm_body = point_from(dvl_lever, "dvl.lever_arm_m");
+    dvl.velocity_sigma_mps =
+      declare_parameter<double>("dvl.velocity_sigma_mps", dvl.velocity_sigma_mps);
+    dvl.huber_k = declare_parameter<double>("dvl.huber_k", dvl.huber_k);
+    dvl.max_speed_mps = declare_parameter<double>("dvl.max_speed_mps", dvl.max_speed_mps);
+
+    auto & depth = config.depth;
+    depth.enabled = !pressure_topic.empty();
+    depth.depth_sigma_m = declare_parameter<double>("pressure.depth_sigma_m", depth.depth_sigma_m);
+    depth.huber_k = declare_parameter<double>("pressure.huber_k", depth.huber_k);
+    depth.lever_arm_body = point_from(
+      declare_parameter<std::vector<double>>("pressure.lever_arm_m", {0.0, 0.0, 0.0}),
+      "pressure.lever_arm_m");
+    aqua_imu_loc::PressureDepthConfig pressure_config;
+    pressure_config.use_first_pressure_as_reference = declare_parameter<bool>(
+      "pressure.use_first_pressure_as_reference", pressure_config.use_first_pressure_as_reference);
+    pressure_config.reference_pressure_pa = declare_parameter<double>(
+      "pressure.reference_pressure_pa", pressure_config.reference_pressure_pa);
+    pressure_config.water_density_kg_m3 = declare_parameter<double>(
+      "pressure.water_density_kg_m3", pressure_config.water_density_kg_m3);
+    pressure_config.depth_offset_m =
+      declare_parameter<double>("pressure.depth_offset_m", pressure_config.depth_offset_m);
+    pressure_config.gravity_mps2 = imu.gravity_mps2;
+    pressure_converter_.configure(pressure_config);
+
+    auto & position = config.position;
+    position.enabled = !position_topic.empty();
+    position.sigma_floor_m =
+      declare_parameter<double>("position.sigma_floor_m", position.sigma_floor_m);
+    position.huber_k = declare_parameter<double>("position.huber_k", position.huber_k);
+    use_position_covariance_ = declare_parameter<bool>("position.use_message_covariance", true);
+
+    estimator_ = std::make_unique<TightlyCoupledEstimator>(config);
+
+    const auto sensor_qos = rclcpp::SensorDataQoS().keep_last(static_cast<size_t>(sensor_depth));
+    imu_sub_ = create_subscription<sensor_msgs::msg::Imu>(
+      imu_topic, sensor_qos, [this](sensor_msgs::msg::Imu::ConstSharedPtr msg) {on_imu(*msg);});
+    if (!pressure_topic.empty()) {
+      pressure_sub_ = create_subscription<sensor_msgs::msg::FluidPressure>(
+        pressure_topic, sensor_qos,
+        [this](sensor_msgs::msg::FluidPressure::ConstSharedPtr msg) {on_pressure(*msg);});
+    }
+    if (!dvl_topic.empty()) {
+      dvl_sub_ = create_subscription<geometry_msgs::msg::TwistStamped>(
+        dvl_topic, sensor_qos,
+        [this](geometry_msgs::msg::TwistStamped::ConstSharedPtr msg) {on_dvl(*msg);});
+    }
+    if (!position_topic.empty()) {
+      position_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+        position_topic, rclcpp::QoS(50),
+        [this](nav_msgs::msg::Odometry::ConstSharedPtr msg) {on_position(*msg);});
+    }
+    odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(odometry_topic, rclcpp::QoS(100));
+    status_pub_ =
+      create_publisher<aqua_msgs::msg::GraphEstimatorStatus>(status_topic, rclcpp::QoS(10));
+
+    RCLCPP_INFO(
+      get_logger(),
+      "aqua_graph started: imu=%s pressure=%s dvl=%s position=%s odom=%s grid=%.3fs lag=%.1fs",
+      imu_topic.c_str(), pressure_topic.empty() ? "<disabled>" : pressure_topic.c_str(),
+      dvl_topic.empty() ? "<disabled>" : dvl_topic.c_str(),
+      position_topic.empty() ? "<disabled>" : position_topic.c_str(), odometry_topic.c_str(),
+      config.state_period_s, config.smoother_lag_s);
+  }
+
+private:
+  gtsam::Rot3 rotation_from_rpy(const std::vector<double> & rpy, const std::string & name)
+  {
+    if (rpy.size() != 3) {
+      throw std::invalid_argument(name + " must have 3 elements");
+    }
+    return gtsam::Rot3::Ypr(rpy[2], rpy[1], rpy[0]);
+  }
+
+  gtsam::Point3 point_from(const std::vector<double> & xyz, const std::string & name)
+  {
+    if (xyz.size() != 3) {
+      throw std::invalid_argument(name + " must have 3 elements");
+    }
+    return gtsam::Point3(xyz[0], xyz[1], xyz[2]);
+  }
+
+  void on_imu(const sensor_msgs::msg::Imu & msg)
+  {
+    const double t = to_seconds(msg.header.stamp);
+    const gtsam::Vector3 accel(
+      msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z);
+    const gtsam::Vector3 gyro(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z);
+    std::optional<gtsam::Rot3> orientation;
+    const auto & q = msg.orientation;
+    const double qn = std::sqrt(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
+    if (msg.orientation_covariance[0] >= 0.0 && qn > 0.5 && std::isfinite(qn)) {
+      orientation = gtsam::Rot3::Quaternion(q.w / qn, q.x / qn, q.y / qn, q.z / qn);
+    }
+    const bool was_initialized = estimator_->initialized();
+    const auto states = estimator_->add_imu(t, accel, gyro, orientation);
+    last_gyro_ = gyro;
+    if (!was_initialized && estimator_->initialized()) {
+      RCLCPP_INFO(get_logger(), "aqua_graph initialized at t=%.3f", t);
+    }
+    for (const auto & state : states) {
+      publish_status(state);
+      if (!publish_imu_rate_) {
+        publish_odometry(state);
+      }
+    }
+    if (publish_imu_rate_) {
+      if (const auto estimate = estimator_->imu_rate_estimate()) {
+        publish_odometry(*estimate);
+      }
+    }
+  }
+
+  void on_pressure(const sensor_msgs::msg::FluidPressure & msg)
+  {
+    if (const auto depth = pressure_converter_.pressure_to_depth(msg.fluid_pressure)) {
+      estimator_->add_depth(to_seconds(msg.header.stamp), *depth);
+    }
+  }
+
+  void on_dvl(const geometry_msgs::msg::TwistStamped & msg)
+  {
+    const auto & v = msg.twist.linear;
+    estimator_->add_dvl(to_seconds(msg.header.stamp), gtsam::Vector3(v.x, v.y, v.z));
+  }
+
+  void on_position(const nav_msgs::msg::Odometry & msg)
+  {
+    const auto & p = msg.pose.pose.position;
+    gtsam::Matrix3 cov = gtsam::Matrix3::Zero();
+    if (use_position_covariance_) {
+      for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) {
+          cov(r, c) = msg.pose.covariance[static_cast<size_t>(r * 6 + c)];
+        }
+      }
+    }
+    estimator_->add_position(to_seconds(msg.header.stamp), gtsam::Point3(p.x, p.y, p.z), cov);
+  }
+
+  void publish_odometry(const EstimatorOutput & state)
+  {
+    nav_msgs::msg::Odometry odom;
+    odom.header.stamp = to_stamp(state.stamp_s);
+    odom.header.frame_id = map_frame_;
+    odom.child_frame_id = base_frame_;
+    const gtsam::Point3 & t = state.pose.translation();
+    const gtsam::Quaternion q = state.pose.rotation().toQuaternion();
+    odom.pose.pose.position.x = t.x();
+    odom.pose.pose.position.y = t.y();
+    odom.pose.pose.position.z = t.z();
+    odom.pose.pose.orientation.w = q.w();
+    odom.pose.pose.orientation.x = q.x();
+    odom.pose.pose.orientation.y = q.y();
+    odom.pose.pose.orientation.z = q.z();
+    // REP-105: twist in the child (body) frame.
+    odom.twist.twist.linear = to_msg(state.pose.rotation().unrotate(state.velocity_world));
+    odom.twist.twist.angular = to_msg(last_gyro_ - state.bias.gyroscope());
+    odom_pub_->publish(odom);
+  }
+
+  void publish_status(const EstimatorOutput & state)
+  {
+    const auto & c = estimator_->counters();
+    aqua_msgs::msg::GraphEstimatorStatus status;
+    status.header.stamp = to_stamp(state.stamp_s);
+    status.header.frame_id = map_frame_;
+    status.state_index = state.state_index;
+    status.imu_samples = c.imu_samples;
+    status.dvl_received = c.dvl_received;
+    status.dvl_applied = c.dvl_applied;
+    status.dvl_rejected = c.dvl_rejected;
+    status.depth_received = c.depth_received;
+    status.depth_applied = c.depth_applied;
+    status.position_received = c.position_received;
+    status.position_applied = c.position_applied;
+    status.measurements_too_old = c.measurements_too_old;
+    status.smoother_updates = c.smoother_updates;
+    status.velocity_world = to_msg(state.velocity_world);
+    status.accel_bias = to_msg(state.bias.accelerometer());
+    status.gyro_bias = to_msg(state.bias.gyroscope());
+    status_pub_->publish(status);
+  }
+
+  std::unique_ptr<TightlyCoupledEstimator> estimator_;
+  aqua_imu_loc::PressureDepthConverter pressure_converter_;
+  std::string map_frame_;
+  std::string base_frame_;
+  bool publish_imu_rate_{true};
+  bool use_position_covariance_{true};
+  gtsam::Vector3 last_gyro_{gtsam::Vector3::Zero()};
+
+  rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr dvl_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr position_sub_;
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  rclcpp::Publisher<aqua_msgs::msg::GraphEstimatorStatus>::SharedPtr status_pub_;
+};
+
+}  // namespace aqua_graph
+
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(aqua_graph::AquaGraphNode)

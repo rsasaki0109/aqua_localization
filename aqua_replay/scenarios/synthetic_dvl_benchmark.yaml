@@ -1,0 +1,44 @@
+# Side-by-side estimator benchmark on the synthetic survey bag: the 15-state
+# UKF (aqua_imu_loc) and the factor-graph smoother (aqua_graph) both consume
+# the same IMU + pressure + DVL stream in one deterministic replay, and the
+# ground truth is recorded alongside for APE.
+#
+#   ros2 run aqua_replay make_synthetic_mbes_bag.py --dst /tmp/synth --duration-s 120
+#   ros2 run aqua_replay offline_replay --scenario .../synthetic_dvl_benchmark.yaml \
+#     --bag /tmp/synth --out /tmp/synth_bench
+#   # then export each odometry topic to TUM and run compare_trajectories.py
+input:
+  topics: [/imu/data, /pressure, /dvl/twist, /ground_truth/odometry]
+  order: header
+  reorder_window_s: 0.5
+
+nodes:
+  - plugin: aqua_imu_loc::ImuLocNode
+    params_files: [$(find-pkg-share aqua_imu_loc)/config/params.yaml]
+    parameters:
+      topics:
+        imu: /imu/data
+        pressure: /pressure
+        dvl_velocity: /dvl/twist
+        sonar_odometry: ""
+      pressure:
+        water_density_kg_m3: 1000.0
+      publish:
+        tf: false
+  - plugin: aqua_graph::AquaGraphNode
+    params_files: [$(find-pkg-share aqua_graph)/config/params.yaml]
+    parameters:
+      init:
+        static_window_s: 2.0
+      pressure:
+        water_density_kg_m3: 1000.0
+      dvl:
+        velocity_sigma_mps: 0.01
+
+output:
+  storage_id: mcap
+  topics:
+    - /ground_truth/odometry
+    - /aqua_imu_loc/odometry
+    - /aqua_graph/odometry
+    - /aqua_graph/status

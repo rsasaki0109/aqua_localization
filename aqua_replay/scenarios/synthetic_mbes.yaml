@@ -1,0 +1,44 @@
+# Full tightly-coupled MBES pipeline on the synthetic survey bag from
+# scripts/make_synthetic_mbes_bag.py: UKF (IMU + pressure + DVL + sonar
+# feedback), sonar registration, pose graph, and MBES loop closure.
+#
+#   ros2 run aqua_replay make_synthetic_mbes_bag.py --dst /tmp/synthetic_mbes
+#   ros2 run aqua_replay offline_replay \
+#     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/synthetic_mbes.yaml \
+#     --bag /tmp/synthetic_mbes --out /tmp/synthetic_mbes_replay
+input:
+  order: header
+  reorder_window_s: 0.5
+
+nodes:
+  - plugin: aqua_imu_loc::ImuLocNode
+    params_files: [$(find-pkg-share aqua_imu_loc)/config/params.yaml]
+    parameters:
+      topics:
+        imu: /imu/data
+        pressure: /pressure
+        dvl_velocity: /dvl/twist
+        sonar_odometry: /aqua_sonar_loc/odometry
+      publish:
+        tf: false
+  - plugin: aqua_sonar_loc::SonarLocNode
+    params_files: [$(find-pkg-share aqua_sonar_loc)/config/params.yaml]
+    parameters:
+      topics:
+        points: /sonar/points
+  - plugin: aqua_pose_graph::PoseGraphNode
+    params_files: [$(find-pkg-share aqua_pose_graph)/config/params.yaml]
+  - plugin: aqua_sonar_loc::MbesLoopClosureNode
+    params_files: [$(find-pkg-share aqua_sonar_loc)/config/mbes_loop_closure.yaml]
+
+output:
+  storage_id: mcap
+  topics:
+    - /aqua_imu_loc/odometry
+    - /aqua_imu_loc/status
+    - /aqua_sonar_loc/odometry
+    - /aqua_sonar_loc/status
+    - /aqua_pose_graph/keyframe
+    - /aqua_pose_graph/loop_constraint
+    - /aqua_pose_graph/optimization_count
+    - /mbes_loop_closure/status

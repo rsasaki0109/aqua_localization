@@ -1,0 +1,77 @@
+aqua_graph:
+  ros__parameters:
+    topics:
+      imu: /imu/data
+      # sensor_msgs/FluidPressure in Pa; leave empty to run without depth.
+      pressure: /pressure
+      # geometry_msgs/TwistStamped bottom-track velocity in the DVL frame.
+      dvl_velocity: /dvl/twist
+      # Optional nav_msgs/Odometry absolute position (e.g. a visual frontend).
+      position_odometry: ""
+      odometry: /aqua_graph/odometry
+      status: /aqua_graph/status
+
+    frames:
+      map: map
+      base_link: base_link
+
+    publish:
+      # true: odometry at IMU rate (latest state propagated with the IMU).
+      # false: one odometry per smoothed grid state.
+      imu_rate: true
+
+    qos:
+      sensor_depth: 200
+
+    graph:
+      state_period_s: 0.1
+      smoother_lag_s: 5.0
+      relinearize_threshold: 0.01
+      relinearize_skip: 1
+
+    imu:
+      gravity_mps2: 9.80665
+      # Continuous-time densities. Defaults describe an industrial MEMS unit;
+      # tighten them for a tactical-grade IMU.
+      accel_noise_density: 0.02
+      gyro_noise_density: 0.002
+      accel_bias_random_walk: 0.001
+      gyro_bias_random_walk: 0.0001
+      integration_sigma: 0.0001
+
+    init:
+      # accelerometer: level from the first static_window_s (vehicle at rest).
+      # imu_orientation: take roll/pitch (and yaw if keep_imu_yaw) from the
+      # AHRS quaternion of the first IMU sample.
+      attitude_source: accelerometer
+      static_window_s: 0.5
+      keep_imu_yaw: false
+      position_sigma_m: 0.001
+      roll_pitch_sigma_rad: 0.05
+      yaw_sigma_rad: 0.001
+      velocity_sigma_mps: 0.2
+      accel_bias_sigma: 0.1
+      gyro_bias_sigma: 0.01
+
+    dvl:
+      # Same convention as aqua_imu_loc: rotates DVL-frame vectors into base_link.
+      mount:
+        rotation_rpy_rad: [0.0, 0.0, 0.0]
+      lever_arm_m: [0.0, 0.0, 0.0]
+      velocity_sigma_mps: 0.02
+      huber_k: 3.0
+      max_speed_mps: 5.0
+
+    pressure:
+      use_first_pressure_as_reference: true
+      reference_pressure_pa: 101325.0
+      water_density_kg_m3: 1025.0
+      depth_offset_m: 0.0
+      depth_sigma_m: 0.05
+      huber_k: 0.0
+      lever_arm_m: [0.0, 0.0, 0.0]
+
+    position:
+      use_message_covariance: true
+      sigma_floor_m: 0.02
+      huber_k: 3.0

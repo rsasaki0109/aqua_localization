@@ -1,0 +1,41 @@
+# Tank Dataset (Xu et al., IJRR 2025) through convert_tank_dataset_bag.py:
+# Microstrain 3DM-GX5 on /imu/data, synthesized /pressure, WaterLinked A50
+# bottom-track on /dvl/twist. Starting point only: IMU densities and the DVL
+# extrinsic have not been calibrated on held-out sequences yet.
+aqua_graph:
+  ros__parameters:
+    topics:
+      imu: /imu/data
+      pressure: /pressure
+      dvl_velocity: /dvl/twist
+      position_odometry: ""
+      odometry: /aqua_graph/odometry
+      status: /aqua_graph/status
+
+    graph:
+      state_period_s: 0.1
+      smoother_lag_s: 5.0
+
+    imu:
+      # 3DM-GX5-25 datasheet: ~100 ug/sqrt(Hz) accel, ~0.005 deg/s/sqrt(Hz) gyro,
+      # inflated for vibration and unmodeled thruster effects.
+      accel_noise_density: 0.004
+      gyro_noise_density: 0.0003
+      accel_bias_random_walk: 0.0004
+      gyro_bias_random_walk: 0.00002
+
+    init:
+      # The bag starts with a brief still stand (see aqua_imu_loc tank config).
+      attitude_source: accelerometer
+      static_window_s: 1.0
+
+    dvl:
+      mount:
+        rotation_rpy_rad: [0.0, 0.0, 0.0]
+      lever_arm_m: [0.0, 0.0, 0.0]
+      velocity_sigma_mps: 0.02
+
+    pressure:
+      use_first_pressure_as_reference: true
+      water_density_kg_m3: 1000.0
+      depth_sigma_m: 0.02

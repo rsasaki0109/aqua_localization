@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  colcon:
+    name: colcon build + test (${{ matrix.ros_distro }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        ros_distro: [humble, jazzy]
+    container:
+      image: ros:${{ matrix.ros_distro }}-ros-base
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      # Keep test-time DDS traffic inside the container.
+      ROS_LOCALHOST_ONLY: "1"
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          path: src/aqua_localization
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3-pip python3-pytest
+          rosdep update --rosdistro "${ROS_DISTRO}"
+          rosdep install --from-paths src --ignore-src -r -y --rosdistro "${ROS_DISTRO}"
+          # rosbags is not packaged for apt; the bag conversion tests need it.
+          if python3 -m pip install --help | grep -q -- --break-system-packages; then
+            python3 -m pip install --break-system-packages "rosbags>=0.10"
+          else
+            python3 -m pip install "rosbags>=0.10"
+          fi
+
+      - name: Build
+        run: |
+          source /opt/ros/${ROS_DISTRO}/setup.bash
+          colcon build --symlink-install \
+            --event-handlers console_cohesion+ \
+            --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+      - name: Test
+        run: |
+          source /opt/ros/${ROS_DISTRO}/setup.bash
+          source install/setup.bash
+          colcon test --event-handlers console_cohesion+ --return-code-on-test-failure
+
+      - name: Test results
+        if: always()
+        run: |
+          source /opt/ros/${ROS_DISTRO}/setup.bash
+          colcon test-result --verbose
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.ros_distro }}
+          path: |
+            build/*/test_results
+            log/latest_test
+          if-no-files-found: ignore
