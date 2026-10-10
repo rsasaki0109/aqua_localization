@@ -309,3 +309,20 @@ The available HF `.tum` is a ReAqROVIO estimate; independent hardware truth and
 competitive evaluation remain blocked. See ntnu_fjord_development_results.json
 and ntnu_fjord_development.md for the full provenance and all failed/successful
 outcomes. Tank applications remain skipped.
+
+## Full native sequence development extension
+
+The separately registered full-sequence adapter keeps the v6 model and fixed
+calibration while extending replay to all 6,368 native cam0 images, 63,698 IMU
+packets and 15,926 pressure packets. The final pressure is 6.132534 ms beyond
+native IMU support and is retained with an explicit no-update reason. On complete
+input only, SDK queue waiting is disabled to process the supported tail without
+extrapolation or changing native timestamps. An actual-SDK regression and an
+independent ROS-to-wire check validate this boundary handling. Previous prefix
+registrations and failures are immutable. See `ntnu_fjord_full.md` and
+`ntnu_fjord_full_results.json` for full outcomes and support accounting.
+
+This extends execution coverage, not accuracy evidence. The full sequence is
+development data with no independent hardware reference acquired or read; the
+modified mono adapter has not been evaluated against competitive methods with
+independent underwater truth. No SoTA result follows from these runs.

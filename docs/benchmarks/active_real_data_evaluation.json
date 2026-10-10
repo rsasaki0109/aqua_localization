@@ -180,8 +180,8 @@
     "sota_achieved": false
   },
   "independent_underwater_vio_next": {
-    "report": "ntnu_fjord_development_results.json",
-    "status": "HF native fjord1 acquired and verified; v6 mono pressure ablation four trials processed and frozen; independent MoCap hardware truth remains unavailable",
+    "report": "ntnu_fjord_full_results.json",
+    "status": "full native fjord1 mono pressure ablation: four full-sequence trials processed and frozen; independent MoCap hardware truth remains unavailable",
     "reference_values_read": false,
     "native_data_acquired": true,
     "required_domain": "us.aws.cdn.hf.co",
@@ -194,6 +194,20 @@
     "details": "ntnu_fjord_development_results.json",
     "final_freeze_sha256": "e4986d9b4605a959baafadbe148e279a39a22d40e4078f9b9ef3f60aff251e90",
     "native_data_complete": true,
+    "independent_accuracy_scoring": "blocked_missing_hardware_truth",
+    "sota_achieved": false
+  },
+  "ntnu_fjord_full_development": {
+    "status": "four_full_sequence_trials_processed_and_frozen_reference_unread",
+    "details": "ntnu_fjord_full_results.json",
+    "freeze_sha256": "c6d359fa008151b8b23687de11f17149fc0bf0e1349d1c4268086e9bbb013929",
+    "native_data_complete": true,
+    "all_native_cam0_processed_per_trial": 6368,
+    "all_native_pressure_consumed_per_trial": 15926,
+    "depth_updates_per_pressure_trial": 15924,
+    "excluded_last_pressure_ordinal": 15925,
+    "excluded_last_pressure_after_imu_ns": 6132534,
+    "common_support_seconds": 318.246877804,
     "independent_accuracy_scoring": "blocked_missing_hardware_truth",
     "sota_achieved": false
   }

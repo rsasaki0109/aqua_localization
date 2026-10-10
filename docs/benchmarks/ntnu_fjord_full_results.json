@@ -1,0 +1,318 @@
+{
+  "schema": "ntnu-full-development-results-v1",
+  "recorded_at_utc": "2026-10-10T19:33:12.061094+00:00",
+  "sequence": "fjord_1",
+  "role": "development; prefix failures and successful v6 already observed",
+  "method": "modified pinned ReAqROVIO mono feature reprojection EKF with depth ablation; not the published multi-camera refractive method",
+  "root": "/workspace/aqua-data/development/ntnu_fjord_01",
+  "native_input": {
+    "schema": "ntnu-mono-input-result-v1",
+    "plan_sha256": "3933dbb59b7c0480b0d0bf51123e270777622480dac5a42b07c77049ffe29ba0",
+    "native_sensor_counts": {
+      "/alphasense_driver_ros/imu": 63698,
+      "/mavros/imu/static_pressure": 15926,
+      "/alphasense_driver_ros/cam0": 6368,
+      "/alphasense_driver_ros/cam1": 6367
+    },
+    "native_imu_support_ns": [
+      1700604776664728326,
+      1700605095188237130
+    ],
+    "fixed_prefix_end_ns": 1700605095194369664,
+    "wire_counts": {
+      "I": 63698,
+      "P": 15926,
+      "C": 6368
+    },
+    "reasons": [
+      {
+        "topic": "/alphasense_driver_ros/imu",
+        "reason": "retained_for_replay",
+        "count": 63698
+      },
+      {
+        "topic": "/mavros/imu/static_pressure",
+        "reason": "retained_for_replay",
+        "count": 15925
+      },
+      {
+        "topic": "/alphasense_driver_ros/cam0",
+        "reason": "retained_for_replay",
+        "count": 6368
+      },
+      {
+        "topic": "/alphasense_driver_ros/cam1",
+        "reason": "outside_registered_mono_camera_profile",
+        "count": 6367
+      },
+      {
+        "topic": "/mavros/imu/static_pressure",
+        "reason": "retained_pressure_outside_native_imu_support",
+        "count": 1
+      }
+    ],
+    "wire_sha256": "43dfbe9698e68f7be2686af358e026a4c25d6eb738807269f8bfec2215194c00",
+    "ledger_sha256": "a630be589fbd19b547ed78d654b4ce51acba113c08b7142a093387a2f9690bf0",
+    "reference_values_read": false,
+    "evaluation_ready": false
+  },
+  "independent_wire_verification": {
+    "schema": "ntnu-full-mono-wire-verification-v1",
+    "verified_counts": {
+      "I": 63698,
+      "P": 15926,
+      "C": 6368
+    },
+    "input_sha256": "43dfbe9698e68f7be2686af358e026a4c25d6eb738807269f8bfec2215194c00",
+    "verifier_sha256": "197fc1b8d4990788349ca7ea2f63a347f83903c977f4caeede5b76754b43b301",
+    "full_native_selected_sensor_counts": {
+      "/alphasense_driver_ros/imu": 63698,
+      "/mavros/imu/static_pressure": 15926,
+      "/alphasense_driver_ros/cam0": 6368,
+      "/alphasense_driver_ros/cam1": 6367
+    },
+    "reference_values_read": false,
+    "status": "every_wire_sensor_value_image_ordinal_and_corrected_clock_verified"
+  },
+  "freeze_sha256": "c6d359fa008151b8b23687de11f17149fc0bf0e1349d1c4268086e9bbb013929",
+  "freeze": {
+    "schema": "ntnu-full-mono-comparison-freeze-v1",
+    "plan_sha256": "f07a04c659a22849d59f30de926325c1267fe7c7bba4e7fe9596c4ae7b0d1470",
+    "trials": [
+      {
+        "name": "vio-1",
+        "depth": false,
+        "status": "success",
+        "exit_code": 0,
+        "error": null,
+        "wall_seconds": 61.061472708999645,
+        "output": {
+          "poses": 6369,
+          "full_support_ns": [
+            1700604776664728326,
+            1700605095125093130
+          ],
+          "tracking_start_ns": 1700604776878215326,
+          "scoring_support_ns": [
+            1700604776878215326,
+            1700605095125093130
+          ],
+          "initialization_excluded_pose_count": 3,
+          "native_image_events": 6368,
+          "native_pressure_events": 15926,
+          "event_dispositions": {
+            "complete_native_end_of_stream_wait_disabled_no_extrapolation": 1,
+            "depth_ablation_disabled": 15924,
+            "initial_pressure_anchor_no_update": 1,
+            "outside_available_imu_support": 1,
+            "queued_native_cam0": 6368
+          }
+        },
+        "artifacts_sha256": {
+          "estimate.events.tsv": "f0447fddb85a959192042c309b9b9c9584acc4f50027c3c68ca4450c4acb8d0f",
+          "estimate.tum": "36b3924c8a27470105507ddfb07997e85633966c590beeca6f15849e1740bd1e",
+          "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+          "run.log": "1021e9a6a9ec12318a86a67656a2b48b0555a5119bc2e32af388b0d18f9225d3"
+        }
+      },
+      {
+        "name": "vio-2",
+        "depth": false,
+        "status": "success",
+        "exit_code": 0,
+        "error": null,
+        "wall_seconds": 67.97376872899986,
+        "output": {
+          "poses": 6369,
+          "full_support_ns": [
+            1700604776664728326,
+            1700605095125093130
+          ],
+          "tracking_start_ns": 1700604776878215326,
+          "scoring_support_ns": [
+            1700604776878215326,
+            1700605095125093130
+          ],
+          "initialization_excluded_pose_count": 3,
+          "native_image_events": 6368,
+          "native_pressure_events": 15926,
+          "event_dispositions": {
+            "complete_native_end_of_stream_wait_disabled_no_extrapolation": 1,
+            "depth_ablation_disabled": 15924,
+            "initial_pressure_anchor_no_update": 1,
+            "outside_available_imu_support": 1,
+            "queued_native_cam0": 6368
+          }
+        },
+        "artifacts_sha256": {
+          "estimate.events.tsv": "f0447fddb85a959192042c309b9b9c9584acc4f50027c3c68ca4450c4acb8d0f",
+          "estimate.tum": "36b3924c8a27470105507ddfb07997e85633966c590beeca6f15849e1740bd1e",
+          "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+          "run.log": "1021e9a6a9ec12318a86a67656a2b48b0555a5119bc2e32af388b0d18f9225d3"
+        }
+      },
+      {
+        "name": "pressure-1",
+        "depth": true,
+        "status": "success",
+        "exit_code": 0,
+        "error": null,
+        "wall_seconds": 65.9921470090012,
+        "output": {
+          "poses": 22281,
+          "full_support_ns": [
+            1700604776664728326,
+            1700605095174369664
+          ],
+          "tracking_start_ns": 1700604776878215326,
+          "scoring_support_ns": [
+            1700604776878215326,
+            1700605095174369664
+          ],
+          "initialization_excluded_pose_count": 12,
+          "native_image_events": 6368,
+          "native_pressure_events": 15926,
+          "event_dispositions": {
+            "complete_native_end_of_stream_wait_disabled_no_extrapolation": 1,
+            "initial_pressure_anchor_no_update": 1,
+            "outside_available_imu_support": 1,
+            "queued_native_cam0": 6368,
+            "submitted_pressure_update": 15924
+          }
+        },
+        "artifacts_sha256": {
+          "estimate.events.tsv": "d138c8f36d1925a33518155225d0319f2e79cb706389ed66c97c5af3709a586b",
+          "estimate.tum": "6cab32d8e96ff12d32eae13a07a3dd34db2323f6b3a8efe2e395719bb3c4d24b",
+          "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+          "run.log": "80facceb1b8cca1fbb2c4a206a9d9002867e355dca8d4082c5f3045d86cfaf6b"
+        }
+      },
+      {
+        "name": "pressure-2",
+        "depth": true,
+        "status": "success",
+        "exit_code": 0,
+        "error": null,
+        "wall_seconds": 62.4548057840002,
+        "output": {
+          "poses": 22281,
+          "full_support_ns": [
+            1700604776664728326,
+            1700605095174369664
+          ],
+          "tracking_start_ns": 1700604776878215326,
+          "scoring_support_ns": [
+            1700604776878215326,
+            1700605095174369664
+          ],
+          "initialization_excluded_pose_count": 12,
+          "native_image_events": 6368,
+          "native_pressure_events": 15926,
+          "event_dispositions": {
+            "complete_native_end_of_stream_wait_disabled_no_extrapolation": 1,
+            "initial_pressure_anchor_no_update": 1,
+            "outside_available_imu_support": 1,
+            "queued_native_cam0": 6368,
+            "submitted_pressure_update": 15924
+          }
+        },
+        "artifacts_sha256": {
+          "estimate.events.tsv": "d138c8f36d1925a33518155225d0319f2e79cb706389ed66c97c5af3709a586b",
+          "estimate.tum": "6cab32d8e96ff12d32eae13a07a3dd34db2323f6b3a8efe2e395719bb3c4d24b",
+          "resolved-profile.info": "209a4d7cc7ed82d0b9edc0637aa5b855484b23e2a7c621fc2da21a55ed09e56b",
+          "run.log": "80facceb1b8cca1fbb2c4a206a9d9002867e355dca8d4082c5f3045d86cfaf6b"
+        }
+      }
+    ],
+    "common_support_ns": [
+      1700604776878215326,
+      1700605095125093130
+    ],
+    "source_changes": [],
+    "integrity_status": "verified",
+    "reference_values_read": false,
+    "scoring_status": "not_executed_no_independent_hardware_truth"
+  },
+  "restoration_gate": {
+    "schema": "ntnu-full-snapshot-verification-v1",
+    "full_native_input_verified": true,
+    "trials": [
+      {
+        "name": "vio-1",
+        "wall_seconds": 61.061472708999645,
+        "support_ns": [
+          1700604776878215326,
+          1700605095125093130
+        ],
+        "initialization_excluded_pose_count": 3,
+        "processed_images": 6368,
+        "processed_pressure": 0
+      },
+      {
+        "name": "vio-2",
+        "wall_seconds": 67.97376872899986,
+        "support_ns": [
+          1700604776878215326,
+          1700605095125093130
+        ],
+        "initialization_excluded_pose_count": 3,
+        "processed_images": 6368,
+        "processed_pressure": 0
+      },
+      {
+        "name": "pressure-1",
+        "wall_seconds": 65.9921470090012,
+        "support_ns": [
+          1700604776878215326,
+          1700605095174369664
+        ],
+        "initialization_excluded_pose_count": 12,
+        "processed_images": 6368,
+        "processed_pressure": 15924
+      },
+      {
+        "name": "pressure-2",
+        "wall_seconds": 62.4548057840002,
+        "support_ns": [
+          1700604776878215326,
+          1700605095174369664
+        ],
+        "initialization_excluded_pose_count": 12,
+        "processed_images": 6368,
+        "processed_pressure": 15924
+      }
+    ],
+    "common_support_ns": [
+      1700604776878215326,
+      1700605095125093130
+    ],
+    "freeze_sha256": "c6d359fa008151b8b23687de11f17149fc0bf0e1349d1c4268086e9bbb013929",
+    "excluded_pressure": {
+      "native_ordinal": 15925,
+      "stamp_ns": 1700605095194369664,
+      "after_native_imu_ns": 6132534,
+      "native_packet_retained": true,
+      "reason": "outside_available_imu_support"
+    },
+    "reference_values_read": false,
+    "independent_accuracy_evaluation_ready": false
+  },
+  "checks": {
+    "published_prefix_restoration": "passed including native/source/runtime/input/output checks, two SDK regressions and 16 Python tests",
+    "full_snapshot_gate": "passed including registered source/runtime/input/output, event ordinals and every supported tail update",
+    "actual_sdk_end_of_stream": "passed at exact native .24 with native IMU ending .25; no extrapolation",
+    "full_input_boundary_pytest": "1 passed; both unsupported pressure boundaries retained and unsupported camera explicit",
+    "full_snapshot_check_log_sha256": "f3be27f63d1346c2c9b9a7637a76fe8bd50795be065eb51bf6960d1501c6b2d3",
+    "full_build": "passed; isolated new binary, original SDK binaries unchanged"
+  },
+  "common_support_seconds": 318.246877804,
+  "repeated_trajectory_hashes_identical_per_arm": true,
+  "reference_values_read": false,
+  "reference_acquired": false,
+  "independent_hardware_truth": false,
+  "accuracy_scoring": "unexecuted; no independent underwater hardware truth available",
+  "sota_achieved": false,
+  "competitive_evaluation": "not executed with independent underwater hardware truth",
+  "tank_application": "skipped by user; no contact or application",
+  "original_51cea95": "unavailable; these sources do not reproduce that method"
+}
