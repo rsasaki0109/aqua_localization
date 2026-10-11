@@ -6,6 +6,7 @@
 #include <deque>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -161,6 +162,42 @@ SubmapDescriptor describe_cloud(const PointCloud & cloud);
 std::array<double, 36> diagonal_information(
   double translation_sigma_m,
   double rotation_sigma_rad);
+
+// Time-indexed body poses (e.g. a 100 Hz odometry stream) for placing each
+// MBES ping at its own pose. A ping is a single across-track line, so a
+// bathymetric submap only becomes a 2.5D patch once successive pings are
+// laid out along the dead-reckoned track.
+class PoseInterpolator
+{
+public:
+  PoseInterpolator(double max_history_s = 300.0, double max_gap_s = 0.5);
+
+  // Stamps must be non-decreasing; older or duplicate samples are ignored.
+  void add(double stamp_s, const Eigen::Isometry3d & pose);
+  // Linear translation / slerp rotation between the bracketing samples.
+  // nullopt outside the buffered span or across a gap longer than max_gap_s.
+  std::optional<Eigen::Isometry3d> at(double stamp_s) const;
+  std::size_t size() const {return samples_.size();}
+
+private:
+  struct Sample
+  {
+    double stamp_s;
+    Eigen::Isometry3d pose;
+  };
+  std::deque<Sample> samples_;
+  double max_history_s_;
+  double max_gap_s_;
+};
+
+// Apply T to every point, dropping non-finite points, returns closer than
+// min_range_m to the sensor (MBES drivers report invalid beams as zeros)
+// and, when max_across_track_ratio > 0, outer beams with
+// |y| > max_across_track_ratio * |z| in the sensor frame (refraction makes
+// outer-beam depths disagree between passes far more than inner beams).
+PointCloud::Ptr transform_cloud(
+  const PointCloud & cloud, const Eigen::Isometry3d & T, double min_range_m,
+  double max_across_track_ratio = 0.0);
 
 class SubmapManager
 {

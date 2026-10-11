@@ -7,6 +7,12 @@ registration, loop diagnostics, and false-positive control.
 
 ## Current Status
 
+> **2026-10-11 caveat:** the loop runs on this page used submaps built by
+> stacking raw sensor-frame pings (no per-ping pose), so their accepted
+> loops registered single-line profiles, not seafloor patches. See
+> [`beach_pond_mbes_loop_feasibility.md`](beach_pond_mbes_loop_feasibility.md)
+> before relying on them.
+
 Status: `tuning measured, false-positive audit pending`
 
 The first real `beach_pond` loop-status replay now reaches registration and

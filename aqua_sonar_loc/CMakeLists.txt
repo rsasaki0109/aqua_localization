@@ -75,6 +75,7 @@ ament_target_dependencies(
   mbes_loop_closure_component
   aqua_msgs
   geometry_msgs
+  nav_msgs
   pcl_conversions
   rclcpp
   rclcpp_components
@@ -141,6 +142,7 @@ if(BUILD_TESTING)
     test_mbes_loop_closure_node_runtime
     aqua_msgs
     geometry_msgs
+    nav_msgs
     pcl_conversions
     rclcpp
     sensor_msgs

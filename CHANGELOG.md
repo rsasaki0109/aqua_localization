@@ -26,6 +26,13 @@
   surface vessels, `dvl.time_offset_s`, zero-bias init for moving starts,
   and smoother re-anchoring instead of crashing on singular / inconsistent
   fixed-lag updates (`GraphEstimatorStatus.smoother_resets`).
+- Fixed MBES loop-closure submaps: `mbes_loop_closure` stacked raw
+  sensor-frame pings (single across-track lines) into a submap; with
+  `topics.odometry` each ping is now placed at its own odometry pose, and
+  `sensor.max_across_track_ratio` drops refraction-limited outer beams.
+  Earlier `mbes_beach_pond_loop_audit*` pages predate this fix. On
+  beach_pond, bathymetric loops are not identifiable (flat basin at the
+  crossings); see `docs/benchmarks/beach_pond_mbes_loop_feasibility.md`.
 
 - Reduced pose-graph runtime work by skipping automatic g2o optimization on
   odometry-only chains until a loop constraint exists, with an opt-in parameter
