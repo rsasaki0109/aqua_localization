@@ -7,7 +7,8 @@
     Online stereo feature frontend for aqua_graph: tracks corners in rectified
     stereo images (GFTT + pyramidal Lucas-Kanade with forward-backward and
     fundamental-matrix checks, stereo matching along the epipolar line) and
-    publishes persistent-id aqua_msgs/StereoFeatures.
+    publishes persistent-id aqua_msgs/StereoFeatures. Optionally rectifies a
+    raw equidistant (fisheye) pair online from a Kalibr camchain.
   </description>
   <maintainer email="rsasaki0109@gmail.com">Ryohei Sasaki</maintainer>
   <license>Apache-2.0</license>
@@ -21,6 +22,7 @@
   <depend>rclcpp_components</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>yaml_cpp_vendor</depend>
 
   <exec_depend>aqua_graph</exec_depend>
   <exec_depend>launch</exec_depend>
