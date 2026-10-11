@@ -60,6 +60,7 @@ install(PROGRAMS
   scripts/evaluate_replay_trajectories.py
   scripts/make_stereo_feature_track.py
   scripts/run_beach_pond_benchmark.py
+  scripts/run_ntnu_benchmark.py
   scripts/run_tank_benchmark.py
   scripts/run_tank_live.py
   scripts/run_tank_robustness.py
