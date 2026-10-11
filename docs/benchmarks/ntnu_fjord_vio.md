@@ -48,15 +48,68 @@ ros2 run aqua_replay run_ntnu_benchmark.py --calib-dir <calib> \
 including streaming ~115 GB of raw bags.
 
 - **fjord_1-4: 0.36-0.73 m RMSE, 0.70-1.08 % drift per 100 m.**
-- **fjord_5 / fjord_6: 2.3 m / 4.1 m (2.3 % / 3.4 % per 100 m).** The first
-  run of these two re-anchored the fixed-lag smoother 10+ times; logging the
-  cause showed `IndeterminantLinearSystem` at a landmark: GTSAM's stereo
-  factor returns zero Jacobians for points behind the camera, leaving such
-  a landmark unconstrained. A weak 10 m prior on each new landmark
-  (`visual.landmark_prior_sigma_m`, now the default) removed every reset and
-  improved fjord_5 2.44 -> 2.33 m and fjord_6 4.79 -> 4.14 m (fjord_1-4 within
-  +-0.02 m; Tank `short_test` unchanged). The remaining error on these two
-  is drift between resets, not a failure, and is still open.
+- History: before the drift fix below, fjord_5 / 6 were at 2.33 m / 4.14 m
+  (2.3 % / 3.4 % per 100 m), and before that 2.44 m / 4.79 m with 10+
+  fixed-lag smoother re-anchors each: GTSAM's stereo factor returns zero
+  Jacobians for points behind the camera, leaving such a landmark
+  unconstrained (`IndeterminantLinearSystem`). A weak 10 m prior on each new
+  landmark (`visual.landmark_prior_sigma_m`, default) removed every reset.
+
+## fjord_5 / 6 drift: hazy images and sun glare
+
+The remaining fjord_5 / 6 error was almost all yaw: about -30 deg / -38 deg
+at the end, against a reference that turns over 1000 deg. What it was not:
+
+- *Not the smoother*: no resets, and a 10x tighter gyro bias random walk
+  only took fjord_5 from 2.33 to 2.09 m.
+- *Not static features*: no track sits on the rectification border or
+  stays fixed in the image.
+- *Not the focal length*: scaling the backend's fx by 0.97 helps fjord_5 / 6
+  (1.53 / 2.72 m) but ruins fjord_1 (0.375 -> 1.06 m, +18 deg yaw). An
+  air-calibration + Snell check also agrees with the in-water calibration to
+  about 1 %.
+
+Where it was: the yaw error grows in steps of 2-3 deg exactly where
+tracking collapses, with 30-45 features and more than 1000 new track ids/s
+in frames that are hazy and have sun glare at the top. Stereo PnP between
+consecutive frames finds clearly wrong rotations in a handful of those
+frames. Equalizing contrast (CLAHE, clip 2.0) and keeping features out of
+saturated pixels (`saturation_level` 245) fixes it:
+
+| fjord_5 | RMSE m | Final m | drift 100 m % | final yaw err deg |
+|---------|------:|------:|------:|------:|
+| before | 2.332 | 5.601 | 2.32 | -29.1 |
+| glare mask only | 2.349 | 6.057 | 2.33 | -29.3 |
+| CLAHE only | 0.756 | 0.852 | 0.96 | -7.0 |
+| CLAHE + glare mask (now the NTNU default) | **0.637** | **0.581** | **0.82** | -4.5 |
+
+Both are `aqua_visual_frontend` parameters (`clahe_clip_limit`,
+`saturation_level`), off by default. The NTNU scenarios turn them on. The
+Tank scenario leaves them off: on Tank `short_test` (dehazed images) they
+change nothing (0.0099 m either way). They were chosen once on fjord_5,
+not swept, and the six-sequence table above is with them on.
+
+## Online fisheye rectification
+
+`aqua_visual_frontend` can rectify the raw equidistant pair itself, so a live
+vehicle needs no offline converter. It takes `input_format: raw`
+(sensor_msgs/Image: mono8/16, bgr/rgb(a)8, Bayer 8-bit) or `compressed`, and
+`rectify.camchain` / `left_camera` / `right_camera` / `balance`. The same
+cv::fisheye rectification as the converter yields the same geometry on this
+calibration (fx 418.125, baseline 0.10968 m, logged at startup). The
+backend still needs the matching `ntnu_fjord_stereo_geometry.yaml` overlay.
+
+```bash
+ros2 run aqua_replay run_ntnu_benchmark.py --calib-dir <calib> \
+  --work-dir <dir> --sequences fjord_1 --online-rectify
+```
+
+This converts with `--no-rectify` (raw fisheye JPEGs on
+`/camera/{left,right}/image_raw/compressed`) and replays
+`ntnu_fjord_vio_online_rectify.yaml`. On fjord_1 it scores **0.330 m** RMSE
+(offline-rectified: 0.320 m; the JPEG step sits before rather than after
+rectification). Two runs give the same fingerprint
+(`000a45e0772913ce`).
 
 ## Reproduce
 
