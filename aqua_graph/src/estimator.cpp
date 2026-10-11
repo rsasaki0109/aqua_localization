@@ -2,12 +2,16 @@
 #include "aqua_graph/estimator.hpp"
 
 #include <algorithm>
+#include <cstdlib>
+#include <cxxabi.h>
+#include <typeinfo>
 #include <cmath>
 #include <limits>
 #include <utility>
 
 #include <gtsam/geometry/StereoCamera.h>
 #include <gtsam/inference/Symbol.h>
+#include <gtsam/linear/linearExceptions.h>
 #include <gtsam/navigation/GPSFactor.h>
 #include <gtsam/nonlinear/PriorFactor.h>
 #include <gtsam/slam/StereoFactor.h>
@@ -603,6 +607,10 @@ void TightlyCoupledEstimator::attach_stereo(
     const gtsam::Key key = L(next_landmark_++);
     batch.values.insert(key, point);
     batch.timestamps[key] = stamp;
+    if (vis.landmark_prior_sigma_m > 0.0) {
+      batch.graph.addPrior(
+        key, point, gtsam::noiseModel::Isotropic::Sigma(3, vis.landmark_prior_sigma_m));
+    }
     batch.graph.emplace_shared<StereoFactor>(
       track.first_measurement, noise, X(*track.first_state), key, stereo_calibration_,
       vis.body_P_camera);
@@ -659,7 +667,16 @@ void TightlyCoupledEstimator::run_update(UpdateBatch & batch, const StateRecord 
     ++counters_.smoother_updates;
     current_state_ = state;
     current_bias_ = bias;
-  } catch (const std::exception &) {
+  } catch (const gtsam::IndeterminantLinearSystemException & e) {
+    last_reset_reason_ = "IndeterminantLinearSystem near " +
+      gtsam::DefaultKeyFormatter(e.nearbyVariable());
+    reset_smoother(newest);
+  } catch (const std::exception & e) {
+    int status = 0;
+    char * name = abi::__cxa_demangle(typeid(e).name(), nullptr, nullptr, &status);
+    last_reset_reason_ = std::string(status == 0 && name ? name : typeid(e).name()) + ": " +
+      e.what();
+    std::free(name);
     // Two failure modes end up here. (1) Without an absolute heading or
     // position, x/y/yaw are gauge freedoms whose marginal covariance only
     // grows, and over long dead-reckoning runs the fixed-lag marginal turns
