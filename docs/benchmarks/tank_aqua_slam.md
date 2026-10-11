@@ -95,6 +95,36 @@ same-run replay. The claim gate still requires held-out sequences
 (`Structure_Easy`, `Medium`, `Hard`; download needs the dataset form) with
 AQUA-SLAM rerun under identical conditions.
 
+### Online frontend and live real-time runs (2026-10-11)
+
+The stereo frontend now runs online as a C++ component
+(`aqua_visual_frontend::StereoFrontendNode`, a port of
+`make_stereo_feature_track.py` on the same OpenCV 4.6).
+
+- **Parity.** In `offline_replay` with the raw compressed images
+  (`tank_short_test_vio_online.yaml`), its features are bit-identical to the
+  offline Python tracker on all 150 published frames, and aqua_graph scores
+  the same 0.0099 m (full) / 0.0092 m (last 11.65 s).
+- **Live.** `run_tank_live.py` plays `short_test` at 1x with
+  `ros2 bag play --clock 1000` into a multi-threaded component container
+  (`tank_vio_live.launch.py`: frontend + aqua_graph, intra-process) and
+  records on the sim clock. Nothing is deterministic here; frames that
+  arrive while the frontend is busy are dropped.
+
+| Live run | RMSE m (last 11.65 s) | RMSE m (full) | feature frames / 150 | frontend ms p50 / p95 | odometry latency ms p50 / p95 |
+|---------:|------:|------:|------:|------:|------:|
+| 0 | 0.0098 | 0.0102 | 146 | 10.2 / 21.0 | 0.4 / 27.5 |
+| 1 | 0.0095 | 0.0096 | 147 | 9.8 / 19.6 | 0.3 / 27.7 |
+| 2 | 0.0095 | 0.0097 | 147 | 9.5 / 19.6 | 0.4 / 25.5 |
+
+Cloud container, 4 vCPU. The camera period is 50 ms, so the frontend uses
+~20 % of it at p50 and ~40 % at p95. Odometry is published at IMU rate,
+propagated from the latest smoothed state (latency ~0.4 ms median); the p95
+reflects smoother updates. Live accuracy stays within 0.0003-0.0006 m of
+the deterministic replay and at half of AQUA-SLAM's 0.0194 m on the same
+window. AQUA-SLAM's own timing has not been measured on this machine
+(needs its Docker image).
+
 ## Current Anchor Result
 
 `aqua_localization` already has a public Tank Dataset anchor on `short_test`

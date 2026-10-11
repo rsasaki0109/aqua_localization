@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>aqua_visual_frontend</name>
+  <version>0.0.1</version>
+  <description>
+    Online stereo feature frontend for aqua_graph: tracks corners in rectified
+    stereo images (GFTT + pyramidal Lucas-Kanade with forward-backward and
+    fundamental-matrix checks, stereo matching along the epipolar line) and
+    publishes persistent-id aqua_msgs/StereoFeatures.
+  </description>
+  <maintainer email="rsasaki0109@gmail.com">Ryohei Sasaki</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>aqua_msgs</depend>
+  <depend>libopencv-dev</depend>
+  <depend>message_filters</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+
+  <exec_depend>aqua_graph</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

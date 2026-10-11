@@ -26,6 +26,11 @@
   surface vessels, `dvl.time_offset_s`, zero-bias init for moving starts,
   and smoother re-anchoring instead of crashing on singular / inconsistent
   fixed-lag updates (`GraphEstimatorStatus.smoother_resets`).
+- Added `aqua_visual_frontend`: the stereo feature tracker as an online C++
+  component (bit-identical to the offline Python tracker on Tank
+  `short_test`) with a live launch file; `run_tank_live.py` runs Tank at
+  real-time rate: 0.0095-0.0098 m RMSE on AQUA-SLAM's window, frontend
+  ~10 ms/frame, odometry latency ~0.4 ms median.
 - Fixed MBES loop-closure submaps: `mbes_loop_closure` stacked raw
   sensor-frame pings (single across-track lines) into a submap; with
   `topics.odometry` each ping is now placed at its own odometry pose, and

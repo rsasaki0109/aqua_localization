@@ -61,6 +61,7 @@ install(PROGRAMS
   scripts/make_stereo_feature_track.py
   scripts/run_beach_pond_benchmark.py
   scripts/run_tank_benchmark.py
+  scripts/run_tank_live.py
   scripts/run_tank_robustness.py
   DESTINATION lib/${PROJECT_NAME}
 )
