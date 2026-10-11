@@ -46,6 +46,10 @@ from rosbags.typesys import Stores, get_typestore
 
 LEFT_TOPIC = "/camera/left/image_rect/compressed"
 RIGHT_TOPIC = "/camera/right/image_rect/compressed"
+# --no-rectify: the raw fisheye images, left/right ordered, for the
+# frontend's online rectification (rectify.camchain).
+LEFT_RAW_TOPIC = "/camera/left/image_raw/compressed"
+RIGHT_RAW_TOPIC = "/camera/right/image_raw/compressed"
 IMU_TOPIC = "/imu/data"
 PRESSURE_TOPIC = "/pressure"
 REFERENCE_TOPIC = "/reference/odometry"
@@ -231,6 +235,9 @@ def run(args) -> int:
     print(f"left={rect['left_name']} right={rect['right_name']} fx={P[0, 0]:.2f} "
           f"cx={P[0, 2]:.2f} cy={P[1, 2]:.2f} baseline={rect['baseline']:.5f} m")
 
+    left_topic, right_topic = (LEFT_RAW_TOPIC, RIGHT_RAW_TOPIC) if args.no_rectify else \
+        (LEFT_TOPIC, RIGHT_TOPIC)
+
     ts = ros2_typestore()
     T = ts.types
     Header, Time = T["std_msgs/msg/Header"], T["builtin_interfaces/msg/Time"]
@@ -247,9 +254,9 @@ def run(args) -> int:
     counts = {}
     with Writer(dst, **writer_kwargs) as writer:
         conns = {
-            LEFT_TOPIC: writer.add_connection(LEFT_TOPIC, "sensor_msgs/msg/CompressedImage",
+            left_topic: writer.add_connection(left_topic, "sensor_msgs/msg/CompressedImage",
                                               typestore=ts),
-            RIGHT_TOPIC: writer.add_connection(RIGHT_TOPIC, "sensor_msgs/msg/CompressedImage",
+            right_topic: writer.add_connection(right_topic, "sensor_msgs/msg/CompressedImage",
                                                typestore=ts),
             IMU_TOPIC: writer.add_connection(IMU_TOPIC, "sensor_msgs/msg/Imu", typestore=ts),
             PRESSURE_TOPIC: writer.add_connection(PRESSURE_TOPIC, "sensor_msgs/msg/FluidPressure",
@@ -257,7 +264,7 @@ def run(args) -> int:
             REFERENCE_TOPIC: writer.add_connection(REFERENCE_TOPIC, "nav_msgs/msg/Odometry",
                                                    typestore=ts),
         }
-        out_topic = {rect["left_topic"]: LEFT_TOPIC, rect["right_topic"]: RIGHT_TOPIC}
+        out_topic = {rect["left_topic"]: left_topic, rect["right_topic"]: right_topic}
         wanted = set(out_topic) | {args.imu_topic, args.pressure_topic}
         for topic_in, t_ns, msg in iter_source(args, wanted):
             if args.duration_s > 0 and start is not None and \
@@ -268,13 +275,15 @@ def run(args) -> int:
             ns = stamp_ns(msg)
             if topic_in in out_topic:
                 m1, m2 = rect["maps"][topic_in]
-                img = cv2.remap(decode(msg), m1, m2, cv2.INTER_LINEAR)
+                img = decode(msg)
+                if not args.no_rectify:
+                    img = cv2.remap(img, m1, m2, cv2.INTER_LINEAR)
                 ok, jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, args.jpeg_quality])
                 if not ok:
                     continue
                 topic = out_topic[topic_in]
                 out = T["sensor_msgs/msg/CompressedImage"](
-                    header=header(ns, "camera_left" if topic == LEFT_TOPIC else "camera_right"),
+                    header=header(ns, "camera_left" if topic == left_topic else "camera_right"),
                     format="mono8; jpeg compressed mono8", data=jpg.reshape(-1))
                 writer.write(conns[topic], t_ns,
                              ts.serialize_cdr(out, "sensor_msgs/msg/CompressedImage"))
@@ -352,6 +361,9 @@ def parse_args(argv):
     p.add_argument("--params-out", help="Write an aqua_graph visual-geometry params overlay.")
     p.add_argument("--balance", type=float, default=0.0,
                    help="cv2.fisheye.stereoRectify balance (0 = crop to valid pixels).")
+    p.add_argument("--no-rectify", action="store_true",
+                   help=f"Write the raw (fisheye) pair to {LEFT_RAW_TOPIC} / {RIGHT_RAW_TOPIC} "
+                        "for online rectification in aqua_visual_frontend.")
     p.add_argument("--jpeg-quality", type=int, default=95)
     p.add_argument("--duration-s", type=float, default=0.0)
     p.add_argument("--overwrite", action="store_true")

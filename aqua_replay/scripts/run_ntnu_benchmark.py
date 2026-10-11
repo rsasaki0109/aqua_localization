@@ -5,7 +5,10 @@ For each sequence: stream the ROS 1 bag from the dataset repository straight
 into convert_ntnu_stereo_bag.py (no local raw copy, so 20+ GB bags fit), run
 the ntnu_fjord_vio scenario deterministically, and score against the
 sequence's ReAqROVIO reference (`<seq>_baseline.tum`, four cameras + IMU).
-Converted bags can be deleted after scoring with --cleanup.
+Converted bags can be deleted after scoring with --cleanup. With
+--online-rectify the bag keeps the raw fisheye pair and aqua_visual_frontend
+rectifies it in the replay (ntnu_fjord_vio_online_rectify scenario), the
+live-vehicle configuration.
 
     run_ntnu_benchmark.py --calib-dir calib --work-dir /data/ntnu \\
         --sequences fjord_1 fjord_2 --cleanup --markdown rows.md
@@ -47,13 +50,22 @@ def main(argv=None) -> int:
     p.add_argument("--cleanup", action="store_true",
                    help="Delete each converted bag and replay output after scoring.")
     p.add_argument("--markdown", type=Path)
+    p.add_argument("--online-rectify", action="store_true",
+                   help="Convert with --no-rectify and rectify in aqua_visual_frontend.")
+    p.add_argument("--param", action="append", default=[],
+                   help="Extra offline_replay --param NODE:NAME:=VALUE (repeatable).")
     args = p.parse_args(argv)
 
     scenario = args.scenario
     if scenario is None:
         prefix = subprocess.run(["ros2", "pkg", "prefix", "aqua_replay"], check=True,
                                 capture_output=True, text=True).stdout.strip()
-        scenario = Path(prefix) / "share" / "aqua_replay" / "scenarios" / "ntnu_fjord_vio.yaml"
+        name = "ntnu_fjord_vio_online_rectify.yaml" if args.online_rectify else "ntnu_fjord_vio.yaml"
+        scenario = Path(prefix) / "share" / "aqua_replay" / "scenarios" / name
+    intrinsics = args.calib_dir / "camchain-stereo-intrinsics-underwater.yaml"
+    params = list(args.param)
+    if args.online_rectify:
+        params.append(f"stereo_frontend:rectify.camchain:={intrinsics.resolve()}")
     replay_bin = os.environ.get("AQUA_REPLAY_BIN", "")
     replay_cmd = [replay_bin] if replay_bin else ["ros2", "run", "aqua_replay", "offline_replay"]
     args.work_dir.mkdir(parents=True, exist_ok=True)
@@ -66,20 +78,22 @@ def main(argv=None) -> int:
         if not reference.exists():
             run(["curl", "-sSL", "--fail", "-o", reference,
                  f"{BASE_URL}/{args.subset}/{seq}/{seq}_baseline.tum"])
-        converted = seq_dir / "stereo_ros2"
+        converted = seq_dir / ("raw_ros2" if args.online_rectify else "stereo_ros2")
         if not converted.exists():
             run(["ros2", "run", "aqua_localization", "convert_ntnu_stereo_bag.py",
                  "--src-url", f"{BASE_URL}/{args.subset}/{seq}/{seq}.bag",
                  "--reference", reference,
-                 "--intrinsics", args.calib_dir / "camchain-stereo-intrinsics-underwater.yaml",
+                 "--intrinsics", intrinsics,
                  "--imu-extrinsics", args.calib_dir / "camchain-imucam-stereo-extrinsics-air.yaml",
-                 "--dst", converted], stdout=subprocess.DEVNULL)
-        replay = seq_dir / "replay"
+                 "--dst", converted] + (["--no-rectify"] if args.online_rectify else []),
+                stdout=subprocess.DEVNULL)
+        replay = seq_dir / ("replay_online" if args.online_rectify else "replay")
         if replay.exists():
             raise SystemExit(f"{replay} exists; remove it or use a fresh --work-dir")
+        param_args = [a for p in params for a in ("--param", p)]
         run(replay_cmd + ["--scenario", scenario, "--bag", converted, "--out", replay,
-                          "--quiet"], stdout=subprocess.DEVNULL)
-        score_json = seq_dir / "ape.json"
+                          "--quiet"] + param_args, stdout=subprocess.DEVNULL)
+        score_json = seq_dir / ("ape_online.json" if args.online_rectify else "ape.json")
         run([sys.executable, SCRIPT_DIR / "evaluate_replay_trajectories.py", "--bag", replay,
              "--reference", "/reference/odometry", "--estimate", "/aqua_graph/odometry",
              "--segment-lengths", *SEGMENTS, "--json", score_json], stdout=subprocess.DEVNULL)
