@@ -156,8 +156,12 @@ official `short_test.yaml` from the dataset page).
 
 **Next steps (in order).**
 
-1. *(needs a human)* Held-out Tank sequences: the download link is mailed
-   after the form on the dataset page. Then run
+1. *(blocked, on hold since 2026-10-11)* Held-out Tank sequences: the
+   download form at senseroboticslab.github.io/underwater-tank-dataset/download/
+   only accepts an organizational e-mail address, so an individual developer
+   cannot obtain them; the AQUA-SLAM comparison stays a single-sequence
+   result (`short_test`) until someone with an institutional address (or the
+   authors) provides them. Then run
    `run_tank_benchmark.py` on `Structure_Easy` / `Medium` / `Hard` (check
    whether those sequences need the `long` calibration) and rerun AQUA-SLAM
    in its Docker image on the same bags to get same-run trajectories.
