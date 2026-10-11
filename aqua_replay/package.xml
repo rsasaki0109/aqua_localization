@@ -35,6 +35,7 @@
   <exec_depend>aqua_imu_loc</exec_depend>
   <exec_depend>aqua_pose_graph</exec_depend>
   <exec_depend>aqua_sonar_loc</exec_depend>
+  <exec_depend>aqua_visual_frontend</exec_depend>
   <exec_depend>rosbag2_storage_mcap</exec_depend>
 
   <test_depend>ament_cmake_gtest</test_depend>

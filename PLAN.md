@@ -168,7 +168,10 @@ official `short_test.yaml` from the dataset page).
    poses (`docs/benchmarks/beach_pond_mbes_loop_feasibility.md`). Next:
    a dataset with bathymetric relief; then PCM / group-k selection and
    registration-derived information.
-3. Remaining robustness evidence: real-time live node run.
+3. Real-time evidence: done for the Tank stack (online C++ frontend
+   bit-identical to the offline one; live 1x runs at 0.0095-0.0098 m,
+   frontend ~10 ms of a 50 ms camera period). Still open: AQUA-SLAM's own
+   timing on the same machine (Docker).
 4. Generated SOTA evidence packet (Phase 5) once held-out rows exist.
 
 ## 2026-06-11 Work-Loss Incident and Reconstruction (READ FIRST)

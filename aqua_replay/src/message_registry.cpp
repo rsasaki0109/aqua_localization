@@ -23,6 +23,7 @@
 #include "nav_msgs/msg/path.hpp"
 #include "rclcpp/serialization.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
+#include "sensor_msgs/msg/compressed_image.hpp"
 #include "sensor_msgs/msg/fluid_pressure.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/imu.hpp"
@@ -149,6 +150,7 @@ const std::map<std::string, TypeSupport> & registry()
       add(make_support<nav_msgs::msg::Odometry>("nav_msgs/msg/Odometry"));
       add(make_support<nav_msgs::msg::Path>("nav_msgs/msg/Path"));
       add(make_support<sensor_msgs::msg::CameraInfo>("sensor_msgs/msg/CameraInfo"));
+      add(make_support<sensor_msgs::msg::CompressedImage>("sensor_msgs/msg/CompressedImage"));
       add(make_support<sensor_msgs::msg::FluidPressure>("sensor_msgs/msg/FluidPressure"));
       add(make_support<sensor_msgs::msg::Image>("sensor_msgs/msg/Image"));
       add(make_support<sensor_msgs::msg::Imu>("sensor_msgs/msg/Imu"));
@@ -205,6 +207,8 @@ std::optional<std::string> default_type_for_topic(const std::string & topic)
     {"/mbes_loop_closure/markers", "visualization_msgs/msg/MarkerArray"},
     {"/aqua_graph/odometry", "nav_msgs/msg/Odometry"},
     {"/aqua_graph/status", "aqua_msgs/msg/GraphEstimatorStatus"},
+    {"/aqua_visual_frontend/stereo_features", "aqua_msgs/msg/StereoFeatures"},
+    {"/aqua_visual_frontend/processing_time_ms", "std_msgs/msg/Float64"},
     {"/ground_truth/odometry", "nav_msgs/msg/Odometry"},
     {"/tf", "tf2_msgs/msg/TFMessage"},
   };
