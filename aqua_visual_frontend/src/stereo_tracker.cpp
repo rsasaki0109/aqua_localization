@@ -15,6 +15,35 @@ namespace aqua_visual_frontend
 StereoTracker::StereoTracker(StereoTrackerConfig config)
 : config_(std::move(config)), disparity_guess_(config_.initial_disparity_px)
 {
+  if (config_.clahe_clip_limit > 0.0) {
+    clahe_ = cv::createCLAHE(
+      config_.clahe_clip_limit, cv::Size(config_.clahe_tile_grid, config_.clahe_tile_grid));
+  }
+}
+
+cv::Mat StereoTracker::prepare(const cv::Mat & image) const
+{
+  if (clahe_.empty()) {
+    return image;
+  }
+  cv::Mat out;
+  clahe_->apply(image, out);
+  return out;
+}
+
+cv::Mat StereoTracker::valid_mask(const cv::Mat & image) const
+{
+  cv::Mat mask(image.size(), CV_8UC1, cv::Scalar(255));
+  if (config_.saturation_level <= 255) {
+    cv::Mat saturated;
+    cv::threshold(image, saturated, config_.saturation_level - 1, 255, cv::THRESH_BINARY);
+    if (cv::countNonZero(saturated) > 0) {
+      const int k = 2 * config_.min_distance_px + 1;
+      cv::dilate(saturated, saturated, cv::getStructuringElement(cv::MORPH_ELLIPSE, {k, k}));
+      mask.setTo(0, saturated);
+    }
+  }
+  return mask;
 }
 
 void StereoTracker::reset()
@@ -60,9 +89,14 @@ void StereoTracker::flow(
   }
 }
 
-std::vector<StereoTrack> StereoTracker::process(const cv::Mat & left, const cv::Mat & right)
+std::vector<StereoTrack> StereoTracker::process(
+  const cv::Mat & raw_left, const cv::Mat & raw_right)
 {
   const auto & c = config_;
+  // Saturation is judged on the raw image, before CLAHE stretches it.
+  const cv::Mat valid = valid_mask(raw_left);
+  const cv::Mat left = prepare(raw_left);
+  const cv::Mat right = prepare(raw_right);
   std::vector<cv::Point2f> pts;
   std::vector<std::uint64_t> ids;
 
@@ -73,7 +107,9 @@ std::vector<StereoTrack> StereoTracker::process(const cv::Mat & left, const cv::
     flow(prev_left_, left, prev_pts_, nullptr, cur, ok);
     std::vector<cv::Point2f> prev_kept;
     for (size_t i = 0; i < ok.size(); ++i) {
-      if (ok[i]) {
+      if (ok[i] && valid.at<uchar>(
+          static_cast<int>(cur[i].y), static_cast<int>(cur[i].x)) != 0)
+      {
         prev_kept.push_back(prev_pts_[i]);
         pts.push_back(cur[i]);
         ids.push_back(ids_[i]);
@@ -101,7 +137,7 @@ std::vector<StereoTrack> StereoTracker::process(const cv::Mat & left, const cv::
   // 2) Top up with new corners away from existing tracks.
   const int missing = c.max_features - static_cast<int>(pts.size());
   if (missing > 0) {
-    cv::Mat mask(left.size(), CV_8UC1, cv::Scalar(255));
+    cv::Mat mask = valid.clone();
     for (const auto & p : pts) {
       cv::circle(
         mask, cv::Point(static_cast<int>(std::lround(p.x)), static_cast<int>(std::lround(p.y))),

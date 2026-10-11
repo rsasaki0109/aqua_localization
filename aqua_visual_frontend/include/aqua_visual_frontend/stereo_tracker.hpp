@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 
 namespace aqua_visual_frontend
 {
@@ -28,6 +29,13 @@ struct StereoTrackerConfig
   double min_disparity_px{1.0};
   double max_disparity_px{200.0};
   double initial_disparity_px{0.0};
+  // Contrast-limited histogram equalization of both images before tracking
+  // (hazy, low-contrast water); 0 disables it.
+  double clahe_clip_limit{0.0};
+  int clahe_tile_grid{8};
+  // Pixels at or above this level (sun glare, strobes) and a min_distance_px
+  // band around them get no new corners and drop tracks; 256 disables it.
+  int saturation_level{256};
 };
 
 struct StereoTrack
@@ -57,7 +65,13 @@ private:
     const std::vector<cv::Point2f> * guess, std::vector<cv::Point2f> & out,
     std::vector<bool> & ok) const;
 
+  // Grayscale image the tracker works on (CLAHE applied when enabled).
+  cv::Mat prepare(const cv::Mat & image) const;
+  // 255 where corners may be detected and tracks may live.
+  cv::Mat valid_mask(const cv::Mat & image) const;
+
   StereoTrackerConfig config_;
+  cv::Ptr<cv::CLAHE> clahe_;
   cv::Mat prev_left_;
   std::vector<cv::Point2f> prev_pts_;
   std::vector<std::uint64_t> ids_;
