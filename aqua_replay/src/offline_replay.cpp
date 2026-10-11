@@ -28,6 +28,7 @@
 #include <memory>
 #include <optional>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -76,6 +77,9 @@ struct OutputTopic
 struct Scenario
 {
   std::string bag;
+  // Additional bags merged into the input by receive time (e.g. a precomputed
+  // frontend's output recorded next to the raw sensor bag).
+  std::vector<std::string> extra_bags;
   std::string input_storage_id;
   std::vector<std::string> input_topics;
   std::map<std::string, std::string> input_remap;
@@ -93,6 +97,7 @@ struct Options
 {
   std::string scenario_path;
   std::optional<std::string> bag;
+  std::vector<std::string> extra_bags;
   std::optional<std::string> out;
   std::optional<double> start_offset_s;
   std::optional<double> duration_s;
@@ -172,6 +177,11 @@ Scenario load_scenario(const std::string & path)
   if (input) {
     if (input["bag"]) {s.bag = resolve_path(input["bag"].as<std::string>(), base_dir);}
     if (input["storage_id"]) {s.input_storage_id = input["storage_id"].as<std::string>();}
+    if (input["extra_bags"]) {
+      for (const auto & b : input["extra_bags"]) {
+        s.extra_bags.push_back(resolve_path(b.as<std::string>(), base_dir));
+      }
+    }
     if (input["topics"]) {s.input_topics = input["topics"].as<std::vector<std::string>>();}
     if (input["remap"]) {
       for (const auto & e : input["remap"]) {
@@ -250,6 +260,8 @@ Options parse_options(int argc, char ** argv)
       o.scenario_path = need(i);
     } else if (arg == "--bag") {
       o.bag = need(i);
+    } else if (arg == "--extra-bag") {
+      o.extra_bags.push_back(need(i));
     } else if (arg == "--out") {
       o.out = need(i);
     } else if (arg == "--start-offset") {
@@ -264,7 +276,8 @@ Options parse_options(int argc, char ** argv)
       o.quiet = true;
     } else if (arg == "-h" || arg == "--help") {
       std::cout <<
-        "offline_replay --scenario S.yaml [--bag IN] [--out OUT] [--start-offset SEC]\n"
+        "offline_replay --scenario S.yaml [--bag IN] [--extra-bag IN2]... [--out OUT]\n"
+        "               [--start-offset SEC]\n"
         "               [--duration SEC] [--param NODE:NAME:=VALUE]... [--summary PATH]\n"
         "               [--quiet]\n";
       std::exit(0);
@@ -436,6 +449,94 @@ LoadedNode load_node(const NodeSpec & spec, const std::vector<ComponentLibrary> 
   return loaded;
 }
 
+// Reads one or more bags as a single stream ordered by receive time (ties go
+// to the earlier bag). The first bag defines the replay's start time.
+class MergedBagReader
+{
+public:
+  void open(const std::vector<std::string> & uris, const std::string & storage_id)
+  {
+    for (const auto & uri : uris) {
+      auto reader = std::make_unique<rosbag2_cpp::Reader>();
+      rosbag2_storage::StorageOptions storage;
+      storage.uri = uri;
+      storage.storage_id = storage_id;
+      reader->open(storage);
+      readers_.push_back(std::move(reader));
+    }
+    next_.resize(readers_.size());
+  }
+
+  std::vector<rosbag2_storage::TopicMetadata> topics() const
+  {
+    std::vector<rosbag2_storage::TopicMetadata> all;
+    for (const auto & reader : readers_) {
+      for (const auto & meta : reader->get_all_topics_and_types()) {
+        if (std::none_of(
+            all.begin(), all.end(), [&](const auto & m) {return m.name == meta.name;}))
+        {
+          all.push_back(meta);
+        }
+      }
+    }
+    return all;
+  }
+
+  void set_filter(const std::vector<std::string> & topics)
+  {
+    for (auto & reader : readers_) {
+      rosbag2_storage::StorageFilter filter;
+      for (const auto & meta : reader->get_all_topics_and_types()) {
+        if (std::find(topics.begin(), topics.end(), meta.name) != topics.end()) {
+          filter.topics.push_back(meta.name);
+        }
+      }
+      if (filter.topics.empty()) {
+        // An empty filter means "everything"; park this reader instead.
+        exhausted_.insert(reader.get());
+      }
+      reader->set_filter(filter);
+    }
+  }
+
+  int64_t start_ns() const
+  {
+    return readers_.front()->get_metadata().starting_time.time_since_epoch().count();
+  }
+
+  void seek(int64_t stamp_ns)
+  {
+    for (auto & reader : readers_) {
+      reader->seek(stamp_ns);
+    }
+    std::fill(next_.begin(), next_.end(), nullptr);
+  }
+
+  std::shared_ptr<rosbag2_storage::SerializedBagMessage> read_next()
+  {
+    std::optional<size_t> best;
+    for (size_t i = 0; i < readers_.size(); ++i) {
+      if (!next_[i] && !exhausted_.count(readers_[i].get()) && readers_[i]->has_next()) {
+        next_[i] = readers_[i]->read_next();
+      }
+      if (next_[i] && (!best || receive_ns(*next_[i]) < receive_ns(*next_[*best]))) {
+        best = i;
+      }
+    }
+    if (!best) {
+      return nullptr;
+    }
+    auto message = std::move(next_[*best]);
+    next_[*best] = nullptr;
+    return message;
+  }
+
+private:
+  std::vector<std::unique_ptr<rosbag2_cpp::Reader>> readers_;
+  std::vector<std::shared_ptr<rosbag2_storage::SerializedBagMessage>> next_;
+  std::set<const rosbag2_cpp::Reader *> exhausted_;
+};
+
 struct InputTopic
 {
   std::string bag_topic;
@@ -463,6 +564,7 @@ int run(const Options & options)
 {
   Scenario scenario = load_scenario(options.scenario_path);
   if (options.bag) {scenario.bag = *options.bag;}
+  for (const auto & extra : options.extra_bags) {scenario.extra_bags.push_back(extra);}
   if (options.out) {scenario.out_bag = *options.out;}
   if (options.start_offset_s) {scenario.start_offset_s = *options.start_offset_s;}
   if (options.duration_s) {scenario.duration_s = *options.duration_s;}
@@ -476,17 +578,16 @@ int run(const Options & options)
 
   const auto wall_start = std::chrono::steady_clock::now();
 
-  // --- Input bag --------------------------------------------------------
-  rosbag2_cpp::Reader reader;
+  // --- Input bag(s) -----------------------------------------------------
+  MergedBagReader reader;
   {
-    rosbag2_storage::StorageOptions storage;
-    storage.uri = scenario.bag;
-    storage.storage_id = scenario.input_storage_id;
-    reader.open(storage);
+    std::vector<std::string> uris{scenario.bag};
+    uris.insert(uris.end(), scenario.extra_bags.begin(), scenario.extra_bags.end());
+    reader.open(uris, scenario.input_storage_id);
   }
   std::vector<InputTopic> inputs;
   std::map<std::string, size_t> input_index;
-  for (const auto & meta : reader.get_all_topics_and_types()) {
+  for (const auto & meta : reader.topics()) {
     if (!scenario.input_topics.empty() &&
       std::find(scenario.input_topics.begin(), scenario.input_topics.end(), meta.name) ==
       scenario.input_topics.end())
@@ -516,12 +617,11 @@ int run(const Options & options)
   }
   if (inputs.empty()) {fail("no replayable input topics");}
   {
-    rosbag2_storage::StorageFilter filter;
-    for (const auto & in : inputs) {filter.topics.push_back(in.bag_topic);}
-    reader.set_filter(filter);
+    std::vector<std::string> topics;
+    for (const auto & in : inputs) {topics.push_back(in.bag_topic);}
+    reader.set_filter(topics);
   }
-  const int64_t bag_start_ns =
-    reader.get_metadata().starting_time.time_since_epoch().count();
+  const int64_t bag_start_ns = reader.start_ns();
   const int64_t start_ns =
     bag_start_ns + static_cast<int64_t>(scenario.start_offset_s * 1e9);
   const int64_t end_ns = scenario.duration_s > 0.0 ?
@@ -628,8 +728,9 @@ int run(const Options & options)
       }
     };
 
-  while (reader.has_next() && rclcpp::ok()) {
+  while (rclcpp::ok()) {
     const auto bag_msg = reader.read_next();
+    if (!bag_msg) {break;}
     const int64_t recv_ns = receive_ns(*bag_msg);
     if (recv_ns < start_ns) {continue;}
     if (recv_ns > end_ns) {break;}
@@ -672,6 +773,7 @@ int run(const Options & options)
   y << YAML::BeginMap;
   y << YAML::Key << "scenario" << YAML::Value << fs::absolute(options.scenario_path).string();
   y << YAML::Key << "input_bag" << YAML::Value << scenario.bag;
+  y << YAML::Key << "extra_bags" << YAML::Value << scenario.extra_bags;
   y << YAML::Key << "output_bag" << YAML::Value << scenario.out_bag;
   y << YAML::Key << "order" << YAML::Value << (scenario.header_order ? "header" : "receive");
   y << YAML::Key << "reorder_window_s" << YAML::Value << scenario.reorder_window_s;

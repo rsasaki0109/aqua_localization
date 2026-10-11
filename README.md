@@ -41,7 +41,7 @@ are generated from recorded demo bags rather than hand-captured screenshots.
 
 | Dataset | What it shows | rerun view |
 |---------|---------------|------------|
-| **Tank Dataset `short_test`** | DVL fusion **0.43 m APE RMSE**; experimental visual-aided fusion **0.37 m** with same-sequence scale fit | [`tank_dataset_rerun.png`](docs/media/tank_dataset_rerun.png) |
+| **Tank Dataset `short_test`** | Tightly-coupled `aqua_graph` (stereo + IMU + DVL + pressure) **0.0092 m APE RMSE** on AQUA-SLAM's 11.65 s window (AQUA-SLAM: 0.0194 m); UKF 0.137 m. Single public sequence, not yet held-out ([details](docs/benchmarks/tank_aqua_slam.md)) | [`tank_dataset_rerun.png`](docs/media/tank_dataset_rerun.png) |
 | **MBES-SLAM `beach_pond`** | Multibeam fans accumulated into a depth-coloured bathymetric scan | [`mbes_slam_rerun.png`](docs/media/mbes_slam_rerun.png) |
 | **NTNU `subset-fjord/fjord_1`** | Dataset SLAM baseline through a 7 m fjord dive | [`ntnu_fjord_1_rerun.png`](docs/media/ntnu_fjord_1_rerun.png) |
 | **AQUALOC `harbor_07`** | LIRMM "Dumbo" ROV underwater camera + pressure depth track | [`aqualoc_harbor_07_rerun.png`](docs/media/aqualoc_harbor_07_rerun.png) |

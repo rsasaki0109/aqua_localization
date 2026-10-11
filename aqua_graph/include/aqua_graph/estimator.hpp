@@ -1,29 +1,42 @@
 // SPDX-License-Identifier: Apache-2.0
-// Tightly-coupled IMU + DVL + pressure (+ optional absolute position)
-// fixed-lag smoother built on GTSAM.
+// Tightly-coupled IMU + DVL + pressure + stereo-vision (+ optional absolute
+// position) fixed-lag smoother built on GTSAM.
 //
-// States (pose, world velocity, IMU bias) are created on a fixed time grid
-// driven by the IMU stream. IMU samples between grid states are folded into a
-// CombinedImuFactor; DVL, depth, and position measurements are attached to the
-// grid state nearest to their stamp. The estimator is a plain C++ library with
-// no ROS dependency so it can be driven by a ROS node, the deterministic
-// offline replay harness, or synthetic unit tests with identical results.
+// States (pose, world velocity, IMU bias) are created on a regular time grid
+// and, additionally, exactly at the stamps of "anchoring" measurements (stereo
+// frames, and DVL samples when dvl.anchor_states is set), so those
+// measurements constrain the state at their own time instead of the nearest
+// grid point. IMU samples between consecutive states are folded into a
+// CombinedImuFactor. Depth and position measurements attach to the nearest
+// state, shifted to its stamp with the current velocity estimate. Stereo
+// feature tracks become landmarks with GenericStereoFactor reprojection
+// constraints once a track has been seen in two frames.
 //
-// Callers must feed measurements in non-decreasing stamp order across all
-// sensors (the replay harness and the node's reorder buffer guarantee this).
+// To allow states at measurement stamps, IMU samples are buffered and states
+// are only created up to (latest IMU stamp - processing_delay_s). Anchoring
+// measurements must therefore arrive no later than processing_delay_s after
+// the IMU stream passes their stamp; later ones fall back to nearest-state
+// attachment. The estimator is a plain C++ library with no ROS dependency so
+// it can be driven by a ROS node, the deterministic offline replay harness,
+// or synthetic unit tests with identical results.
 #pragma once
 
 #include <cstdint>
 #include <deque>
+#include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
+#include <gtsam/geometry/Cal3_S2Stereo.h>
 #include <gtsam/geometry/Pose3.h>
+#include <gtsam/geometry/StereoPoint2.h>
 #include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/navigation/ImuBias.h>
 #include <gtsam/navigation/NavState.h>
+#include <gtsam_unstable/nonlinear/FixedLagSmoother.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
 
@@ -73,6 +86,8 @@ struct InitConfig
 struct DvlConfig
 {
   bool enabled{true};
+  // Create a state at every DVL stamp instead of using the nearest grid state.
+  bool anchor_states{true};
   gtsam::Rot3 body_R_dvl{};
   gtsam::Point3 lever_arm_body{0.0, 0.0, 0.0};
   double velocity_sigma_mps{0.02};
@@ -100,6 +115,23 @@ struct PositionConfig
   double huber_k{3.0};
 };
 
+struct VisualConfig
+{
+  bool enabled{true};
+  // Rectified stereo pinhole model (left camera) and baseline.
+  double fx{655.0};
+  double fy{655.0};
+  double cx{306.0};
+  double cy{256.0};
+  double baseline_m{0.12};
+  // Pose of the left camera in the body (IMU) frame.
+  gtsam::Pose3 body_P_camera{};
+  double pixel_sigma{1.0};
+  double huber_k{1.345};
+  double min_disparity_px{1.0};
+  double max_depth_m{20.0};
+};
+
 struct EstimatorConfig
 {
   ImuNoiseConfig imu;
@@ -107,13 +139,14 @@ struct EstimatorConfig
   DvlConfig dvl;
   DepthConfig depth;
   PositionConfig position;
-  // Spacing of the state grid. Measurements attach to the nearest grid state.
+  VisualConfig visual;
+  // Maximum spacing of the state grid between anchoring measurements.
   double state_period_s{0.1};
+  // States are created up to (latest IMU stamp - processing_delay_s), so
+  // anchoring measurements may lag the IMU stream by up to this much.
+  double processing_delay_s{0.05};
   // Fixed-lag smoother window.
   double smoother_lag_s{5.0};
-  // IMU samples with dt above this are treated as gaps and integrated with
-  // the previous sample held (covariance still grows with dt).
-  double max_imu_dt_s{0.1};
   // iSAM2 relinearization.
   double relinearize_threshold{0.01};
   int relinearize_skip{1};
@@ -139,9 +172,21 @@ struct EstimatorCounters
   uint64_t depth_applied{0};
   uint64_t position_received{0};
   uint64_t position_applied{0};
-  // Measurements whose nearest state already left the smoother window.
+  uint64_t stereo_frames{0};
+  uint64_t stereo_observations{0};
+  uint64_t stereo_rejected{0};
+  uint64_t landmarks_created{0};
+  // Measurements whose state already left the smoother window.
   uint64_t measurements_too_old{0};
   uint64_t smoother_updates{0};
+};
+
+struct StereoObservation
+{
+  uint64_t id{0};
+  double u_left{0.0};
+  double u_right{0.0};
+  double v{0.0};
 };
 
 class TightlyCoupledEstimator
@@ -159,8 +204,8 @@ public:
     double stamp_s, const gtsam::Pose3 & pose, const gtsam::Vector3 & velocity_world,
     const gtsam::imuBias::ConstantBias & bias);
 
-  // Feed one IMU sample. Returns the estimates of any grid states created
-  // while integrating this sample (normally zero or one).
+  // Feed one IMU sample. Returns the estimates of any states created as a
+  // result (states lag the IMU stream by processing_delay_s).
   std::vector<EstimatorOutput> add_imu(
     double stamp_s, const gtsam::Vector3 & accel_body, const gtsam::Vector3 & gyro_body,
     const std::optional<gtsam::Rot3> & orientation = std::nullopt);
@@ -171,27 +216,60 @@ public:
   void add_depth(double stamp_s, double depth_m);
   void add_position(
     double stamp_s, const gtsam::Point3 & position_world, const gtsam::Matrix3 & covariance);
+  // One rectified stereo frame of tracked features (ids persist across frames).
+  void add_stereo_frame(double stamp_s, const std::vector<StereoObservation> & observations);
 
   bool initialized() const {return initialized_;}
 
-  // Latest grid-state estimate propagated with the IMU samples received since.
+  // Newest state propagated with the buffered IMU samples up to the latest one.
   std::optional<EstimatorOutput> imu_rate_estimate() const;
-  // Latest smoothed estimate of the newest grid state.
+  // Latest smoothed estimate of the newest state.
   std::optional<EstimatorOutput> latest_state() const;
 
   const EstimatorCounters & counters() const {return counters_;}
   const EstimatorConfig & config() const {return config_;}
 
 private:
+  struct ImuSample
+  {
+    double stamp_s{0.0};
+    gtsam::Vector3 accel{gtsam::Vector3::Zero()};
+    gtsam::Vector3 gyro{gtsam::Vector3::Zero()};
+  };
+
+  struct StateRecord
+  {
+    uint64_t index{0};
+    double stamp_s{0.0};
+  };
+
   struct PendingMeasurement
   {
-    enum class Kind {kDvl, kDepth, kPosition};
+    enum class Kind {kDvl, kDepth, kPosition, kStereo};
     Kind kind{Kind::kDvl};
     double stamp_s{0.0};
+    bool anchored{false};
     gtsam::Vector3 vector{gtsam::Vector3::Zero()};
     gtsam::Vector3 omega{gtsam::Vector3::Zero()};
     double scalar{0.0};
     gtsam::Matrix3 covariance{gtsam::Matrix3::Zero()};
+    std::vector<StereoObservation> stereo;
+  };
+
+  struct FeatureTrack
+  {
+    std::optional<gtsam::Key> landmark;
+    // First observation, held until the second one initializes the landmark.
+    std::optional<uint64_t> first_state;
+    gtsam::StereoPoint2 first_measurement;
+    double last_seen_s{0.0};
+  };
+
+  struct UpdateBatch
+  {
+    gtsam::NonlinearFactorGraph graph;
+    gtsam::Values values;
+    gtsam::FixedLagSmoother::KeyTimestampMap timestamps;
   };
 
   void try_initialize(
@@ -199,22 +277,26 @@ private:
     const std::optional<gtsam::Rot3> & orientation);
   void start_graph(double stamp_s, const gtsam::NavState & state,
     const gtsam::imuBias::ConstantBias & bias);
-  void integrate(double dt, const gtsam::Vector3 & accel, const gtsam::Vector3 & gyro);
-  EstimatorOutput create_next_state();
-  int64_t nearest_state_index(double stamp_s) const;
-  void attach_measurements(gtsam::NonlinearFactorGraph & graph, uint64_t newest_index);
+  void enqueue(PendingMeasurement measurement);
+  std::vector<EstimatorOutput> advance(double target_s);
+  void integrate_to(double stamp_s);
+  EstimatorOutput create_state(double stamp_s);
+  // Nearest in-window state to a stamp (exact match for anchored ones).
+  std::optional<StateRecord> find_state(double stamp_s) const;
+  void attach_measurements(UpdateBatch & batch, const StateRecord & newest);
+  void attach_stereo(
+    UpdateBatch & batch, const StateRecord & state, const std::vector<StereoObservation> & obs);
+  gtsam::Pose3 pose_estimate(uint64_t index, const UpdateBatch & batch) const;
   gtsam::SharedNoiseModel robust(
     const gtsam::SharedNoiseModel & model, double huber_k) const;
-  void run_update(
-    const gtsam::NonlinearFactorGraph & graph, const gtsam::Values & values,
-    uint64_t new_state_index);
-  double state_stamp(uint64_t index) const;
+  void run_update(UpdateBatch & batch, const StateRecord & newest);
 
   EstimatorConfig config_;
   EstimatorCounters counters_;
   boost::shared_ptr<gtsam::PreintegrationCombinedParams> preint_params_;
   std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> preint_;
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> smoother_;
+  gtsam::Cal3_S2Stereo::shared_ptr stereo_calibration_;
 
   bool initialized_{false};
   std::optional<double> manual_init_stamp_;
@@ -228,16 +310,22 @@ private:
   gtsam::Vector3 init_gyro_sum_{gtsam::Vector3::Zero()};
   uint64_t init_samples_{0};
 
-  double t0_s_{0.0};
-  uint64_t current_index_{0};
-  double last_imu_stamp_s_{0.0};
-  gtsam::Vector3 last_accel_{gtsam::Vector3::Zero()};
-  gtsam::Vector3 last_gyro_{gtsam::Vector3::Zero()};
+  // IMU stream: the sample held over [integrated_until_s_, next sample) plus
+  // the not-yet-integrated samples after it.
+  ImuSample held_imu_;
+  std::deque<ImuSample> imu_buffer_;
   double integrated_until_s_{0.0};
+  double latest_imu_s_{0.0};
+  gtsam::Vector3 latest_gyro_{gtsam::Vector3::Zero()};
+
+  std::deque<StateRecord> states_;  // in the smoother window, oldest first
+  std::set<double> requested_stamps_;
+  std::deque<PendingMeasurement> pending_;
+  std::map<uint64_t, FeatureTrack> tracks_;
+  uint64_t next_landmark_{0};
 
   gtsam::NavState current_state_;
   gtsam::imuBias::ConstantBias current_bias_;
-  std::deque<PendingMeasurement> pending_;
 };
 
 // Parse "kAccelerometer"-style names used in YAML ("accelerometer",

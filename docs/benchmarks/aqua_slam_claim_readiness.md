@@ -11,10 +11,10 @@
 
 | Best current system | Sequence | Current RMSE m | AQUA-SLAM RMSE m | Gap |
 |---------------------|----------|---------------:|-----------------:|----:|
-| aqua_dvl_prior_visual | short_test | 0.0154 | 0.0194 | 0.79x |
+| aqua_graph | short_test | 0.0092 | 0.0194 | 0.47x |
 
 - No claimable AQUA-SLAM win is available yet.
-- Best numeric blockers: current row is diagnostic; held-out validation not established.
+- Best numeric blockers: held-out validation not established.
 
 ## Claim Gate
 
@@ -45,7 +45,7 @@ ros2 run aqua_localization aqua_slam_head_to_head_report.py docs/benchmarks/tank
 ## Candidate Link Bootstrap
 
 ```bash
-ros2 run aqua_localization verify_tank_medium_heldout_ready.py --sequence Medium --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml --locator-max-depth 5 --apply-located-links --archive-out-dir /tmp/tank_medium_download --out /tmp/aqua_slam_medium_heldout_verify/heldout_verify.md --locator-root /tmp
+ros2 run aqua_localization verify_tank_medium_heldout_ready.py --sequence Medium --profile /tmp/aqua_tank_dvl_prior_confidence_sweep_short_diag/best_profile.yaml --locator-max-depth 7 --apply-located-links --archive-out-dir /tmp/tank_medium_download --out /tmp/aqua_slam_medium_heldout_verify/heldout_verify.md
 ```
 
 ## Located Candidates

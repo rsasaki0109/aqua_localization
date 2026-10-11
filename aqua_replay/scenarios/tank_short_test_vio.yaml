@@ -1,0 +1,46 @@
+# Tank Dataset short_test with the full sensor set AQUA-SLAM uses: aqua_graph
+# fuses IMU preintegration, DVL, pressure, and stereo reprojection factors
+# from make_stereo_feature_track.py (passed as an extra bag), with the UKF
+# Tank profile alongside as the lightweight baseline.
+#
+#   ros2 run aqua_replay make_stereo_feature_track.py \
+#     --bag <short_test_ros2> --dst /tmp/short_test_features \
+#     --max-features 100 --publish-every 2
+#   ros2 run aqua_replay offline_replay \
+#     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/tank_short_test_vio.yaml \
+#     --bag <short_test_ros2> --extra-bag /tmp/short_test_features --out /tmp/tank_vio
+#   ros2 run aqua_replay evaluate_replay_trajectories.py --bag /tmp/tank_vio \
+#     --reference /apriltag_slam/GT --estimate /aqua_graph/odometry --last-s 11.65
+#
+# run_tank_benchmark.py wraps all three steps and prints the doc table rows.
+input:
+  topics:
+    - /imu/data
+    - /pressure
+    - /dvl/twist
+    - /apriltag_slam/GT
+    - /aqua_visual_frontend/stereo_features
+  order: header
+  reorder_window_s: 0.5
+
+nodes:
+  - plugin: aqua_imu_loc::ImuLocNode
+    name: aqua_imu_loc
+    params_files: [$(find-pkg-share aqua_imu_loc)/config/tank_dataset.yaml]
+    parameters:
+      publish:
+        tf: false
+  - plugin: aqua_graph::AquaGraphNode
+    name: aqua_graph
+    params_files: [$(find-pkg-share aqua_graph)/config/tank_dataset.yaml]
+    parameters:
+      topics:
+        stereo_features: /aqua_visual_frontend/stereo_features
+
+output:
+  storage_id: mcap
+  topics:
+    - {topic: /apriltag_slam/GT, type: nav_msgs/msg/Odometry}
+    - /aqua_imu_loc/odometry
+    - /aqua_graph/odometry
+    - /aqua_graph/status

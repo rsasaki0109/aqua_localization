@@ -57,6 +57,8 @@ install(PROGRAMS
   scripts/make_synthetic_mbes_bag.py
   scripts/compare_replay_summaries.py
   scripts/evaluate_replay_trajectories.py
+  scripts/make_stereo_feature_track.py
+  scripts/run_tank_benchmark.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

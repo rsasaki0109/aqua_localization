@@ -53,9 +53,14 @@ def umeyama(source: np.ndarray, target: np.ndarray, with_scale: bool):
     return scale, rotation, mu_t - scale * rotation @ mu_s
 
 
-def ape(reference: np.ndarray, estimate: np.ndarray, with_scale: bool = False) -> dict:
+def ape(reference: np.ndarray, estimate: np.ndarray, with_scale: bool = False,
+        window_start: float | None = None, window_end: float | None = None) -> dict:
     t0 = max(reference[0, 0], estimate[0, 0])
     t1 = min(reference[-1, 0], estimate[-1, 0])
+    if window_start is not None:
+        t0 = max(t0, window_start)
+    if window_end is not None:
+        t1 = min(t1, window_end)
     ref = reference[(reference[:, 0] >= t0) & (reference[:, 0] <= t1)]
     if ref.shape[0] < 3:
         return {"samples": int(ref.shape[0]), "error": "insufficient overlap"}
@@ -88,16 +93,28 @@ def main(argv=None) -> int:
                         help="Estimate nav_msgs/Odometry topic (repeatable).")
     parser.add_argument("--scale", action="store_true", help="Sim(3) instead of SE(3) alignment.")
     parser.add_argument("--json", type=Path, help="Write the result rows as JSON.")
+    window = parser.add_mutually_exclusive_group()
+    window.add_argument("--skip-first-s", type=float,
+                        help="Only score reference samples at least this long after the "
+                             "reference's first stamp.")
+    window.add_argument("--last-s", type=float,
+                        help="Only score the final N seconds of the reference (e.g. to match "
+                             "a baseline that initializes late).")
     parser.add_argument("--tum-dir", type=Path, help="Also export every trajectory as TUM here.")
     args = parser.parse_args(argv)
 
     reference = load_odometry(args.bag, args.reference)
+    window_start = None
+    if args.skip_first_s is not None:
+        window_start = reference[0, 0] + args.skip_first_s
+    elif args.last_s is not None:
+        window_start = reference[-1, 0] - args.last_s
     rows = {}
     trajectories = {args.reference: reference}
     for topic in args.estimate:
         estimate = load_odometry(args.bag, topic)
         trajectories[topic] = estimate
-        rows[topic] = ape(reference, estimate, args.scale)
+        rows[topic] = ape(reference, estimate, args.scale, window_start)
 
     align = "Sim(3)" if args.scale else "SE(3)"
     print(f"Reference: {args.reference} ({reference.shape[0]} samples), alignment {align}\n")

@@ -10,6 +10,8 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/navigation/ImuBias.h>
 
+#include "aqua_graph/estimator.hpp"
+
 namespace aqua_graph
 {
 
@@ -57,8 +59,26 @@ struct SyntheticSensorConfig
   double dvl_sigma_mps{0.02};
   gtsam::Point3 pressure_lever_arm_body{0.0, 0.0, 0.0};
   double depth_sigma_m{0.02};
+  // Downward-looking stereo camera over a seabed point field.
+  double camera_rate_hz{10.0};
+  VisualConfig camera;  // intrinsics, baseline, body_P_camera
+  int image_width{612};
+  int image_height{512};
+  double seabed_z{-4.0};
+  int seabed_points{4000};
+  double pixel_sigma{0.5};
   uint32_t seed{42};
 };
+
+struct SyntheticStereoFrame
+{
+  double stamp_s{0.0};
+  std::vector<StereoObservation> observations;
+};
+
+// Camera looking straight down (optical axis -z_world when the body is
+// level), image x along body +y; used by the synthetic tests and replay bags.
+gtsam::Pose3 downward_camera_mount();
 
 // Smooth figure-eight survey at ~2 m depth with gentle roll/pitch/yaw motion.
 TruthSample synthetic_truth(double stamp_s, double gravity_mps2 = 9.80665);
@@ -69,6 +89,7 @@ struct SyntheticDataset
   std::vector<SyntheticImuSample> imu;
   std::vector<SyntheticVectorSample> dvl;
   std::vector<SyntheticScalarSample> depth;
+  std::vector<SyntheticStereoFrame> stereo;
 };
 
 SyntheticDataset make_synthetic_dataset(const SyntheticSensorConfig & config);

@@ -34,14 +34,23 @@ aqua_graph::EstimatorConfig config_for(const aqua_graph::SyntheticSensorConfig &
   config.dvl.velocity_sigma_mps = sensors.dvl_sigma_mps;
   config.depth.lever_arm_body = sensors.pressure_lever_arm_body;
   config.depth.depth_sigma_m = sensors.depth_sigma_m;
+  config.visual = sensors.camera;
+  config.visual.pixel_sigma = std::max(sensors.pixel_sigma, 0.5);
   return config;
+}
+
+aqua_graph::SyntheticSensorConfig sensors_with_camera()
+{
+  aqua_graph::SyntheticSensorConfig sensors;
+  sensors.camera.body_P_camera = aqua_graph::downward_camera_mount();
+  return sensors;
 }
 
 // Merge all sensor streams in stamp order (IMU first on ties, as the replay
 // harness does for equal stamps) and run the estimator.
 RunResult run(
   const aqua_graph::SyntheticDataset & data, const aqua_graph::EstimatorConfig & config,
-  bool use_dvl, bool use_depth)
+  bool use_dvl, bool use_depth, bool use_stereo = false)
 {
   aqua_graph::TightlyCoupledEstimator estimator(config);
   const auto & first = data.truth.front();
@@ -51,6 +60,7 @@ RunResult run(
   RunResult result;
   size_t i_dvl = 0;
   size_t i_depth = 0;
+  size_t i_stereo = 0;
   for (const auto & imu : data.imu) {
     for (auto & out : estimator.add_imu(imu.stamp_s, imu.accel_body, imu.gyro_body)) {
       result.outputs.push_back(out);
@@ -66,6 +76,13 @@ RunResult run(
         estimator.add_depth(data.depth[i_depth].stamp_s, data.depth[i_depth].value);
       }
       ++i_depth;
+    }
+    while (i_stereo < data.stereo.size() && data.stereo[i_stereo].stamp_s <= imu.stamp_s) {
+      if (use_stereo) {
+        estimator.add_stereo_frame(
+          data.stereo[i_stereo].stamp_s, data.stereo[i_stereo].observations);
+      }
+      ++i_stereo;
     }
   }
 
@@ -124,14 +141,30 @@ TEST(TightlyCoupledEstimator, WithoutDvlDriftsMuchMore)
   EXPECT_LT(aided.max_depth_error_m, 0.05);
 }
 
+TEST(TightlyCoupledEstimator, StereoLandmarksReduceDrift)
+{
+  auto sensors = sensors_with_camera();
+  sensors.duration_s = 40.0;
+  const auto data = aqua_graph::make_synthetic_dataset(sensors);
+  const auto config = config_for(sensors);
+  const RunResult dvl_only = run(data, config, true, true, false);
+  const RunResult with_stereo = run(data, config, true, true, true);
+  std::printf("[aqua_graph] 40 s RMSE DVL+depth %.4f m vs +stereo %.4f m (%lu landmarks)\n",
+    dvl_only.position_rmse_m, with_stereo.position_rmse_m,
+    static_cast<unsigned long>(with_stereo.counters.landmarks_created));
+  EXPECT_GT(with_stereo.counters.landmarks_created, 100u);
+  EXPECT_GT(with_stereo.counters.stereo_observations, 1000u);
+  EXPECT_LT(with_stereo.position_rmse_m, 0.7 * dvl_only.position_rmse_m);
+}
+
 TEST(TightlyCoupledEstimator, RepeatedRunsAreBitIdentical)
 {
-  aqua_graph::SyntheticSensorConfig sensors;
+  auto sensors = sensors_with_camera();
   sensors.duration_s = 20.0;
   const auto data = aqua_graph::make_synthetic_dataset(sensors);
   const auto config = config_for(sensors);
-  const RunResult a = run(data, config, true, true);
-  const RunResult b = run(data, config, true, true);
+  const RunResult a = run(data, config, true, true, true);
+  const RunResult b = run(data, config, true, true, true);
   ASSERT_EQ(a.outputs.size(), b.outputs.size());
   for (size_t i = 0; i < a.outputs.size(); ++i) {
     const gtsam::Matrix4 ma = a.outputs[i].pose.matrix();

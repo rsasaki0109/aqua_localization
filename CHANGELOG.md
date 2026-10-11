@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Added `aqua_graph`, a GTSAM fixed-lag factor-graph backend fusing IMU
+  preintegration, body-frame DVL velocity, pressure depth, and stereo
+  reprojection factors with event-anchored states. Tank `short_test`:
+  0.0092 m APE RMSE on AQUA-SLAM's 11.65 s window (AQUA-SLAM 0.0194 m);
+  single public sequence, held-out validation pending.
+- Added `aqua_replay`: deterministic offline replay (bit-identical repeat
+  runs, verified on real beach_pond MBES data), multi-bag input, an offline
+  stereo feature frontend, and `run_tank_benchmark.py`.
+- Fixed the Tank IMU-DVL extrinsic (identity -> official calibration
+  rotation); UKF Tank row 0.429 m -> 0.145 m.
+- Registered all stack nodes as rclcpp components; added CI on Humble and
+  Jazzy.
+
 - Reduced pose-graph runtime work by skipping automatic g2o optimization on
   odometry-only chains until a loop constraint exists, with an opt-in parameter
   for the older chain-only auto-optimize behavior.
