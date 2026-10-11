@@ -161,11 +161,13 @@ official `short_test.yaml` from the dataset page).
    `run_tank_benchmark.py` on `Structure_Easy` / `Medium` / `Hard` (check
    whether those sequences need the `long` calibration) and rerun AQUA-SLAM
    in its Docker image on the same bags to get same-run trajectories.
-2. Track B loop closures: feed aqua_graph odometry into the existing
-   pose graph + MBES submap loop frontend, PCM / group-k consistency
-   selection, robust back end, registration-derived information. Score on
-   the no-compass beach_pond run (gyro-drift dominated) and check the
-   compass run is not degraded.
+2. Track B loop closures: the plumbing exists (motion-compensated
+   submaps, beam-angle filter, aqua_graph -> pose graph -> MBES loop
+   scenario), but on beach_pond no correct loop is obtainable: the 12
+   crossings lie in a flat basin and are not identifiable even at reference
+   poses (`docs/benchmarks/beach_pond_mbes_loop_feasibility.md`). Next:
+   a dataset with bathymetric relief; then PCM / group-k selection and
+   registration-derived information.
 3. Remaining robustness evidence: real-time live node run.
 4. Generated SOTA evidence packet (Phase 5) once held-out rows exist.
 
