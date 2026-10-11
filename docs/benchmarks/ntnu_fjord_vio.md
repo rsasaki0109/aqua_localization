@@ -22,6 +22,31 @@ error in % of path length (`evaluate_replay_trajectories.py
 `19c999b16ecfe3b0`. 312 s of data replay in ~200 s on 4 vCPU,
 single-threaded, including image decoding and tracking.
 
+## All six fjord sequences
+
+Same settings, nothing tuned per sequence; every bag is streamed from the
+dataset repository into the converter (`--src-url`, no local raw copy),
+replayed deterministically and scored against its own ReAqROVIO reference:
+
+```bash
+ros2 run aqua_replay run_ntnu_benchmark.py --calib-dir <calib> \
+  --work-dir <dir> --sequences fjord_1 fjord_2 fjord_3 fjord_4 fjord_5 fjord_6 --cleanup
+```
+
+<!-- generated:begin -->
+| Sequence | Path m | Duration s | RMSE m | Max m | Final m | drift 10 m % | drift 50 m % | drift 100 m % | Fingerprint |
+|----------|------:|------:|------:|------:|------:|------:|------:|------:|------|
+| `fjord_1` | 142 | 312 | 0.379 | 0.806 | 0.685 | 2.93 | 1.07 | 0.73 | `19c999b16ecfe3b0` |
+| `fjord_2` | 207 | 500 | 0.731 | 1.349 | 1.222 | 4.95 | 1.97 | 0.96 | `c26fe4b128c21c05` |
+| `fjord_3` | 123 | 272 | 0.339 | 0.545 | 0.396 | 2.94 | 0.99 | 0.65 | `aa5d84afa3ed569c` |
+| `fjord_4` | 166 | 411 | 0.553 | 1.120 | 1.101 | 3.85 | 1.30 | 1.04 | `5de84434c07496b8` |
+| `fjord_5` | 235 | 441 | 2.442 | 6.017 | 5.932 | 13.61 | 5.81 | 2.39 | `8911e18ec604dca7` |
+| `fjord_6` | 306 | 639 | 4.790 | 12.406 | 12.145 | 15.35 | 7.78 | 4.02 | `99dc467230be950b` |
+<!-- generated:end -->
+
+1.9 km of trajectory in total; 53 min wall for all six on 4 vCPU, including
+streaming ~115 GB of raw bags.
+
 ## Reproduce
 
 ```bash
