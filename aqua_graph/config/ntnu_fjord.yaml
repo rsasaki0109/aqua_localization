@@ -1,13 +1,16 @@
 # NTNU underwater-datasets, Trondheim fjord (Ariel, BlueROV2-Heavy class):
-# Alphasense IMU + rectified cam1/cam0 stereo (convert_ntnu_stereo_bag.py) +
-# MAVROS barometer. No DVL. The visual geometry (intrinsics, baseline,
+# Alphasense IMU + rectified cam1/cam0 stereo (convert_ntnu_stereo_bag.py).
+# No DVL, and no depth: /mavros/imu/static_pressure is the hull's internal
+# barometer, not the water-depth sensor (it moves +-0.16 m-equivalent while
+# the reference climbs ~7 m at the end of fjord_1); fusing it as depth makes
+# the estimate diverge. The visual geometry (intrinsics, baseline,
 # body_T_camera) comes from the overlay the converter writes; IMU noise is
 # the dataset's published Kalibr imu0_alphasense_noise.yaml.
 aqua_graph:
   ros__parameters:
     topics:
       imu: /imu/data
-      pressure: /pressure
+      pressure: ""
       dvl_velocity: ""
       position_odometry: ""
       stereo_features: /aqua_visual_frontend/stereo_features

@@ -154,6 +154,15 @@ official `short_test.yaml` from the dataset page).
   init, unhandled GTSAM fixed-lag failures (now re-anchored), DVL invalid
   sentinel handling in the baseline.
 
+**Cross-dataset check (2026-10-11).** With the Tank held-out sequences out
+of reach, the stack was run unchanged on NTNU `fjord_1` (fisheye stereo
+rectified offline, no DVL, no depth): 0.38 m RMSE / 0.73 % drift per 100 m
+against the 4-camera ReAqROVIO reference, deterministic
+(`docs/benchmarks/ntnu_fjord_vio.md`). Not an AQUA-SLAM comparison, but
+evidence the Tank result is not a single-sequence fit. Next candidates:
+fjord_2..6 (larger downloads), online fisheye rectification in the
+frontend.
+
 **Next steps (in order).**
 
 1. *(blocked, on hold since 2026-10-11)* Held-out Tank sequences: the

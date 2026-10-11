@@ -1,7 +1,8 @@
 # NTNU underwater-datasets fjord sequence, converted with
 # convert_ntnu_stereo_bag.py (rectified cam1/cam0 stereo, Alphasense IMU,
 # barometer, ReAqROVIO reference). The online C++ frontend and aqua_graph
-# (IMU + stereo + pressure, no DVL) run in-process. The rectified camera
+# run in-process on IMU + stereo only: no DVL on this vehicle, and no depth
+# (the bag's barometer is the hull's internal one). The rectified camera
 # geometry is aqua_graph/config/ntnu_fjord_stereo_geometry.yaml, the
 # overlay the converter writes from the dataset's Kalibr calibration.
 #
@@ -13,7 +14,6 @@
 input:
   topics:
     - /imu/data
-    - /pressure
     - /reference/odometry
     - /camera/left/image_rect/compressed
     - /camera/right/image_rect/compressed
@@ -35,6 +35,8 @@ nodes:
       - $(find-pkg-share aqua_graph)/config/ntnu_fjord.yaml
       - $(find-pkg-share aqua_graph)/config/ntnu_fjord_stereo_geometry.yaml
 
+# processing_time_ms is wall-clock and would make the fingerprint vary run
+# to run; it is measured in live runs (run_tank_live.py) instead.
 output:
   storage_id: mcap
   topics:
@@ -42,4 +44,3 @@ output:
     - /aqua_graph/odometry
     - /aqua_graph/status
     - /aqua_visual_frontend/stereo_features
-    - /aqua_visual_frontend/processing_time_ms

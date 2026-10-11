@@ -12,7 +12,8 @@ aqua_visual_frontend tracker expects rectified stereo, so this script:
    its right (Kalibr's cam0 is not necessarily the left one).
 3. Writes the rectified pair as JPEG `sensor_msgs/CompressedImage` on
    /camera/left/image_rect/compressed and /camera/right/image_rect/compressed,
-   plus the Alphasense IMU, the barometer, and the dataset's reference
+   plus the Alphasense IMU, the MAVROS barometer (/pressure; note it is the
+   hull's internal barometer, not a water-depth sensor), and the dataset's reference
    trajectory (`<sequence>_baseline.tum`, ReAqROVIO with four cameras + IMU)
    as nav_msgs/Odometry on /reference/odometry.
 4. Writes an aqua_graph parameter overlay (--params-out) with the rectified
