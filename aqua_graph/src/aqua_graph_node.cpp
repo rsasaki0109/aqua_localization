@@ -7,16 +7,19 @@
 // Measurements can arrive out of order across topics: the estimator attaches
 // each one to its nearest grid state as long as that state is still inside
 // the smoother window. The IMU stream itself must be time-ordered.
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "aqua_graph/estimator.hpp"
+#include "aqua_graph/factors.hpp"
 #include "aqua_imu_loc/pressure_depth_converter.hpp"
 #include "aqua_msgs/msg/graph_estimator_status.hpp"
 #include "aqua_msgs/msg/stereo_features.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
+#include "geometry_msgs/msg/twist_with_covariance_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/fluid_pressure.hpp"
@@ -63,6 +66,11 @@ public:
     const std::string pressure_topic =
       declare_parameter<std::string>("topics.pressure", "/pressure");
     const std::string dvl_topic = declare_parameter<std::string>("topics.dvl_velocity", "");
+    // Same DVL velocity as TwistWithCovarianceStamped; the message's linear
+    // covariance sets the factor sigma when dvl.use_message_covariance is set.
+    const std::string dvl_cov_topic =
+      declare_parameter<std::string>("topics.dvl_velocity_with_covariance", "");
+    const std::string heading_topic = declare_parameter<std::string>("topics.heading", "");
     const std::string position_topic =
       declare_parameter<std::string>("topics.position_odometry", "");
     const std::string stereo_topic =
@@ -110,6 +118,8 @@ public:
     init.attitude_source = *parsed;
     init.static_window_s = declare_parameter<double>("init.static_window_s", init.static_window_s);
     init.keep_imu_yaw = declare_parameter<bool>("init.keep_imu_yaw", init.keep_imu_yaw);
+    init.gyro_bias_from_static_window = declare_parameter<bool>(
+      "init.gyro_bias_from_static_window", init.gyro_bias_from_static_window);
     init.position_sigma_m =
       declare_parameter<double>("init.position_sigma_m", init.position_sigma_m);
     init.roll_pitch_sigma_rad =
@@ -122,7 +132,11 @@ public:
     init.gyro_bias_sigma = declare_parameter<double>("init.gyro_bias_sigma", init.gyro_bias_sigma);
 
     auto & dvl = config.dvl;
-    dvl.enabled = !dvl_topic.empty();
+    dvl.enabled = !dvl_topic.empty() || !dvl_cov_topic.empty();
+    use_dvl_covariance_ = declare_parameter<bool>("dvl.use_message_covariance", false);
+    // Added to DVL header stamps (sensor latency calibration): the true
+    // measurement time is stamp + time_offset_s.
+    dvl_time_offset_s_ = declare_parameter<double>("dvl.time_offset_s", 0.0);
     dvl.anchor_states = declare_parameter<bool>("dvl.anchor_states", dvl.anchor_states);
     const auto dvl_rpy = declare_parameter<std::vector<double>>(
       "dvl.mount.rotation_rpy_rad", {0.0, 0.0, 0.0});
@@ -153,6 +167,24 @@ public:
       declare_parameter<double>("pressure.depth_offset_m", pressure_config.depth_offset_m);
     pressure_config.gravity_mps2 = imu.gravity_mps2;
     pressure_converter_.configure(pressure_config);
+
+    depth.hold_initial_depth =
+      declare_parameter<bool>("depth.hold_initial_depth", depth.hold_initial_depth);
+    depth.hold_sigma_m = declare_parameter<double>("depth.hold_sigma_m", depth.hold_sigma_m);
+
+    auto & heading = config.heading;
+    heading.enabled = !heading_topic.empty();
+    heading.axis_body = point_from(
+      declare_parameter<std::vector<double>>("heading.axis_body", {1.0, 0.0, 0.0}),
+      "heading.axis_body");
+    // Heading of the measuring sensor's x axis is mapped to axis_body via this
+    // offset: measured = heading(sensor x) + offset_rad.
+    heading_offset_rad_ = declare_parameter<double>("heading.offset_rad", 0.0);
+    heading.sigma_rad = declare_parameter<double>("heading.sigma_rad", heading.sigma_rad);
+    heading.huber_k = declare_parameter<double>("heading.huber_k", heading.huber_k);
+    heading.align_initial_yaw =
+      declare_parameter<bool>("heading.align_initial_yaw", heading.align_initial_yaw);
+    use_heading_covariance_ = declare_parameter<bool>("heading.use_message_covariance", false);
 
     auto & position = config.position;
     position.enabled = !position_topic.empty();
@@ -195,6 +227,18 @@ public:
         dvl_topic, sensor_qos,
         [this](geometry_msgs::msg::TwistStamped::ConstSharedPtr msg) {on_dvl(*msg);});
     }
+    if (!dvl_cov_topic.empty()) {
+      dvl_cov_sub_ = create_subscription<geometry_msgs::msg::TwistWithCovarianceStamped>(
+        dvl_cov_topic, sensor_qos,
+        [this](geometry_msgs::msg::TwistWithCovarianceStamped::ConstSharedPtr msg) {
+          on_dvl_cov(*msg);
+        });
+    }
+    if (!heading_topic.empty()) {
+      heading_sub_ = create_subscription<sensor_msgs::msg::Imu>(
+        heading_topic, sensor_qos,
+        [this](sensor_msgs::msg::Imu::ConstSharedPtr msg) {on_heading(*msg);});
+    }
     if (!position_topic.empty()) {
       position_sub_ = create_subscription<nav_msgs::msg::Odometry>(
         position_topic, rclcpp::QoS(50),
@@ -211,10 +255,12 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "aqua_graph started: imu=%s pressure=%s dvl=%s position=%s stereo=%s odom=%s grid=%.3fs "
-      "lag=%.1fs",
+      "aqua_graph started: imu=%s pressure=%s dvl=%s heading=%s position=%s stereo=%s odom=%s "
+      "grid=%.3fs lag=%.1fs",
       imu_topic.c_str(), pressure_topic.empty() ? "<disabled>" : pressure_topic.c_str(),
-      dvl_topic.empty() ? "<disabled>" : dvl_topic.c_str(),
+      !dvl_topic.empty() ? dvl_topic.c_str() :
+      dvl_cov_topic.empty() ? "<disabled>" : dvl_cov_topic.c_str(),
+      heading_topic.empty() ? "<disabled>" : heading_topic.c_str(),
       position_topic.empty() ? "<disabled>" : position_topic.c_str(),
       stereo_topic.empty() ? "<disabled>" : stereo_topic.c_str(), odometry_topic.c_str(),
       config.state_period_s, config.smoother_lag_s);
@@ -309,7 +355,43 @@ private:
   void on_dvl(const geometry_msgs::msg::TwistStamped & msg)
   {
     const auto & v = msg.twist.linear;
-    estimator_->add_dvl(to_seconds(msg.header.stamp), gtsam::Vector3(v.x, v.y, v.z));
+    estimator_->add_dvl(
+      to_seconds(msg.header.stamp) + dvl_time_offset_s_, gtsam::Vector3(v.x, v.y, v.z));
+  }
+
+  void on_dvl_cov(const geometry_msgs::msg::TwistWithCovarianceStamped & msg)
+  {
+    const auto & v = msg.twist.twist.linear;
+    double sigma = -1.0;
+    if (use_dvl_covariance_) {
+      const auto & c = msg.twist.covariance;
+      const double var = std::max({c[0], c[7], c[14]});
+      if (std::isfinite(var) && var > 0.0) {
+        sigma = std::sqrt(var);
+      }
+    }
+    estimator_->add_dvl(
+      to_seconds(msg.header.stamp) + dvl_time_offset_s_, gtsam::Vector3(v.x, v.y, v.z), sigma);
+  }
+
+  void on_heading(const sensor_msgs::msg::Imu & msg)
+  {
+    const auto & q = msg.orientation;
+    const double qn = std::sqrt(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
+    if (!std::isfinite(qn) || qn < 0.5) {
+      return;
+    }
+    const gtsam::Rot3 r = gtsam::Rot3::Quaternion(q.w / qn, q.x / qn, q.y / qn, q.z / qn);
+    const double heading =
+      heading_of_axis(r, gtsam::Vector3::UnitX()) + heading_offset_rad_;
+    double sigma = -1.0;
+    if (use_heading_covariance_) {
+      const double var = msg.orientation_covariance[8];
+      if (std::isfinite(var) && var > 0.0) {
+        sigma = std::sqrt(var);
+      }
+    }
+    estimator_->add_heading(to_seconds(msg.header.stamp), heading, sigma);
   }
 
   void on_position(const nav_msgs::msg::Odometry & msg)
@@ -367,6 +449,9 @@ private:
     status.landmarks_created = c.landmarks_created;
     status.measurements_too_old = c.measurements_too_old;
     status.smoother_updates = c.smoother_updates;
+    status.smoother_resets = c.smoother_resets;
+    status.heading_received = c.heading_received;
+    status.heading_applied = c.heading_applied;
     status.velocity_world = to_msg(state.velocity_world);
     status.accel_bias = to_msg(state.bias.accelerometer());
     status.gyro_bias = to_msg(state.bias.gyroscope());
@@ -379,11 +464,17 @@ private:
   std::string base_frame_;
   bool publish_imu_rate_{true};
   bool use_position_covariance_{true};
+  bool use_dvl_covariance_{false};
+  bool use_heading_covariance_{false};
+  double dvl_time_offset_s_{0.0};
+  double heading_offset_rad_{0.0};
   gtsam::Vector3 last_gyro_{gtsam::Vector3::Zero()};
 
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr dvl_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr dvl_cov_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr heading_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr position_sub_;
   rclcpp::Subscription<aqua_msgs::msg::StereoFeatures>::SharedPtr stereo_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;

@@ -14,6 +14,18 @@
   rotation); UKF Tank row 0.429 m -> 0.145 m.
 - Registered all stack nodes as rclcpp components; added CI on Humble and
   Jazzy.
+- Added a sensor-outage robustness sweep (`run_tank_robustness.py`,
+  `offline_replay --drop-topic`, feature-track `--drop`): on Tank
+  `short_test` aqua_graph stays at 0.0096 m through a 10 s DVL outage (UKF
+  7.4 m) and degrades to 0.022 m through a 10 s camera outage.
+- Track B dead reckoning on the full MBES-SLAM `beach_pond` survey (16.6 km,
+  no GNSS position): aqua_graph with IMU + DVL + GNSS compass reaches 2.84 m
+  APE RMSE vs 3.60 m for classical DVL dead reckoning
+  (`docs/benchmarks/beach_pond_dead_reckoning.md`). New in aqua_graph: a
+  heading factor, `TwistWithCovarianceStamped` DVL input, depth hold for
+  surface vessels, `dvl.time_offset_s`, zero-bias init for moving starts,
+  and smoother re-anchoring instead of crashing on singular / inconsistent
+  fixed-lag updates (`GraphEstimatorStatus.smoother_resets`).
 
 - Reduced pose-graph runtime work by skipping automatic g2o optimization on
   odometry-only chains until a loop constraint exists, with an opt-in parameter

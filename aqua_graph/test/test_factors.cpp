@@ -74,4 +74,26 @@ TEST(PressureDepthFactor, JacobiansMatchNumerical)
   EXPECT_TRUE(gtsam::internal::testFactorJacobians("depth", factor, values, 1.0e-6, 1.0e-6));
 }
 
+TEST(HeadingFactor, ZeroErrorAtTruthAndWraps)
+{
+  const gtsam::Values values = make_values();
+  const auto pose = values.at<gtsam::Pose3>(X(0));
+  const gtsam::Vector3 axis(0.0, 1.0, 0.0);
+  const double heading = aqua_graph::heading_of_axis(pose.rotation(), axis);
+  aqua_graph::HeadingFactor exact(X(0), heading, axis, gtsam::noiseModel::Isotropic::Sigma(1, 0.01));
+  EXPECT_LT(exact.unwhitenedError(values).norm(), 1.0e-12);
+  // A measurement 2*pi away is the same heading.
+  aqua_graph::HeadingFactor wrapped(
+    X(0), heading + 2.0 * M_PI, axis, gtsam::noiseModel::Isotropic::Sigma(1, 0.01));
+  EXPECT_LT(wrapped.unwhitenedError(values).norm(), 1.0e-9);
+}
+
+TEST(HeadingFactor, JacobiansMatchNumerical)
+{
+  const gtsam::Values values = make_values();
+  aqua_graph::HeadingFactor factor(
+    X(0), 0.3, gtsam::Vector3(1.0, 0.2, 0.1), gtsam::noiseModel::Isotropic::Sigma(1, 0.01));
+  EXPECT_TRUE(gtsam::internal::testFactorJacobians("heading", factor, values, 1.0e-6, 1.0e-6));
+}
+
 }  // namespace

@@ -139,6 +139,21 @@ official `short_test.yaml` from the dataset page).
   claim gate reports "win, evidence blocked: held-out validation not
   established" - correct, since `short_test` is the only public sequence.
 
+**Robustness + Track B dead reckoning (2026-10-11).**
+
+- *Sensor outages (Tank `short_test`, `run_tank_robustness.py`):* aqua_graph
+  0.0124 / 0.0152 / 0.0201 / 0.0221 m through 2 / 4 / 6 / 10 s camera
+  outages, 0.0093 / 0.0096 m through 4 / 10 s DVL outages (UKF 0.72 /
+  7.38 m), 0.0211 / 0.0582 m with camera + DVL out for 2 / 4 s.
+- *beach_pond dead reckoning (`docs/benchmarks/beach_pond_dead_reckoning.md`):*
+  full 2.4 h / 16.6 km survey, GNSS position never used. With the GNSS
+  compass: aqua_graph 2.84 m RMSE (max 5.91 m) vs classical DVL DR 3.60 m
+  (max 9.05 m). Without it, both are bounded by gyro yaw drift (aqua_graph
+  2.31 m vs 2.37 m over 300 s, hundreds of metres over 2.4 h) - the regime
+  MBES loop closures must fix. Bugs found and fixed: moving-start gyro bias
+  init, unhandled GTSAM fixed-lag failures (now re-anchored), DVL invalid
+  sentinel handling in the baseline.
+
 **Next steps (in order).**
 
 1. *(needs a human)* Held-out Tank sequences: the download link is mailed
@@ -146,12 +161,12 @@ official `short_test.yaml` from the dataset page).
    `run_tank_benchmark.py` on `Structure_Easy` / `Medium` / `Hard` (check
    whether those sequences need the `long` calibration) and rerun AQUA-SLAM
    in its Docker image on the same bags to get same-run trajectories.
-2. Robustness evidence: visual dropout segments (DVL + pressure carry the
-   graph), long-sequence stability, real-time live node run.
-3. Track B on the graph: MBES submap loop factors in `aqua_graph`, PCM /
-   group-k consistency selection, robust back end, registration-derived
-   information, trajectory metrics against `/nav/processed/odometry`
-   (current UKF/sonar baseline ~50 m APE over 120 s).
+2. Track B loop closures: feed aqua_graph odometry into the existing
+   pose graph + MBES submap loop frontend, PCM / group-k consistency
+   selection, robust back end, registration-derived information. Score on
+   the no-compass beach_pond run (gyro-drift dominated) and check the
+   compass run is not degraded.
+3. Remaining robustness evidence: real-time live node run.
 4. Generated SOTA evidence packet (Phase 5) once held-out rows exist.
 
 ## 2026-06-11 Work-Loss Incident and Reconstruction (READ FIRST)

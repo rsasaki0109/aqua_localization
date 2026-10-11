@@ -56,8 +56,10 @@ install(TARGETS offline_replay
 install(PROGRAMS
   scripts/make_synthetic_mbes_bag.py
   scripts/compare_replay_summaries.py
+  scripts/dvl_dead_reckoning_baseline.py
   scripts/evaluate_replay_trajectories.py
   scripts/make_stereo_feature_track.py
+  scripts/run_beach_pond_benchmark.py
   scripts/run_tank_benchmark.py
   scripts/run_tank_robustness.py
   DESTINATION lib/${PROJECT_NAME}

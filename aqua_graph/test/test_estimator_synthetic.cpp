@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "aqua_graph/estimator.hpp"
+#include "aqua_graph/factors.hpp"
 #include "aqua_graph/synthetic_trajectory.hpp"
 
 namespace
@@ -194,6 +195,80 @@ TEST(TightlyCoupledEstimator, AccelerometerInitializationLevelsAttitude)
   EXPECT_NEAR(ypr.z(), -0.05, 1.0e-3);
   // Static: stays put.
   EXPECT_LT(state->pose.translation().norm(), 1.0e-3);
+}
+
+TEST(TightlyCoupledEstimator, AccelerometerInitializationWaitsForHeading)
+{
+  aqua_graph::EstimatorConfig config;
+  config.init.static_window_s = 0.5;
+  config.heading.enabled = true;
+  aqua_graph::TightlyCoupledEstimator estimator(config);
+  const gtsam::Rot3 R = gtsam::Rot3::Ypr(0.4, 0.1, -0.05);
+  const gtsam::Vector3 f = R.unrotate(gtsam::Vector3(0.0, 0.0, config.imu.gravity_mps2));
+  for (int i = 0; i <= 200; ++i) {
+    estimator.add_imu(i * 0.005, f, gtsam::Vector3::Zero());
+  }
+  // Static window complete, but no heading yet.
+  EXPECT_FALSE(estimator.initialized());
+  estimator.add_heading(1.0, 1.2);
+  for (int i = 201; i <= 300; ++i) {
+    estimator.add_imu(i * 0.005, f, gtsam::Vector3::Zero());
+  }
+  ASSERT_TRUE(estimator.initialized());
+  const auto state = estimator.latest_state();
+  ASSERT_TRUE(state.has_value());
+  EXPECT_NEAR(
+    aqua_graph::heading_of_axis(state->pose.rotation(), gtsam::Vector3::UnitX()), 1.2, 1.0e-3);
+  EXPECT_NEAR(state->pose.rotation().pitch(), 0.1, 1.0e-3);
+}
+
+TEST(TightlyCoupledEstimator, HeadingFactorCorrectsInitialYawError)
+{
+  aqua_graph::SyntheticSensorConfig sensors;
+  const auto data = aqua_graph::make_synthetic_dataset(sensors);
+  auto final_yaw_error = [&](bool use_heading) {
+      auto config = config_for(sensors);
+      config.init.yaw_sigma_rad = 0.2;
+      config.heading.enabled = use_heading;
+      config.heading.align_initial_yaw = false;
+      config.heading.sigma_rad = 0.005;
+      aqua_graph::TightlyCoupledEstimator estimator(config);
+      const auto & first = data.truth.front();
+      // Start 0.1 rad off in yaw.
+      const gtsam::Pose3 start(
+        gtsam::Rot3::Rz(0.1) * first.pose.rotation(), first.pose.translation());
+      estimator.set_initial_state(
+        first.stamp_s, start, first.velocity_world, gtsam::imuBias::ConstantBias());
+      size_t i_dvl = 0;
+      double next_heading_s = first.stamp_s;
+      for (const auto & imu : data.imu) {
+        estimator.add_imu(imu.stamp_s, imu.accel_body, imu.gyro_body);
+        while (i_dvl < data.dvl.size() && data.dvl[i_dvl].stamp_s <= imu.stamp_s) {
+          estimator.add_dvl(data.dvl[i_dvl].stamp_s, data.dvl[i_dvl].value);
+          ++i_dvl;
+        }
+        if (use_heading && imu.stamp_s >= next_heading_s) {
+          const auto truth = aqua_graph::synthetic_truth(imu.stamp_s);
+          estimator.add_heading(
+            imu.stamp_s,
+            aqua_graph::heading_of_axis(truth.pose.rotation(), gtsam::Vector3::UnitX()));
+          next_heading_s += 0.2;
+        }
+      }
+      const auto state = estimator.latest_state();
+      const auto truth = aqua_graph::synthetic_truth(state->stamp_s);
+      if (use_heading) {
+        EXPECT_GT(estimator.counters().heading_applied, 250u);
+      }
+      return std::abs(
+        gtsam::Rot3::Logmap(truth.pose.rotation().between(state->pose.rotation())).z());
+    };
+  const double without = final_yaw_error(false);
+  const double with = final_yaw_error(true);
+  std::printf("[aqua_graph] final yaw error: %.4f rad without heading, %.4f with\n",
+    without, with);
+  EXPECT_GT(without, 0.05);
+  EXPECT_LT(with, 0.01);
 }
 
 }  // namespace

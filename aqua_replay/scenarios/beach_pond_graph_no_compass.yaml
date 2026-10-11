@@ -1,0 +1,38 @@
+# beach_pond_graph.yaml without the GNSS compass: IMU + DVL + depth hold
+# only, as on a vehicle with no absolute heading. Yaw is then unobservable,
+# and with a MEMS IMU the gyro z bias is only weakly (and wrongly) observable
+# through the lateral specific force: letting the graph estimate it drifted
+# 6.4 % of distance on the first 300 s vs 2.0 % for plain gyro integration.
+# The gyro bias is therefore held at its calibrated value (zero here) with a
+# datasheet-level random walk.
+#
+#   ros2 run aqua_replay offline_replay \
+#     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/beach_pond_graph_no_compass.yaml \
+#     --bag beach_pond_ros2 --extra-bag beach_pond_aux --out /tmp/beach_pond_graph_nc
+input:
+  topics:
+    - /nav/sensors/microstrain/imu/raw
+    - /nav/processed/nortek/dvl_twist
+    - /nav/processed/odometry
+  order: header
+  reorder_window_s: 0.5
+  start_offset_s: 855.0
+
+nodes:
+  - plugin: aqua_graph::AquaGraphNode
+    name: aqua_graph
+    params_files: [$(find-pkg-share aqua_graph)/config/beach_pond.yaml]
+    parameters:
+      topics:
+        heading: ""
+      init:
+        gyro_bias_sigma: 0.00001
+      imu:
+        gyro_bias_random_walk: 0.000001
+
+output:
+  storage_id: mcap
+  topics:
+    - {topic: /nav/processed/odometry, type: nav_msgs/msg/Odometry}
+    - /aqua_graph/odometry
+    - /aqua_graph/status

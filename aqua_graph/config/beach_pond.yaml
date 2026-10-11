@@ -1,0 +1,63 @@
+# MBES-SLAM beach_pond (surface vessel, converted ROS 2 bag + aux bag with
+# the DVL twist and GNSS dual-antenna heading). Dead-reckoning profile:
+# raw Microstrain 3DM-GX5 IMU + Nortek DVL bottom track + GNSS-compass
+# heading + a constant-depth hold. GNSS position is never used; the
+# RTK GNSS-INS /nav/processed/odometry is only the reference.
+aqua_graph:
+  ros__parameters:
+    topics:
+      imu: /nav/sensors/microstrain/imu/raw
+      pressure: ""
+      dvl_velocity: ""
+      dvl_velocity_with_covariance: /nav/processed/nortek/dvl_twist
+      heading: /nav/processed/navsat/ubx_hdg/imu
+      position_odometry: ""
+      odometry: /aqua_graph/odometry
+      status: /aqua_graph/status
+
+    graph:
+      state_period_s: 0.2
+      smoother_lag_s: 5.0
+
+    imu:
+      # 3DM-GX5-25 datasheet densities, inflated for hull vibration.
+      accel_noise_density: 0.004
+      gyro_noise_density: 0.0003
+      accel_bias_random_walk: 0.0004
+      gyro_bias_random_walk: 0.00002
+
+    init:
+      # The vessel is already under way (~2 m/s) and turning when the DVL
+      # comes up, so level over a short window, keep the velocity prior
+      # loose (the DVL fixes it within a few states) and do not take the
+      # mean gyro as bias: the turn rate would be frozen in as yaw drift.
+      attitude_source: accelerometer
+      static_window_s: 0.5
+      velocity_sigma_mps: 3.0
+      gyro_bias_from_static_window: false
+      # 3DM-GX5-25 turn-on bias specs (+-0.04 deg/s, +-2 mg) instead of the
+      # generic defaults.
+      gyro_bias_sigma: 0.002
+      accel_bias_sigma: 0.02
+
+    dvl:
+      # nortek_dvl in the ustrain_imu frame (both from the bag's /tf_static):
+      # R_imu_dvl = Rz(90)^T * Rx(180); lever arm expressed in the IMU frame.
+      mount:
+        rotation_rpy_rad: [3.141592653589793, 0.0, -1.5707963267948966]
+      lever_arm_m: [1.105, 0.093, -0.843]
+      use_message_covariance: true
+      velocity_sigma_mps: 0.02
+
+    heading:
+      # The ubx_hdg orientation is the yaw of the gps_stbd frame, whose x
+      # axis is parallel to the IMU x axis (measured: constant 91.86 deg to
+      # base_link yaw, std 0.1 deg), so the measured axis is IMU +x.
+      axis_body: [1.0, 0.0, 0.0]
+      use_message_covariance: true
+      sigma_rad: 0.01
+      align_initial_yaw: true
+
+    depth:
+      hold_initial_depth: true
+      hold_sigma_m: 0.2

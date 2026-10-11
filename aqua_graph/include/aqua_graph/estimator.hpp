@@ -72,6 +72,10 @@ struct InitConfig
 {
   AttitudeInitSource attitude_source{AttitudeInitSource::kAccelerometer};
   double static_window_s{0.5};
+  // Take the mean gyro over the static window as the initial gyro bias.
+  // Disable for platforms that start under way (a turn rate would be
+  // frozen in as bias); the bias then starts at zero.
+  bool gyro_bias_from_static_window{true};
   // When true the initial yaw from the AHRS orientation is kept; otherwise the
   // initial yaw is zeroed so the trajectory starts heading along +x.
   bool keep_imu_yaw{false};
@@ -105,6 +109,25 @@ struct DepthConfig
   // Pressure is the most reliable underwater measurement; a robust loss here
   // stops depth from pulling a drifted vertical channel back.
   double huber_k{0.0};
+  // Surface vessels: constrain every state to the initial depth (sigma
+  // hold_sigma_m) instead of (or in addition to) pressure.
+  bool hold_initial_depth{false};
+  double hold_sigma_m{0.2};
+};
+
+struct HeadingConfig
+{
+  // Off by default: with align_initial_yaw, initialization waits for the
+  // first heading, which must not happen on platforms without one.
+  bool enabled{false};
+  // Body axis whose world heading is measured (e.g. the GNSS antenna
+  // baseline). Must not be close to vertical.
+  gtsam::Vector3 axis_body{1.0, 0.0, 0.0};
+  double sigma_rad{0.01};
+  double huber_k{3.0};
+  // Start the graph with the measured heading instead of yaw = 0, so the
+  // world frame is the heading sensor's (e.g. ENU) frame.
+  bool align_initial_yaw{true};
 };
 
 struct PositionConfig
@@ -139,6 +162,7 @@ struct EstimatorConfig
   DvlConfig dvl;
   DepthConfig depth;
   PositionConfig position;
+  HeadingConfig heading;
   VisualConfig visual;
   // Maximum spacing of the state grid between anchoring measurements.
   double state_period_s{0.1};
@@ -172,6 +196,8 @@ struct EstimatorCounters
   uint64_t depth_applied{0};
   uint64_t position_received{0};
   uint64_t position_applied{0};
+  uint64_t heading_received{0};
+  uint64_t heading_applied{0};
   uint64_t stereo_frames{0};
   uint64_t stereo_observations{0};
   uint64_t stereo_rejected{0};
@@ -179,6 +205,9 @@ struct EstimatorCounters
   // Measurements whose state already left the smoother window.
   uint64_t measurements_too_old{0};
   uint64_t smoother_updates{0};
+  // Times the smoother hit an indeterminate system and was re-anchored at
+  // the latest estimate (see run_update).
+  uint64_t smoother_resets{0};
 };
 
 struct StereoObservation
@@ -216,6 +245,8 @@ public:
   void add_depth(double stamp_s, double depth_m);
   void add_position(
     double stamp_s, const gtsam::Point3 & position_world, const gtsam::Matrix3 & covariance);
+  // World heading of config.heading.axis_body (sigma <= 0: configured one).
+  void add_heading(double stamp_s, double heading_rad, double sigma_rad = -1.0);
   // One rectified stereo frame of tracked features (ids persist across frames).
   void add_stereo_frame(double stamp_s, const std::vector<StereoObservation> & observations);
 
@@ -245,7 +276,7 @@ private:
 
   struct PendingMeasurement
   {
-    enum class Kind {kDvl, kDepth, kPosition, kStereo};
+    enum class Kind {kDvl, kDepth, kPosition, kHeading, kStereo};
     Kind kind{Kind::kDvl};
     double stamp_s{0.0};
     bool anchored{false};
@@ -289,7 +320,13 @@ private:
   gtsam::Pose3 pose_estimate(uint64_t index, const UpdateBatch & batch) const;
   gtsam::SharedNoiseModel robust(
     const gtsam::SharedNoiseModel & model, double huber_k) const;
+  void add_state_priors(
+    UpdateBatch & batch, uint64_t index, const gtsam::NavState & state,
+    const gtsam::imuBias::ConstantBias & bias, double yaw_sigma_rad,
+    double position_sigma_m) const;
+  void make_smoother();
   void run_update(UpdateBatch & batch, const StateRecord & newest);
+  void reset_smoother(StateRecord newest);
 
   EstimatorConfig config_;
   EstimatorCounters counters_;
@@ -309,6 +346,7 @@ private:
   gtsam::Vector3 init_accel_sum_{gtsam::Vector3::Zero()};
   gtsam::Vector3 init_gyro_sum_{gtsam::Vector3::Zero()};
   uint64_t init_samples_{0};
+  std::optional<double> latest_heading_rad_;
 
   // IMU stream: the sample held over [integrated_until_s_, next sample) plus
   // the not-yet-integrated samples after it.
