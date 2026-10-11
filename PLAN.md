@@ -5,7 +5,7 @@ This is the canonical "where we are, where we are going" document for
 what is already solid, what is still experimental, and what the next useful
 engineering move is.
 
-Current date: 2026-10-10.
+Current date: 2026-10-11.
 Latest release: [v0.5](https://github.com/rsasaki0109/aqua_localization/releases/tag/v0.5).
 Current public goal: make the project useful enough to earn 10 GitHub stars
 through reproducible public-data demos, honest limits, and small contribution
@@ -113,44 +113,46 @@ substrate and one estimator:
     the graph's kinematic model; real-data validation is the next step.
     Replays with GTSAM's TBB threading are bit-identical too (CI test).
 
+**Phase 1 + Track A first real-data results (2026-10-11).** Data acquired in
+the cloud session (beach_pond from seaward.science, Tank `short_test` and its
+official `short_test.yaml` from the dataset page).
+
+- *MBES determinism closed:* beach_pond 120 s, two `offline_replay` runs of
+  the full UKF + sonar feedback + registration + pose graph + loop-closure
+  pipeline are bit-identical (fingerprint `21d1bfd162135d70`, 26 s wall per
+  run). The old `ros2 bag play` probe diverged by 184 m on the same window.
+  Accuracy is still poor (UKF/sonar ~50 m APE vs `/nav/processed/odometry`
+  over 120 s) - Track B accuracy work starts from here.
+- *Tank calibration bug:* both Tank profiles used an identity IMU-DVL
+  rotation, but the IMU is mounted y-down; horizontal DVL motion was fused
+  as vertical. With the official `T_imu_camera`/`T_dvl_camera` rotation the
+  UKF row goes 0.429 m -> 0.145 m.
+- *Why the old visual frontend needed a scale fit:* frame-to-frame PnP on
+  the near-planar tank floor over-estimates translation ~5x
+  (rotation/translation ambiguity). Gyro-constrained reprojection factors
+  remove it.
+- *aqua_graph stereo + IMU + DVL + pressure:* event-anchored states, stereo
+  landmark reprojection factors, new VINS-style offline frontend. On
+  `short_test`, AQUA-SLAM's 234-sample window: **0.0092 m** vs AQUA-SLAM
+  0.0194 m (full overlap 0.0099 m), deterministic, ~9 s wall for 15 s.
+  Ablations and settings: `docs/benchmarks/tank_aqua_slam.md`. The repo's
+  claim gate reports "win, evidence blocked: held-out validation not
+  established" - correct, since `short_test` is the only public sequence.
+
 **Next steps (in order).**
 
-1. *(needs the external-SSD data)* Run the MBES determinism probe with the
-   new harness and confirm it closes Phase 1:
-   ```bash
-   for r in a b; do
-     ros2 run aqua_replay offline_replay \
-       --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/mbes_beach_pond.yaml \
-       --bag datasets/public/mbes_slam/beach_pond_ros2 --out /tmp/mbes_replay_$r --duration 120
-   done
-   ros2 run aqua_replay compare_replay_summaries.py /tmp/mbes_replay_a /tmp/mbes_replay_b
-   ```
-   The output bags carry the same topics as `record_mbes_demo.sh`, so the
-   existing export/metric scripts apply. Then rebase descriptor sweeps and
-   loop audits on harness runs (one run per setting is now sufficient).
-2. *(needs Tank data)* First real-data row for the graph backend:
-   ```bash
-   ros2 run aqua_replay offline_replay \
-     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/tank_short_test_dvl.yaml \
-     --bag <short_test ros2 bag> --out /tmp/tank_dvl_replay
-   ros2 run aqua_replay evaluate_replay_trajectories.py --bag /tmp/tank_dvl_replay \
-     --reference /apriltag_slam/GT --estimate /aqua_imu_loc/odometry --estimate /aqua_graph/odometry
-   ```
-   Compare with the 0.4291 m IMU+pressure+DVL UKF row. Tune only IMU noise
-   densities and DVL extrinsic/sigma, and record what was tuned.
-3. Visual factors in `aqua_graph`: start with the existing stereo frontend's
-   output as relative-pose (between) factors, then stereo smart factors with
-   online extrinsic refinement. Target: `short_test` < 0.05 m without
-   same-sequence scale fitting, then AQUA-SLAM's 0.0194 m.
-4. Held-out Tank (`Structure_Easy`, `Medium`, `Hard`; still awaiting
-   delivery since June: re-request or find an alternative channel) with
-   AQUA-SLAM run under identical conditions, multiple runs, crash rate.
-5. Track B on the graph: MBES submap loop factors in `aqua_graph`, PCM /
-   group-k consistency selection, switchable or GNC robust back end,
-   registration-derived information matrices, and trajectory metrics against
-   the beach_pond reference.
-6. Robustness/differentiation experiments (visual dropout with DVL+pressure
-   carrying through) and the generated SOTA-readiness evidence packet.
+1. *(needs a human)* Held-out Tank sequences: the download link is mailed
+   after the form on the dataset page. Then run
+   `run_tank_benchmark.py` on `Structure_Easy` / `Medium` / `Hard` (check
+   whether those sequences need the `long` calibration) and rerun AQUA-SLAM
+   in its Docker image on the same bags to get same-run trajectories.
+2. Robustness evidence: visual dropout segments (DVL + pressure carry the
+   graph), long-sequence stability, real-time live node run.
+3. Track B on the graph: MBES submap loop factors in `aqua_graph`, PCM /
+   group-k consistency selection, robust back end, registration-derived
+   information, trajectory metrics against `/nav/processed/odometry`
+   (current UKF/sonar baseline ~50 m APE over 120 s).
+4. Generated SOTA evidence packet (Phase 5) once held-out rows exist.
 
 ## 2026-06-11 Work-Loss Incident and Reconstruction (READ FIRST)
 
@@ -1313,12 +1315,11 @@ Large issues:
 
 ## One-Sentence Handover
 
-As of 2026-10-10 the project is on an explicit two-track SOTA program (Tank vs
-AQUA-SLAM, and MBES bathymetric SLAM) and Phase 0 is in place on
-`claude/sota-phase0-aqua-graph`: CI on Humble/Jazzy, componentized nodes, a
-deterministic offline replay harness that makes the full MBES feedback
-pipeline bit-identical across runs on synthetic data, and a GTSAM
-tightly-coupled IMU+DVL+pressure backend (`aqua_graph`) that beats the UKF
-20x on a synthetic survey; the next moves are running the harness on the real
-beach_pond and Tank bags (the external-SSD data), then adding visual factors
-to `aqua_graph`. The earlier history below remains accurate for its dates.
+As of 2026-10-11 the deterministic replay harness has closed MBES Phase 1 on
+real beach_pond data (bit-identical runs), and `aqua_graph` with stereo,
+IMU, DVL, and pressure scores 0.0092 m on Tank `short_test` against AQUA-SLAM's
+0.0194 m on the same window, after fixing the Tank IMU-DVL extrinsic; the
+claim gate correctly holds this as "evidence blocked" until held-out
+sequences (form-gated download) are run with AQUA-SLAM side by side, and
+Track B (MBES accuracy, ~50 m today) is the other open front. The earlier
+history below remains accurate for its dates.
