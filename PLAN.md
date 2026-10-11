@@ -159,9 +159,10 @@ of reach, the stack was run unchanged on NTNU `fjord_1` (fisheye stereo
 rectified offline, no DVL, no depth): 0.38 m RMSE / 0.73 % drift per 100 m
 against the 4-camera ReAqROVIO reference, deterministic
 (`docs/benchmarks/ntnu_fjord_vio.md`). Not an AQUA-SLAM comparison, but
-evidence the Tank result is not a single-sequence fit. Next candidates:
-fjord_2..6 (larger downloads), online fisheye rectification in the
-frontend.
+evidence the Tank result is not a single-sequence fit. All six fjord
+sequences (1.9 km): 0.36-0.73 m on fjord_1-4, 2.3 / 4.1 m on fjord_5 / 6
+after a landmark prior removed visual smoother resets. Open: the residual
+drift on fjord_5 / 6, online fisheye rectification in the frontend.
 
 **Next steps (in order).**
 

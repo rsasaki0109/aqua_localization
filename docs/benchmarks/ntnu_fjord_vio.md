@@ -13,13 +13,13 @@ below measure agreement with that published VIO, using one stereo pair.
 
 | Method | Inputs | RMSE m | Max m | Final m | drift 10 m % | drift 50 m % | drift 100 m % |
 |--------|--------|------:|------:|------:|------:|------:|------:|
-| aqua_graph (online frontend) | cam1/cam0 stereo + Alphasense IMU | **0.379** | 0.806 | 0.685 | 2.93 | 1.07 | 0.73 |
+| aqua_graph (online frontend) | cam1/cam0 stereo + Alphasense IMU | **0.375** | 0.793 | 0.674 | 2.93 | 1.05 | 0.73 |
 | aqua_imu_loc UKF (history, [`fjord_1.md`](fjord_1.md)) | MAVROS IMU + "pressure" | ~800-1300 | | | | | |
 
 SE(3)-aligned APE over the whole 312 s; drift is the world-frame segment
 error in % of path length (`evaluate_replay_trajectories.py
---segment-lengths`). Deterministic: two replays give fingerprint
-`19c999b16ecfe3b0`. 312 s of data replay in ~200 s on 4 vCPU,
+--segment-lengths`). Deterministic: two replays give the same fingerprint
+(`6c81ee5b2c1284db` with the landmark prior; `19c999b16ecfe3b0` before it). 312 s of data replay in ~200 s on 4 vCPU,
 single-threaded, including image decoding and tracking.
 
 ## All six fjord sequences
@@ -36,16 +36,27 @@ ros2 run aqua_replay run_ntnu_benchmark.py --calib-dir <calib> \
 <!-- generated:begin -->
 | Sequence | Path m | Duration s | RMSE m | Max m | Final m | drift 10 m % | drift 50 m % | drift 100 m % | Fingerprint |
 |----------|------:|------:|------:|------:|------:|------:|------:|------:|------|
-| `fjord_1` | 142 | 312 | 0.379 | 0.806 | 0.685 | 2.93 | 1.07 | 0.73 | `19c999b16ecfe3b0` |
-| `fjord_2` | 207 | 500 | 0.731 | 1.349 | 1.222 | 4.95 | 1.97 | 0.96 | `c26fe4b128c21c05` |
-| `fjord_3` | 123 | 272 | 0.339 | 0.545 | 0.396 | 2.94 | 0.99 | 0.65 | `aa5d84afa3ed569c` |
-| `fjord_4` | 166 | 411 | 0.553 | 1.120 | 1.101 | 3.85 | 1.30 | 1.04 | `5de84434c07496b8` |
-| `fjord_5` | 235 | 441 | 2.442 | 6.017 | 5.932 | 13.61 | 5.81 | 2.39 | `8911e18ec604dca7` |
-| `fjord_6` | 306 | 639 | 4.790 | 12.406 | 12.145 | 15.35 | 7.78 | 4.02 | `99dc467230be950b` |
+| `fjord_1` | 142 | 312 | 0.375 | 0.793 | 0.674 | 2.93 | 1.05 | 0.73 | `6c81ee5b2c1284db` |
+| `fjord_2` | 207 | 500 | 0.731 | 1.353 | 1.214 | 4.87 | 1.98 | 0.96 | `38bcec08cc5c830e` |
+| `fjord_3` | 123 | 272 | 0.358 | 0.569 | 0.436 | 3.11 | 1.03 | 0.70 | `4e69fcec7edfafc5` |
+| `fjord_4` | 166 | 411 | 0.576 | 1.167 | 1.149 | 3.92 | 1.36 | 1.08 | `6f8609b8cbf39ca6` |
+| `fjord_5` | 235 | 441 | 2.332 | 5.694 | 5.601 | 12.79 | 5.50 | 2.32 | `7d7156a6a29acc77` |
+| `fjord_6` | 306 | 639 | 4.139 | 10.976 | 10.717 | 13.74 | 7.02 | 3.44 | `993bbf4b5799c0b9` |
 <!-- generated:end -->
 
-1.9 km of trajectory in total; 53 min wall for all six on 4 vCPU, including
-streaming ~115 GB of raw bags.
+1.9 km of trajectory in total; ~55 min wall for all six on 4 vCPU,
+including streaming ~115 GB of raw bags.
+
+- **fjord_1-4: 0.36-0.73 m RMSE, 0.70-1.08 % drift per 100 m.**
+- **fjord_5 / fjord_6: 2.3 m / 4.1 m (2.3 % / 3.4 % per 100 m).** The first
+  run of these two re-anchored the fixed-lag smoother 10+ times; logging the
+  cause showed `IndeterminantLinearSystem` at a landmark: GTSAM's stereo
+  factor returns zero Jacobians for points behind the camera, leaving such
+  a landmark unconstrained. A weak 10 m prior on each new landmark
+  (`visual.landmark_prior_sigma_m`, now the default) removed every reset and
+  improved fjord_5 2.44 -> 2.33 m and fjord_6 4.79 -> 4.14 m (fjord_1-4 within
+  +-0.02 m; Tank `short_test` unchanged). The remaining error on these two
+  is drift between resets, not a failure, and is still open.
 
 ## Reproduce
 
