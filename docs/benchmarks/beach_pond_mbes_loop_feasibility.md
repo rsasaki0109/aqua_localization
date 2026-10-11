@@ -53,11 +53,6 @@ claim.
    deep central basin, which is flat to ~0.1 m over tens of metres; the
    sloped banks, where registration could work, are only surveyed by
    parallel concentric passes.
-4. **Earlier finding, single passes (first 30 min).** All 33 candidates
-   are true revisits, but the dead-reckoned guess is off by 12-39 m and
-   15.6 deg (gyro-bias heading drift before the first revisit), and the
-   pond's median slope is 4 %, so slope alone cannot resolve that.
-
 ## Next options
 
 - Evaluate MBES loop closure on a dataset with real relief (the plumbing:
