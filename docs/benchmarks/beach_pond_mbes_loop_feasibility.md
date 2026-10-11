@@ -3,8 +3,9 @@
 Goal: correct the no-compass dead-reckoning drift of
 [`beach_pond_dead_reckoning.md`](beach_pond_dead_reckoning.md) (hundreds of
 metres over 2.4 h) with bathymetric submap loop closures. Status: **no
-loop accepted yet; the blocker is registration observability on this
-seafloor, not the plumbing.** Nothing here is a benchmark claim.
+correct loop constraint is obtainable on this seafloor; the plumbing is
+in place for a dataset with more relief.** Nothing here is a benchmark
+claim.
 
 ## What changed
 
@@ -32,29 +33,37 @@ seafloor, not the plumbing.** Nothing here is a benchmark claim.
    (~2.3e-4 rad/s) accumulated before the first revisit (~20 min). Local
    GICP (3 m correspondence radius) cannot converge from there; every pair
    failed the fitness gate.
-2. **Submaps disagree even at the true pose.** Gridded at 1 m and placed
-   with the reference INS poses, overlapping submaps differ by 0.17-1.16 m
-   RMS (mean offsets up to 0.7 m). A sonar mount roll/pitch sweep
-   (+-1.5 deg) changes this by < 5 %, so it is not a simple mount bias;
-   outer-beam refraction and steep-bank gridding are the likely sources.
-   With aqua_graph attitude instead of the INS the disagreement grows a
-   little (graph-vs-INS tilt: 0.43 deg mean, 0.5 deg std about the swath
-   roll axis).
-3. **The seafloor is too smooth to resolve that.** Median slope is 4 %
-   (p90 15 %), so a 0.5 m vertical inconsistency equals ~12 m of
-   horizontal ambiguity. A coarse yaw x translation search over DEMs never
-   recovered the true pose: plain NCC is flat (0.998 everywhere, a tilted
-   plane matches its shifted copies), high-pass NCC peaks are not unique,
-   and absolute-height RMS (with a 50 % overlap requirement) lands
-   6-35 m from the truth.
+2. **Outer beams are refraction-limited.** Gridded at 1 m from the
+   reference INS poses, overlapping passes disagree by 0.17-1.6 m at the
+   true pose, while each pass is internally smooth (points within 0.02 m
+   of their cell median, p99 0.19 m). The disagreement depends on beam
+   angle: median |dz| between passes is ~0.45 m with all beams, 0.06-0.13 m
+   with beams within 45 deg (|y| <= depth), 0.03-0.06 m within ~31 deg.
+   Ruled out on the way: sonar mount roll/pitch (+-1.5 deg sweep, < 5 %
+   change), a port/starboard mirror, and sonar-vs-nav clock offsets
+   (including the 18 s GPS-UTC leap). New
+   `sensor.max_across_track_ratio` (1.0 in the scenario) applies the 45 deg
+   limit.
+3. **Crossings are not identifiable either.** Restricting loops to the 12
+   near-perpendicular crossings (45-90 deg) on the reference track, with
+   reference poses, inner beams and median gridding, a yaw (+-30 deg) x
+   translation (+-30 m) search never selects the true pose: shifted or
+   rotated placements match more cells within 0.15 m (up to ~90 % of the
+   overlap) than the truth does (~60 %). The crossings lie in the ~21 m
+   deep central basin, which is flat to ~0.1 m over tens of metres; the
+   sloped banks, where registration could work, are only surveyed by
+   parallel concentric passes.
+4. **Earlier finding, single passes (first 30 min).** All 33 candidates
+   are true revisits, but the dead-reckoned guess is off by 12-39 m and
+   15.6 deg (gyro-bias heading drift before the first revisit), and the
+   pond's median slope is 4 %, so slope alone cannot resolve that.
 
 ## Next options
 
-- Larger, multi-pass submaps (100 m+ of track) so curvature, not slope,
-  dominates; or restrict loops to crossing transits where the two swaths
-  are near-perpendicular (along-slope ambiguity of one pass is constrained
-  by the other).
-- Use the compass case instead (the realistic configuration for this
-  surface vessel): DR is already 2.84 m RMSE there, so loops would need
-  sub-metre registration, which finding 2 rules out on this data.
-- Evaluate on a dataset with more relief before investing further here.
+- Evaluate MBES loop closure on a dataset with real relief (the plumbing:
+  motion-compensated submaps, beam-angle filter, pose-graph scenario, is
+  ready). On beach_pond the honest result is that bathymetric loop closure
+  cannot correct the no-compass drift.
+- With the compass (the realistic configuration for this surface vessel)
+  dead reckoning is already 2.84 m RMSE, so there is little left for loops
+  to correct here.

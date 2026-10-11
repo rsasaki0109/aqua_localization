@@ -59,6 +59,8 @@ nodes:
         translation_m: [0.089, 0.353, -0.843]
         rotation_rpy_rad: [3.141592653589793, 0.0, -1.5707963267948966]
         min_range_m: 1.0
+        # Beams within 45 deg only: outer beams are refraction-limited.
+        max_across_track_ratio: 1.0
       submaps:
         # 20 Hz x 512 beams x ~10 s per submap before the voxel filter.
         max_points: 200000

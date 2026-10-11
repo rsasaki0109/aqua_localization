@@ -190,10 +190,14 @@ private:
   double max_gap_s_;
 };
 
-// Apply T to every point, dropping non-finite points and returns closer than
-// min_range_m to the sensor (MBES drivers report invalid beams as zeros).
+// Apply T to every point, dropping non-finite points, returns closer than
+// min_range_m to the sensor (MBES drivers report invalid beams as zeros)
+// and, when max_across_track_ratio > 0, outer beams with
+// |y| > max_across_track_ratio * |z| in the sensor frame (refraction makes
+// outer-beam depths disagree between passes far more than inner beams).
 PointCloud::Ptr transform_cloud(
-  const PointCloud & cloud, const Eigen::Isometry3d & T, double min_range_m);
+  const PointCloud & cloud, const Eigen::Isometry3d & T, double min_range_m,
+  double max_across_track_ratio = 0.0);
 
 class SubmapManager
 {

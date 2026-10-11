@@ -399,3 +399,14 @@ TEST(TransformCloud, MovesPointsAndDropsInvalidReturns)
   EXPECT_NEAR(out->at(0).y, -3.0F, 1.0e-5F);
   EXPECT_NEAR(out->at(0).z, -8.0F, 1.0e-5F);
 }
+
+TEST(TransformCloud, DropsOuterBeamsBeyondAcrossTrackRatio)
+{
+  aqua_sonar_loc::PointCloud cloud;
+  cloud.push_back(pcl::PointXYZ(0.0F, 5.0F, 10.0F));   // 26.6 deg: kept
+  cloud.push_back(pcl::PointXYZ(0.0F, -15.0F, 10.0F));  // 56.3 deg: dropped
+  const auto out = aqua_sonar_loc::transform_cloud(cloud, Eigen::Isometry3d::Identity(), 0.5, 1.0);
+  ASSERT_EQ(out->size(), 1U);
+  EXPECT_NEAR(out->at(0).y, 5.0F, 1.0e-6F);
+  EXPECT_EQ(aqua_sonar_loc::transform_cloud(cloud, Eigen::Isometry3d::Identity(), 0.5)->size(), 2U);
+}

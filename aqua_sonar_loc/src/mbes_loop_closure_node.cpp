@@ -226,6 +226,10 @@ private:
       Eigen::AngleAxisd(sensor_rpy[0], Eigen::Vector3d::UnitX())).toRotationMatrix();
     body_T_sensor_.translation() = Eigen::Vector3d(sensor_xyz[0], sensor_xyz[1], sensor_xyz[2]);
     min_point_range_m_ = declare_parameter<double>("sensor.min_range_m", 0.5);
+    // Keep beams with |y| <= ratio * |z| (1.0 = 45 deg). On beach_pond,
+    // outer beams disagree between passes by ~0.45 m median vs ~0.1 m
+    // within 45 deg. 0 keeps every beam.
+    max_across_track_ratio_ = declare_parameter<double>("sensor.max_across_track_ratio", 0.0);
     pose_history_ = PoseInterpolator(
       declare_parameter<double>("odometry.history_s", 300.0),
       declare_parameter<double>("odometry.max_gap_s", 0.5));
@@ -442,7 +446,8 @@ private:
         continue;
       }
       submap_manager_.append_points(*transform_cloud(
-          *buffered.cloud, anchor_inverse * *ping_pose * body_T_sensor_, min_point_range_m_));
+          *buffered.cloud, anchor_inverse * *ping_pose * body_T_sensor_, min_point_range_m_,
+          max_across_track_ratio_));
     }
     finalize_current_submap();
   }
@@ -1016,6 +1021,7 @@ private:
   std::string odometry_topic_;
   Eigen::Isometry3d body_T_sensor_{Eigen::Isometry3d::Identity()};
   double min_point_range_m_{0.5};
+  double max_across_track_ratio_{0.0};
   PoseInterpolator pose_history_;
   std::deque<KeyframeRecord> keyframe_buffer_;
   std::deque<BufferedCloud> point_buffer_;

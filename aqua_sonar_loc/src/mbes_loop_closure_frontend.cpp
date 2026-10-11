@@ -220,7 +220,8 @@ std::optional<Eigen::Isometry3d> PoseInterpolator::at(double stamp_s) const
 }
 
 PointCloud::Ptr transform_cloud(
-  const PointCloud & cloud, const Eigen::Isometry3d & T, double min_range_m)
+  const PointCloud & cloud, const Eigen::Isometry3d & T, double min_range_m,
+  double max_across_track_ratio)
 {
   auto out = std::make_shared<PointCloud>();
   out->reserve(cloud.size());
@@ -230,6 +231,11 @@ PointCloud::Ptr transform_cloud(
   for (const auto & p : cloud) {
     const Eigen::Vector3f v(p.x, p.y, p.z);
     if (!v.allFinite() || v.squaredNorm() < min_range_sq) {
+      continue;
+    }
+    if (max_across_track_ratio > 0.0 &&
+      std::abs(v.y()) > static_cast<float>(max_across_track_ratio) * std::abs(v.z()))
+    {
       continue;
     }
     const Eigen::Vector3f w = R * v + t;
