@@ -99,13 +99,18 @@ aqua_imu_loc:
         # over-corrected updates.
         snap_first_update: true
 
-      # WaterLinked A50 DVL bottom-track. The Tank Dataset paper provides the
-      # extrinsic between the DVL and the camera; the IMU↔DVL relative
-      # orientation is small and assumed identity here. If you need a tighter
-      # baseline, fill imu.dvl.mount.rotation_rpy_rad below.
+      # WaterLinked A50 DVL bottom-track. The Microstrain IMU is mounted with
+      # its y axis pointing down, and the DVL frame is rotated ~90 deg about x
+      # and ~180 deg about z relative to it, so an identity mount maps the
+      # DVL's horizontal velocity onto the IMU's vertical axis. The rotation
+      # below is R_imu_dvl = R_imu_cam * R_dvl_cam^T from the published Tank
+      # rig calibration (AQUA-SLAM data/underwater_orbslam3_blue_gx5_short.yaml,
+      # T_gyro_c and T_dvl_c); it is not fitted to any sequence. With it the
+      # DVL velocity's vertical component drops from 0.080 to 0.006 m/s on
+      # short_test, and the UKF row improves from 0.429 m to 0.145 m.
       dvl:
         mount:
-          rotation_rpy_rad: [0.0, 0.0, 0.0]
+          rotation_rpy_rad: [1.59272, 0.01941, 3.12966]
         # WaterLinked A50 specs the bottom-track velocity precision at ~1% of
         # measured speed; on a slow tank ROV that comes out to centimetric
         # one-sigma. 0.01 m²/s² ≈ 10 cm/s std-dev is a sensible starter.

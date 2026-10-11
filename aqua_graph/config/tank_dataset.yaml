@@ -1,7 +1,8 @@
 # Tank Dataset (Xu et al., IJRR 2025) through convert_tank_dataset_bag.py:
 # Microstrain 3DM-GX5 on /imu/data, synthesized /pressure, WaterLinked A50
-# bottom-track on /dvl/twist. Starting point only: IMU densities and the DVL
-# extrinsic have not been calibrated on held-out sequences yet.
+# bottom-track on /dvl/twist. IMU densities are datasheet-derived and have
+# not been tuned on any sequence; the DVL rotation is the published rig
+# calibration.
 aqua_graph:
   ros__parameters:
     topics:
@@ -25,13 +26,20 @@ aqua_graph:
       gyro_bias_random_walk: 0.00002
 
     init:
-      # The bag starts with a brief still stand (see aqua_imu_loc tank config).
+      # short_test is already moving at the first sample, so keep the leveling
+      # window short (the AHRS quaternion is not in this estimator's z-up
+      # world convention, so imu_orientation init does not apply here).
       attitude_source: accelerometer
-      static_window_s: 1.0
+      static_window_s: 0.2
 
     dvl:
+      # R_imu_dvl from the published rig calibration (AQUA-SLAM
+      # underwater_orbslam3_blue_gx5_short.yaml: T_gyro_c * T_dvl_c^-1); the
+      # IMU is y-down, so identity would turn horizontal DVL motion vertical.
+      # The calibration's translation is marked rotation-only upstream and
+      # made short_test slightly worse (0.030 vs 0.026 m), so no lever arm.
       mount:
-        rotation_rpy_rad: [0.0, 0.0, 0.0]
+        rotation_rpy_rad: [1.59272, 0.01941, 3.12966]
       lever_arm_m: [0.0, 0.0, 0.0]
       velocity_sigma_mps: 0.02
 
