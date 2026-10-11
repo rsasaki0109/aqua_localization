@@ -173,7 +173,14 @@ def run(args) -> int:
     writer_kwargs = {"version": 9} if "version" in inspect.signature(Writer).parameters else {}
     with Writer(dst, **writer_kwargs) as writer:
         conn = writer.add_connection(args.topic, STEREO_FEATURES_TYPE, typestore=ts)
+        first_ns = lefts[0][0] if lefts else 0
+        dropouts = [(first_ns + round(a * 1e9), first_ns + round(b * 1e9)) for a, b in args.drop]
         for stamp_ns, left_msg in lefts:
+            if any(a <= stamp_ns < b for a, b in dropouts):
+                # Simulated camera loss (blackout / turbidity): nothing is
+                # published and every track is lost, as after a real outage.
+                tracker.prev_left = None
+                continue
             j = int(np.argmin(np.abs(right_stamps - stamp_ns)))
             if abs(int(right_stamps[j]) - stamp_ns) > args.sync_slop_s * 1e9:
                 continue
@@ -201,6 +208,14 @@ def run(args) -> int:
     return 0
 
 
+def parse_window(text: str):
+    start, _, end = text.partition(":")
+    window = (float(start), float(end))
+    if not window[1] > window[0]:
+        raise argparse.ArgumentTypeError(f"bad window {text!r}; expected START:END with END > START")
+    return window
+
+
 def parse_args(argv):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--bag", required=True, help="Input rosbag2 with stereo images.")
@@ -223,6 +238,9 @@ def parse_args(argv):
     p.add_argument("--min-disparity-px", type=float, default=1.0)
     p.add_argument("--max-disparity-px", type=float, default=200.0)
     p.add_argument("--initial-disparity-px", type=float, default=0.0)
+    p.add_argument("--drop", action="append", default=[], type=parse_window, metavar="START:END",
+                   help="Simulate a camera outage between these offsets (s) from the first "
+                        "frame; repeatable. Used for robustness experiments.")
     p.add_argument("--overwrite", action="store_true")
     return p.parse_args(argv)
 

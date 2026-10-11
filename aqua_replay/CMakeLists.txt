@@ -59,6 +59,7 @@ install(PROGRAMS
   scripts/evaluate_replay_trajectories.py
   scripts/make_stereo_feature_track.py
   scripts/run_tank_benchmark.py
+  scripts/run_tank_robustness.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

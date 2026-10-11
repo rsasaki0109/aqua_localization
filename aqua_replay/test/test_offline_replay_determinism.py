@@ -107,3 +107,12 @@ def test_graph_backend_benchmark_is_deterministic_and_accurate(tmp_path):
     # this test was written; the UKF on the same stream is ~3-4 m).
     assert rows["/aqua_graph/odometry"]["matched_s"] > 100.0
     assert rows["/aqua_graph/odometry"]["rmse_m"] < 0.4
+
+
+def test_drop_topic_simulates_outage(synthetic_bag, tmp_path):
+    out = replay(synthetic_bag, tmp_path / "dvl_outage",
+                 "--drop-topic", "/dvl/twist:10.0:20.0")
+    # 5 Hz DVL over a 10 s window.
+    assert out["dropped_messages"] == 50
+    assert out["inputs"]["/dvl/twist"]["delivered"] == 300 - 50
+    assert out["inputs"]["/imu/data"]["delivered"] == 6001
