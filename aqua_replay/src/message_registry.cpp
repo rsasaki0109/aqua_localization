@@ -13,6 +13,7 @@
 #include "aqua_msgs/msg/pose_graph_keyframe.hpp"
 #include "aqua_msgs/msg/pose_graph_loop_constraint.hpp"
 #include "aqua_msgs/msg/scan_matching_status.hpp"
+#include "aqua_msgs/msg/stereo_features.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
@@ -137,6 +138,7 @@ const std::map<std::string, TypeSupport> & registry()
       add(make_support<aqua_msgs::msg::PoseGraphLoopConstraint>(
           "aqua_msgs/msg/PoseGraphLoopConstraint"));
       add(make_support<aqua_msgs::msg::ScanMatchingStatus>("aqua_msgs/msg/ScanMatchingStatus"));
+      add(make_support<aqua_msgs::msg::StereoFeatures>("aqua_msgs/msg/StereoFeatures"));
       add(make_support<geometry_msgs::msg::PoseStamped>("geometry_msgs/msg/PoseStamped"));
       add(make_support<geometry_msgs::msg::PoseWithCovarianceStamped>(
           "geometry_msgs/msg/PoseWithCovarianceStamped"));
