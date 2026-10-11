@@ -100,3 +100,35 @@ TEST(StereoTracker, RejectsPairsWithoutValidDisparity)
   const cv::Mat img = view(world, 40, 30, 320, 240);
   EXPECT_TRUE(tracker.process(img, img).empty());
 }
+
+TEST(StereoTracker, SaturatedRegionGetsNoFeatures)
+{
+  cv::Mat world = texture(400, 300);
+  world.convertTo(world, CV_8UC1, 200.0 / 255.0);
+  // A blown-out band (sun glare) across the top of both views.
+  world(cv::Rect(0, 0, 400, 90)).setTo(255);
+  aqua_visual_frontend::StereoTrackerConfig config;
+  config.saturation_level = 250;
+  aqua_visual_frontend::StereoTracker tracker(config);
+  // The views start at y = 30, so the glare covers image rows 0-59.
+  const auto f = tracker.process(view(world, 40, 30, 320, 240), view(world, 48, 30, 320, 240));
+  ASSERT_GT(f.size(), 20U);
+  for (const auto & t : f) {
+    EXPECT_GE(t.v, 60.0F + config.min_distance_px - 1.0F) << "id " << t.id;
+  }
+}
+
+TEST(StereoTracker, ClaheKeepsDisparity)
+{
+  cv::Mat world = texture(400, 300);
+  // Low-contrast, hazy version of the texture.
+  world.convertTo(world, CV_8UC1, 40.0 / 255.0, 100.0);
+  aqua_visual_frontend::StereoTrackerConfig config;
+  config.clahe_clip_limit = 2.0;
+  aqua_visual_frontend::StereoTracker tracker(config);
+  const auto f = tracker.process(view(world, 40, 30, 320, 240), view(world, 48, 30, 320, 240));
+  ASSERT_GT(f.size(), 40U);
+  for (const auto & t : f) {
+    EXPECT_NEAR(t.u_left - t.u_right, 8.0F, 0.3F) << "id " << t.id;
+  }
+}

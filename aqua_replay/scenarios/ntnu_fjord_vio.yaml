@@ -29,6 +29,10 @@ nodes:
         right: /camera/right/image_rect/compressed
       max_features: 150
       publish_every: 2
+      # Hazy fjord water with sun glare: equalize contrast, keep features
+      # out of blown-out regions (2026-10-11 drift diagnosis, fjord_5/6).
+      clahe_clip_limit: 2.0
+      saturation_level: 245
   - plugin: aqua_graph::AquaGraphNode
     name: aqua_graph
     params_files:

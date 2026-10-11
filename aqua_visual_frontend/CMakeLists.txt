@@ -17,15 +17,17 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(yaml_cpp_vendor REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
-add_library(stereo_tracker src/stereo_tracker.cpp)
+add_library(stereo_tracker src/stereo_tracker.cpp src/stereo_rectifier.cpp)
 target_compile_features(stereo_tracker PUBLIC cxx_std_17)
 target_include_directories(stereo_tracker PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
   ${OpenCV_INCLUDE_DIRS}
 )
-target_link_libraries(stereo_tracker ${OpenCV_LIBS})
+target_link_libraries(stereo_tracker ${OpenCV_LIBS} yaml-cpp)
 set_target_properties(stereo_tracker PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_library(stereo_frontend_component SHARED src/stereo_frontend_node.cpp)
@@ -50,6 +52,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_stereo_tracker test/test_stereo_tracker.cpp)
   target_link_libraries(test_stereo_tracker stereo_tracker)
+  ament_add_gtest(test_stereo_rectifier test/test_stereo_rectifier.cpp)
+  target_link_libraries(test_stereo_rectifier stereo_tracker)
 endif()
 
 ament_package()
