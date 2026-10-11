@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <utility>
 #include <vector>
@@ -173,6 +174,68 @@ PointCloud::Ptr convert_cloud(const sensor_msgs::msg::PointCloud2 & msg)
   std::vector<int> finite_indices;
   pcl::removeNaNFromPointCloud(*cloud, *cloud, finite_indices);
   return cloud;
+}
+
+PoseInterpolator::PoseInterpolator(double max_history_s, double max_gap_s)
+: max_history_s_(max_history_s), max_gap_s_(max_gap_s)
+{
+}
+
+void PoseInterpolator::add(double stamp_s, const Eigen::Isometry3d & pose)
+{
+  if (!std::isfinite(stamp_s) || (!samples_.empty() && stamp_s <= samples_.back().stamp_s)) {
+    return;
+  }
+  samples_.push_back(Sample{stamp_s, pose});
+  while (!samples_.empty() && samples_.front().stamp_s < stamp_s - max_history_s_) {
+    samples_.pop_front();
+  }
+}
+
+std::optional<Eigen::Isometry3d> PoseInterpolator::at(double stamp_s) const
+{
+  if (samples_.empty() || stamp_s < samples_.front().stamp_s ||
+    stamp_s > samples_.back().stamp_s)
+  {
+    return std::nullopt;
+  }
+  const auto upper = std::lower_bound(
+    samples_.begin(), samples_.end(), stamp_s,
+    [](const Sample & s, double t) {return s.stamp_s < t;});
+  if (upper->stamp_s == stamp_s) {
+    return upper->pose;
+  }
+  const auto lower = std::prev(upper);
+  const double span = upper->stamp_s - lower->stamp_s;
+  if (span > max_gap_s_) {
+    return std::nullopt;
+  }
+  const double a = (stamp_s - lower->stamp_s) / span;
+  const Eigen::Quaterniond q0(lower->pose.linear());
+  const Eigen::Quaterniond q1(upper->pose.linear());
+  Eigen::Isometry3d out = Eigen::Isometry3d::Identity();
+  out.linear() = q0.slerp(a, q1).normalized().toRotationMatrix();
+  out.translation() = (1.0 - a) * lower->pose.translation() + a * upper->pose.translation();
+  return out;
+}
+
+PointCloud::Ptr transform_cloud(
+  const PointCloud & cloud, const Eigen::Isometry3d & T, double min_range_m)
+{
+  auto out = std::make_shared<PointCloud>();
+  out->reserve(cloud.size());
+  const Eigen::Matrix3f R = T.linear().cast<float>();
+  const Eigen::Vector3f t = T.translation().cast<float>();
+  const float min_range_sq = static_cast<float>(min_range_m * min_range_m);
+  for (const auto & p : cloud) {
+    const Eigen::Vector3f v(p.x, p.y, p.z);
+    if (!v.allFinite() || v.squaredNorm() < min_range_sq) {
+      continue;
+    }
+    const Eigen::Vector3f w = R * v + t;
+    out->push_back(pcl::PointXYZ(w.x(), w.y(), w.z()));
+  }
+  return out;
 }
 
 PointCloud::Ptr downsample(const PointCloud & cloud, double voxel_leaf_m)

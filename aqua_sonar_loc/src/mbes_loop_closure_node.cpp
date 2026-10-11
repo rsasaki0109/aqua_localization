@@ -17,6 +17,7 @@
 #include "aqua_msgs/msg/loop_closure_status.hpp"
 #include "aqua_msgs/msg/pose_graph_keyframe.hpp"
 #include "aqua_msgs/msg/pose_graph_loop_constraint.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
@@ -168,6 +169,14 @@ public:
       [this](const aqua_msgs::msg::PoseGraphKeyframe::SharedPtr msg) {
         on_keyframe(*msg);
       });
+    if (!odometry_topic_.empty()) {
+      odometry_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+        odometry_topic_, rclcpp::QoS(500),
+        [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
+          pose_history_.add(
+            rclcpp::Time(msg->header.stamp).seconds(), pose_to_isometry(msg->pose.pose));
+        });
+    }
     points_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
       points_topic_, rclcpp::SensorDataQoS(),
       [this](const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
@@ -182,10 +191,12 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "mbes_loop_closure started: points=%s keyframes=%s loops=%s status=%s markers=%s backend=%s",
+      "mbes_loop_closure started: points=%s keyframes=%s loops=%s status=%s markers=%s backend=%s "
+      "ping_poses=%s",
       points_topic_.c_str(), keyframe_topic_.c_str(),
       loop_constraint_topic_.c_str(), status_topic_.c_str(), marker_topic_.c_str(),
-      registration_options_.backend.c_str());
+      registration_options_.backend.c_str(),
+      odometry_topic_.empty() ? "<off: raw sensor-frame pings>" : odometry_topic_.c_str());
   }
 
 private:
@@ -195,6 +206,29 @@ private:
       "topics.points", "/aqua_sonar_loc/points_filtered");
     keyframe_topic_ = declare_parameter<std::string>(
       "topics.keyframe", "/aqua_pose_graph/keyframe");
+    // Body odometry used to place every ping at its own pose inside the
+    // submap (motion compensation). Empty keeps the legacy behaviour of
+    // stacking raw sensor-frame pings, which only suits pre-registered
+    // point streams.
+    odometry_topic_ = declare_parameter<std::string>("topics.odometry", "");
+    const auto sensor_xyz = declare_parameter<std::vector<double>>(
+      "sensor.translation_m", {0.0, 0.0, 0.0});
+    const auto sensor_rpy = declare_parameter<std::vector<double>>(
+      "sensor.rotation_rpy_rad", {0.0, 0.0, 0.0});
+    if (sensor_xyz.size() != 3 || sensor_rpy.size() != 3) {
+      throw std::invalid_argument(
+        "sensor.translation_m and sensor.rotation_rpy_rad need 3 values");
+    }
+    body_T_sensor_ = Eigen::Isometry3d::Identity();
+    body_T_sensor_.linear() =
+      (Eigen::AngleAxisd(sensor_rpy[2], Eigen::Vector3d::UnitZ()) *
+      Eigen::AngleAxisd(sensor_rpy[1], Eigen::Vector3d::UnitY()) *
+      Eigen::AngleAxisd(sensor_rpy[0], Eigen::Vector3d::UnitX())).toRotationMatrix();
+    body_T_sensor_.translation() = Eigen::Vector3d(sensor_xyz[0], sensor_xyz[1], sensor_xyz[2]);
+    min_point_range_m_ = declare_parameter<double>("sensor.min_range_m", 0.5);
+    pose_history_ = PoseInterpolator(
+      declare_parameter<double>("odometry.history_s", 300.0),
+      declare_parameter<double>("odometry.max_gap_s", 0.5));
     loop_constraint_topic_ = declare_parameter<std::string>(
       "topics.loop_constraint", "/aqua_pose_graph/loop_constraint");
     status_topic_ = declare_parameter<std::string>(
@@ -378,10 +412,37 @@ private:
       [](const BufferedCloud & a, const BufferedCloud & b) {
         return a.stamp < b.stamp;
       });
-    for (const auto & buffered : selected) {
-      if (buffered.cloud && !buffered.cloud->empty()) {
-        submap_manager_.append_points(*buffered.cloud);
+    if (odometry_topic_.empty()) {
+      for (const auto & buffered : selected) {
+        if (buffered.cloud && !buffered.cloud->empty()) {
+          submap_manager_.append_points(*buffered.cloud);
+        }
       }
+      finalize_current_submap();
+      return;
+    }
+
+    // Motion-compensated submap: every ping goes to the anchor (start
+    // keyframe) body frame through the odometry pose at its own stamp.
+    // Relative odometry poses are used, so the submap shape does not depend
+    // on later pose-graph corrections of the anchor.
+    const auto anchor = pose_history_.at(start.stamp.seconds());
+    if (!anchor) {
+      publish_submap_status(submap_manager_.finalize_current().submap,
+        "no odometry pose at the keyframe stamp");
+      return;
+    }
+    const Eigen::Isometry3d anchor_inverse = anchor->inverse();
+    for (const auto & buffered : selected) {
+      if (!buffered.cloud || buffered.cloud->empty()) {
+        continue;
+      }
+      const auto ping_pose = pose_history_.at(buffered.stamp.seconds());
+      if (!ping_pose) {
+        continue;
+      }
+      submap_manager_.append_points(*transform_cloud(
+          *buffered.cloud, anchor_inverse * *ping_pose * body_T_sensor_, min_point_range_m_));
     }
     finalize_current_submap();
   }
@@ -952,6 +1013,10 @@ private:
   bool loop_selection_enabled_{false};
   std::unordered_set<std::uint64_t> selected_loop_pairs_;
   std::vector<SelectedLoopSignature> selected_loop_signatures_;
+  std::string odometry_topic_;
+  Eigen::Isometry3d body_T_sensor_{Eigen::Isometry3d::Identity()};
+  double min_point_range_m_{0.5};
+  PoseInterpolator pose_history_;
   std::deque<KeyframeRecord> keyframe_buffer_;
   std::deque<BufferedCloud> point_buffer_;
 
@@ -960,6 +1025,7 @@ private:
 
   rclcpp::Subscription<aqua_msgs::msg::PoseGraphKeyframe>::SharedPtr keyframe_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr points_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_sub_;
   rclcpp::Publisher<aqua_msgs::msg::PoseGraphLoopConstraint>::SharedPtr loop_pub_;
   rclcpp::Publisher<aqua_msgs::msg::LoopClosureStatus>::SharedPtr status_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;

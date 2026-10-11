@@ -349,3 +349,53 @@ TEST(MbesLoopClosureFrontendTest, AcceptedLoopTrackerCanRequireMultipleConsisten
   EXPECT_EQ(supported_by_two_check.required_support_count, 2U);
   EXPECT_NEAR(supported_by_two_check.nearest_translation_delta_m, 0.2, 1.0e-9);
 }
+
+TEST(PoseInterpolator, InterpolatesTranslationAndRotation)
+{
+  aqua_sonar_loc::PoseInterpolator history(100.0, 0.5);
+  Eigen::Isometry3d a = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3d b = Eigen::Isometry3d::Identity();
+  b.translation() = Eigen::Vector3d(2.0, -4.0, 1.0);
+  b.linear() = Eigen::AngleAxisd(0.4, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+  history.add(10.0, a);
+  history.add(10.2, b);
+  history.add(10.1, b);  // out of order: ignored
+
+  const auto mid = history.at(10.05);
+  ASSERT_TRUE(mid.has_value());
+  EXPECT_TRUE(mid->translation().isApprox(Eigen::Vector3d(0.5, -1.0, 0.25), 1.0e-12));
+  EXPECT_NEAR(Eigen::AngleAxisd(mid->linear()).angle(), 0.1, 1.0e-9);
+  ASSERT_TRUE(history.at(10.2).has_value());
+  EXPECT_FALSE(history.at(9.99).has_value());
+  EXPECT_FALSE(history.at(10.21).has_value());
+}
+
+TEST(PoseInterpolator, RefusesGapsAndDropsOldHistory)
+{
+  aqua_sonar_loc::PoseInterpolator history(1.0, 0.5);
+  history.add(0.0, Eigen::Isometry3d::Identity());
+  history.add(2.0, Eigen::Isometry3d::Identity());  // evicts t=0 (older than 1 s)
+  EXPECT_EQ(history.size(), 1U);
+  history.add(2.4, Eigen::Isometry3d::Identity());
+  EXPECT_TRUE(history.at(2.2).has_value());
+  history.add(3.4, Eigen::Isometry3d::Identity());  // evicts t=2.0
+  EXPECT_FALSE(history.at(2.2).has_value());
+  EXPECT_FALSE(history.at(3.0).has_value());  // 1 s gap > max_gap_s
+}
+
+TEST(TransformCloud, MovesPointsAndDropsInvalidReturns)
+{
+  aqua_sonar_loc::PointCloud cloud;
+  cloud.push_back(pcl::PointXYZ(0.0F, 3.0F, 8.0F));
+  cloud.push_back(pcl::PointXYZ(0.0F, 0.0F, 0.0F));  // invalid beam
+  cloud.push_back(pcl::PointXYZ(std::nanf(""), 1.0F, 1.0F));
+  Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
+  T.linear() = Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX()).toRotationMatrix();
+  T.translation() = Eigen::Vector3d(1.0, 0.0, 0.0);
+
+  const auto out = aqua_sonar_loc::transform_cloud(cloud, T, 0.5);
+  ASSERT_EQ(out->size(), 1U);
+  EXPECT_NEAR(out->at(0).x, 1.0F, 1.0e-5F);
+  EXPECT_NEAR(out->at(0).y, -3.0F, 1.0e-5F);
+  EXPECT_NEAR(out->at(0).z, -8.0F, 1.0e-5F);
+}
