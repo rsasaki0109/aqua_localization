@@ -276,6 +276,28 @@ private:
       declare_parameter<double>("registration.ndt.step_size_m", 0.1);
     registration_options_.ndt_outlier_ratio =
       declare_parameter<double>("registration.ndt.outlier_ratio", 0.55);
+    auto & coarse = registration_options_.coarse;
+    coarse.enabled = declare_parameter<bool>("registration.coarse.enabled", coarse.enabled);
+    coarse.cell_m = declare_parameter<double>("registration.coarse.cell_m", coarse.cell_m);
+    coarse.yaw_range_rad =
+      declare_parameter<double>("registration.coarse.yaw_range_rad", coarse.yaw_range_rad);
+    coarse.yaw_step_rad =
+      declare_parameter<double>("registration.coarse.yaw_step_rad", coarse.yaw_step_rad);
+    coarse.xy_range_m =
+      declare_parameter<double>("registration.coarse.xy_range_m", coarse.xy_range_m);
+    coarse.xy_step_m = declare_parameter<double>("registration.coarse.xy_step_m", coarse.xy_step_m);
+    coarse.min_overlap_cells =
+      declare_parameter<int>("registration.coarse.min_overlap_cells", coarse.min_overlap_cells);
+    coarse.residual_clip_m =
+      declare_parameter<double>("registration.coarse.residual_clip_m", coarse.residual_clip_m);
+    coarse.min_relief_m =
+      declare_parameter<double>("registration.coarse.min_relief_m", coarse.min_relief_m);
+    coarse.min_distinctiveness = declare_parameter<double>(
+      "registration.coarse.min_distinctiveness", coarse.min_distinctiveness);
+    coarse.distinct_radius_m =
+      declare_parameter<double>("registration.coarse.distinct_radius_m", coarse.distinct_radius_m);
+    coarse.distinct_yaw_rad =
+      declare_parameter<double>("registration.coarse.distinct_yaw_rad", coarse.distinct_yaw_rad);
 
     gate_options_.max_fitness_score =
       declare_parameter<double>("gates.max_fitness_score", 2.0);
@@ -930,6 +952,9 @@ private:
     msg.descriptor_extent_ratio = gate.descriptor_extent_ratio;
     msg.descriptor_point_count_ratio = gate.descriptor_point_count_ratio;
     msg.status = gate.status;
+    if (!result.coarse_detail.empty()) {
+      msg.status += " [" + result.coarse_detail + "]";
+    }
     status_pub_->publish(msg);
   }
 

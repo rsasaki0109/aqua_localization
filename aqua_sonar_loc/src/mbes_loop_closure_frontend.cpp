@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <cstdio>
 #include <iterator>
 #include <limits>
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -137,6 +141,241 @@ MatchResult run_registration(
 }
 
 }  // namespace
+
+namespace
+{
+
+struct HeightCell
+{
+  double x{0.0};
+  double y{0.0};
+  float h{0.0F};
+};
+
+// Median height per cell of points already in the levelled frame.
+std::vector<HeightCell> grid_heights(const std::vector<Eigen::Vector3d> & pts, double cell)
+{
+  std::unordered_map<std::int64_t, std::vector<float>> cells;
+  for (const auto & p : pts) {
+    const auto ix = static_cast<std::int64_t>(std::floor(p.x() / cell));
+    const auto iy = static_cast<std::int64_t>(std::floor(p.y() / cell));
+    cells[(ix << 32) ^ (iy & 0xffffffffLL)].push_back(static_cast<float>(p.z()));
+  }
+  std::vector<HeightCell> out;
+  out.reserve(cells.size());
+  for (auto & kv : cells) {
+    auto & v = kv.second;
+    if (v.size() < 2) {
+      continue;
+    }
+    std::nth_element(v.begin(), v.begin() + static_cast<long>(v.size() / 2), v.end());
+    const auto ix = kv.first >> 32;
+    const auto iy = static_cast<std::int32_t>(kv.first & 0xffffffffLL);
+    out.push_back(HeightCell{(static_cast<double>(ix) + 0.5) * cell,
+        (static_cast<double>(iy) + 0.5) * cell, v[v.size() / 2]});
+  }
+  // Deterministic order regardless of hash iteration.
+  std::sort(out.begin(), out.end(), [](const HeightCell & a, const HeightCell & b) {
+      return a.x != b.x ? a.x < b.x : a.y < b.y;
+    });
+  return out;
+}
+
+// Std of heights about their least-squares plane.
+double detrended_std(const std::vector<HeightCell> & cells)
+{
+  if (cells.size() < 4) {
+    return 0.0;
+  }
+  Eigen::Matrix3d A = Eigen::Matrix3d::Zero();
+  Eigen::Vector3d b = Eigen::Vector3d::Zero();
+  for (const auto & c : cells) {
+    const Eigen::Vector3d row(c.x, c.y, 1.0);
+    A += row * row.transpose();
+    b += row * static_cast<double>(c.h);
+  }
+  const Eigen::Vector3d coef = A.ldlt().solve(b);
+  double sq = 0.0;
+  for (const auto & c : cells) {
+    const double r = static_cast<double>(c.h) - (coef.x() * c.x + coef.y() * c.y + coef.z());
+    sq += r * r;
+  }
+  return std::sqrt(sq / static_cast<double>(cells.size()));
+}
+
+}  // namespace
+
+std::string CoarseAlignResult::detail() const
+{
+  char buf[128];
+  std::snprintf(
+    buf, sizeof(buf), "relief %.2f m, distinct %.2f, rms %.3f m, cells %d", relief_m,
+    distinctiveness, residual_m, overlap_cells);
+  return buf;
+}
+
+CoarseAlignResult coarse_align_heightmaps(
+  const PointCloud & candidate, const PointCloud & current,
+  const Eigen::Isometry3d & candidate_pose,
+  const Eigen::Isometry3d & current_to_candidate_guess, const CoarseAlignOptions & o)
+{
+  CoarseAlignResult result;
+  // Level the candidate frame: keep its heading, drop its roll and pitch.
+  const Eigen::Matrix3d R_wc = candidate_pose.linear();
+  const double yaw_c = std::atan2(R_wc(1, 0), R_wc(0, 0));
+  const Eigen::Matrix3d R_level =
+    Eigen::AngleAxisd(-yaw_c, Eigen::Vector3d::UnitZ()).toRotationMatrix() * R_wc;
+
+  std::vector<Eigen::Vector3d> cand_pts;
+  cand_pts.reserve(candidate.size());
+  for (const auto & p : candidate.points) {
+    cand_pts.push_back(R_level * Eigen::Vector3d(p.x, p.y, p.z));
+  }
+  std::vector<Eigen::Vector3d> cur_pts;
+  cur_pts.reserve(current.size());
+  for (const auto & p : current.points) {
+    cur_pts.push_back(R_level * (current_to_candidate_guess * Eigen::Vector3d(p.x, p.y, p.z)));
+  }
+  const double cell = o.cell_m;
+  const auto cand_cells = grid_heights(cand_pts, cell);
+  const auto cur_cells = grid_heights(cur_pts, cell);
+  if (static_cast<int>(cand_cells.size()) < o.min_overlap_cells ||
+    static_cast<int>(cur_cells.size()) < o.min_overlap_cells)
+  {
+    result.status = "coarse: too few height cells";
+    return result;
+  }
+
+  // Dense candidate grid with a margin for the search range.
+  double min_x = cand_cells.front().x, max_x = min_x, min_y = cand_cells.front().y, max_y = min_y;
+  for (const auto & c : cand_cells) {
+    min_x = std::min(min_x, c.x); max_x = std::max(max_x, c.x);
+    min_y = std::min(min_y, c.y); max_y = std::max(max_y, c.y);
+  }
+  const int nx = static_cast<int>(std::lround((max_x - min_x) / cell)) + 1;
+  const int ny = static_cast<int>(std::lround((max_y - min_y) / cell)) + 1;
+  const float nan = std::numeric_limits<float>::quiet_NaN();
+  std::vector<float> dense(static_cast<std::size_t>(nx) * static_cast<std::size_t>(ny), nan);
+  for (const auto & c : cand_cells) {
+    const int ix = static_cast<int>(std::lround((c.x - min_x) / cell));
+    const int iy = static_cast<int>(std::lround((c.y - min_y) / cell));
+    dense[static_cast<std::size_t>(ix) * static_cast<std::size_t>(ny) + static_cast<std::size_t>(iy)] = c.h;
+  }
+  Eigen::Vector2d pivot = Eigen::Vector2d::Zero();
+  for (const auto & c : cur_cells) {
+    pivot += Eigen::Vector2d(c.x, c.y);
+  }
+  pivot /= static_cast<double>(cur_cells.size());
+
+  struct Score
+  {
+    double yaw, dx, dy, residual, dz;
+    int n;
+  };
+  std::vector<Score> scores;
+  std::vector<float> diffs;
+  std::vector<double> rx(cur_cells.size()), ry(cur_cells.size());
+  const int n_yaw = static_cast<int>(std::floor(o.yaw_range_rad / o.yaw_step_rad + 1e-9));
+  const int n_xy = static_cast<int>(std::floor(o.xy_range_m / o.xy_step_m + 1e-9));
+  for (int iyaw = -n_yaw; iyaw <= n_yaw; ++iyaw) {
+    const double yaw = iyaw * o.yaw_step_rad;
+    const double cy = std::cos(yaw), sy = std::sin(yaw);
+    for (std::size_t k = 0; k < cur_cells.size(); ++k) {
+      const double px = cur_cells[k].x - pivot.x(), py = cur_cells[k].y - pivot.y();
+      rx[k] = cy * px - sy * py + pivot.x() - min_x;
+      ry[k] = sy * px + cy * py + pivot.y() - min_y;
+    }
+    for (int ix = -n_xy; ix <= n_xy; ++ix) {
+      for (int iy = -n_xy; iy <= n_xy; ++iy) {
+        const double dx = ix * o.xy_step_m, dy = iy * o.xy_step_m;
+        diffs.clear();
+        for (std::size_t k = 0; k < cur_cells.size(); ++k) {
+          const int gx = static_cast<int>(std::lround((rx[k] + dx) / cell));
+          const int gy = static_cast<int>(std::lround((ry[k] + dy) / cell));
+          if (gx < 0 || gy < 0 || gx >= nx || gy >= ny) {
+            continue;
+          }
+          const float hc =
+            dense[static_cast<std::size_t>(gx) * static_cast<std::size_t>(ny) + static_cast<std::size_t>(gy)];
+          if (!std::isnan(hc)) {
+            diffs.push_back(hc - cur_cells[k].h);
+          }
+        }
+        const int n = static_cast<int>(diffs.size());
+        if (n < o.min_overlap_cells) {
+          continue;
+        }
+        auto mid = diffs.begin() + n / 2;
+        std::nth_element(diffs.begin(), mid, diffs.end());
+        const double med = *mid;
+        double sq = 0.0;
+        for (const float d : diffs) {
+          const double e = std::min(std::abs(d - med), o.residual_clip_m);
+          sq += e * e;
+        }
+        scores.push_back(Score{yaw, dx, dy, std::sqrt(sq / n), med, n});
+      }
+    }
+  }
+  if (scores.empty()) {
+    result.status = "coarse: no overlap in search range";
+    return result;
+  }
+  const auto best = *std::min_element(scores.begin(), scores.end(),
+      [](const Score & a, const Score & b) {return a.residual < b.residual;});
+  double second = std::numeric_limits<double>::infinity();
+  for (const auto & s : scores) {
+    if (std::hypot(s.dx - best.dx, s.dy - best.dy) > o.distinct_radius_m ||
+      std::abs(s.yaw - best.yaw) > o.distinct_yaw_rad)
+    {
+      second = std::min(second, s.residual);
+    }
+  }
+  result.residual_m = best.residual;
+  result.overlap_cells = best.n;
+  result.distinctiveness = second / std::max(best.residual, 1e-6);
+
+  // Relief of the candidate cells under the best placement.
+  {
+    const double cy = std::cos(best.yaw), sy = std::sin(best.yaw);
+    std::vector<HeightCell> overlap;
+    for (const auto & c : cur_cells) {
+      const double px = c.x - pivot.x(), py = c.y - pivot.y();
+      const int gx = static_cast<int>(std::lround((cy * px - sy * py + pivot.x() - min_x + best.dx) / cell));
+      const int gy = static_cast<int>(std::lround((sy * px + cy * py + pivot.y() - min_y + best.dy) / cell));
+      if (gx < 0 || gy < 0 || gx >= nx || gy >= ny) {
+        continue;
+      }
+      const float hc =
+        dense[static_cast<std::size_t>(gx) * static_cast<std::size_t>(ny) + static_cast<std::size_t>(gy)];
+      if (!std::isnan(hc)) {
+        overlap.push_back(HeightCell{gx * cell, gy * cell, hc});
+      }
+    }
+    result.relief_m = detrended_std(overlap);
+  }
+  if (result.relief_m < o.min_relief_m) {
+    result.status = "coarse: insufficient relief";
+    return result;
+  }
+  if (result.distinctiveness < o.min_distinctiveness) {
+    result.status = "coarse: ambiguous";
+    return result;
+  }
+
+  // Delta in the levelled frame, then back into the candidate frame.
+  Eigen::Isometry3d delta_level = Eigen::Isometry3d::Identity();
+  delta_level.linear() = Eigen::AngleAxisd(best.yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+  const Eigen::Vector3d pivot3(pivot.x(), pivot.y(), 0.0);
+  delta_level.translation() = pivot3 - delta_level.linear() * pivot3 +
+    Eigen::Vector3d(best.dx, best.dy, best.dz);
+  Eigen::Isometry3d level = Eigen::Isometry3d::Identity();
+  level.linear() = R_level;
+  result.current_to_candidate = level.inverse() * delta_level * level * current_to_candidate_guess;
+  result.accepted = true;
+  result.status = "coarse: aligned";
+  return result;
+}
 
 Eigen::Isometry3d pose_to_isometry(const geometry_msgs::msg::Pose & msg)
 {
@@ -446,25 +685,45 @@ RegistrationPipeline::RegistrationPipeline(RegistrationOptions options)
 MatchResult RegistrationPipeline::match(
   const Submap & candidate,
   const Submap & current,
-  const Eigen::Isometry3d & current_to_candidate_guess) const
+  const Eigen::Isometry3d & current_to_candidate_input) const
 {
+  Eigen::Isometry3d current_to_candidate_guess = current_to_candidate_input;
+  std::string coarse_detail;
+  auto with_detail = [&coarse_detail](MatchResult r) {
+      r.coarse_detail = coarse_detail;
+      return r;
+    };
+  if (options_.coarse.enabled) {
+    const CoarseAlignResult coarse = coarse_align_heightmaps(
+      *candidate.cloud, *current.cloud, candidate.pose, current_to_candidate_input,
+      options_.coarse);
+    if (!coarse.accepted) {
+      MatchResult rejected;
+      rejected.fitness = std::numeric_limits<double>::quiet_NaN();
+      rejected.status = coarse.status;
+      rejected.coarse_detail = coarse.detail();
+      return rejected;
+    }
+    current_to_candidate_guess = coarse.current_to_candidate;
+    coarse_detail = coarse.detail();
+  }
   if (options_.backend == "icp") {
     pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
-    return run_registration(
-      icp, candidate.cloud, current.cloud, current_to_candidate_guess, options_);
+    return with_detail(run_registration(
+      icp, candidate.cloud, current.cloud, current_to_candidate_guess, options_));
   }
   if (options_.backend == "ndt") {
     pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt;
     ndt.setResolution(static_cast<float>(options_.ndt_resolution_m));
     ndt.setStepSize(options_.ndt_step_size_m);
     ndt.setOulierRatio(options_.ndt_outlier_ratio);
-    return run_registration(
-      ndt, candidate.cloud, current.cloud, current_to_candidate_guess, options_);
+    return with_detail(run_registration(
+      ndt, candidate.cloud, current.cloud, current_to_candidate_guess, options_));
   }
 
   pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
-  return run_registration(
-    gicp, candidate.cloud, current.cloud, current_to_candidate_guess, options_);
+  return with_detail(run_registration(
+    gicp, candidate.cloud, current.cloud, current_to_candidate_guess, options_));
 }
 
 DescriptorGateEvaluator::DescriptorGateEvaluator(DescriptorGateOptions options)
