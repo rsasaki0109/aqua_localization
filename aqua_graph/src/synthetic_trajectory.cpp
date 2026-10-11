@@ -3,6 +3,8 @@
 
 #include <cmath>
 
+#include <gtsam/geometry/StereoCamera.h>
+
 namespace aqua_graph
 {
 
@@ -42,6 +44,17 @@ gtsam::Rot3 attitude(double t)
 }
 
 }  // namespace
+
+gtsam::Pose3 downward_camera_mount()
+{
+  // Columns are the camera axes in the body frame: x_c = +y_b, y_c = +x_b,
+  // z_c = -z_b (a proper rotation: x_c cross y_c = z_c).
+  gtsam::Matrix3 r;
+  r << 0.0, 1.0, 0.0,
+    1.0, 0.0, 0.0,
+    0.0, 0.0, -1.0;
+  return gtsam::Pose3(gtsam::Rot3(r), gtsam::Point3(0.1, 0.0, -0.05));
+}
 
 TruthSample synthetic_truth(double stamp_s, double gravity_mps2)
 {
@@ -111,6 +124,45 @@ SyntheticDataset make_synthetic_dataset(const SyntheticSensorConfig & config)
     depth.value = -truth.pose.transformFrom(config.pressure_lever_arm_body).z() +
       config.depth_sigma_m * normal(rng);
     data.depth.push_back(depth);
+  }
+  if (config.camera_rate_hz > 0.0 && config.seabed_points > 0) {
+    // Seabed points under the survey area (x in [-8, 18], y in [-6, 6]).
+    std::uniform_real_distribution<double> ux(-8.0, 18.0);
+    std::uniform_real_distribution<double> uy(-6.0, 6.0);
+    std::uniform_real_distribution<double> uz(-0.3, 0.3);
+    std::vector<gtsam::Point3> points;
+    points.reserve(static_cast<size_t>(config.seabed_points));
+    for (int i = 0; i < config.seabed_points; ++i) {
+      points.emplace_back(ux(rng), uy(rng), config.seabed_z + uz(rng));
+    }
+    const auto K = boost::make_shared<gtsam::Cal3_S2Stereo>(
+      config.camera.fx, config.camera.fy, 0.0, config.camera.cx, config.camera.cy,
+      config.camera.baseline_m);
+    const auto frame_count =
+      static_cast<int64_t>(std::floor(config.duration_s * config.camera_rate_hz));
+    for (int64_t f = 1; f <= frame_count; ++f) {
+      const double t = static_cast<double>(f) / config.camera_rate_hz;
+      const TruthSample truth = synthetic_truth(t, config.gravity_mps2);
+      const gtsam::StereoCamera camera(truth.pose * config.camera.body_P_camera, K);
+      SyntheticStereoFrame frame;
+      frame.stamp_s = t;
+      for (size_t id = 0; id < points.size(); ++id) {
+        const gtsam::Point3 pc = camera.pose().transformTo(points[id]);
+        if (pc.z() < 0.3) {
+          continue;
+        }
+        const gtsam::StereoPoint2 z = camera.project(points[id]);
+        if (z.uL() < 0 || z.uL() >= config.image_width || z.uR() < 0 ||
+          z.v() < 0 || z.v() >= config.image_height)
+        {
+          continue;
+        }
+        frame.observations.push_back(StereoObservation{
+            id, z.uL() + config.pixel_sigma * normal(rng),
+            z.uR() + config.pixel_sigma * normal(rng), z.v() + config.pixel_sigma * normal(rng)});
+      }
+      data.stereo.push_back(std::move(frame));
+    }
   }
   return data;
 }

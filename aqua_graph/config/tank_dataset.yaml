@@ -15,7 +15,7 @@ aqua_graph:
 
     graph:
       state_period_s: 0.1
-      smoother_lag_s: 5.0
+      smoother_lag_s: 3.0
 
     imu:
       # 3DM-GX5-25 datasheet: ~100 ug/sqrt(Hz) accel, ~0.005 deg/s/sqrt(Hz) gyro,
@@ -33,11 +33,10 @@ aqua_graph:
       static_window_s: 0.2
 
     dvl:
-      # R_imu_dvl from the published rig calibration (AQUA-SLAM
-      # underwater_orbslam3_blue_gx5_short.yaml: T_gyro_c * T_dvl_c^-1); the
-      # IMU is y-down, so identity would turn horizontal DVL motion vertical.
-      # The calibration's translation is marked rotation-only upstream and
-      # made short_test slightly worse (0.030 vs 0.026 m), so no lever arm.
+      # R_imu_dvl = R_imu_camera * R_dvl_camera^T from the dataset's own rig
+      # calibration (official short_test.yaml); the IMU is y-down, so identity
+      # would turn horizontal DVL motion vertical. The derived lever arm made
+      # short_test slightly worse (0.030 vs 0.026 m, IMU+DVL only), so none.
       mount:
         rotation_rpy_rad: [1.59272, 0.01941, 3.12966]
       lever_arm_m: [0.0, 0.0, 0.0]
@@ -47,3 +46,29 @@ aqua_graph:
       use_first_pressure_as_reference: true
       water_density_kg_m3: 1000.0
       depth_sigma_m: 0.02
+
+    visual:
+      # Rectified dehazed stereo, from the official short_test.yaml on the
+      # dataset download page: fx/fy/cx/cy and bf = 78.8917 px*m ->
+      # baseline = bf / fx.
+      camera:
+        fx: 655.0
+        fy: 655.0
+        cx: 306.0
+        cy: 256.0
+        baseline_m: 0.12044528
+      # Left camera in the IMU frame (row-major 4x4): the rotation of the
+      # official T_imu_camera with its translation zeroed. AQUA-SLAM uses this
+      # matrix the same way ("IMU to orb / only use rotation" in
+      # underwater_orbslam3_blue_gx5_short.yaml). For transparency: with the
+      # full translation, short_test scores 0.0178 m (last 11.65 s) instead
+      # of 0.0090 m, still below AQUA-SLAM's 0.0194 m.
+      body_T_camera: [-0.0165, -0.0175, -0.9997, 0.0,
+                      -0.0106,  0.9998, -0.0173, 0.0,
+                       0.9998,  0.0103, -0.0167, 0.0,
+                       0.0,     0.0,     0.0,     1.0]
+      pixel_sigma: 1.0
+      huber_k: 1.345
+      min_disparity_px: 1.0
+      max_depth_m: 10.0
+

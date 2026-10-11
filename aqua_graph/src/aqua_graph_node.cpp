@@ -15,6 +15,7 @@
 #include "aqua_graph/estimator.hpp"
 #include "aqua_imu_loc/pressure_depth_converter.hpp"
 #include "aqua_msgs/msg/graph_estimator_status.hpp"
+#include "aqua_msgs/msg/stereo_features.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -64,6 +65,8 @@ public:
     const std::string dvl_topic = declare_parameter<std::string>("topics.dvl_velocity", "");
     const std::string position_topic =
       declare_parameter<std::string>("topics.position_odometry", "");
+    const std::string stereo_topic =
+      declare_parameter<std::string>("topics.stereo_features", "");
     const std::string odometry_topic =
       declare_parameter<std::string>("topics.odometry", "/aqua_graph/odometry");
     const std::string status_topic =
@@ -76,6 +79,8 @@ public:
     EstimatorConfig config;
     config.state_period_s = declare_parameter<double>("graph.state_period_s", config.state_period_s);
     config.smoother_lag_s = declare_parameter<double>("graph.smoother_lag_s", config.smoother_lag_s);
+    config.processing_delay_s =
+      declare_parameter<double>("graph.processing_delay_s", config.processing_delay_s);
     config.relinearize_threshold =
       declare_parameter<double>("graph.relinearize_threshold", config.relinearize_threshold);
     config.relinearize_skip =
@@ -118,6 +123,7 @@ public:
 
     auto & dvl = config.dvl;
     dvl.enabled = !dvl_topic.empty();
+    dvl.anchor_states = declare_parameter<bool>("dvl.anchor_states", dvl.anchor_states);
     const auto dvl_rpy = declare_parameter<std::vector<double>>(
       "dvl.mount.rotation_rpy_rad", {0.0, 0.0, 0.0});
     const auto dvl_lever = declare_parameter<std::vector<double>>(
@@ -155,6 +161,25 @@ public:
     position.huber_k = declare_parameter<double>("position.huber_k", position.huber_k);
     use_position_covariance_ = declare_parameter<bool>("position.use_message_covariance", true);
 
+    auto & visual = config.visual;
+    visual.enabled = !stereo_topic.empty();
+    visual.fx = declare_parameter<double>("visual.camera.fx", visual.fx);
+    visual.fy = declare_parameter<double>("visual.camera.fy", visual.fy);
+    visual.cx = declare_parameter<double>("visual.camera.cx", visual.cx);
+    visual.cy = declare_parameter<double>("visual.camera.cy", visual.cy);
+    visual.baseline_m = declare_parameter<double>("visual.camera.baseline_m", visual.baseline_m);
+    // body_P_camera as a row-major 4x4 homogeneous matrix (left camera in the
+    // body/IMU frame); identity by default.
+    const auto body_T_camera = declare_parameter<std::vector<double>>(
+      "visual.body_T_camera",
+      {1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0});
+    visual.body_P_camera = pose_from_matrix(body_T_camera, "visual.body_T_camera");
+    visual.pixel_sigma = declare_parameter<double>("visual.pixel_sigma", visual.pixel_sigma);
+    visual.huber_k = declare_parameter<double>("visual.huber_k", visual.huber_k);
+    visual.min_disparity_px =
+      declare_parameter<double>("visual.min_disparity_px", visual.min_disparity_px);
+    visual.max_depth_m = declare_parameter<double>("visual.max_depth_m", visual.max_depth_m);
+
     estimator_ = std::make_unique<TightlyCoupledEstimator>(config);
 
     const auto sensor_qos = rclcpp::SensorDataQoS().keep_last(static_cast<size_t>(sensor_depth));
@@ -175,16 +200,23 @@ public:
         position_topic, rclcpp::QoS(50),
         [this](nav_msgs::msg::Odometry::ConstSharedPtr msg) {on_position(*msg);});
     }
+    if (!stereo_topic.empty()) {
+      stereo_sub_ = create_subscription<aqua_msgs::msg::StereoFeatures>(
+        stereo_topic, rclcpp::QoS(50),
+        [this](aqua_msgs::msg::StereoFeatures::ConstSharedPtr msg) {on_stereo(*msg);});
+    }
     odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(odometry_topic, rclcpp::QoS(100));
     status_pub_ =
       create_publisher<aqua_msgs::msg::GraphEstimatorStatus>(status_topic, rclcpp::QoS(10));
 
     RCLCPP_INFO(
       get_logger(),
-      "aqua_graph started: imu=%s pressure=%s dvl=%s position=%s odom=%s grid=%.3fs lag=%.1fs",
+      "aqua_graph started: imu=%s pressure=%s dvl=%s position=%s stereo=%s odom=%s grid=%.3fs "
+      "lag=%.1fs",
       imu_topic.c_str(), pressure_topic.empty() ? "<disabled>" : pressure_topic.c_str(),
       dvl_topic.empty() ? "<disabled>" : dvl_topic.c_str(),
-      position_topic.empty() ? "<disabled>" : position_topic.c_str(), odometry_topic.c_str(),
+      position_topic.empty() ? "<disabled>" : position_topic.c_str(),
+      stereo_topic.empty() ? "<disabled>" : stereo_topic.c_str(), odometry_topic.c_str(),
       config.state_period_s, config.smoother_lag_s);
   }
 
@@ -203,6 +235,37 @@ private:
       throw std::invalid_argument(name + " must have 3 elements");
     }
     return gtsam::Point3(xyz[0], xyz[1], xyz[2]);
+  }
+
+  gtsam::Pose3 pose_from_matrix(const std::vector<double> & m, const std::string & name)
+  {
+    if (m.size() != 16) {
+      throw std::invalid_argument(name + " must have 16 elements (row-major 4x4)");
+    }
+    gtsam::Matrix3 r;
+    r << m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10];
+    // Re-orthonormalize: calibration files often carry 4-digit rotations.
+    const Eigen::JacobiSVD<gtsam::Matrix3> svd(r, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    gtsam::Matrix3 rotation = svd.matrixU() * svd.matrixV().transpose();
+    if (rotation.determinant() < 0.0) {
+      throw std::invalid_argument(name + " rotation is not proper");
+    }
+    return gtsam::Pose3(gtsam::Rot3(rotation), gtsam::Point3(m[3], m[7], m[11]));
+  }
+
+  void on_stereo(const aqua_msgs::msg::StereoFeatures & msg)
+  {
+    const size_t n = msg.ids.size();
+    if (msg.u_left.size() != n || msg.u_right.size() != n || msg.v.size() != n) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000, "Rejected stereo features with mismatched arrays.");
+      return;
+    }
+    std::vector<StereoObservation> observations(n);
+    for (size_t i = 0; i < n; ++i) {
+      observations[i] = StereoObservation{msg.ids[i], msg.u_left[i], msg.u_right[i], msg.v[i]};
+    }
+    estimator_->add_stereo_frame(to_seconds(msg.header.stamp), observations);
   }
 
   void on_imu(const sensor_msgs::msg::Imu & msg)
@@ -299,6 +362,9 @@ private:
     status.depth_applied = c.depth_applied;
     status.position_received = c.position_received;
     status.position_applied = c.position_applied;
+    status.stereo_frames = c.stereo_frames;
+    status.stereo_observations = c.stereo_observations;
+    status.landmarks_created = c.landmarks_created;
     status.measurements_too_old = c.measurements_too_old;
     status.smoother_updates = c.smoother_updates;
     status.velocity_world = to_msg(state.velocity_world);
@@ -319,6 +385,7 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr dvl_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr position_sub_;
+  rclcpp::Subscription<aqua_msgs::msg::StereoFeatures>::SharedPtr stereo_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<aqua_msgs::msg::GraphEstimatorStatus>::SharedPtr status_pub_;
 };

@@ -11,6 +11,9 @@ uint64 depth_received
 uint64 depth_applied
 uint64 position_received
 uint64 position_applied
+uint64 stereo_frames
+uint64 stereo_observations
+uint64 landmarks_created
 # Measurements whose grid state had already left the smoother window.
 uint64 measurements_too_old
 uint64 smoother_updates

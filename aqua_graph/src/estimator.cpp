@@ -3,11 +3,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 
+#include <gtsam/geometry/StereoCamera.h>
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/navigation/GPSFactor.h>
 #include <gtsam/nonlinear/PriorFactor.h>
+#include <gtsam/slam/StereoFactor.h>
 #include <gtsam_unstable/nonlinear/IncrementalFixedLagSmoother.h>
 
 #include "aqua_graph/factors.hpp"
@@ -19,8 +22,15 @@ namespace
 {
 
 using gtsam::symbol_shorthand::B;
+using gtsam::symbol_shorthand::L;
 using gtsam::symbol_shorthand::V;
 using gtsam::symbol_shorthand::X;
+
+using StereoFactor = gtsam::GenericStereoFactor<gtsam::Pose3, gtsam::Point3>;
+
+// Stamps closer than this are the same instant (anchored measurements carry
+// the exact stamp they requested a state for).
+constexpr double kSameStampS = 1.0e-6;
 
 gtsam::Rot3 strip_yaw(const gtsam::Rot3 & rotation)
 {
@@ -58,6 +68,10 @@ TightlyCoupledEstimator::TightlyCoupledEstimator(const EstimatorConfig & config)
     gtsam::I_3x3 * imu.gyro_bias_random_walk * imu.gyro_bias_random_walk);
   preint_params_->setBiasAccOmegaInit(gtsam::I_6x6 * 1.0e-5);
 
+  const auto & vis = config_.visual;
+  stereo_calibration_ = boost::make_shared<gtsam::Cal3_S2Stereo>(
+    vis.fx, vis.fy, 0.0, vis.cx, vis.cy, vis.baseline_m);
+
   gtsam::ISAM2Params isam_params;
   isam_params.relinearizeThreshold = config_.relinearize_threshold;
   isam_params.relinearizeSkip = std::max(1, config_.relinearize_skip);
@@ -82,45 +96,32 @@ std::vector<EstimatorOutput> TightlyCoupledEstimator::add_imu(
   double stamp_s, const gtsam::Vector3 & accel_body, const gtsam::Vector3 & gyro_body,
   const std::optional<gtsam::Rot3> & orientation)
 {
-  std::vector<EstimatorOutput> outputs;
   if (!accel_body.allFinite() || !gyro_body.allFinite() || !std::isfinite(stamp_s)) {
-    return outputs;
+    return {};
   }
   ++counters_.imu_samples;
+  latest_gyro_ = gyro_body;
 
   if (!initialized_) {
     try_initialize(stamp_s, accel_body, gyro_body, orientation);
-    last_imu_stamp_s_ = stamp_s;
-    last_accel_ = accel_body;
-    last_gyro_ = gyro_body;
-    return outputs;
+    if (initialized_) {
+      held_imu_ = ImuSample{stamp_s, accel_body, gyro_body};
+      integrated_until_s_ = stamp_s;
+      latest_imu_s_ = stamp_s;
+    }
+    return {};
   }
 
-  if (stamp_s <= last_imu_stamp_s_) {
-    // Duplicate or out-of-order sample: keep the newest reading for the hold
-    // but do not integrate negative/zero time.
-    last_accel_ = accel_body;
-    last_gyro_ = gyro_body;
-    return outputs;
+  if (stamp_s <= latest_imu_s_) {
+    // Duplicate stamp: keep the newest reading; never integrate backwards.
+    if (!imu_buffer_.empty() && imu_buffer_.back().stamp_s == stamp_s) {
+      imu_buffer_.back() = ImuSample{stamp_s, accel_body, gyro_body};
+    }
+    return {};
   }
-
-  // Zero-order hold of the previous sample over (last_imu_stamp, stamp].
-  // A grid state is created only once the IMU stream moves strictly past its
-  // stamp, so measurements stamped exactly on the grid (which the replay
-  // delivers after the IMU sample with the same stamp) join the same update.
-  while (state_stamp(current_index_ + 1) < stamp_s) {
-    const double boundary = state_stamp(current_index_ + 1);
-    integrate(boundary - integrated_until_s_, last_accel_, last_gyro_);
-    integrated_until_s_ = boundary;
-    outputs.push_back(create_next_state());
-  }
-  integrate(stamp_s - integrated_until_s_, last_accel_, last_gyro_);
-  integrated_until_s_ = stamp_s;
-
-  last_imu_stamp_s_ = stamp_s;
-  last_accel_ = accel_body;
-  last_gyro_ = gyro_body;
-  return outputs;
+  imu_buffer_.push_back(ImuSample{stamp_s, accel_body, gyro_body});
+  latest_imu_s_ = stamp_s;
+  return advance(stamp_s - config_.processing_delay_s);
 }
 
 void TightlyCoupledEstimator::add_dvl(double stamp_s, const gtsam::Vector3 & velocity_dvl)
@@ -139,13 +140,14 @@ void TightlyCoupledEstimator::add_dvl(
     ++counters_.dvl_rejected;
     return;
   }
-  PendingMeasurement m{};
+  PendingMeasurement m;
   m.kind = PendingMeasurement::Kind::kDvl;
   m.stamp_s = stamp_s;
+  m.anchored = config_.dvl.anchor_states;
   m.vector = velocity_dvl;
-  m.omega = last_gyro_;
+  m.omega = latest_gyro_;
   m.scalar = sigma_mps > 0.0 ? sigma_mps : config_.dvl.velocity_sigma_mps;
-  pending_.push_back(m);
+  enqueue(std::move(m));
 }
 
 void TightlyCoupledEstimator::add_depth(double stamp_s, double depth_m)
@@ -154,11 +156,11 @@ void TightlyCoupledEstimator::add_depth(double stamp_s, double depth_m)
     return;
   }
   ++counters_.depth_received;
-  PendingMeasurement m{};
+  PendingMeasurement m;
   m.kind = PendingMeasurement::Kind::kDepth;
   m.stamp_s = stamp_s;
   m.scalar = depth_m;
-  pending_.push_back(m);
+  enqueue(std::move(m));
 }
 
 void TightlyCoupledEstimator::add_position(
@@ -168,12 +170,41 @@ void TightlyCoupledEstimator::add_position(
     return;
   }
   ++counters_.position_received;
-  PendingMeasurement m{};
+  PendingMeasurement m;
   m.kind = PendingMeasurement::Kind::kPosition;
   m.stamp_s = stamp_s;
   m.vector = position_world;
   m.covariance = covariance.allFinite() ? covariance : gtsam::Matrix3::Zero();
-  pending_.push_back(m);
+  enqueue(std::move(m));
+}
+
+void TightlyCoupledEstimator::add_stereo_frame(
+  double stamp_s, const std::vector<StereoObservation> & observations)
+{
+  if (!config_.visual.enabled || !initialized_ || !std::isfinite(stamp_s)) {
+    return;
+  }
+  ++counters_.stereo_frames;
+  PendingMeasurement m;
+  m.kind = PendingMeasurement::Kind::kStereo;
+  m.stamp_s = stamp_s;
+  m.anchored = true;
+  m.stereo = observations;
+  enqueue(std::move(m));
+}
+
+void TightlyCoupledEstimator::enqueue(PendingMeasurement measurement)
+{
+  // An anchored measurement newer than the newest state asks for a state at
+  // its own stamp; an older one (it arrived too late) uses the nearest state.
+  if (measurement.anchored) {
+    if (measurement.stamp_s > states_.back().stamp_s + kSameStampS) {
+      requested_stamps_.insert(measurement.stamp_s);
+    } else {
+      measurement.anchored = false;
+    }
+  }
+  pending_.push_back(std::move(measurement));
 }
 
 std::optional<EstimatorOutput> TightlyCoupledEstimator::imu_rate_estimate() const
@@ -181,10 +212,22 @@ std::optional<EstimatorOutput> TightlyCoupledEstimator::imu_rate_estimate() cons
   if (!initialized_) {
     return std::nullopt;
   }
-  const gtsam::NavState predicted = preint_->predict(current_state_, current_bias_);
+  // Propagate the newest state through the buffered, not yet integrated IMU
+  // samples with the same zero-order hold the smoother uses.
+  gtsam::PreintegratedCombinedMeasurements pim(preint_params_, current_bias_);
+  double t = integrated_until_s_;
+  ImuSample held = held_imu_;
+  for (const auto & sample : imu_buffer_) {
+    if (sample.stamp_s > t) {
+      pim.integrateMeasurement(held.accel, held.gyro, sample.stamp_s - t);
+      t = sample.stamp_s;
+    }
+    held = sample;
+  }
+  const gtsam::NavState predicted = pim.predict(current_state_, current_bias_);
   EstimatorOutput out;
-  out.stamp_s = integrated_until_s_;
-  out.state_index = current_index_;
+  out.stamp_s = t;
+  out.state_index = states_.back().index;
   out.pose = predicted.pose();
   out.velocity_world = predicted.v();
   out.bias = current_bias_;
@@ -197,8 +240,8 @@ std::optional<EstimatorOutput> TightlyCoupledEstimator::latest_state() const
     return std::nullopt;
   }
   EstimatorOutput out;
-  out.stamp_s = state_stamp(current_index_);
-  out.state_index = current_index_;
+  out.stamp_s = states_.back().stamp_s;
+  out.state_index = states_.back().index;
   out.pose = current_state_.pose();
   out.velocity_world = current_state_.v();
   out.bias = current_bias_;
@@ -254,15 +297,11 @@ void TightlyCoupledEstimator::start_graph(
   double stamp_s, const gtsam::NavState & state, const gtsam::imuBias::ConstantBias & bias)
 {
   const auto & init = config_.init;
-  t0_s_ = stamp_s;
-  current_index_ = 0;
-  integrated_until_s_ = stamp_s;
   current_state_ = state;
   current_bias_ = bias;
   preint_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(preint_params_, bias);
 
-  gtsam::NonlinearFactorGraph graph;
-  gtsam::Values values;
+  UpdateBatch batch;
   // Pose3 tangent order: [roll, pitch, yaw (approx, body axes), x, y, z].
   gtsam::Vector6 pose_sigmas;
   pose_sigmas << init.roll_pitch_sigma_rad, init.roll_pitch_sigma_rad, init.yaw_sigma_rad,
@@ -270,49 +309,94 @@ void TightlyCoupledEstimator::start_graph(
   gtsam::Vector6 bias_sigmas;
   bias_sigmas << gtsam::Vector3::Constant(init.accel_bias_sigma),
     gtsam::Vector3::Constant(init.gyro_bias_sigma);
-  graph.addPrior(X(0), state.pose(), gtsam::noiseModel::Diagonal::Sigmas(pose_sigmas));
-  graph.addPrior(
+  batch.graph.addPrior(X(0), state.pose(), gtsam::noiseModel::Diagonal::Sigmas(pose_sigmas));
+  batch.graph.addPrior(
     V(0), state.v(), gtsam::noiseModel::Isotropic::Sigma(3, init.velocity_sigma_mps));
-  graph.addPrior(B(0), bias, gtsam::noiseModel::Diagonal::Sigmas(bias_sigmas));
-  values.insert(X(0), state.pose());
-  values.insert(V(0), state.v());
-  values.insert(B(0), bias);
+  batch.graph.addPrior(B(0), bias, gtsam::noiseModel::Diagonal::Sigmas(bias_sigmas));
+  batch.values.insert(X(0), state.pose());
+  batch.values.insert(V(0), state.v());
+  batch.values.insert(B(0), bias);
 
   initialized_ = true;
+  states_.push_back(StateRecord{0, stamp_s});
   ++counters_.states;
-  run_update(graph, values, 0);
+  run_update(batch, states_.back());
 }
 
-void TightlyCoupledEstimator::integrate(
-  double dt, const gtsam::Vector3 & accel, const gtsam::Vector3 & gyro)
+std::vector<EstimatorOutput> TightlyCoupledEstimator::advance(double target_s)
 {
-  if (dt <= 0.0) {
-    return;
+  std::vector<EstimatorOutput> outputs;
+  const double period = config_.state_period_s;
+  for (;;) {
+    const double last = states_.back().stamp_s;
+    while (!requested_stamps_.empty() && *requested_stamps_.begin() <= last + kSameStampS) {
+      requested_stamps_.erase(requested_stamps_.begin());
+    }
+    double next = last + period;
+    bool anchored = false;
+    // An anchor shortly after the grid point replaces it, so grid states do
+    // not crowd measurement states.
+    if (!requested_stamps_.empty() && *requested_stamps_.begin() < next + 0.3 * period) {
+      next = *requested_stamps_.begin();
+      anchored = true;
+    }
+    if (next > target_s) {
+      break;
+    }
+    if (anchored) {
+      requested_stamps_.erase(requested_stamps_.begin());
+    }
+    integrate_to(next);
+    outputs.push_back(create_state(next));
   }
-  preint_->integrateMeasurement(accel, gyro, dt);
+  return outputs;
 }
 
-EstimatorOutput TightlyCoupledEstimator::create_next_state()
+void TightlyCoupledEstimator::integrate_to(double stamp_s)
 {
-  const uint64_t k = current_index_ + 1;
+  // Zero-order hold: each sample is held until the next sample's stamp.
+  while (integrated_until_s_ < stamp_s) {
+    const double next_sample =
+      imu_buffer_.empty() ? std::numeric_limits<double>::infinity() :
+      imu_buffer_.front().stamp_s;
+    const double segment_end = std::min(stamp_s, next_sample);
+    if (segment_end > integrated_until_s_) {
+      preint_->integrateMeasurement(
+        held_imu_.accel, held_imu_.gyro, segment_end - integrated_until_s_);
+    }
+    integrated_until_s_ = segment_end;
+    if (segment_end >= next_sample) {
+      held_imu_ = imu_buffer_.front();
+      imu_buffer_.pop_front();
+    }
+  }
+}
+
+EstimatorOutput TightlyCoupledEstimator::create_state(double stamp_s)
+{
+  const uint64_t k = states_.back().index + 1;
   const gtsam::NavState predicted = preint_->predict(current_state_, current_bias_);
 
-  gtsam::NonlinearFactorGraph graph;
-  gtsam::Values values;
-  graph.emplace_shared<gtsam::CombinedImuFactor>(
+  UpdateBatch batch;
+  batch.graph.emplace_shared<gtsam::CombinedImuFactor>(
     X(k - 1), V(k - 1), X(k), V(k), B(k - 1), B(k), *preint_);
-  values.insert(X(k), predicted.pose());
-  values.insert(V(k), predicted.v());
-  values.insert(B(k), current_bias_);
+  batch.values.insert(X(k), predicted.pose());
+  batch.values.insert(V(k), predicted.v());
+  batch.values.insert(B(k), current_bias_);
 
-  current_index_ = k;
-  attach_measurements(graph, k);
+  states_.push_back(StateRecord{k, stamp_s});
+  // Mirror the smoother's marginalization: keys older than the lag go away.
+  while (!states_.empty() && states_.front().stamp_s < stamp_s - config_.smoother_lag_s) {
+    states_.pop_front();
+  }
+  current_state_ = predicted;
+  attach_measurements(batch, states_.back());
   ++counters_.states;
-  run_update(graph, values, k);
+  run_update(batch, states_.back());
 
   preint_->resetIntegrationAndSetBias(current_bias_);
   EstimatorOutput out;
-  out.stamp_s = state_stamp(k);
+  out.stamp_s = stamp_s;
   out.state_index = k;
   out.pose = current_state_.pose();
   out.velocity_world = current_state_.v();
@@ -320,9 +404,30 @@ EstimatorOutput TightlyCoupledEstimator::create_next_state()
   return out;
 }
 
-int64_t TightlyCoupledEstimator::nearest_state_index(double stamp_s) const
+std::optional<TightlyCoupledEstimator::StateRecord>
+TightlyCoupledEstimator::find_state(double stamp_s) const
 {
-  return static_cast<int64_t>(std::llround((stamp_s - t0_s_) / config_.state_period_s));
+  // Keep one grid period of margin to the window edge so a factor never
+  // references a key the smoother is about to marginalize.
+  const double oldest_safe =
+    states_.back().stamp_s - config_.smoother_lag_s + config_.state_period_s;
+  auto it = std::lower_bound(
+    states_.begin(), states_.end(), stamp_s,
+    [](const StateRecord & s, double t) {return s.stamp_s < t;});
+  const StateRecord * best = nullptr;
+  if (it != states_.end()) {
+    best = &*it;
+  }
+  if (it != states_.begin()) {
+    const StateRecord & before = *std::prev(it);
+    if (!best || stamp_s - before.stamp_s <= best->stamp_s - stamp_s) {
+      best = &before;
+    }
+  }
+  if (!best || best->stamp_s < oldest_safe) {
+    return std::nullopt;
+  }
+  return *best;
 }
 
 gtsam::SharedNoiseModel TightlyCoupledEstimator::robust(
@@ -336,39 +441,36 @@ gtsam::SharedNoiseModel TightlyCoupledEstimator::robust(
 }
 
 void TightlyCoupledEstimator::attach_measurements(
-  gtsam::NonlinearFactorGraph & graph, uint64_t newest_index)
+  UpdateBatch & batch, const StateRecord & newest)
 {
-  // Keys older than the smoother lag may already be marginalized; keep one
-  // grid period of margin so we never reference a removed key.
-  const double oldest_safe_stamp =
-    state_stamp(newest_index) - config_.smoother_lag_s + config_.state_period_s;
   const gtsam::Vector3 velocity_world = current_state_.v();
-
   std::deque<PendingMeasurement> keep;
-  for (const auto & m : pending_) {
-    const int64_t raw_index = nearest_state_index(m.stamp_s);
-    if (raw_index > static_cast<int64_t>(newest_index)) {
-      keep.push_back(m);
+  for (auto & m : pending_) {
+    // Wait until a state at or after the measurement exists, so the nearest
+    // state is final (and an anchored state has been created).
+    if (m.stamp_s > newest.stamp_s + kSameStampS) {
+      keep.push_back(std::move(m));
       continue;
     }
-    const uint64_t j = static_cast<uint64_t>(std::max<int64_t>(raw_index, 0));
-    if (state_stamp(j) < oldest_safe_stamp) {
+    const auto state = find_state(m.stamp_s);
+    if (!state) {
       ++counters_.measurements_too_old;
       continue;
     }
-    // Shift positional measurements from their stamp to the grid stamp using
-    // the latest velocity estimate (|dt| <= state_period / 2).
-    const double dt = m.stamp_s - state_stamp(j);
+    const uint64_t j = state->index;
+    // Shift positional measurements from their stamp to the state stamp
+    // using the current velocity estimate (zero for anchored ones).
+    const double dt = m.stamp_s - state->stamp_s;
     switch (m.kind) {
       case PendingMeasurement::Kind::kDvl:
-        graph.emplace_shared<DvlVelocityFactor>(
+        batch.graph.emplace_shared<DvlVelocityFactor>(
           X(j), V(j), B(j), m.vector, m.omega, config_.dvl.body_R_dvl,
           config_.dvl.lever_arm_body,
           robust(gtsam::noiseModel::Isotropic::Sigma(3, m.scalar), config_.dvl.huber_k));
         ++counters_.dvl_applied;
         break;
       case PendingMeasurement::Kind::kDepth:
-        graph.emplace_shared<PressureDepthFactor>(
+        batch.graph.emplace_shared<PressureDepthFactor>(
           X(j), m.scalar + velocity_world.z() * dt, config_.depth.lever_arm_body,
           robust(gtsam::noiseModel::Isotropic::Sigma(1, config_.depth.depth_sigma_m),
           config_.depth.huber_k));
@@ -387,39 +489,123 @@ void TightlyCoupledEstimator::attach_measurements(
           } else {
             model = gtsam::noiseModel::Diagonal::Variances(cov.diagonal());
           }
-          graph.emplace_shared<gtsam::GPSFactor>(
+          batch.graph.emplace_shared<gtsam::GPSFactor>(
             X(j), gtsam::Point3(m.vector - velocity_world * dt),
             robust(model, config_.position.huber_k));
           ++counters_.position_applied;
           break;
         }
+      case PendingMeasurement::Kind::kStereo:
+        attach_stereo(batch, *state, m.stereo);
+        break;
     }
   }
   pending_.swap(keep);
 }
 
-void TightlyCoupledEstimator::run_update(
-  const gtsam::NonlinearFactorGraph & graph, const gtsam::Values & values,
-  uint64_t new_state_index)
+gtsam::Pose3 TightlyCoupledEstimator::pose_estimate(
+  uint64_t index, const UpdateBatch & batch) const
 {
-  gtsam::FixedLagSmoother::KeyTimestampMap timestamps;
-  const double stamp = state_stamp(new_state_index);
-  timestamps[X(new_state_index)] = stamp;
-  timestamps[V(new_state_index)] = stamp;
-  timestamps[B(new_state_index)] = stamp;
-  smoother_->update(graph, values, timestamps);
+  if (batch.values.exists(X(index))) {
+    return batch.values.at<gtsam::Pose3>(X(index));
+  }
+  return smoother_->calculateEstimate<gtsam::Pose3>(X(index));
+}
+
+void TightlyCoupledEstimator::attach_stereo(
+  UpdateBatch & batch, const StateRecord & state, const std::vector<StereoObservation> & obs)
+{
+  const auto & vis = config_.visual;
+  const double stamp = states_.back().stamp_s;
+  const auto noise = robust(gtsam::noiseModel::Isotropic::Sigma(3, vis.pixel_sigma), vis.huber_k);
+  const auto & smoother_stamps = smoother_->timestamps();
+  const double bf = vis.fx * vis.baseline_m;
+
+  for (const auto & o : obs) {
+    const double disparity = o.u_left - o.u_right;
+    if (!std::isfinite(disparity) || disparity < vis.min_disparity_px ||
+      bf / disparity > vis.max_depth_m)
+    {
+      ++counters_.stereo_rejected;
+      continue;
+    }
+    const gtsam::StereoPoint2 measurement(o.u_left, o.u_right, o.v);
+    FeatureTrack & track = tracks_[o.id];
+    track.last_seen_s = stamp;
+
+    // A landmark that left the smoother window starts over as a new track.
+    if (track.landmark && !smoother_stamps.count(*track.landmark)) {
+      track.landmark.reset();
+      track.first_state.reset();
+    }
+
+    if (track.landmark) {
+      batch.graph.emplace_shared<StereoFactor>(
+        measurement, noise, X(state.index), *track.landmark, stereo_calibration_,
+        vis.body_P_camera);
+      batch.timestamps[*track.landmark] = stamp;
+      ++counters_.stereo_observations;
+      continue;
+    }
+
+    // The first sighting's pose must still be safely inside the window.
+    const double oldest_safe = stamp - config_.smoother_lag_s + config_.state_period_s;
+    const bool first_usable = track.first_state && *track.first_state != state.index &&
+      std::any_of(
+      states_.begin(), states_.end(),
+      [&](const StateRecord & s) {
+        return s.index == *track.first_state && s.stamp_s >= oldest_safe;
+      });
+    if (!first_usable) {
+      track.first_state = state.index;
+      track.first_measurement = measurement;
+      continue;
+    }
+
+    // Second sighting: triangulate from the first stereo observation with the
+    // current estimate of that pose and add both reprojection factors.
+    const gtsam::Pose3 world_P_camera =
+      pose_estimate(*track.first_state, batch) * vis.body_P_camera;
+    const gtsam::Point3 point =
+      gtsam::StereoCamera(world_P_camera, stereo_calibration_).backproject(
+      track.first_measurement);
+    const gtsam::Key key = L(next_landmark_++);
+    batch.values.insert(key, point);
+    batch.timestamps[key] = stamp;
+    batch.graph.emplace_shared<StereoFactor>(
+      track.first_measurement, noise, X(*track.first_state), key, stereo_calibration_,
+      vis.body_P_camera);
+    batch.graph.emplace_shared<StereoFactor>(
+      measurement, noise, X(state.index), key, stereo_calibration_, vis.body_P_camera);
+    track.landmark = key;
+    track.first_state.reset();
+    ++counters_.landmarks_created;
+    counters_.stereo_observations += 2;
+  }
+
+  // Forget tracks that have not been seen for a whole smoother window.
+  for (auto it = tracks_.begin(); it != tracks_.end(); ) {
+    if (it->second.last_seen_s < stamp - config_.smoother_lag_s) {
+      it = tracks_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+void TightlyCoupledEstimator::run_update(UpdateBatch & batch, const StateRecord & newest)
+{
+  batch.timestamps[X(newest.index)] = newest.stamp_s;
+  batch.timestamps[V(newest.index)] = newest.stamp_s;
+  batch.timestamps[B(newest.index)] = newest.stamp_s;
+  smoother_->update(batch.graph, batch.values, batch.timestamps);
   ++counters_.smoother_updates;
 
   current_state_ = gtsam::NavState(
-    smoother_->calculateEstimate<gtsam::Pose3>(X(new_state_index)),
-    smoother_->calculateEstimate<gtsam::Vector3>(V(new_state_index)));
+    smoother_->calculateEstimate<gtsam::Pose3>(X(newest.index)),
+    smoother_->calculateEstimate<gtsam::Vector3>(V(newest.index)));
   current_bias_ =
-    smoother_->calculateEstimate<gtsam::imuBias::ConstantBias>(B(new_state_index));
-}
-
-double TightlyCoupledEstimator::state_stamp(uint64_t index) const
-{
-  return t0_s_ + static_cast<double>(index) * config_.state_period_s;
+    smoother_->calculateEstimate<gtsam::imuBias::ConstantBias>(B(newest.index));
 }
 
 }  // namespace aqua_graph

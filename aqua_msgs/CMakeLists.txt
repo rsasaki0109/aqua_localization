@@ -15,6 +15,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PoseGraphKeyframe.msg"
   "msg/PoseGraphLoopConstraint.msg"
   "msg/ScanMatchingStatus.msg"
+  "msg/StereoFeatures.msg"
   DEPENDENCIES builtin_interfaces geometry_msgs std_msgs
 )
 
