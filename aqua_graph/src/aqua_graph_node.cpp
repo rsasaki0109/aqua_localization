@@ -211,6 +211,8 @@ public:
     visual.min_disparity_px =
       declare_parameter<double>("visual.min_disparity_px", visual.min_disparity_px);
     visual.max_depth_m = declare_parameter<double>("visual.max_depth_m", visual.max_depth_m);
+    visual.landmark_prior_sigma_m =
+      declare_parameter<double>("visual.landmark_prior_sigma_m", visual.landmark_prior_sigma_m);
 
     estimator_ = std::make_unique<TightlyCoupledEstimator>(config);
 
@@ -450,6 +452,13 @@ private:
     status.measurements_too_old = c.measurements_too_old;
     status.smoother_updates = c.smoother_updates;
     status.smoother_resets = c.smoother_resets;
+    if (c.smoother_resets != reported_resets_) {
+      reported_resets_ = c.smoother_resets;
+      RCLCPP_WARN(
+        get_logger(), "smoother re-anchored (#%lu) at t=%.3f: %s",
+        static_cast<unsigned long>(c.smoother_resets), state.stamp_s,
+        estimator_->last_reset_reason().c_str());
+    }
     status.heading_received = c.heading_received;
     status.heading_applied = c.heading_applied;
     status.velocity_world = to_msg(state.velocity_world);
@@ -467,6 +476,7 @@ private:
   bool use_dvl_covariance_{false};
   bool use_heading_covariance_{false};
   double dvl_time_offset_s_{0.0};
+  uint64_t reported_resets_{0};
   double heading_offset_rad_{0.0};
   gtsam::Vector3 last_gyro_{gtsam::Vector3::Zero()};
 

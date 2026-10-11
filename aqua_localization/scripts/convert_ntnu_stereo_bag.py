@@ -28,8 +28,12 @@ aqua_visual_frontend tracker expects rectified stereo, so this script:
 """
 
 import argparse
+import bz2
 import inspect
+import io
 import shutil
+import struct
+import subprocess
 import sys
 from pathlib import Path
 
@@ -103,6 +107,107 @@ def decode(msg) -> np.ndarray:
     return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if channels == 3 else img
 
 
+def _read_exact(stream, n: int) -> bytes:
+    buf = bytearray()
+    while len(buf) < n:
+        chunk = stream.read(n - len(buf))
+        if not chunk:
+            raise EOFError
+        buf += chunk
+    return bytes(buf)
+
+
+def _fields(header: bytes) -> dict:
+    out, pos = {}, 0
+    while pos < len(header):
+        (n,) = struct.unpack_from("<I", header, pos)
+        key, _, value = header[pos + 4:pos + 4 + n].partition(b"=")
+        out[key.decode()] = value
+        pos += 4 + n
+    return out
+
+
+def _records(stream):
+    """Yield (fields, data) for each ROS 1 bag v2.0 record in `stream`."""
+    while True:
+        try:
+            (hlen,) = struct.unpack("<I", _read_exact(stream, 4))
+        except EOFError:
+            return
+        fields = _fields(_read_exact(stream, hlen))
+        (dlen,) = struct.unpack("<I", _read_exact(stream, 4))
+        yield fields, _read_exact(stream, dlen)
+
+
+def stream_ros1_messages(stream, topics):
+    """Sequentially parse a ROS 1 bag (no index needed: connection records
+    precede the messages that use them) and yield (topic, msgtype, t_ns, raw)
+    for the wanted topics. Lets huge remote bags be converted without a local
+    copy."""
+    magic = _read_exact(stream, 13)
+    if magic != b"#ROSBAG V2.0\n":
+        raise SystemExit(f"not a ROS 1 bag v2.0 stream: {magic!r}")
+    conns = {}
+
+    def handle(fields, data):
+        op = fields["op"][0]
+        if op == 0x07:  # connection
+            conn = struct.unpack("<I", fields["conn"])[0]
+            info = _fields(data)
+            msgtype = info["type"].decode()
+            pkg, _, name = msgtype.partition("/")
+            conns[conn] = (fields["topic"].decode(), f"{pkg}/msg/{name}")
+        elif op == 0x02:  # message data
+            conn = struct.unpack("<I", fields["conn"])[0]
+            topic, msgtype = conns[conn]
+            if topic in topics:
+                sec, nsec = struct.unpack("<II", fields["time"])
+                return topic, msgtype, sec * 1_000_000_000 + nsec, data
+        return None
+
+    for fields, data in _records(stream):
+        op = fields["op"][0]
+        if op == 0x05:  # chunk
+            compression = fields["compression"].decode()
+            if compression == "bz2":
+                data = bz2.decompress(data)
+            elif compression == "lz4":
+                import lz4.frame
+                data = lz4.frame.decompress(data)
+            elif compression != "none":
+                raise SystemExit(f"unsupported chunk compression {compression}")
+            for inner_fields, inner_data in _records(io.BytesIO(data)):
+                out = handle(inner_fields, inner_data)
+                if out is not None:
+                    yield out
+        else:
+            out = handle(fields, data)
+            if out is not None:
+                yield out
+
+
+def iter_source(args, wanted):
+    """Yield (topic, t_ns, deserialized msg) from --src (file) or --src-url (stream)."""
+    if args.src_url:
+        ts1 = get_typestore(Stores.ROS1_NOETIC)
+        curl = subprocess.Popen(["curl", "-sSL", "--fail", args.src_url], stdout=subprocess.PIPE)
+        try:
+            stream = io.BufferedReader(curl.stdout, buffer_size=1 << 22)
+            for topic, msgtype, t_ns, raw in stream_ros1_messages(stream, wanted):
+                yield topic, t_ns, ts1.deserialize_ros1(raw, msgtype)
+        finally:
+            curl.kill()
+            curl.wait()
+        return
+    with AnyReader([Path(args.src)]) as reader:
+        src_conns = [c for c in reader.connections if c.topic in wanted]
+        missing = wanted - {c.topic for c in src_conns}
+        if missing:
+            raise SystemExit(f"source bag lacks {sorted(missing)}")
+        for conn, t_ns, raw in reader.messages(connections=src_conns):
+            yield conn.topic, t_ns, reader.deserialize(raw, conn.msgtype)
+
+
 def ros2_typestore():
     for name in ("ROS2_JAZZY", "ROS2_HUMBLE", "LATEST"):
         store = getattr(Stores, name, None)
@@ -154,50 +259,44 @@ def run(args) -> int:
         }
         out_topic = {rect["left_topic"]: LEFT_TOPIC, rect["right_topic"]: RIGHT_TOPIC}
         wanted = set(out_topic) | {args.imu_topic, args.pressure_topic}
-        with AnyReader([Path(args.src)]) as reader:
-            src_conns = [c for c in reader.connections if c.topic in wanted]
-            missing = wanted - {c.topic for c in src_conns}
-            if missing:
-                raise SystemExit(f"source bag lacks {sorted(missing)}")
-            for conn, t_ns, raw in reader.messages(connections=src_conns):
-                if args.duration_s > 0 and start is not None and \
-                        t_ns - start > args.duration_s * 1e9:
-                    break
-                msg = reader.deserialize(raw, conn.msgtype)
-                start = t_ns if start is None else start
-                end = t_ns
-                ns = stamp_ns(msg)
-                if conn.topic in out_topic:
-                    m1, m2 = rect["maps"][conn.topic]
-                    img = cv2.remap(decode(msg), m1, m2, cv2.INTER_LINEAR)
-                    ok, jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, args.jpeg_quality])
-                    if not ok:
-                        continue
-                    topic = out_topic[conn.topic]
-                    out = T["sensor_msgs/msg/CompressedImage"](
-                        header=header(ns, "camera_left" if topic == LEFT_TOPIC else "camera_right"),
-                        format="mono8; jpeg compressed mono8", data=jpg.reshape(-1))
-                    writer.write(conns[topic], t_ns,
-                                 ts.serialize_cdr(out, "sensor_msgs/msg/CompressedImage"))
-                elif conn.topic == args.imu_topic:
-                    topic = IMU_TOPIC
-                    out = T["sensor_msgs/msg/Imu"](
-                        header=header(ns, "imu"), orientation=msg.orientation,
-                        orientation_covariance=np.asarray(msg.orientation_covariance),
-                        angular_velocity=msg.angular_velocity,
-                        angular_velocity_covariance=np.asarray(msg.angular_velocity_covariance),
-                        linear_acceleration=msg.linear_acceleration,
-                        linear_acceleration_covariance=np.asarray(
-                            msg.linear_acceleration_covariance))
-                    writer.write(conns[topic], t_ns, ts.serialize_cdr(out, "sensor_msgs/msg/Imu"))
-                else:
-                    topic = PRESSURE_TOPIC
-                    out = T["sensor_msgs/msg/FluidPressure"](
-                        header=header(ns, "pressure"), fluid_pressure=msg.fluid_pressure,
-                        variance=msg.variance)
-                    writer.write(conns[topic], t_ns,
-                                 ts.serialize_cdr(out, "sensor_msgs/msg/FluidPressure"))
-                counts[topic] = counts.get(topic, 0) + 1
+        for topic_in, t_ns, msg in iter_source(args, wanted):
+            if args.duration_s > 0 and start is not None and \
+                    t_ns - start > args.duration_s * 1e9:
+                break
+            start = t_ns if start is None else start
+            end = t_ns
+            ns = stamp_ns(msg)
+            if topic_in in out_topic:
+                m1, m2 = rect["maps"][topic_in]
+                img = cv2.remap(decode(msg), m1, m2, cv2.INTER_LINEAR)
+                ok, jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, args.jpeg_quality])
+                if not ok:
+                    continue
+                topic = out_topic[topic_in]
+                out = T["sensor_msgs/msg/CompressedImage"](
+                    header=header(ns, "camera_left" if topic == LEFT_TOPIC else "camera_right"),
+                    format="mono8; jpeg compressed mono8", data=jpg.reshape(-1))
+                writer.write(conns[topic], t_ns,
+                             ts.serialize_cdr(out, "sensor_msgs/msg/CompressedImage"))
+            elif topic_in == args.imu_topic:
+                topic = IMU_TOPIC
+                out = T["sensor_msgs/msg/Imu"](
+                    header=header(ns, "imu"), orientation=msg.orientation,
+                    orientation_covariance=np.asarray(msg.orientation_covariance),
+                    angular_velocity=msg.angular_velocity,
+                    angular_velocity_covariance=np.asarray(msg.angular_velocity_covariance),
+                    linear_acceleration=msg.linear_acceleration,
+                    linear_acceleration_covariance=np.asarray(
+                        msg.linear_acceleration_covariance))
+                writer.write(conns[topic], t_ns, ts.serialize_cdr(out, "sensor_msgs/msg/Imu"))
+            else:
+                topic = PRESSURE_TOPIC
+                out = T["sensor_msgs/msg/FluidPressure"](
+                    header=header(ns, "pressure"), fluid_pressure=msg.fluid_pressure,
+                    variance=msg.variance)
+                writer.write(conns[topic], t_ns,
+                             ts.serialize_cdr(out, "sensor_msgs/msg/FluidPressure"))
+            counts[topic] = counts.get(topic, 0) + 1
 
         # Reference trajectory (TUM: t x y z qx qy qz qw) as Odometry.
         ref = np.loadtxt(args.reference, comments="#")
@@ -237,7 +336,11 @@ def run(args) -> int:
 
 def parse_args(argv):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("--src", required=True)
+    src = p.add_mutually_exclusive_group(required=True)
+    src.add_argument("--src", help="Local ROS 1 bag.")
+    src.add_argument("--src-url",
+                     help="Stream the ROS 1 bag over HTTP(S) (via curl) instead of reading a "
+                          "local copy; for bags larger than the free disk.")
     p.add_argument("--dst", required=True)
     p.add_argument("--reference", required=True, help="<sequence>_baseline.tum")
     p.add_argument("--intrinsics", required=True,

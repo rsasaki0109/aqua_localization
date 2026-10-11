@@ -37,6 +37,11 @@
   over 142 m against the 4-camera ReAqROVIO reference (UKF history ~1 km).
   The bag's "pressure" topic turned out to be the hull barometer. Timing
   topics are no longer part of deterministic replay fingerprints.
+- All six NTNU fjord sequences (1.9 km), streamed straight from the dataset
+  repository (`convert_ntnu_stereo_bag.py --src-url`): 0.36-0.73 m RMSE on
+  fjord_1-4, 2.3 / 4.1 m on fjord_5 / 6. A weak landmark prior (default 10 m)
+  removes the visual smoother resets those two sequences triggered; the
+  node now logs the cause of every reset.
 - Fixed MBES loop-closure submaps: `mbes_loop_closure` stacked raw
   sensor-frame pings (single across-track lines) into a submap; with
   `topics.odometry` each ping is now placed at its own odometry pose, and

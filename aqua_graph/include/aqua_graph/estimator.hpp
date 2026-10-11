@@ -153,6 +153,11 @@ struct VisualConfig
   double huber_k{1.345};
   double min_disparity_px{1.0};
   double max_depth_m{20.0};
+  // Weak isotropic prior on each new landmark at its triangulated position.
+  // GTSAM's stereo factor returns zero Jacobians for points behind the
+  // camera, so a landmark whose observations all fail cheirality is
+  // otherwise unconstrained and makes the system singular. <= 0 disables.
+  double landmark_prior_sigma_m{10.0};
 };
 
 struct EstimatorConfig
@@ -258,6 +263,8 @@ public:
   std::optional<EstimatorOutput> latest_state() const;
 
   const EstimatorCounters & counters() const {return counters_;}
+  // what() of the exception behind the latest smoother reset (empty if none).
+  const std::string & last_reset_reason() const {return last_reset_reason_;}
   const EstimatorConfig & config() const {return config_;}
 
 private:
@@ -347,6 +354,7 @@ private:
   gtsam::Vector3 init_gyro_sum_{gtsam::Vector3::Zero()};
   uint64_t init_samples_{0};
   std::optional<double> latest_heading_rad_;
+  std::string last_reset_reason_;
 
   // IMU stream: the sample held over [integrated_until_s_, next sample) plus
   // the not-yet-integrated samples after it.
