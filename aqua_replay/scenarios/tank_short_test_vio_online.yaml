@@ -32,6 +32,8 @@ nodes:
       topics:
         stereo_features: /aqua_visual_frontend/stereo_features
 
+# processing_time_ms is wall-clock and would make the fingerprint vary run
+# to run; it is measured in live runs (run_tank_live.py) instead.
 output:
   storage_id: mcap
   topics:
@@ -39,4 +41,3 @@ output:
     - /aqua_graph/odometry
     - /aqua_graph/status
     - /aqua_visual_frontend/stereo_features
-    - /aqua_visual_frontend/processing_time_ms

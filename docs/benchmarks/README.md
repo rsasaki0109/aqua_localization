@@ -7,6 +7,8 @@ datasets and baseline comparisons.
 
 - [`fjord_1.md`](fjord_1.md): NTNU `subset-fjord/fjord_1` APE history for
   `/aqua_imu_loc/odometry` against the dataset baseline trajectory.
+- [`ntnu_fjord_vio.md`](ntnu_fjord_vio.md): aqua_graph stereo VIO on NTNU
+  `fjord_1` (cross-dataset check, 0.38 m RMSE vs the ReAqROVIO reference).
 - [`fjord_1_yaw_frame.md`](fjord_1_yaw_frame.md): yaw-frame diagnosis for the
   same NTNU sequence.
 - [`tank_aqua_slam.md`](tank_aqua_slam.md): first AQUA-SLAM Docker measurement

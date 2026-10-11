@@ -37,6 +37,13 @@ BENCH_NOTE="describe the change here" ros2 run aqua_localization bench_fjord_1.s
 
 ## Honest takeaways
 
+- **2026-10-11:** aqua_graph with the online stereo frontend reaches 0.38 m
+  RMSE on this sequence against the same reference
+  ([`ntnu_fjord_vio.md`](ntnu_fjord_vio.md)). That run also found that
+  `/mavros/imu/static_pressure` is the hull's internal barometer, not water
+  depth, so the "pressure" input used for the rows above is not a depth
+  measurement.
+
 - The trajectory is ~142 m long; an IMU-only dead-reckoning APE of ~1.1 km after rigid alignment
   is ~8x the trajectory length. This is the expected MVP behavior without DVL/sonar/visual aiding.
 - Enabling the AHRS yaw observation made things worse on `fjord_1`. Initial hypothesis was a

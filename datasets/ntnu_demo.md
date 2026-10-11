@@ -63,7 +63,10 @@ Filtered output is approximately 41 MB and contains 318.5 s of replay data.
 Suggested role mapping:
 
 - `imu`: `/mavros/imu/data` (50 Hz, base_link-aligned via MAVROS)
-- `pressure`: `/mavros/imu/static_pressure` (native `sensor_msgs/msg/FluidPressure`, 50 Hz)
+- `pressure`: `/mavros/imu/static_pressure` (native `sensor_msgs/msg/FluidPressure`, 50 Hz).
+  **Caveat (2026-10-11):** this is the hull's internal barometer, not water
+  depth; it changes by only ~0.16 m-equivalent while the vehicle climbs ~7 m
+  (see `docs/benchmarks/ntnu_fjord_vio.md`).
 - No scalar barometer, no depth scalar, no sonar.
 
 The bag exposes pressure as native `FluidPressure`, so the `scalar_to_pressure_node` adapter is **not**

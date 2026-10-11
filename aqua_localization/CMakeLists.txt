@@ -58,6 +58,7 @@ install(PROGRAMS
   scripts/make_synthetic_sonar_bag.py
   scripts/make_demo_gif.py
   scripts/make_visual_odometry_gif.py
+  scripts/convert_ntnu_stereo_bag.py
   scripts/convert_tank_dataset_bag.py
   scripts/stereo_visual_odometry.py
   scripts/rerun_export.py

@@ -154,10 +154,23 @@ official `short_test.yaml` from the dataset page).
   init, unhandled GTSAM fixed-lag failures (now re-anchored), DVL invalid
   sentinel handling in the baseline.
 
+**Cross-dataset check (2026-10-11).** With the Tank held-out sequences out
+of reach, the stack was run unchanged on NTNU `fjord_1` (fisheye stereo
+rectified offline, no DVL, no depth): 0.38 m RMSE / 0.73 % drift per 100 m
+against the 4-camera ReAqROVIO reference, deterministic
+(`docs/benchmarks/ntnu_fjord_vio.md`). Not an AQUA-SLAM comparison, but
+evidence the Tank result is not a single-sequence fit. Next candidates:
+fjord_2..6 (larger downloads), online fisheye rectification in the
+frontend.
+
 **Next steps (in order).**
 
-1. *(needs a human)* Held-out Tank sequences: the download link is mailed
-   after the form on the dataset page. Then run
+1. *(blocked, on hold since 2026-10-11)* Held-out Tank sequences: the
+   download form at senseroboticslab.github.io/underwater-tank-dataset/download/
+   only accepts an organizational e-mail address, so an individual developer
+   cannot obtain them; the AQUA-SLAM comparison stays a single-sequence
+   result (`short_test`) until someone with an institutional address (or the
+   authors) provides them. Then run
    `run_tank_benchmark.py` on `Structure_Easy` / `Medium` / `Hard` (check
    whether those sequences need the `long` calibration) and rerun AQUA-SLAM
    in its Docker image on the same bags to get same-run trajectories.

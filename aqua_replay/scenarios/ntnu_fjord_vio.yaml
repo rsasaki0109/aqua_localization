@@ -1,0 +1,46 @@
+# NTNU underwater-datasets fjord sequence, converted with
+# convert_ntnu_stereo_bag.py (rectified cam1/cam0 stereo, Alphasense IMU,
+# barometer, ReAqROVIO reference). The online C++ frontend and aqua_graph
+# run in-process on IMU + stereo only: no DVL on this vehicle, and no depth
+# (the bag's barometer is the hull's internal one). The rectified camera
+# geometry is aqua_graph/config/ntnu_fjord_stereo_geometry.yaml, the
+# overlay the converter writes from the dataset's Kalibr calibration.
+#
+#   ros2 run aqua_replay offline_replay \
+#     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/ntnu_fjord_vio.yaml \
+#     --bag fjord_1_stereo_ros2 --out /tmp/fjord_vio
+#   ros2 run aqua_replay evaluate_replay_trajectories.py --bag /tmp/fjord_vio \
+#     --reference /reference/odometry --estimate /aqua_graph/odometry
+input:
+  topics:
+    - /imu/data
+    - /reference/odometry
+    - /camera/left/image_rect/compressed
+    - /camera/right/image_rect/compressed
+  order: header
+  reorder_window_s: 0.5
+
+nodes:
+  - plugin: aqua_visual_frontend::StereoFrontendNode
+    name: stereo_frontend
+    parameters:
+      topics:
+        left: /camera/left/image_rect/compressed
+        right: /camera/right/image_rect/compressed
+      max_features: 150
+      publish_every: 2
+  - plugin: aqua_graph::AquaGraphNode
+    name: aqua_graph
+    params_files:
+      - $(find-pkg-share aqua_graph)/config/ntnu_fjord.yaml
+      - $(find-pkg-share aqua_graph)/config/ntnu_fjord_stereo_geometry.yaml
+
+# processing_time_ms is wall-clock and would make the fingerprint vary run
+# to run; it is measured in live runs (run_tank_live.py) instead.
+output:
+  storage_id: mcap
+  topics:
+    - {topic: /reference/odometry, type: nav_msgs/msg/Odometry}
+    - /aqua_graph/odometry
+    - /aqua_graph/status
+    - /aqua_visual_frontend/stereo_features

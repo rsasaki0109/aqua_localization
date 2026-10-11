@@ -31,6 +31,12 @@
   `short_test`) with a live launch file; `run_tank_live.py` runs Tank at
   real-time rate: 0.0095-0.0098 m RMSE on AQUA-SLAM's window, frontend
   ~10 ms/frame, odometry latency ~0.4 ms median.
+- Cross-dataset check on NTNU `fjord_1` (different vehicle and sensors):
+  `convert_ntnu_stereo_bag.py` rectifies the fisheye stereo pair, and
+  aqua_graph with the online frontend (stereo + IMU) reaches 0.38 m RMSE
+  over 142 m against the 4-camera ReAqROVIO reference (UKF history ~1 km).
+  The bag's "pressure" topic turned out to be the hull barometer. Timing
+  topics are no longer part of deterministic replay fingerprints.
 - Fixed MBES loop-closure submaps: `mbes_loop_closure` stacked raw
   sensor-frame pings (single across-track lines) into a submap; with
   `topics.odometry` each ping is now placed at its own odometry pose, and
