@@ -13,13 +13,15 @@ below measure agreement with that published VIO, using one stereo pair.
 
 | Method | Inputs | RMSE m | Max m | Final m | drift 10 m % | drift 50 m % | drift 100 m % |
 |--------|--------|------:|------:|------:|------:|------:|------:|
-| aqua_graph (online frontend) | cam1/cam0 stereo + Alphasense IMU | **0.375** | 0.793 | 0.674 | 2.93 | 1.05 | 0.73 |
+| aqua_graph (online frontend) | cam1/cam0 stereo + Alphasense IMU | **0.320** | 0.630 | 0.506 | 3.81 | 0.87 | 0.54 |
+| aqua_graph, frontend rectifying online | raw fisheye cam1/cam0 + IMU | 0.330 | 0.661 | 0.384 | 3.84 | 0.91 | 0.54 |
 | aqua_imu_loc UKF (history, [`fjord_1.md`](fjord_1.md)) | MAVROS IMU + "pressure" | ~800-1300 | | | | | |
 
 SE(3)-aligned APE over the whole 312 s; drift is the world-frame segment
 error in % of path length (`evaluate_replay_trajectories.py
 --segment-lengths`). Deterministic: two replays give the same fingerprint
-(`6c81ee5b2c1284db` with the landmark prior; `19c999b16ecfe3b0` before it). 312 s of data replay in ~200 s on 4 vCPU,
+(`786a451e00bdbec0`; before CLAHE + glare mask 0.375 m,
+`6c81ee5b2c1284db`). 312 s of data replay in ~200 s on 4 vCPU,
 single-threaded, including image decoding and tracking.
 
 ## All six fjord sequences
@@ -36,18 +38,22 @@ ros2 run aqua_replay run_ntnu_benchmark.py --calib-dir <calib> \
 <!-- generated:begin -->
 | Sequence | Path m | Duration s | RMSE m | Max m | Final m | drift 10 m % | drift 50 m % | drift 100 m % | Fingerprint |
 |----------|------:|------:|------:|------:|------:|------:|------:|------:|------|
-| `fjord_1` | 142 | 312 | 0.375 | 0.793 | 0.674 | 2.93 | 1.05 | 0.73 | `6c81ee5b2c1284db` |
-| `fjord_2` | 207 | 500 | 0.731 | 1.353 | 1.214 | 4.87 | 1.98 | 0.96 | `38bcec08cc5c830e` |
-| `fjord_3` | 123 | 272 | 0.358 | 0.569 | 0.436 | 3.11 | 1.03 | 0.70 | `4e69fcec7edfafc5` |
-| `fjord_4` | 166 | 411 | 0.576 | 1.167 | 1.149 | 3.92 | 1.36 | 1.08 | `6f8609b8cbf39ca6` |
-| `fjord_5` | 235 | 441 | 2.332 | 5.694 | 5.601 | 12.79 | 5.50 | 2.32 | `7d7156a6a29acc77` |
-| `fjord_6` | 306 | 639 | 4.139 | 10.976 | 10.717 | 13.74 | 7.02 | 3.44 | `993bbf4b5799c0b9` |
+| `fjord_1` | 142 | 312 | 0.320 | 0.630 | 0.506 | 3.81 | 0.87 | 0.54 | `786a451e00bdbec0` |
+| `fjord_2` | 207 | 500 | 0.689 | 1.526 | 0.592 | 4.87 | 2.18 | 0.81 | `89dd83b3463fcbd4` |
+| `fjord_3` | 123 | 272 | 0.286 | 0.595 | 0.310 | 3.69 | 0.89 | 0.37 | `7d9150143a5ebe8c` |
+| `fjord_4` | 166 | 411 | 0.559 | 1.213 | 0.970 | 4.34 | 1.33 | 0.83 | `8a1d37852bb3d7e5` |
+| `fjord_5` | 235 | 441 | 0.637 | 1.325 | 0.581 | 3.86 | 1.70 | 0.82 | `a20833f882f5143e` |
+| `fjord_6` | 306 | 639 | 0.904 | 1.748 | 0.625 | 4.54 | 2.40 | 0.93 | `ced91d0ae4c2eb91` |
 <!-- generated:end -->
 
 1.9 km of trajectory in total; ~55 min wall for all six on 4 vCPU,
 including streaming ~115 GB of raw bags.
 
-- **fjord_1-4: 0.36-0.73 m RMSE, 0.70-1.08 % drift per 100 m.**
+- **All six: 0.29-0.90 m RMSE, 0.37-0.93 % drift per 100 m** (before
+  the CLAHE + glare mask fix below: 0.36-4.14 m, 0.70-3.44 %). Every
+  sequence improved in RMSE and 100 m drift; 10 m drift got slightly worse
+  on fjord_1/3/4 (e.g. fjord_1 2.93 -> 3.81 %), CLAHE amplifies image
+  noise at short range.
 - History: before the drift fix below, fjord_5 / 6 were at 2.33 m / 4.14 m
   (2.3 % / 3.4 % per 100 m), and before that 2.44 m / 4.79 m with 10+
   fixed-lag smoother re-anchors each: GTSAM's stereo factor returns zero
@@ -135,10 +141,11 @@ x) and writes the rectified geometry overlay
 `aqua_graph/config/ntnu_fjord_stereo_geometry.yaml` (fx 418.1 px, baseline
 0.1097 m, body_T_camera from the Kalibr IMU-camera calibration).
 
-## Settings (nothing tuned on fjord_1)
+## Settings
 
-- Frontend: same tracker and defaults as Tank, 150 features, every 2nd
-  frame published (10 Hz).
+- Frontend: same tracker as Tank, 150 features, every 2nd frame published
+  (10 Hz), plus CLAHE (clip 2.0) and the glare mask (level 245), chosen on
+  fjord_5 as described above.
 - IMU noise: the dataset's published `imu0_alphasense_noise.yaml`
   (Kalibr values). A 10x tighter bias random walk was tried and was worse.
 - No DVL (none on the vehicle) and **no depth**, see below.

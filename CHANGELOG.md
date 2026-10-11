@@ -42,6 +42,17 @@
   fjord_1-4, 2.3 / 4.1 m on fjord_5 / 6. A weak landmark prior (default 10 m)
   removes the visual smoother resets those two sequences triggered; the
   node now logs the cause of every reset.
+- NTNU fjord drift fix: the fjord_5 / 6 yaw drift came from tracking
+  collapse in hazy, sun-glared frames. `aqua_visual_frontend` gained
+  `clahe_clip_limit` and `saturation_level` (both off by default, on in the
+  NTNU scenarios): all six sequences now 0.29-0.90 m RMSE and 0.37-0.93 %
+  drift per 100 m (fjord_5 2.33 -> 0.64 m, fjord_6 4.14 -> 0.90 m); Tank
+  unchanged.
+- `aqua_visual_frontend` rectifies a raw fisheye pair online from a Kalibr
+  camchain (`rectify.*`) and takes raw `sensor_msgs/Image` input
+  (`input_format`); `convert_ntnu_stereo_bag.py --no-rectify` and
+  `run_ntnu_benchmark.py --online-rectify` exercise it (fjord_1 0.330 m vs
+  0.320 m offline-rectified).
 - Fixed MBES loop-closure submaps: `mbes_loop_closure` stacked raw
   sensor-frame pings (single across-track lines) into a submap; with
   `topics.odometry` each ping is now placed at its own odometry pose, and
