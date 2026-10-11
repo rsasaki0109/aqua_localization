@@ -18,7 +18,7 @@
   `offline_replay --drop-topic`, feature-track `--drop`): on Tank
   `short_test` aqua_graph stays at 0.0096 m through a 10 s DVL outage (UKF
   7.4 m) and degrades to 0.022 m through a 10 s camera outage.
-- Track B dead reckoning on the full MBES-SLAM `beach_pond` survey (16.6 km,
+- Track B dead reckoning on the full MBES-SLAM `beach_pond` survey (16.7 km,
   no GNSS position): aqua_graph with IMU + DVL + GNSS compass reaches 2.84 m
   APE RMSE vs 3.60 m for classical DVL dead reckoning
   (`docs/benchmarks/beach_pond_dead_reckoning.md`). New in aqua_graph: a

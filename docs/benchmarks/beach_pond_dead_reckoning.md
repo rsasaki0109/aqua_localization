@@ -2,7 +2,7 @@
 
 Track B starts from the navigation prior that bathymetric SLAM corrects: how
 well does the vehicle know where it is *before* any MBES loop closure? This
-page measures it on the whole `beach_pond` survey (~2.4 h, ~16.6 km at
+page measures it on the whole `beach_pond` survey (~2.4 h, ~16.7 km at
 ~2 m/s, surface vessel) against the dataset's RTK GNSS-INS reference
 (`/nav/processed/odometry`). **GNSS position is never an input.** The only
 GNSS-derived input is the dual-antenna heading, and only in the "with
@@ -24,12 +24,35 @@ every reference segment of that path length, in % of the length; it
 therefore includes absolute heading error.
 
 <!-- generated:begin -->
+Commit `6da1aa3`; replay fingerprints: compass `ef700ee330f14be0`, no compass `6262ad634fa31f62`.
+
+#### With GNSS compass heading (8619 s, 16.7 km)
+
+| Method | RMSE m | Max m | Final m | drift 100 m % | drift 500 m % | drift 1000 m % | drift 2000 m % |
+|--------|------:|------:|------:|------:|------:|------:|------:|
+| aqua_graph (IMU + DVL + compass + depth hold) | 2.84 | 5.91 | 5.41 | 0.31 | 0.23 | 0.19 | 0.13 |
+| DVL DR, compass yaw | 3.60 | 9.05 | 4.52 | 0.31 | 0.24 | 0.19 | 0.14 |
+| DVL DR, Madgwick AHRS yaw | 256.85 | 693.09 | 615.25 | 60.74 | 50.15 | 34.55 | 16.60 |
+
+#### Without compass, first 300 s (635 m)
+
+| Method | RMSE m | Max m | Final m | drift 100 m % | drift 500 m % | drift 1000 m % | drift 2000 m % |
+|--------|------:|------:|------:|------:|------:|------:|------:|
+| aqua_graph (IMU + DVL + depth hold) | 2.31 | 7.01 | 3.65 | 1.96 | 1.13 | - | - |
+| DVL DR, integrated gyro yaw | 2.37 | 7.14 | 3.79 | 2.01 | 1.16 | - | - |
+
+#### Without compass, full run (8619 s)
+
+| Method | RMSE m | Max m | Final m | drift 100 m % | drift 500 m % | drift 1000 m % | drift 2000 m % |
+|--------|------:|------:|------:|------:|------:|------:|------:|
+| aqua_graph (IMU + DVL + depth hold) | 287.66 | 741.60 | 732.62 | 67.56 | 55.84 | 38.52 | 18.38 |
+| DVL DR, integrated gyro yaw | 258.01 | 695.90 | 616.42 | 61.03 | 50.39 | 34.72 | 16.69 |
 <!-- generated:end -->
 
 ## What the numbers say
 
 - **With a compass, aqua_graph beats classical DVL DR on absolute error**
-  (RMSE 2.84 vs 3.60 m, max 5.91 vs 9.05 m over 16.6 km, i.e. 0.017 % of
+  (RMSE 2.84 vs 3.60 m, max 5.91 vs 9.05 m over 16.7 km, i.e. 0.017 % of
   distance travelled), with identical segment drift (0.13-0.31 %). The gain
   comes from the IMU carrying the 1934 invalid DVL samples (no bottom lock)
   and from the coupled attitude / lever-arm model, not from a better

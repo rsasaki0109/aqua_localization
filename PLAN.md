@@ -146,7 +146,7 @@ official `short_test.yaml` from the dataset page).
   outages, 0.0093 / 0.0096 m through 4 / 10 s DVL outages (UKF 0.72 /
   7.38 m), 0.0211 / 0.0582 m with camera + DVL out for 2 / 4 s.
 - *beach_pond dead reckoning (`docs/benchmarks/beach_pond_dead_reckoning.md`):*
-  full 2.4 h / 16.6 km survey, GNSS position never used. With the GNSS
+  full 2.4 h / 16.7 km survey, GNSS position never used. With the GNSS
   compass: aqua_graph 2.84 m RMSE (max 5.91 m) vs classical DVL DR 3.60 m
   (max 9.05 m). Without it, both are bounded by gyro yaw drift (aqua_graph
   2.31 m vs 2.37 m over 300 s, hundreds of metres over 2.4 h) - the regime
