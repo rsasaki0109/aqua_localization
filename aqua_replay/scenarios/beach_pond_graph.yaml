@@ -1,0 +1,29 @@
+# MBES-SLAM beach_pond dead reckoning in aqua_graph: raw IMU + DVL + GNSS
+# heading + depth hold, scored against the RTK GNSS-INS reference. The DVL
+# and heading live in a second bag (pass it with --extra-bag), and the DVL
+# only comes up ~853 s into the recording, so replay starts there.
+#
+#   ros2 run aqua_replay offline_replay \
+#     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/beach_pond_graph.yaml \
+#     --bag beach_pond_ros2 --extra-bag beach_pond_aux --out /tmp/beach_pond_graph
+input:
+  topics:
+    - /nav/sensors/microstrain/imu/raw
+    - /nav/processed/nortek/dvl_twist
+    - /nav/processed/navsat/ubx_hdg/imu
+    - /nav/processed/odometry
+  order: header
+  reorder_window_s: 0.5
+  start_offset_s: 855.0
+
+nodes:
+  - plugin: aqua_graph::AquaGraphNode
+    name: aqua_graph
+    params_files: [$(find-pkg-share aqua_graph)/config/beach_pond.yaml]
+
+output:
+  storage_id: mcap
+  topics:
+    - {topic: /nav/processed/odometry, type: nav_msgs/msg/Odometry}
+    - /aqua_graph/odometry
+    - /aqua_graph/status

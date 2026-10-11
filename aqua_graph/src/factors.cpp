@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "aqua_graph/factors.hpp"
 
+#include <cmath>
+
 namespace aqua_graph
 {
 
@@ -73,6 +75,40 @@ gtsam::Vector PressureDepthFactor::evaluateError(
   gtsam::Vector1 error;
   error << -sensor_world.z() - measured_;
   return error;
+}
+
+HeadingFactor::HeadingFactor(
+  gtsam::Key pose_key, double measured_heading_rad, const gtsam::Vector3 & axis_body,
+  const gtsam::SharedNoiseModel & noise_model)
+: Base(noise_model, pose_key),
+  measured_(measured_heading_rad),
+  axis_body_(axis_body)
+{
+}
+
+gtsam::Vector HeadingFactor::evaluateError(
+  const gtsam::Pose3 & pose, boost::optional<gtsam::Matrix &> H_pose) const
+{
+  const gtsam::Rot3 & R = pose.rotation();
+  const gtsam::Vector3 d = R * axis_body_;
+  const double n2 = d.x() * d.x() + d.y() * d.y();
+  const double heading = std::atan2(d.y(), d.x());
+  if (H_pose) {
+    // Right perturbation R*Exp(w): d' = d - R [a]x w.
+    gtsam::Matrix13 dh_dd;
+    dh_dd << -d.y() / n2, d.x() / n2, 0.0;
+    H_pose->setZero(1, 6);
+    H_pose->leftCols<3>() = -dh_dd * R.matrix() * gtsam::skewSymmetric(axis_body_);
+  }
+  gtsam::Vector1 error;
+  error << std::remainder(heading - measured_, 2.0 * M_PI);
+  return error;
+}
+
+double heading_of_axis(const gtsam::Rot3 & world_R_body, const gtsam::Vector3 & axis_body)
+{
+  const gtsam::Vector3 d = world_R_body * axis_body;
+  return std::atan2(d.y(), d.x());
 }
 
 }  // namespace aqua_graph

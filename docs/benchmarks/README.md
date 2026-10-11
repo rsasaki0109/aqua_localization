@@ -25,6 +25,10 @@ datasets and baseline comparisons.
 - [`aqua_slam_error_budget.md`](aqua_slam_error_budget.md): generated error
   budget showing the remaining RMSE gap, progress already banked, and the
   current fusion regression to fix next.
+- [`beach_pond_dead_reckoning.md`](beach_pond_dead_reckoning.md): MBES-SLAM
+  `beach_pond` full-survey dead reckoning (IMU + DVL, with and without the
+  GNSS compass) of `aqua_graph` vs classical DVL dead reckoning, against the
+  RTK GNSS-INS reference.
 - [`mbes_beach_pond_loop_status.md`](mbes_beach_pond_loop_status.md):
   first MBES-SLAM `beach_pond` tuning measurement with loop-status counts,
   descriptor/consistency sweep output, and false-positive audit notes.

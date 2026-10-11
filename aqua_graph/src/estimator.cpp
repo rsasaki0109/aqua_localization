@@ -72,6 +72,11 @@ TightlyCoupledEstimator::TightlyCoupledEstimator(const EstimatorConfig & config)
   stereo_calibration_ = boost::make_shared<gtsam::Cal3_S2Stereo>(
     vis.fx, vis.fy, 0.0, vis.cx, vis.cy, vis.baseline_m);
 
+  make_smoother();
+}
+
+void TightlyCoupledEstimator::make_smoother()
+{
   gtsam::ISAM2Params isam_params;
   isam_params.relinearizeThreshold = config_.relinearize_threshold;
   isam_params.relinearizeSkip = std::max(1, config_.relinearize_skip);
@@ -175,6 +180,24 @@ void TightlyCoupledEstimator::add_position(
   m.stamp_s = stamp_s;
   m.vector = position_world;
   m.covariance = covariance.allFinite() ? covariance : gtsam::Matrix3::Zero();
+  enqueue(std::move(m));
+}
+
+void TightlyCoupledEstimator::add_heading(double stamp_s, double heading_rad, double sigma_rad)
+{
+  if (!config_.heading.enabled || !std::isfinite(heading_rad) || !std::isfinite(stamp_s)) {
+    return;
+  }
+  latest_heading_rad_ = heading_rad;
+  if (!initialized_) {
+    return;
+  }
+  ++counters_.heading_received;
+  PendingMeasurement m;
+  m.kind = PendingMeasurement::Kind::kHeading;
+  m.stamp_s = stamp_s;
+  m.scalar = heading_rad;
+  m.vector.x() = sigma_rad > 0.0 ? sigma_rad : config_.heading.sigma_rad;
   enqueue(std::move(m));
 }
 
@@ -286,11 +309,20 @@ void TightlyCoupledEstimator::try_initialize(
   // Static specific force in body is R^T * (0, 0, g) for a z-up world.
   const double roll = std::atan2(f.y(), f.z());
   const double pitch = std::atan2(-f.x(), std::hypot(f.y(), f.z()));
-  const gtsam::imuBias::ConstantBias bias(gtsam::Vector3::Zero(), gyro_mean);
+  const gtsam::imuBias::ConstantBias bias(
+    gtsam::Vector3::Zero(),
+    config_.init.gyro_bias_from_static_window ? gyro_mean : gtsam::Vector3::Zero());
+  gtsam::Rot3 attitude = gtsam::Rot3::Ypr(0.0, pitch, roll);
+  if (config_.heading.enabled && config_.heading.align_initial_yaw) {
+    if (!latest_heading_rad_) {
+      return;  // wait for the first heading measurement
+    }
+    const double current = heading_of_axis(attitude, config_.heading.axis_body);
+    attitude = gtsam::Rot3::Rz(*latest_heading_rad_ - current) * attitude;
+  }
   start_graph(
-    stamp_s, gtsam::NavState(
-      gtsam::Pose3(gtsam::Rot3::Ypr(0.0, pitch, roll), gtsam::Point3::Zero()),
-      gtsam::Vector3::Zero()), bias);
+    stamp_s, gtsam::NavState(gtsam::Pose3(attitude, gtsam::Point3::Zero()),
+    gtsam::Vector3::Zero()), bias);
 }
 
 void TightlyCoupledEstimator::start_graph(
@@ -302,20 +334,7 @@ void TightlyCoupledEstimator::start_graph(
   preint_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(preint_params_, bias);
 
   UpdateBatch batch;
-  // Pose3 tangent order: [roll, pitch, yaw (approx, body axes), x, y, z].
-  gtsam::Vector6 pose_sigmas;
-  pose_sigmas << init.roll_pitch_sigma_rad, init.roll_pitch_sigma_rad, init.yaw_sigma_rad,
-    init.position_sigma_m, init.position_sigma_m, init.position_sigma_m;
-  gtsam::Vector6 bias_sigmas;
-  bias_sigmas << gtsam::Vector3::Constant(init.accel_bias_sigma),
-    gtsam::Vector3::Constant(init.gyro_bias_sigma);
-  batch.graph.addPrior(X(0), state.pose(), gtsam::noiseModel::Diagonal::Sigmas(pose_sigmas));
-  batch.graph.addPrior(
-    V(0), state.v(), gtsam::noiseModel::Isotropic::Sigma(3, init.velocity_sigma_mps));
-  batch.graph.addPrior(B(0), bias, gtsam::noiseModel::Diagonal::Sigmas(bias_sigmas));
-  batch.values.insert(X(0), state.pose());
-  batch.values.insert(V(0), state.v());
-  batch.values.insert(B(0), bias);
+  add_state_priors(batch, 0, state, bias, init.yaw_sigma_rad, init.position_sigma_m);
 
   initialized_ = true;
   states_.push_back(StateRecord{0, stamp_s});
@@ -390,6 +409,12 @@ EstimatorOutput TightlyCoupledEstimator::create_state(double stamp_s)
     states_.pop_front();
   }
   current_state_ = predicted;
+  if (config_.depth.hold_initial_depth) {
+    // The body origin starts at z = 0, so "initial depth" is depth 0 there.
+    batch.graph.emplace_shared<PressureDepthFactor>(
+      X(k), 0.0, gtsam::Point3::Zero(),
+      gtsam::noiseModel::Isotropic::Sigma(1, config_.depth.hold_sigma_m));
+  }
   attach_measurements(batch, states_.back());
   ++counters_.states;
   run_update(batch, states_.back());
@@ -495,6 +520,12 @@ void TightlyCoupledEstimator::attach_measurements(
           ++counters_.position_applied;
           break;
         }
+      case PendingMeasurement::Kind::kHeading:
+        batch.graph.emplace_shared<HeadingFactor>(
+          X(j), m.scalar, config_.heading.axis_body,
+          robust(gtsam::noiseModel::Isotropic::Sigma(1, m.vector.x()), config_.heading.huber_k));
+        ++counters_.heading_applied;
+        break;
       case PendingMeasurement::Kind::kStereo:
         attach_stereo(batch, *state, m.stereo);
         break;
@@ -593,19 +624,77 @@ void TightlyCoupledEstimator::attach_stereo(
   }
 }
 
+void TightlyCoupledEstimator::add_state_priors(
+  UpdateBatch & batch, uint64_t index, const gtsam::NavState & state,
+  const gtsam::imuBias::ConstantBias & bias, double yaw_sigma_rad, double position_sigma_m) const
+{
+  const auto & init = config_.init;
+  // Pose3 tangent order: [roll, pitch, yaw (approx, body axes), x, y, z].
+  gtsam::Vector6 pose_sigmas;
+  pose_sigmas << init.roll_pitch_sigma_rad, init.roll_pitch_sigma_rad, yaw_sigma_rad,
+    gtsam::Vector3::Constant(position_sigma_m);
+  gtsam::Vector6 bias_sigmas;
+  bias_sigmas << gtsam::Vector3::Constant(init.accel_bias_sigma),
+    gtsam::Vector3::Constant(init.gyro_bias_sigma);
+  batch.graph.addPrior(X(index), state.pose(), gtsam::noiseModel::Diagonal::Sigmas(pose_sigmas));
+  batch.graph.addPrior(
+    V(index), state.v(), gtsam::noiseModel::Isotropic::Sigma(3, init.velocity_sigma_mps));
+  batch.graph.addPrior(B(index), bias, gtsam::noiseModel::Diagonal::Sigmas(bias_sigmas));
+  batch.values.insert(X(index), state.pose());
+  batch.values.insert(V(index), state.v());
+  batch.values.insert(B(index), bias);
+}
+
 void TightlyCoupledEstimator::run_update(UpdateBatch & batch, const StateRecord & newest)
 {
   batch.timestamps[X(newest.index)] = newest.stamp_s;
   batch.timestamps[V(newest.index)] = newest.stamp_s;
   batch.timestamps[B(newest.index)] = newest.stamp_s;
-  smoother_->update(batch.graph, batch.values, batch.timestamps);
-  ++counters_.smoother_updates;
+  try {
+    smoother_->update(batch.graph, batch.values, batch.timestamps);
+    const gtsam::NavState state(
+      smoother_->calculateEstimate<gtsam::Pose3>(X(newest.index)),
+      smoother_->calculateEstimate<gtsam::Vector3>(V(newest.index)));
+    const auto bias = smoother_->calculateEstimate<gtsam::imuBias::ConstantBias>(B(newest.index));
+    ++counters_.smoother_updates;
+    current_state_ = state;
+    current_bias_ = bias;
+  } catch (const std::exception &) {
+    // Two failure modes end up here. (1) Without an absolute heading or
+    // position, x/y/yaw are gauge freedoms whose marginal covariance only
+    // grows, and over long dead-reckoning runs the fixed-lag marginal turns
+    // numerically singular (IndeterminantLinearSystemException). (2) GTSAM's
+    // IncrementalFixedLagSmoother can leave a marginalized key in the Bayes
+    // tree, and the next solve throws "Requested variable ... not in this
+    // VectorValues". Either way, re-anchor a fresh smoother at the latest
+    // prediction (current_state_ is untouched on failure) instead of taking
+    // the node down: the estimate stays continuous, only stale
+    // cross-covariances are lost.
+    reset_smoother(newest);
+  }
+}
 
-  current_state_ = gtsam::NavState(
-    smoother_->calculateEstimate<gtsam::Pose3>(X(newest.index)),
-    smoother_->calculateEstimate<gtsam::Vector3>(V(newest.index)));
-  current_bias_ =
-    smoother_->calculateEstimate<gtsam::imuBias::ConstantBias>(B(newest.index));
+void TightlyCoupledEstimator::reset_smoother(const StateRecord newest_state)
+{
+  // By value: callers pass states_.back(), which is cleared below.
+  const StateRecord & newest = newest_state;
+  ++counters_.smoother_resets;
+  make_smoother();
+  // Older states and landmarks lived only in the discarded smoother.
+  states_.clear();
+  states_.push_back(newest);
+  tracks_.clear();
+  // Keep observable directions tight but let absolute sensors move the
+  // gauge directions they observe.
+  const double yaw_sigma = config_.heading.enabled ? 0.1 : config_.init.yaw_sigma_rad;
+  const double position_sigma =
+    config_.position.enabled ? 10.0 : config_.init.position_sigma_m;
+  UpdateBatch batch;
+  add_state_priors(batch, newest.index, current_state_, current_bias_, yaw_sigma, position_sigma);
+  batch.timestamps[X(newest.index)] = newest.stamp_s;
+  batch.timestamps[V(newest.index)] = newest.stamp_s;
+  batch.timestamps[B(newest.index)] = newest.stamp_s;
+  smoother_->update(batch.graph, batch.values, batch.timestamps);
 }
 
 }  // namespace aqua_graph

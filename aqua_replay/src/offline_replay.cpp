@@ -102,6 +102,7 @@ struct Options
   std::optional<double> start_offset_s;
   std::optional<double> duration_s;
   std::vector<std::string> param_overrides;  // NODE:NAME:=VALUE
+  std::vector<std::string> drop_topics;  // TOPIC:START:END (s from bag start)
   std::optional<std::string> summary;
   bool quiet{false};
 };
@@ -270,6 +271,8 @@ Options parse_options(int argc, char ** argv)
       o.duration_s = std::stod(need(i));
     } else if (arg == "--param") {
       o.param_overrides.push_back(need(i));
+    } else if (arg == "--drop-topic") {
+      o.drop_topics.push_back(need(i));
     } else if (arg == "--summary") {
       o.summary = need(i);
     } else if (arg == "--quiet") {
@@ -279,6 +282,7 @@ Options parse_options(int argc, char ** argv)
         "offline_replay --scenario S.yaml [--bag IN] [--extra-bag IN2]... [--out OUT]\n"
         "               [--start-offset SEC]\n"
         "               [--duration SEC] [--param NODE:NAME:=VALUE]... [--summary PATH]\n"
+        "               [--drop-topic TOPIC:START:END]...\n"
         "               [--quiet]\n";
       std::exit(0);
     } else {
@@ -630,6 +634,31 @@ int run(const Options & options)
   if (scenario.start_offset_s > 0.0) {
     reader.seek(start_ns);
   }
+  // Simulated sensor outages: drop a topic's messages whose receive time
+  // falls in [START, END) seconds after the bag start.
+  struct DropWindow
+  {
+    std::string topic;
+    int64_t begin_ns;
+    int64_t end_ns;
+  };
+  std::vector<DropWindow> drops;
+  for (const auto & raw : options.drop_topics) {
+    const auto second = raw.rfind(':');
+    const auto first = second == std::string::npos ? std::string::npos : raw.rfind(':', second - 1);
+    if (first == std::string::npos || first == 0) {
+      fail("--drop-topic expects TOPIC:START:END, got '" + raw + "'");
+    }
+    DropWindow d;
+    d.topic = raw.substr(0, first);
+    d.begin_ns = bag_start_ns + static_cast<int64_t>(std::stod(raw.substr(first + 1, second - first - 1)) * 1e9);
+    d.end_ns = bag_start_ns + static_cast<int64_t>(std::stod(raw.substr(second + 1)) * 1e9);
+    if (!input_index.count(d.topic) || d.end_ns <= d.begin_ns) {
+      fail("--drop-topic '" + raw + "': unknown input topic or empty window");
+    }
+    drops.push_back(d);
+  }
+  uint64_t dropped = 0;
 
   // --- Nodes ------------------------------------------------------------
   const auto components = list_components();
@@ -736,6 +765,14 @@ int run(const Options & options)
     if (recv_ns > end_ns) {break;}
     const auto idx = input_index.find(bag_msg->topic_name);
     if (idx == input_index.end()) {continue;}
+    if (std::any_of(
+        drops.begin(), drops.end(), [&](const DropWindow & d) {
+          return d.topic == bag_msg->topic_name && recv_ns >= d.begin_ns && recv_ns < d.end_ns;
+        }))
+    {
+      ++dropped;
+      continue;
+    }
     InputTopic & in = inputs[idx->second];
     const rclcpp::SerializedMessage serialized(*bag_msg->serialized_data);
     QueuedMessage q;
@@ -781,6 +818,8 @@ int run(const Options & options)
   y << YAML::Key << "duration_s" << YAML::Value << scenario.duration_s;
   y << YAML::Key << "messages_delivered" << YAML::Value << delivered;
   y << YAML::Key << "late_messages" << YAML::Value << late;
+  y << YAML::Key << "dropped_messages" << YAML::Value << dropped;
+  y << YAML::Key << "drop_topics" << YAML::Value << options.drop_topics;
   y << YAML::Key << "first_stamp_ns" << YAML::Value << first_key_ns;
   y << YAML::Key << "last_stamp_ns" << YAML::Value << clock_ns;
   y << YAML::Key << "wall_time_s" << YAML::Value <<

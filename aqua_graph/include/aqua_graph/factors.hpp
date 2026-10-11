@@ -87,4 +87,40 @@ private:
   gtsam::Point3 lever_arm_body_;
 };
 
+// Absolute heading of a body-fixed axis (e.g. a dual-antenna GNSS baseline or
+// a magnetometer-referenced forward axis), measured counter-clockwise from
+// world +x in the world xy plane:
+//
+//   h = atan2(d.y, d.x),  d = R_wb * axis_body
+//
+// The residual is wrapped to (-pi, pi]. The axis must not be near vertical.
+class HeadingFactor : public gtsam::NoiseModelFactorN<gtsam::Pose3>
+{
+public:
+  using Base = gtsam::NoiseModelFactorN<gtsam::Pose3>;
+
+  HeadingFactor(
+    gtsam::Key pose_key, double measured_heading_rad, const gtsam::Vector3 & axis_body,
+    const gtsam::SharedNoiseModel & noise_model);
+
+  gtsam::Vector evaluateError(
+    const gtsam::Pose3 & pose,
+    boost::optional<gtsam::Matrix &> H_pose = boost::none) const override;
+
+  gtsam::NonlinearFactor::shared_ptr clone() const override
+  {
+    return boost::static_pointer_cast<gtsam::NonlinearFactor>(
+      gtsam::NonlinearFactor::shared_ptr(new HeadingFactor(*this)));
+  }
+
+  double measured() const {return measured_;}
+
+private:
+  double measured_;
+  gtsam::Vector3 axis_body_;
+};
+
+// Heading of a body axis under a rotation (same definition as HeadingFactor).
+double heading_of_axis(const gtsam::Rot3 & world_R_body, const gtsam::Vector3 & axis_body);
+
 }  // namespace aqua_graph

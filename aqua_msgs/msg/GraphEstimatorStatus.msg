@@ -17,6 +17,10 @@ uint64 landmarks_created
 # Measurements whose grid state had already left the smoother window.
 uint64 measurements_too_old
 uint64 smoother_updates
+# Times the smoother was re-anchored after a numerically singular update.
+uint64 smoother_resets
+uint64 heading_received
+uint64 heading_applied
 
 geometry_msgs/Vector3 velocity_world
 geometry_msgs/Vector3 accel_bias
