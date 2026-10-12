@@ -231,6 +231,15 @@ public:
     visual.max_depth_m = declare_parameter<double>("visual.max_depth_m", visual.max_depth_m);
     visual.landmark_prior_sigma_m =
       declare_parameter<double>("visual.landmark_prior_sigma_m", visual.landmark_prior_sigma_m);
+    // Monocular features (u_right = NaN, e.g. stereo_frontend mono: true).
+    visual.mono_min_observations =
+      declare_parameter<int>("visual.mono.min_observations", visual.mono_min_observations);
+    visual.mono_min_parallax_rad =
+      declare_parameter<double>("visual.mono.min_parallax_rad", visual.mono_min_parallax_rad);
+    visual.mono_max_reprojection_px = declare_parameter<double>(
+      "visual.mono.max_reprojection_px", visual.mono_max_reprojection_px);
+    visual.mono_min_depth_m =
+      declare_parameter<double>("visual.mono.min_depth_m", visual.mono_min_depth_m);
 
     estimator_ = std::make_unique<TightlyCoupledEstimator>(config);
 
@@ -508,7 +517,8 @@ private:
     status.position_received = c.position_received;
     status.position_applied = c.position_applied;
     status.stereo_frames = c.stereo_frames;
-    status.stereo_observations = c.stereo_observations;
+    // Monocular projection factors count as visual observations too.
+    status.stereo_observations = c.stereo_observations + c.mono_observations;
     status.landmarks_created = c.landmarks_created;
     status.measurements_too_old = c.measurements_too_old;
     status.smoother_updates = c.smoother_updates;

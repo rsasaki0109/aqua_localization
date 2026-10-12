@@ -57,6 +57,7 @@ install(PROGRAMS
   scripts/make_synthetic_mbes_bag.py
   scripts/compare_replay_summaries.py
   scripts/dvl_dead_reckoning_baseline.py
+  scripts/evaluate_aqualoc.py
   scripts/evaluate_replay_trajectories.py
   scripts/make_stereo_feature_track.py
   scripts/run_beach_pond_benchmark.py

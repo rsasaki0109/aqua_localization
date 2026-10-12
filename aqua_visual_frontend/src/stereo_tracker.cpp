@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 
 #include <opencv2/calib3d.hpp>
@@ -96,7 +97,8 @@ std::vector<StereoTrack> StereoTracker::process(
   // Saturation is judged on the raw image, before CLAHE stretches it.
   const cv::Mat valid = valid_mask(raw_left);
   const cv::Mat left = prepare(raw_left);
-  const cv::Mat right = prepare(raw_right);
+  const bool mono = raw_right.empty();
+  const cv::Mat right = mono ? cv::Mat() : prepare(raw_right);
   std::vector<cv::Point2f> pts;
   std::vector<std::uint64_t> ids;
 
@@ -158,6 +160,14 @@ std::vector<StereoTrack> StereoTracker::process(
   // 3) Stereo matching into the right image along the epipolar line.
   std::vector<StereoTrack> out;
   if (pts.empty()) {
+    return out;
+  }
+  if (mono) {
+    // Monocular: every left-image track, with no right-image coordinate.
+    for (size_t i = 0; i < pts.size(); ++i) {
+      out.push_back(
+        StereoTrack{ids[i], pts[i].x, pts[i].y, std::numeric_limits<float>::quiet_NaN()});
+    }
     return out;
   }
   std::vector<cv::Point2f> guess = pts;

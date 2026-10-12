@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 
+#include <gtsam/geometry/Cal3_S2.h>
 #include <gtsam/geometry/Cal3_S2Stereo.h>
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/StereoPoint2.h>
@@ -158,6 +159,14 @@ struct VisualConfig
   // camera, so a landmark whose observations all fail cheirality is
   // otherwise unconstrained and makes the system singular. <= 0 disables.
   double landmark_prior_sigma_m{10.0};
+  // Monocular observations (u_right not finite): a track is triangulated once
+  // it has this many sightings inside the window whose first and last rays
+  // differ by at least mono_min_parallax_rad, and every sighting reprojects
+  // within mono_max_reprojection_px.
+  int mono_min_observations{3};
+  double mono_min_parallax_rad{0.03};
+  double mono_max_reprojection_px{3.0};
+  double mono_min_depth_m{0.2};
 };
 
 struct EstimatorConfig
@@ -207,6 +216,8 @@ struct EstimatorCounters
   uint64_t stereo_observations{0};
   uint64_t stereo_rejected{0};
   uint64_t landmarks_created{0};
+  uint64_t mono_observations{0};
+  uint64_t mono_landmarks_created{0};
   // Measurements whose state already left the smoother window.
   uint64_t measurements_too_old{0};
   uint64_t smoother_updates{0};
@@ -303,6 +314,8 @@ private:
     // First observation, held until the second one initializes the landmark.
     std::optional<uint64_t> first_state;
     gtsam::StereoPoint2 first_measurement;
+    // Monocular sightings (state index, pixel) waiting for triangulation.
+    std::vector<std::pair<uint64_t, gtsam::Point2>> mono_pending;
     double last_seen_s{0.0};
   };
 
@@ -327,6 +340,11 @@ private:
   void attach_measurements(UpdateBatch & batch, const StateRecord & newest);
   void attach_stereo(
     UpdateBatch & batch, const StateRecord & state, const std::vector<StereoObservation> & obs);
+  // Monocular sighting of a track: a projection factor once its landmark
+  // exists, otherwise held until the track can be triangulated.
+  void attach_mono(
+    UpdateBatch & batch, const StateRecord & state, const StereoObservation & o,
+    const gtsam::SharedNoiseModel & noise);
   gtsam::Pose3 pose_estimate(uint64_t index, const UpdateBatch & batch) const;
   gtsam::SharedNoiseModel robust(
     const gtsam::SharedNoiseModel & model, double huber_k) const;
@@ -344,6 +362,7 @@ private:
   std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> preint_;
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> smoother_;
   gtsam::Cal3_S2Stereo::shared_ptr stereo_calibration_;
+  gtsam::Cal3_S2::shared_ptr mono_calibration_;
 
   bool initialized_{false};
   std::optional<double> manual_init_stamp_;

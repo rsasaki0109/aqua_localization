@@ -14,6 +14,9 @@
 #include <gtsam/linear/linearExceptions.h>
 #include <gtsam/navigation/GPSFactor.h>
 #include <gtsam/nonlinear/PriorFactor.h>
+#include <gtsam/geometry/PinholeCamera.h>
+#include <gtsam/geometry/triangulation.h>
+#include <gtsam/slam/ProjectionFactor.h>
 #include <gtsam/slam/StereoFactor.h>
 #include <gtsam_unstable/nonlinear/IncrementalFixedLagSmoother.h>
 
@@ -31,6 +34,7 @@ using gtsam::symbol_shorthand::V;
 using gtsam::symbol_shorthand::X;
 
 using StereoFactor = gtsam::GenericStereoFactor<gtsam::Pose3, gtsam::Point3>;
+using MonoFactor = gtsam::GenericProjectionFactor<gtsam::Pose3, gtsam::Point3, gtsam::Cal3_S2>;
 
 // Stamps closer than this are the same instant (anchored measurements carry
 // the exact stamp they requested a state for).
@@ -75,6 +79,7 @@ TightlyCoupledEstimator::TightlyCoupledEstimator(const EstimatorConfig & config)
   const auto & vis = config_.visual;
   stereo_calibration_ = boost::make_shared<gtsam::Cal3_S2Stereo>(
     vis.fx, vis.fy, 0.0, vis.cx, vis.cy, vis.baseline_m);
+  mono_calibration_ = boost::make_shared<gtsam::Cal3_S2>(vis.fx, vis.fy, 0.0, vis.cx, vis.cy);
 
   make_smoother();
 }
@@ -555,8 +560,14 @@ void TightlyCoupledEstimator::attach_stereo(
   const auto noise = robust(gtsam::noiseModel::Isotropic::Sigma(3, vis.pixel_sigma), vis.huber_k);
   const auto & smoother_stamps = smoother_->timestamps();
   const double bf = vis.fx * vis.baseline_m;
+  const auto mono_noise =
+    robust(gtsam::noiseModel::Isotropic::Sigma(2, vis.pixel_sigma), vis.huber_k);
 
   for (const auto & o : obs) {
+    if (!std::isfinite(o.u_right)) {
+      attach_mono(batch, state, o, mono_noise);
+      continue;
+    }
     const double disparity = o.u_left - o.u_right;
     if (!std::isfinite(disparity) || disparity < vis.min_disparity_px ||
       bf / disparity > vis.max_depth_m)
@@ -630,6 +641,104 @@ void TightlyCoupledEstimator::attach_stereo(
       ++it;
     }
   }
+}
+
+void TightlyCoupledEstimator::attach_mono(
+  UpdateBatch & batch, const StateRecord & state, const StereoObservation & o,
+  const gtsam::SharedNoiseModel & noise)
+{
+  const auto & vis = config_.visual;
+  const double stamp = states_.back().stamp_s;
+  const gtsam::Point2 uv(o.u_left, o.v);
+  FeatureTrack & track = tracks_[o.id];
+  track.last_seen_s = stamp;
+
+  if (track.landmark && !smoother_->timestamps().count(*track.landmark)) {
+    track.landmark.reset();
+    track.mono_pending.clear();
+  }
+  if (track.landmark) {
+    batch.graph.emplace_shared<MonoFactor>(
+      uv, noise, X(state.index), *track.landmark, mono_calibration_, false, false,
+      vis.body_P_camera);
+    batch.timestamps[*track.landmark] = stamp;
+    ++counters_.mono_observations;
+    return;
+  }
+
+  // Keep only sightings whose states are still safely inside the window.
+  const double oldest_safe = stamp - config_.smoother_lag_s + config_.state_period_s;
+  auto & pending = track.mono_pending;
+  pending.erase(
+    std::remove_if(
+      pending.begin(), pending.end(),
+      [&](const std::pair<uint64_t, gtsam::Point2> & p) {
+        return std::none_of(
+          states_.begin(), states_.end(), [&](const StateRecord & s) {
+            return s.index == p.first && s.stamp_s >= oldest_safe;
+          });
+      }),
+    pending.end());
+  if (!pending.empty() && pending.back().first == state.index) {
+    return;
+  }
+  pending.emplace_back(state.index, uv);
+  if (static_cast<int>(pending.size()) < vis.mono_min_observations) {
+    return;
+  }
+
+  std::vector<gtsam::Pose3> cameras;
+  gtsam::Point2Vector measurements;
+  for (const auto & p : pending) {
+    cameras.push_back(pose_estimate(p.first, batch) * vis.body_P_camera);
+    measurements.push_back(p.second);
+  }
+  // Parallax between the first and the newest ray, rotation compensated.
+  auto ray = [&](const gtsam::Pose3 & camera, const gtsam::Point2 & m) {
+      const gtsam::Point2 n = mono_calibration_->calibrate(m);
+      return gtsam::Vector3(camera.rotation().rotate(gtsam::Vector3(n.x(), n.y(), 1.0)).normalized());
+    };
+  const double parallax = std::acos(std::clamp(
+      ray(cameras.front(), measurements.front()).dot(ray(cameras.back(), measurements.back())),
+      -1.0, 1.0));
+  if (parallax < vis.mono_min_parallax_rad) {
+    return;
+  }
+  gtsam::Point3 point;
+  try {
+    point = gtsam::triangulatePoint3<gtsam::Cal3_S2>(
+      cameras, mono_calibration_, measurements, 1e-9, true);
+  } catch (const std::exception &) {
+    return;
+  }
+  for (size_t i = 0; i < cameras.size(); ++i) {
+    const gtsam::Point3 in_camera = cameras[i].transformTo(point);
+    if (in_camera.z() < vis.mono_min_depth_m || in_camera.z() > vis.max_depth_m) {
+      pending.clear();
+      return;
+    }
+    const gtsam::PinholeCamera<gtsam::Cal3_S2> camera(cameras[i], *mono_calibration_);
+    if ((camera.project(point) - measurements[i]).norm() > vis.mono_max_reprojection_px) {
+      pending.clear();
+      return;
+    }
+  }
+  const gtsam::Key key = L(next_landmark_++);
+  batch.values.insert(key, point);
+  batch.timestamps[key] = stamp;
+  if (vis.landmark_prior_sigma_m > 0.0) {
+    batch.graph.addPrior(
+      key, point, gtsam::noiseModel::Isotropic::Sigma(3, vis.landmark_prior_sigma_m));
+  }
+  for (const auto & p : pending) {
+    batch.graph.emplace_shared<MonoFactor>(
+      p.second, noise, X(p.first), key, mono_calibration_, false, false, vis.body_P_camera);
+  }
+  counters_.mono_observations += pending.size();
+  ++counters_.mono_landmarks_created;
+  ++counters_.landmarks_created;
+  track.landmark = key;
+  pending.clear();
 }
 
 void TightlyCoupledEstimator::add_state_priors(

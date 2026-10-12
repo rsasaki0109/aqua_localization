@@ -132,3 +132,27 @@ TEST(StereoTracker, ClaheKeepsDisparity)
     EXPECT_NEAR(t.u_left - t.u_right, 8.0F, 0.3F) << "id " << t.id;
   }
 }
+
+TEST(StereoTracker, MonocularTracksKeepIdsAndHaveNoRightCoordinate)
+{
+  aqua_visual_frontend::StereoTracker tracker;
+  const cv::Mat world = texture(400, 300);
+  const auto first = tracker.process(view(world, 40, 30, 320, 240), cv::Mat());
+  ASSERT_GT(first.size(), 50U);
+  for (const auto & t : first) {
+    EXPECT_TRUE(std::isnan(t.u_right));
+  }
+  // Shift the view by 3 px: the same ids come back, 3 px to the left.
+  const auto second = tracker.process(view(world, 43, 30, 320, 240), cv::Mat());
+  int matched = 0;
+  for (const auto & a : first) {
+    for (const auto & b : second) {
+      if (a.id == b.id) {
+        EXPECT_NEAR(a.u_left - b.u_left, 3.0, 0.5);
+        EXPECT_NEAR(a.v - b.v, 0.0, 0.5);
+        ++matched;
+      }
+    }
+  }
+  EXPECT_GT(matched, static_cast<int>(first.size()) / 2);
+}

@@ -2,7 +2,9 @@
 // Online stereo frontend: synchronizes left/right images (CompressedImage or
 // raw sensor_msgs/Image), optionally rectifies a fisheye pair from a Kalibr
 // camchain, runs StereoTracker, and publishes aqua_msgs/StereoFeatures
-// stamped with the left image's header stamp. Also publishes the per-frame
+// stamped with the left image's header stamp. With mono: true it tracks the
+// left topic alone (optionally undistorting a pinhole-equidistant camera) and
+// publishes u_right = NaN, which aqua_graph treats as monocular observations. Also publishes the per-frame
 // processing time so real-time margins can be measured on the target.
 #include <chrono>
 #include <memory>
@@ -13,6 +15,7 @@
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/synchronizer.h>
+#include <opencv2/calib3d.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
@@ -49,6 +52,9 @@ public:
       "topics.processing_time", "/aqua_visual_frontend/processing_time_ms");
     frame_id_ = declare_parameter<std::string>("frame_id", "camera_left");
     publish_every_ = std::max<int>(1, declare_parameter<int>("publish_every", 1));
+    // Added to the image stamp of every published frame, e.g. Kalibr's
+    // timeshift_cam_imu (t_imu = t_cam + shift).
+    stamp_offset_s_ = declare_parameter<double>("stamp_offset_s", 0.0);
     const double sync_slop_s = declare_parameter<double>("sync_slop_s", 0.005);
     const int queue = declare_parameter<int>("qos.image_depth", 5);
     // "compressed" (sensor_msgs/CompressedImage) or "raw" (sensor_msgs/Image).
@@ -59,6 +65,16 @@ public:
     const auto left_camera = declare_parameter<std::string>("rectify.left_camera", "cam0");
     const auto right_camera = declare_parameter<std::string>("rectify.right_camera", "cam1");
     const double balance = declare_parameter<double>("rectify.balance", 0.0);
+    const bool mono = declare_parameter<bool>("mono", false);
+    // Monocular pinhole-equidistant camera to undistort ([fx, fy, cx, cy],
+    // [k1..k4]); empty = the input is already undistorted.
+    const auto mono_intrinsics =
+      declare_parameter<std::vector<double>>("undistort.intrinsics", std::vector<double>{});
+    const auto mono_distortion =
+      declare_parameter<std::vector<double>>("undistort.distortion", std::vector<double>{});
+    const auto mono_resolution =
+      declare_parameter<std::vector<int64_t>>("undistort.resolution", std::vector<int64_t>{});
+    const double mono_balance = declare_parameter<double>("undistort.balance", 0.0);
 
     StereoTrackerConfig config;
     config.max_features = declare_parameter<int>("max_features", config.max_features);
@@ -94,12 +110,52 @@ public:
         g.fy, g.cx, g.cy, g.baseline_m);
     }
 
+    if (mono && !mono_intrinsics.empty()) {
+      if (mono_intrinsics.size() != 4 || mono_distortion.size() != 4 ||
+        mono_resolution.size() != 2)
+      {
+        throw std::invalid_argument(
+                "undistort.intrinsics/distortion need 4 values, undistort.resolution 2");
+      }
+      const cv::Matx33d K(
+        mono_intrinsics[0], 0.0, mono_intrinsics[2], 0.0, mono_intrinsics[1], mono_intrinsics[3],
+        0.0, 0.0, 1.0);
+      const cv::Vec4d D(mono_distortion[0], mono_distortion[1], mono_distortion[2],
+        mono_distortion[3]);
+      const cv::Size size(static_cast<int>(mono_resolution[0]),
+        static_cast<int>(mono_resolution[1]));
+      cv::Matx33d P;
+      cv::fisheye::estimateNewCameraMatrixForUndistortRectify(
+        K, D, size, cv::Matx33d::eye(), P, mono_balance);
+      cv::fisheye::initUndistortRectifyMap(
+        K, D, cv::Matx33d::eye(), P, size, CV_32FC1, undistort_map1_, undistort_map2_);
+      // The backend's camera model must use these (aqua_graph visual.fx/fy/cx/cy).
+      RCLCPP_INFO(
+        get_logger(), "undistorting the monocular camera: fx=%.3f fy=%.3f cx=%.3f cy=%.3f",
+        P(0, 0), P(1, 1), P(0, 2), P(1, 2));
+    }
+
     features_pub_ = create_publisher<aqua_msgs::msg::StereoFeatures>(features_topic, 10);
     timing_pub_ = create_publisher<std_msgs::msg::Float64>(timing_topic, 10);
 
     rmw_qos_profile_t qos = rmw_qos_profile_sensor_data;
     qos.depth = static_cast<size_t>(std::max(1, queue));
-    if (input_format == "compressed") {
+    if (mono) {
+      const auto sub_qos = rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(qos), qos);
+      if (input_format == "compressed") {
+        mono_compressed_ = create_subscription<Compressed>(
+          left_topic, sub_qos, [this](Compressed::ConstSharedPtr msg) {
+            on_pair(msg->header.stamp, decode(*msg), cv::Mat());
+          });
+      } else if (input_format == "raw") {
+        mono_raw_ = create_subscription<Raw>(
+          left_topic, sub_qos, [this](Raw::ConstSharedPtr msg) {
+            on_pair(msg->header.stamp, decode(*msg), cv::Mat());
+          });
+      } else {
+        throw std::invalid_argument("input_format must be 'compressed' or 'raw'");
+      }
+    } else if (input_format == "compressed") {
       compressed_.subscribe(this, left_topic, right_topic, qos, sync_slop_s);
     } else if (input_format == "raw") {
       raw_.subscribe(this, left_topic, right_topic, qos, sync_slop_s);
@@ -187,7 +243,19 @@ private:
   void on_pair(const builtin_interfaces::msg::Time & stamp, cv::Mat left, cv::Mat right)
   {
     const auto start = std::chrono::steady_clock::now();
-    if (left.empty() || right.empty() || left.size() != right.size() ||
+    if (right.empty() && !left.empty()) {
+      // Monocular frame.
+      if (!undistort_map1_.empty()) {
+        if (left.size() != undistort_map1_.size()) {
+          RCLCPP_WARN_THROTTLE(
+            get_logger(), *get_clock(), 5000, "skipping wrongly sized monocular image");
+          return;
+        }
+        cv::Mat undistorted;
+        cv::remap(left, undistorted, undistort_map1_, undistort_map2_, cv::INTER_LINEAR);
+        left = undistorted;
+      }
+    } else if (left.empty() || right.empty() || left.size() != right.size() ||
       (rectifier_ && left.size() != rectifier_->size()))
     {
       RCLCPP_WARN_THROTTLE(
@@ -195,7 +263,7 @@ private:
         "skipping undecodable, mismatched or wrongly sized stereo pair");
       return;
     }
-    if (rectifier_) {
+    if (rectifier_ && !right.empty()) {
       cv::Mat rect_left, rect_right;
       rectifier_->rectify_left(left, rect_left);
       rectifier_->rectify_right(right, rect_right);
@@ -209,6 +277,10 @@ private:
     if ((processed_ - 1) % publish_every_ == 0) {
       aqua_msgs::msg::StereoFeatures msg;
       msg.header.stamp = stamp;
+      if (stamp_offset_s_ != 0.0) {
+        msg.header.stamp =
+          (rclcpp::Time(stamp) + rclcpp::Duration::from_seconds(stamp_offset_s_));
+      }
       msg.header.frame_id = frame_id_;
       msg.ids.reserve(tracks.size());
       msg.u_left.reserve(tracks.size());
@@ -230,11 +302,16 @@ private:
 
   std::string frame_id_;
   int publish_every_{1};
+  double stamp_offset_s_{0.0};
   long processed_{0};
   std::unique_ptr<StereoTracker> tracker_;
   std::unique_ptr<StereoRectifier> rectifier_;
   PairSync<Compressed> compressed_;
   PairSync<Raw> raw_;
+  rclcpp::Subscription<Compressed>::SharedPtr mono_compressed_;
+  rclcpp::Subscription<Raw>::SharedPtr mono_raw_;
+  cv::Mat undistort_map1_;
+  cv::Mat undistort_map2_;
   rclcpp::Publisher<aqua_msgs::msg::StereoFeatures>::SharedPtr features_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr timing_pub_;
 };
