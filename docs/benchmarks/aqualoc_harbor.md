@@ -45,16 +45,42 @@ are deterministic, but **aqua_graph is 3-7x behind ORB-SLAM3-VIP and
 behind ORB-SLAM3-VI everywhere except harbor 01. This is not a SOTA
 result.**
 
-## Why, and what would close the gap
+## Why: where the gap comes from (measured 2026-10-12)
 
-- These are small sites the ROV revisits constantly. ORB-SLAM3 keeps a map
-  and keeps re-observing the same map points (local bundle adjustment over
-  keyframes, relocalization, loop closure); aqua_graph forgets a landmark
-  once it leaves the 4 s window and its KLT tracks cannot re-identify it.
-  Map reuse is the structural difference.
-- Scale: the Sim3 scale is off by up to 21 % (harbor 03). Monocular scale
-  comes only from the cheap IMU over short windows; pressure constrains
-  only the vertical part.
+- **Not map reuse.** COLMAP's image-overlap matrices give how often a
+  sequence looks again at a place seen more than 10 s earlier: harbor 01
+  41 %, 02 65 %, 03 79 %, 04 13 %, **05 1 %**, 06 20 %, 07 41 %. Harbor 05
+  never revisits and is as far behind ORB-SLAM3-VIP (0.36 vs 0.047 m) as
+  the others.
+- **The start-up.** Harbor 05, aligned on its first 20 s: the error grows
+  to ~1 m by 42 s and then stays flat to the end. Excluding the first 60 s
+  the ATE is 0.023 m Sim3 (0.161 m SE3): the monocular scale is
+  underestimated by ~25 % for the first ~40 s (estimated speed 0.10 vs
+  0.14 m/s), converges once the ROV moves more, and the 4 s fixed-lag
+  window cannot go back and correct the start.
+- **Smoothing helps but does not close it.** The smoother's own final
+  estimates (`topics.smoothed_odometry`) are barely better than the
+  real-time output (harbor 05 0.350 vs 0.361 m). Keeping every state
+  (`graph.smoother_lag_s` longer than the run, `topics.window_path`): harbor
+  06 0.153 m SE3 / Sim3 (scale 0.998), vs 0.27 m fixed-lag and 0.057 /
+  0.026 m for ORB-SLAM3-VI / -VIP, at ~7x slower than real time. A longer
+  window during start-up only (`graph.initial_lag_s`) is inconsistent:
+  harbor 06 0.17 m, harbor 05 0.27-0.92 m.
+- **What is left** is the quality of the visual constraints: KLT tracks
+  live a few seconds, so each landmark is seen from few, close viewpoints.
+  ORB-SLAM3 bundle-adjusts keyframes with long-lived map points. Closing
+  the gap means a keyframe-based visual SLAM back end, not incremental
+  changes to this one.
+- **Map reuse was tried** (branch `claude/map-reuse`, not merged): ORB
+  descriptors per track, re-identification of lost tracks, persistent
+  landmarks, camera-centre consensus, search by projection. On harbor 06
+  448 of 3000 new tracks had a map point projecting within 40 px, but the
+  best ORB Hamming distance was mostly 80-100 (near random) and only 4
+  were <= 50: ORB at KLT corners does not re-identify points on this
+  imagery.
+- Also: the Kalibr `timeshift_cam_imu` sign is uncertain on this data
+  (harbor 05: -0.04 s 0.36 m, 0 s 0.29 m, +0.04 s 0.27 m Sim3); left at
+  the Kalibr convention.
 - Initialization: the ROV is already moving and the IMU gives no
   orientation; without the bootstrap velocity prior some sequences diverged
   before the first landmarks existed (0.5 s attitude window: harbor 06/07,

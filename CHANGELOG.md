@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- aqua_graph diagnostics: `topics.smoothed_odometry` (final estimate of
+  each state leaving the window), `topics.window_path` (all states in the
+  window, the full smoothed trajectory with a window longer than the run)
+  and `graph.initial_lag_s` (longer window during start-up); all off by
+  default. `evaluate_aqualoc.py` reads a `nav_msgs/Path`. AQUALOC gap
+  analysis in `docs/benchmarks/aqualoc_harbor.md`.
 - Monocular VIO: `stereo_frontend` mono mode (equidistant undistortion,
   `stamp_offset_s`), monocular landmarks with delayed triangulation in
   aqua_graph, bootstrap zero-velocity prior, `evaluate_aqualoc.py`, and the
