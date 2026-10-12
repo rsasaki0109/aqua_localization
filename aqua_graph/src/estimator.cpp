@@ -34,6 +34,9 @@ using gtsam::symbol_shorthand::V;
 using gtsam::symbol_shorthand::X;
 
 using StereoFactor = gtsam::GenericStereoFactor<gtsam::Pose3, gtsam::Point3>;
+// A monocular track unseen for longer than this was re-identified rather
+// than tracked frame to frame.
+constexpr double kReidentifyGapS = 0.5;
 using MonoFactor = gtsam::GenericProjectionFactor<gtsam::Pose3, gtsam::Point3, gtsam::Cal3_S2>;
 
 // Stamps closer than this are the same instant (anchored measurements carry
@@ -659,7 +662,8 @@ void TightlyCoupledEstimator::attach_mono(
   const gtsam::Point2 uv(o.u_left, o.v);
   const bool seen_before = tracks_.count(o.id) > 0;
   FeatureTrack & track = tracks_[o.id];
-  const bool after_gap = !seen_before || stamp - track.last_seen_s >= vis.map_min_gap_s;
+  const double gap_s = seen_before ? stamp - track.last_seen_s : 0.0;
+  const bool after_gap = !seen_before || gap_s >= vis.map_min_gap_s;
   track.last_seen_s = stamp;
 
   if (track.landmark && !smoother_->timestamps().count(*track.landmark)) {
@@ -699,6 +703,25 @@ void TightlyCoupledEstimator::attach_mono(
       ++counters_.map_rejections;
     }
   }
+  if (track.landmark && gap_s > kReidentifyGapS) {
+    // The track came back after a gap (the frontend re-identified it by
+    // descriptor): check it against the landmark before trusting the match.
+    const gtsam::Pose3 camera_pose = pose_estimate(state.index, batch) * vis.body_P_camera;
+    const gtsam::Point3 point = smoother_->calculateEstimate<gtsam::Point3>(*track.landmark);
+    const gtsam::Point3 in_camera = camera_pose.transformTo(point);
+    bool consistent = in_camera.z() >= vis.mono_min_depth_m;
+    if (consistent) {
+      const gtsam::PinholeCamera<gtsam::Cal3_S2> camera(camera_pose, *mono_calibration_);
+      consistent = (camera.project(point) - uv).norm() <= vis.map_max_reprojection_px;
+    }
+    if (!consistent) {
+      // A different point under the same id: start a new track.
+      track.landmark.reset();
+      track.mono_pending.clear();
+      map_points_.erase(o.id);
+      ++counters_.map_rejections;
+    }
+  }
   if (track.landmark) {
     batch.graph.emplace_shared<MonoFactor>(
       uv, noise, X(state.index), *track.landmark, mono_calibration_, false, false,
@@ -708,6 +731,9 @@ void TightlyCoupledEstimator::attach_mono(
     return;
   }
 
+  if (gap_s > kReidentifyGapS) {
+    track.mono_pending.clear();
+  }
   // Keep only sightings whose states are still safely inside the window.
   const double oldest_safe = stamp - config_.smoother_lag_s + config_.state_period_s;
   auto & pending = track.mono_pending;
