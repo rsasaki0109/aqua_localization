@@ -133,6 +133,8 @@ struct CoarseAlignOptions
   double min_distinctiveness{1.2};
   double distinct_radius_m{6.0};
   double distinct_yaw_rad{0.1};
+  // Second pass around the best placement at a quarter of the steps.
+  bool refine{true};
 };
 
 struct CoarseAlignResult
@@ -161,6 +163,9 @@ CoarseAlignResult coarse_align_heightmaps(
 struct RegistrationOptions
 {
   CoarseAlignOptions coarse;
+  // gicp | icp | ndt | none. "none" (requires coarse.enabled) takes the
+  // height-map search result as the registration: on partially overlapping
+  // 2.5D seafloor patches GICP can slide far from even a perfect guess.
   std::string backend{"gicp"};
   int max_iterations{60};
   double max_correspondence_distance_m{3.0};

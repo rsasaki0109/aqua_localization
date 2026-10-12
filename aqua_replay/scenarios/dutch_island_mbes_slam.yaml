@@ -76,6 +76,9 @@ nodes:
         # plus the dead-reckoning drift between the two visits.
         max_distance_m: 60.0
       registration:
+        # GICP slides on these partially overlapping 2.5D patches even from
+        # the true pose; the height-map search is the registration.
+        backend: none
         coarse:
           enabled: true
           yaw_range_rad: 0.52

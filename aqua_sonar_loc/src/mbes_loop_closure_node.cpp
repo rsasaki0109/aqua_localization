@@ -300,6 +300,10 @@ private:
       declare_parameter<double>("registration.coarse.distinct_radius_m", coarse.distinct_radius_m);
     coarse.distinct_yaw_rad =
       declare_parameter<double>("registration.coarse.distinct_yaw_rad", coarse.distinct_yaw_rad);
+    coarse.refine = declare_parameter<bool>("registration.coarse.refine", coarse.refine);
+    if (registration_options_.backend == "none" && !coarse.enabled) {
+      throw std::invalid_argument("registration.backend none requires registration.coarse.enabled");
+    }
 
     gate_options_.max_fitness_score =
       declare_parameter<double>("gates.max_fitness_score", 2.0);

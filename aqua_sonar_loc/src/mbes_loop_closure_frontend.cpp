@@ -281,65 +281,79 @@ CoarseAlignResult coarse_align_heightmaps(
   std::vector<Score> scores;
   std::vector<float> diffs;
   std::vector<double> rx(cur_cells.size()), ry(cur_cells.size());
+  // Score placements on a yaw x shift lattice centred on (yaw0, dx0, dy0).
+  auto search = [&](double yaw0, double dx0, double dy0, int n_yaw, double yaw_step, int n_xy,
+      double xy_step, std::vector<Score> & out) {
+      for (int iyaw = -n_yaw; iyaw <= n_yaw; ++iyaw) {
+        const double yaw = yaw0 + iyaw * yaw_step;
+        const double cy = std::cos(yaw), sy = std::sin(yaw);
+        for (std::size_t k = 0; k < cur_cells.size(); ++k) {
+          const double px = cur_cells[k].x - pivot.x(), py = cur_cells[k].y - pivot.y();
+          rx[k] = cy * px - sy * py + pivot.x() - min_x;
+          ry[k] = sy * px + cy * py + pivot.y() - min_y;
+        }
+        for (int ix = -n_xy; ix <= n_xy; ++ix) {
+          for (int iy = -n_xy; iy <= n_xy; ++iy) {
+            const double dx = dx0 + ix * xy_step, dy = dy0 + iy * xy_step;
+            diffs.clear();
+            for (std::size_t k = 0; k < cur_cells.size(); ++k) {
+              const int gx = static_cast<int>(std::lround((rx[k] + dx) / cell));
+              const int gy = static_cast<int>(std::lround((ry[k] + dy) / cell));
+              if (gx < 0 || gy < 0 || gx >= nx || gy >= ny) {
+                continue;
+              }
+              const float hc = dense[static_cast<std::size_t>(gx) * static_cast<std::size_t>(ny) +
+                static_cast<std::size_t>(gy)];
+              if (!std::isnan(hc)) {
+                diffs.push_back(hc - cur_cells[k].h);
+              }
+            }
+            const int n = static_cast<int>(diffs.size());
+            if (n < min_overlap) {
+              continue;
+            }
+            auto mid = diffs.begin() + n / 2;
+            std::nth_element(diffs.begin(), mid, diffs.end());
+            const double med = *mid;
+            double sq = 0.0;
+            for (const float d : diffs) {
+              const double e = std::min(std::abs(d - med), o.residual_clip_m);
+              sq += e * e;
+            }
+            out.push_back(Score{yaw, dx, dy, std::sqrt(sq / n), med, n});
+          }
+        }
+      }
+    };
   const int n_yaw = static_cast<int>(std::floor(o.yaw_range_rad / o.yaw_step_rad + 1e-9));
   const int n_xy = static_cast<int>(std::floor(o.xy_range_m / o.xy_step_m + 1e-9));
-  for (int iyaw = -n_yaw; iyaw <= n_yaw; ++iyaw) {
-    const double yaw = iyaw * o.yaw_step_rad;
-    const double cy = std::cos(yaw), sy = std::sin(yaw);
-    for (std::size_t k = 0; k < cur_cells.size(); ++k) {
-      const double px = cur_cells[k].x - pivot.x(), py = cur_cells[k].y - pivot.y();
-      rx[k] = cy * px - sy * py + pivot.x() - min_x;
-      ry[k] = sy * px + cy * py + pivot.y() - min_y;
-    }
-    for (int ix = -n_xy; ix <= n_xy; ++ix) {
-      for (int iy = -n_xy; iy <= n_xy; ++iy) {
-        const double dx = ix * o.xy_step_m, dy = iy * o.xy_step_m;
-        diffs.clear();
-        for (std::size_t k = 0; k < cur_cells.size(); ++k) {
-          const int gx = static_cast<int>(std::lround((rx[k] + dx) / cell));
-          const int gy = static_cast<int>(std::lround((ry[k] + dy) / cell));
-          if (gx < 0 || gy < 0 || gx >= nx || gy >= ny) {
-            continue;
-          }
-          const float hc =
-            dense[static_cast<std::size_t>(gx) * static_cast<std::size_t>(ny) + static_cast<std::size_t>(gy)];
-          if (!std::isnan(hc)) {
-            diffs.push_back(hc - cur_cells[k].h);
-          }
-        }
-        const int n = static_cast<int>(diffs.size());
-        if (n < min_overlap) {
-          continue;
-        }
-        auto mid = diffs.begin() + n / 2;
-        std::nth_element(diffs.begin(), mid, diffs.end());
-        const double med = *mid;
-        double sq = 0.0;
-        for (const float d : diffs) {
-          const double e = std::min(std::abs(d - med), o.residual_clip_m);
-          sq += e * e;
-        }
-        scores.push_back(Score{yaw, dx, dy, std::sqrt(sq / n), med, n});
-      }
-    }
-  }
+  search(0.0, 0.0, 0.0, n_yaw, o.yaw_step_rad, n_xy, o.xy_step_m, scores);
   if (scores.empty()) {
     result.status = "coarse: no overlap in search range";
     return result;
   }
-  const auto best = *std::min_element(scores.begin(), scores.end(),
-      [](const Score & a, const Score & b) {return a.residual < b.residual;});
+  auto by_residual = [](const Score & a, const Score & b) {return a.residual < b.residual;};
+  const auto coarse_best = *std::min_element(scores.begin(), scores.end(), by_residual);
+  Score best = coarse_best;
+  if (o.refine) {
+    std::vector<Score> fine;
+    search(coarse_best.yaw, coarse_best.dx, coarse_best.dy, 4, o.yaw_step_rad / 4.0, 4,
+      o.xy_step_m / 4.0, fine);
+    if (!fine.empty()) {
+      best = *std::min_element(fine.begin(), fine.end(), by_residual);
+    }
+  }
   double second = std::numeric_limits<double>::infinity();
   for (const auto & s : scores) {
-    if (std::hypot(s.dx - best.dx, s.dy - best.dy) > o.distinct_radius_m ||
-      std::abs(s.yaw - best.yaw) > o.distinct_yaw_rad)
+    if (std::hypot(s.dx - coarse_best.dx, s.dy - coarse_best.dy) > o.distinct_radius_m ||
+      std::abs(s.yaw - coarse_best.yaw) > o.distinct_yaw_rad)
     {
       second = std::min(second, s.residual);
     }
   }
   result.residual_m = best.residual;
   result.overlap_cells = best.n;
-  result.distinctiveness = second / std::max(best.residual, 1e-6);
+  result.distinctiveness = second / std::max(coarse_best.residual, 1e-6);
 
   // Relief of the candidate cells under the best placement.
   {
@@ -712,6 +726,16 @@ MatchResult RegistrationPipeline::match(
     }
     guess = coarse.candidate_to_current;
     coarse_detail = coarse.detail();
+    if (options_.backend == "none") {
+      MatchResult result;
+      result.success = true;
+      result.converged = true;
+      result.fitness = coarse.residual_m;
+      result.candidate_to_current = guess;
+      result.status = "coarse registration";
+      result.coarse_detail = coarse_detail;
+      return result;
+    }
   }
   if (options_.backend == "icp") {
     pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
