@@ -10,13 +10,17 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "aqua_graph/estimator.hpp"
 #include "aqua_graph/factors.hpp"
+#include "aqua_graph/loop_bias.hpp"
 #include "aqua_imu_loc/pressure_depth_converter.hpp"
 #include "aqua_msgs/msg/graph_estimator_status.hpp"
+#include "aqua_msgs/msg/pose_graph_keyframe.hpp"
+#include "aqua_msgs/msg/pose_graph_loop_constraint.hpp"
 #include "aqua_msgs/msg/stereo_features.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "geometry_msgs/msg/twist_with_covariance_stamped.hpp"
@@ -83,6 +87,20 @@ public:
     base_frame_ = declare_parameter<std::string>("frames.base_link", "base_link");
     publish_imu_rate_ = declare_parameter<bool>("publish.imu_rate", true);
     const int sensor_depth = declare_parameter<int>("qos.sensor_depth", 200);
+    // Loop closures (e.g. MBES bathymetric loops) -> vertical gyro bias. Off
+    // unless a loop topic is set; see loop_bias.hpp.
+    const std::string loop_topic = declare_parameter<std::string>("loop_bias.loop_topic", "");
+    const std::string keyframe_topic =
+      declare_parameter<std::string>("loop_bias.keyframe_topic", "/aqua_pose_graph/keyframe");
+    LoopBiasConfig loop_bias;
+    loop_bias.yaw_sigma_rad =
+      declare_parameter<double>("loop_bias.yaw_sigma_rad", loop_bias.yaw_sigma_rad);
+    loop_bias.min_span_s = declare_parameter<double>("loop_bias.min_span_s", loop_bias.min_span_s);
+    loop_bias.bias_random_walk =
+      declare_parameter<double>("loop_bias.bias_random_walk", loop_bias.bias_random_walk);
+    loop_bias.initial_sigma =
+      declare_parameter<double>("loop_bias.initial_sigma", loop_bias.initial_sigma);
+    loop_bias_ = std::make_unique<LoopBiasEstimator>(loop_bias);
 
     EstimatorConfig config;
     config.state_period_s = declare_parameter<double>("graph.state_period_s", config.state_period_s);
@@ -251,6 +269,17 @@ public:
         stereo_topic, rclcpp::QoS(50),
         [this](aqua_msgs::msg::StereoFeatures::ConstSharedPtr msg) {on_stereo(*msg);});
     }
+    if (!loop_topic.empty()) {
+      loop_bias_enabled_ = true;
+      keyframe_sub_ = create_subscription<aqua_msgs::msg::PoseGraphKeyframe>(
+        keyframe_topic, rclcpp::QoS(1000),
+        [this](aqua_msgs::msg::PoseGraphKeyframe::ConstSharedPtr msg) {
+          loop_bias_->add_keyframe(msg->id, to_seconds(msg->header.stamp));
+        });
+      loop_sub_ = create_subscription<aqua_msgs::msg::PoseGraphLoopConstraint>(
+        loop_topic, rclcpp::QoS(100),
+        [this](aqua_msgs::msg::PoseGraphLoopConstraint::ConstSharedPtr msg) {on_loop(*msg);});
+    }
     odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(odometry_topic, rclcpp::QoS(100));
     status_pub_ =
       create_publisher<aqua_msgs::msg::GraphEstimatorStatus>(status_topic, rclcpp::QoS(10));
@@ -347,6 +376,31 @@ private:
     }
   }
 
+  void on_loop(const aqua_msgs::msg::PoseGraphLoopConstraint & msg)
+  {
+    if (!last_output_) {
+      return;
+    }
+    const auto & q = msg.relative_pose.orientation;
+    const auto update = loop_bias_->add_loop(
+      msg.from_id, msg.to_id, gtsam::Rot3::Quaternion(q.w, q.x, q.y, q.z));
+    if (!update) {
+      return;
+    }
+    const gtsam::Rot3 & attitude = last_output_->pose.rotation();
+    const gtsam::Vector3 bias = LoopBiasEstimator::with_vertical_bias(
+      attitude, last_output_->bias.gyroscope(), update->bias);
+    estimator_->set_gyro_bias(bias, "gyro bias from loop closure");
+    RCLCPP_INFO(
+      get_logger(),
+      "loop %u -> %u over %.0f s: yaw residual %.2f deg, observed vertical gyro bias %.1f deg/h "
+      "(+-%.1f), fused %.1f deg/h (+-%.1f)",
+      msg.from_id, msg.to_id, update->span_s, update->yaw_residual_rad * 180.0 / M_PI,
+      update->observed_bias * 180.0 / M_PI * 3600.0,
+      update->observation_sigma * 180.0 / M_PI * 3600.0, update->bias * 180.0 / M_PI * 3600.0,
+      update->sigma * 180.0 / M_PI * 3600.0);
+  }
+
   void on_pressure(const sensor_msgs::msg::FluidPressure & msg)
   {
     if (const auto depth = pressure_converter_.pressure_to_depth(msg.fluid_pressure)) {
@@ -412,6 +466,13 @@ private:
 
   void publish_odometry(const EstimatorOutput & state)
   {
+    if (loop_bias_enabled_) {
+      last_output_ = state;
+      if (state.stamp_s >= last_history_s_ + 0.05) {
+        last_history_s_ = state.stamp_s;
+        loop_bias_->add_state(state.stamp_s, state.pose.rotation(), state.bias.gyroscope());
+      }
+    }
     nav_msgs::msg::Odometry odom;
     odom.header.stamp = to_stamp(state.stamp_s);
     odom.header.frame_id = map_frame_;
@@ -472,6 +533,12 @@ private:
   std::string map_frame_;
   std::string base_frame_;
   bool publish_imu_rate_{true};
+  bool loop_bias_enabled_{false};
+  std::unique_ptr<LoopBiasEstimator> loop_bias_;
+  std::optional<EstimatorOutput> last_output_;
+  double last_history_s_{-1.0e18};
+  rclcpp::Subscription<aqua_msgs::msg::PoseGraphKeyframe>::SharedPtr keyframe_sub_;
+  rclcpp::Subscription<aqua_msgs::msg::PoseGraphLoopConstraint>::SharedPtr loop_sub_;
   bool use_position_covariance_{true};
   bool use_dvl_covariance_{false};
   bool use_heading_covariance_{false};

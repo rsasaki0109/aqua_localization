@@ -252,6 +252,9 @@ public:
     double stamp_s, const gtsam::Point3 & position_world, const gtsam::Matrix3 & covariance);
   // World heading of config.heading.axis_body (sigma <= 0: configured one).
   void add_heading(double stamp_s, double heading_rad, double sigma_rad = -1.0);
+  // Replace the gyro bias estimate (e.g. one derived from loop closures) and
+  // re-anchor the smoother at the newest state with it.
+  void set_gyro_bias(const gtsam::Vector3 & gyro_bias, const std::string & reason);
   // One rectified stereo frame of tracked features (ids persist across frames).
   void add_stereo_frame(double stamp_s, const std::vector<StereoObservation> & observations);
 
