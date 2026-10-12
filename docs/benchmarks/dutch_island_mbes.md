@@ -86,14 +86,38 @@ already tens of metres off), the rest produced false placements, and no
 gate setting kept a correct loop while dropping the false ones. Lowering
 the gates is not an option.
 
+### Where the online pipeline loses the loops (2026-10-12)
+
+Measured on the node's own submaps (`debug.submap_dump_dir`, beams up to
+63 deg) against the reference, with the coarse search run offline on every
+pair (`--param ... coarse.min_relief_m:=0.0 min_distinctiveness:=0.0`):
+
+- **Overlap geometry.** Outer beams are usable here (salt water): the
+  height disagreement between passes is 0.065 m (inner), 0.12 m (45-63 deg)
+  and 0.23 m (63-72 deg) median. Widening to 63 deg roughly doubles the
+  overlapping 60 s windows (48 -> 106).
+- **Candidates are not the bottleneck.** Of 203 truly overlapping submap
+  pairs, the dead-reckoned guess is within the +-30 m / +-30 deg search
+  range for 45 (median guess error 225 m / 44 deg over all 203), and the
+  candidate search already tests 27 of those 45. A wider candidate radius
+  only adds pairs the search cannot align.
+- **Registration is.** On the 45 in-range true pairs the search returns
+  the truth (3.5 m / 5 deg) for 15; where DR is already within 1 m, flat
+  overlaps (relief < 0.2 m) still pull it tens of metres away. No
+  per-candidate gate separates them: the best combination (relief >= 0.4 m,
+  distinctiveness >= 1.2) keeps 4 correct and 3 false loops. A
+  truncated-least-squares "support" score (off-map cells as outliers) was
+  tried and did worse (8 correct of 376 placements vs 15 of 329).
+
 What would make it work:
 
-- candidate search that accounts for dead-reckoning uncertainty (the
-  yaw drift moves true revisits beyond any fixed radius);
+- loop selection by mutual consistency (PCM / group-k): correct loops
+  agree on the accumulated drift, false ones scatter; per-loop gates have
+  reached their limit;
 - larger and longer-overlap submaps than one keyframe interval (the
   successful offline crossings used 40-200 s of track);
-- loop selection by mutual consistency (PCM / group-k) rather than per-loop
-  gates.
+- bounding the gyro-bias yaw drift (the root cause of the 225 m guess
+  errors) rather than searching wider.
 
 With the compass the drift is 0.2 % of distance, so on this vessel loops
 matter for the compass-free case only.
