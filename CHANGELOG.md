@@ -64,6 +64,9 @@
   loop (and no false one) yet (`docs/benchmarks/dutch_island_mbes.md`).
   Group-k (PCM-style) loop selection (`loop.group.*`, off by default)
   publishes loops only as mutually consistent groups.
+- aqua_graph: vertical gyro bias from loop closures (`loop_bias.*`, off
+  unless a loop topic is set). On Dutch Island without a compass the
+  dead-reckoning RMSE drops from 499 m to 293 m; the scenario runs it.
 - Fixed MBES loop-closure submaps: `mbes_loop_closure` stacked raw
   sensor-frame pings (single across-track lines) into a submap; with
   `topics.odometry` each ping is now placed at its own odometry pose, and
