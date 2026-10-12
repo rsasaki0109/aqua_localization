@@ -260,3 +260,46 @@ TEST(PoseGraph, ResetClearsState)
   EXPECT_EQ(graph.keyframes().size(), 0u);
   EXPECT_EQ(graph.edge_count(), 0u);
 }
+
+namespace {
+
+// Straight 200 m line of keyframes with exact odometry and one loop
+// (5 -> 15) whose translation is right but whose yaw is 3 deg off.
+// Returns how far the last keyframe ends up from the odometry.
+double last_keyframe_shift(double attitude_prior_information)
+{
+  PoseGraphConfig cfg;
+  cfg.keyframe_translation_m = 5.0;
+  cfg.keyframe_rotation_rad = M_PI;
+  cfg.optimize_every_n_keyframes = 0;
+  cfg.odometry_attitude_prior_information = attitude_prior_information;
+  PoseGraph graph(cfg);
+  const Eigen::Matrix<double, 6, 6> no_covariance = Eigen::Matrix<double, 6, 6>::Zero();
+  for (int i = 0; i <= 20; ++i) {
+    graph.add_odometry_sample(i, translation(10.0 * i, 0.0, 0.0), no_covariance);
+  }
+  LoopConstraint loop;
+  loop.from_id = 5;
+  loop.to_id = 15;
+  loop.relative_pose = translation(100.0, 0.0, 0.0);
+  loop.relative_pose.linear() =
+    Eigen::AngleAxisd(3.0 * M_PI / 180.0, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+  loop.information = Eigen::Matrix<double, 6, 6>::Identity() * 400.0;
+  EXPECT_TRUE(graph.add_loop_constraint(loop));
+  graph.optimize();
+  Eigen::Isometry3d last;
+  EXPECT_TRUE(graph.keyframe_pose(20, &last));
+  return (last.translation() - Eigen::Vector3d(200.0, 0.0, 0.0)).norm();
+}
+
+}  // namespace
+
+TEST(PoseGraph, OdometryAttitudePriorKeepsLoopYawErrorsFromRotatingTheChain)
+{
+  const double without_prior = last_keyframe_shift(0.0);
+  const double with_prior = last_keyframe_shift(1.0e6);
+  // A 3 deg loop yaw error over a 50 m lever arm moves the end by metres
+  // when the chain is free to rotate; the attitude prior holds it.
+  EXPECT_GT(without_prior, 1.0);
+  EXPECT_LT(with_prior, 0.2);
+}

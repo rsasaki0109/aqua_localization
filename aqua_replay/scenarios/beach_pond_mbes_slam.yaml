@@ -31,6 +31,9 @@ nodes:
         gyro_bias_random_walk: 0.000001
       publish:
         imu_rate: true
+      # Loops observe the vertical gyro bias (see dutch_island_mbes_slam.yaml).
+      loop_bias:
+        loop_topic: /aqua_pose_graph/loop_constraint
   - plugin: aqua_pose_graph::PoseGraphNode
     name: aqua_pose_graph
     params_files: [$(find-pkg-share aqua_pose_graph)/config/params.yaml]
@@ -71,8 +74,26 @@ nodes:
         min_keyframe_separation: 10
         # Anchors of overlapping swaths can be ~2 swath half-widths apart.
         max_distance_m: 40.0
+      registration:
+        # Same registration and selection as dutch_island_mbes_slam.yaml.
+        # With GICP alone (after the 2026-10-12 registration fix) all 6
+        # published loops here were wrong by ~50 m; this publishes none: the
+        # basin is too flat for the height-map search to identify crossings
+        # (beach_pond_mbes_loop_feasibility.md).
+        backend: none
+        match_window: 3
+        coarse:
+          enabled: true
+          min_relief_m: 0.3
+          min_distinctiveness: 1.05
+          min_overlap_cells: 300
+      loop:
+        group:
+          enabled: true
+          min_group_size: 4
       gates:
-        max_correction_translation_m: 10.0
+        max_correction_translation_m: 35.0
+        max_correction_rotation_rad: 0.6
 
 output:
   storage_id: mcap

@@ -18,6 +18,9 @@ namespace aqua_pose_graph {
 
 namespace {
 
+// Fixed identity vertex that per-keyframe attitude priors attach to.
+constexpr int kOriginVertexId = 1 << 30;
+
 // Map a 6x6 ROS pose covariance (translation x/y/z then rotation) to a g2o
 // SE(3) information matrix. We only keep the 3+3 diagonal because the
 // scan matcher publishes a diagonal-only covariance and any cross terms
@@ -103,6 +106,14 @@ void PoseGraph::reset()
   optimizer_->setAlgorithm(algorithm);
   optimizer_->setVerbose(false);
 
+  if (config_.odometry_attitude_prior_information > 0.0) {
+    auto * origin = new g2o::VertexSE3();
+    origin->setId(kOriginVertexId);
+    origin->setEstimate(Eigen::Isometry3d::Identity());
+    origin->setFixed(true);
+    optimizer_->addVertex(origin);
+  }
+
   keyframes_.clear();
   has_odometry_ = false;
   last_odometry_pose_.setIdentity();
@@ -153,6 +164,19 @@ void PoseGraph::append_keyframe_with_edge(
   e->setMeasurement(delta);
   e->setInformation(covariance_to_information(covariance, config_));
   optimizer_->addEdge(e);
+
+  if (config_.odometry_attitude_prior_information > 0.0) {
+    // Attitude-only prior: the odometry pose with zero translation weight.
+    auto * prior = new g2o::EdgeSE3();
+    prior->setVertex(0, optimizer_->vertex(kOriginVertexId));
+    prior->setVertex(1, v);
+    prior->setMeasurement(odometry_pose);
+    Eigen::Matrix<double, 6, 6> info = Eigen::Matrix<double, 6, 6>::Zero();
+    info.bottomRightCorner<3, 3>() =
+      Eigen::Matrix3d::Identity() * config_.odometry_attitude_prior_information;
+    prior->setInformation(info);
+    optimizer_->addEdge(prior);
+  }
 
   edges_ += 1;
   keyframes_since_last_optimize_ += 1;
