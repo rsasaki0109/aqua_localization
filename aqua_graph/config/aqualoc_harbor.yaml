@@ -27,11 +27,15 @@ aqua_graph:
 
     init:
       # The ROV is already moving when the sequences start, and the IMU
-      # carries no orientation: average 2 s of accelerometer for roll and
-      # pitch (0.5 s left a few degrees of tilt that diverged harbor 06/07
-      # before any monocular landmark could be triangulated).
+      # carries no orientation (all-zero quaternions).
       attitude_source: accelerometer
-      static_window_s: 2.0
+      static_window_s: 0.5
+      # Until 30 monocular landmarks exist, a weak zero-velocity prior keeps
+      # the IMU from running away (the ROV moves at ~0.1-0.3 m/s); without
+      # it the start diverged on some sequences whatever the attitude window
+      # (0.5 s: harbor 06/07, 2 s: harbor 02/05).
+      bootstrap_velocity_sigma_mps: 0.3
+      bootstrap_landmarks: 30
       velocity_sigma_mps: 0.5
       gyro_bias_from_static_window: false
       gyro_bias_sigma: 0.01

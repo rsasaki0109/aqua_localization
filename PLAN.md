@@ -204,6 +204,13 @@ can run live without the offline converter.
    frontend ~10 ms of a 50 ms camera period). Still open: AQUA-SLAM's own
    timing on the same machine (Docker).
 4. Generated SOTA evidence packet (Phase 5) once held-out rows exist.
+5. AQUALOC (public, 17 sequences, published baselines) replaces the
+   unreachable Tank held-out sequences as the multi-sequence comparison.
+   Monocular VIO now runs all 7 harbor sequences (0.16-0.36 m Sim3 ATE)
+   but is 3-7x behind ORB-SLAM3-VIP (`docs/benchmarks/aqualoc_harbor.md`).
+   Next: map reuse (descriptors on tracked features, re-observation of
+   landmarks beyond the smoother window) and keyframe bundle adjustment,
+   then the 10 archaeological sequences against SVIn2.
 
 ## 2026-06-11 Work-Loss Incident and Reconstruction (READ FIRST)
 
