@@ -657,14 +657,18 @@ void TightlyCoupledEstimator::attach_mono(
   const auto & vis = config_.visual;
   const double stamp = states_.back().stamp_s;
   const gtsam::Point2 uv(o.u_left, o.v);
+  const bool seen_before = tracks_.count(o.id) > 0;
   FeatureTrack & track = tracks_[o.id];
+  const bool after_gap = !seen_before || stamp - track.last_seen_s >= vis.map_min_gap_s;
   track.last_seen_s = stamp;
 
   if (track.landmark && !smoother_->timestamps().count(*track.landmark)) {
     track.landmark.reset();
     track.mono_pending.clear();
   }
-  if (!track.landmark && track.mono_pending.empty() && vis.map_point_sigma_m > 0.0) {
+  if (!track.landmark && track.mono_pending.empty() && vis.map_point_sigma_m > 0.0 &&
+    after_gap)
+  {
     // A track the map already knows (still tracked past the window, or
     // re-identified by the frontend): bring its landmark back if the
     // stored position agrees with this sighting.

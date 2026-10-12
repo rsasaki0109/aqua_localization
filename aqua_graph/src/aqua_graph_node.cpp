@@ -248,6 +248,7 @@ public:
       declare_parameter<double>("visual.map.point_sigma_m", visual.map_point_sigma_m);
     visual.map_max_reprojection_px = declare_parameter<double>(
       "visual.map.max_reprojection_px", visual.map_max_reprojection_px);
+    visual.map_min_gap_s = declare_parameter<double>("visual.map.min_gap_s", visual.map_min_gap_s);
 
     estimator_ = std::make_unique<TightlyCoupledEstimator>(config);
 

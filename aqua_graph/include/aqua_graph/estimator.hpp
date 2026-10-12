@@ -181,6 +181,11 @@ struct VisualConfig
   // map_max_reprojection_px of the observation. 0 disables map reuse.
   double map_point_sigma_m{0.0};
   double map_max_reprojection_px{10.0};
+  // Only a track unseen for at least this long is re-anchored to the map: a
+  // landmark that is still being tracked when it leaves the window has its
+  // information in the smoother's marginal already, and re-adding it with an
+  // independent prior would count it twice.
+  double map_min_gap_s{2.0};
 };
 
 struct EstimatorConfig
