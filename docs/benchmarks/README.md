@@ -34,8 +34,8 @@ datasets and baseline comparisons.
 - [`dutch_island_mbes.md`](dutch_island_mbes.md): MBES-SLAM Dutch Island
   dead reckoning (4.46 m RMSE over 18 km with the compass) and the
   bathymetric loop-closure work (registration bug fix, coarse height-map
-  search, group-k selection; loops fed back as gyro bias cut the
-  no-compass RMSE from 499 m to 293 m).
+  search, group-k selection, multi-submap windows; loops fed back as gyro
+  bias hold the no-compass yaw after the first loop).
 - [`mbes_beach_pond_loop_status.md`](mbes_beach_pond_loop_status.md):
   first MBES-SLAM `beach_pond` tuning measurement with loop-status counts,
   descriptor/consistency sweep output, and false-positive audit notes.

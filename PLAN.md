@@ -190,8 +190,11 @@ can run live without the offline converter.
    (`loop.group.*`): online it publishes 4 loops, all within 6 m / 6 deg,
    in one area. Fed back into aqua_graph as a vertical gyro-bias
    observation (`loop_bias.*`), those loops cut the no-compass
-   dead-reckoning RMSE from 499 m to 293 m. Next: loops spread over the
-   run (multi-keyframe submaps for the flat second half).
+   dead-reckoning RMSE from 499 m to 293 m. With 3-submap match windows
+   loops come throughout the second half (33, 31 correct) and hold yaw
+   within a few degrees after the first one (9 m RMSE on that part); the
+   whole-run error is now the first 75 min, which have no revisits.
+   Next: place recognition for late-to-early loops, or an initial bias.
 3. Real-time evidence: done for the Tank stack (online C++ frontend
    bit-identical to the offline one; live 1x runs at 0.0095-0.0098 m,
    frontend ~10 ms of a 50 ms camera period). Still open: AQUA-SLAM's own

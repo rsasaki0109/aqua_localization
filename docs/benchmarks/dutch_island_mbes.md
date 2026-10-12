@@ -164,20 +164,49 @@ from ~-25 deg/h (slow drift of the locked bias) to 174 deg/h (truth
 forms afterwards: the second half is flatter (282 of 538 candidates fail
 the relief gate), and the 21 gated loops there never reach a consistent
 group. The pose graph adds nothing on top (RMSE at keyframes 314 m vs
-317 m for its path). `dutch_island_mbes_slam.yaml` now runs this
-configuration (fingerprint `3f1d5af9af6de2e5`).
+317 m for its path). This was the scenario until match windows below
+(fingerprint `3f1d5af9af6de2e5`).
 
-What would make it work further:
+### Multi-keyframe match windows
 
-- loops spread over the run: the yaw-only model says a bias update every
-  15 min is worth another 2x; the later lines are flat, so this needs
-  larger and longer-overlap submaps than one keyframe interval (the
-  successful offline crossings used 40-200 s of track);
-- an initial bias estimate before the first loop (half the remaining
-  error accumulates in the first 75 min).
+`registration.match_window: n` registers the union of n consecutive
+submaps instead of one: centred on the candidate, trailing the current
+keyframe (its successors do not exist yet), each in its own keyframe
+frame, so the loop constraint is still between the two keyframes.
 
-With the compass the drift is 0.2 % of distance, so on this vessel loops
-matter for the compass-free case only.
+Offline, on the submaps of the bias-corrected run, with node-like
+candidates (dead-reckoned anchors within 60 m):
+
+| Window | True overlaps | Placed correctly | Gated correct : wrong |
+|-------:|------:|------:|------:|
+| 1 | 62 | 31 | 18 : 31 (relief >= 0.3, distinct >= 1.05) |
+| 3 | 129 | 84 | 106 : 58 (same gates) |
+| 5 | 163 | 100 | 115 : 43 (relief >= 0.4, distinct >= 1.1) |
+
+Online, full run (bias feedback and groups of >= 4 as above):
+
+| Run | Loops (correct) | Yaw change after 75 min | RMSE after 75 min* | RMSE all |
+|-----|------:|------:|------:|------:|
+| No loops (bias locked at 0) | 0 | ~+278 deg | - | 498.7 |
+| Window 1 (previous scenario) | 4 (3) | -4 deg | 25 m | **292.5** |
+| Window 3 (scenario, fingerprint `384f6c91a7dba88d`) | 33 (31) | -4 deg | **9 m** | 314.6 |
+| Window 5, relief >= 0.4, distinct >= 1.1 | 8 (4) | +175 deg | 289 m | 552.6 |
+
+\* the part after the first loop, aligned on its own.
+
+With window 3, loops arrive at 75, 85, 91, 93, 115, 126 and 140 min,
+and after each one the fused bias is within ~10-40 deg/h of the truth;
+yaw then holds within a few degrees for the rest of the run. With
+window 5 a few false loops pulled the bias off and yaw ran away again.
+
+The whole-run RMSE does not improve because it is set by the first
+75 min, which have no usable loops: in the first 70 min only 19 submap
+pairs truly overlap and none registers correctly, so the ~115 deg of
+yaw accumulated there stays (the 293 m vs 315 m difference is how each
+run's later part aligns against that). Recovering it needs either a
+heading source for the start (an initial bias estimate) or loops from
+late to early areas, which the dead-reckoned candidate search cannot
+find after 100 deg of drift (a place-recognition search would).
 
 ## Reproduce
 

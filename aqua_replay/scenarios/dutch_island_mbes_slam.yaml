@@ -76,7 +76,8 @@ nodes:
         voxel_leaf_m: 0.5
         max_submaps: 2000
       candidates:
-        min_keyframe_separation: 5
+        # 5 keyframes apart, plus the 3-submap match windows.
+        min_keyframe_separation: 8
         # Anchors of overlapping swaths can be ~2 swath half-widths apart,
         # plus the dead-reckoning drift between the two visits.
         max_distance_m: 60.0
@@ -84,6 +85,9 @@ nodes:
         # GICP slides on these partially overlapping 2.5D patches even from
         # the true pose; the height-map search is the registration.
         backend: none
+        # Register 3-submap windows (~60 s, ~180 m of track): on these flat
+        # crossings one 60 m submap rarely identifies the terrain.
+        match_window: 3
         coarse:
           enabled: true
           yaw_range_rad: 0.52
