@@ -26,9 +26,12 @@ aqua_graph:
       gyro_bias_random_walk: 0.0001
 
     init:
-      # The ROV is already moving when the sequences start.
+      # The ROV is already moving when the sequences start, and the IMU
+      # carries no orientation: average 2 s of accelerometer for roll and
+      # pitch (0.5 s left a few degrees of tilt that diverged harbor 06/07
+      # before any monocular landmark could be triangulated).
       attitude_source: accelerometer
-      static_window_s: 0.5
+      static_window_s: 2.0
       velocity_sigma_mps: 0.5
       gyro_bias_from_static_window: false
       gyro_bias_sigma: 0.01
