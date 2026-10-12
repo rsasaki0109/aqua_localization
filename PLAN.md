@@ -178,13 +178,13 @@ can run live without the offline converter.
    `run_tank_benchmark.py` on `Structure_Easy` / `Medium` / `Hard` (check
    whether those sequences need the `long` calibration) and rerun AQUA-SLAM
    in its Docker image on the same bags to get same-run trajectories.
-2. Track B loop closures: the plumbing exists (motion-compensated
-   submaps, beam-angle filter, aqua_graph -> pose graph -> MBES loop
-   scenario), but on beach_pond no correct loop is obtainable: the 12
-   crossings lie in a flat basin and are not identifiable even at reference
-   poses (`docs/benchmarks/beach_pond_mbes_loop_feasibility.md`). Next:
-   a dataset with bathymetric relief; then PCM / group-k selection and
-   registration-derived information.
+2. Track B loop closures: on Dutch Island (MBES-SLAM, real relief) a
+   registration bug in `mbes_loop_closure` was found and fixed, GICP was
+   shown not to register these 2.5D submaps even from the truth, and a
+   coarse height-map search recovers crossings offline; online, with
+   conservative gates, no loop is accepted (and none wrong)
+   (`docs/benchmarks/dutch_island_mbes.md`). Next: uncertainty-aware
+   candidate search, multi-keyframe submaps, PCM / group-k loop selection.
 3. Real-time evidence: done for the Tank stack (online C++ frontend
    bit-identical to the offline one; live 1x runs at 0.0095-0.0098 m,
    frontend ~10 ms of a 50 ms camera period). Still open: AQUA-SLAM's own

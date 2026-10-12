@@ -53,6 +53,15 @@
   (`input_format`); `convert_ntnu_stereo_bag.py --no-rectify` and
   `run_ntnu_benchmark.py --online-rectify` exercise it (fjord_1 0.330 m vs
   0.320 m offline-rectified).
+- Fixed `mbes_loop_closure` registration: the node passed the inverse of the
+  dead-reckoned relative pose as the initial guess and inverted the result,
+  so every loop started twice the relative pose away and converged loops
+  became inverted constraints. Added a coarse 2.5D height-map search
+  (`registration.coarse.*`, off by default) with relief and
+  distinctiveness gates, `registration.backend: none`, and
+  `debug.submap_dump_dir`. MBES-SLAM Dutch Island (18 km): aqua_graph dead
+  reckoning 4.46 m RMSE with the compass; online loop closure accepts no
+  loop (and no false one) yet (`docs/benchmarks/dutch_island_mbes.md`).
 - Fixed MBES loop-closure submaps: `mbes_loop_closure` stacked raw
   sensor-frame pings (single across-track lines) into a submap; with
   `topics.odometry` each ping is now placed at its own odometry pose, and

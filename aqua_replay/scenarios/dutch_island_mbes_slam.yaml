@@ -83,6 +83,14 @@ nodes:
           enabled: true
           yaw_range_rad: 0.52
           xy_range_m: 30.0
+          # Offline on true overlaps of these submaps, placements with relief
+          # >= 0.5 m and distinctiveness >= 1.2 came back within ~1.5 m of
+          # the truth; online, no candidate with relief >= 0.3 m,
+          # distinctiveness >= 1.2 and >= 300 overlapping cells was a false
+          # match (none passed at all). Conservative on purpose.
+          min_relief_m: 0.5
+          min_distinctiveness: 1.3
+          min_overlap_cells: 300
       gates:
         # The coarse search may move the guess by up to its search range.
         max_correction_translation_m: 35.0

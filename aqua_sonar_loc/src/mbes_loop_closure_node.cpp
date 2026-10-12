@@ -300,6 +300,7 @@ private:
       declare_parameter<double>("registration.coarse.distinct_radius_m", coarse.distinct_radius_m);
     coarse.distinct_yaw_rad =
       declare_parameter<double>("registration.coarse.distinct_yaw_rad", coarse.distinct_yaw_rad);
+    debug_dump_dir_ = declare_parameter<std::string>("debug.submap_dump_dir", "");
     coarse.refine = declare_parameter<bool>("registration.coarse.refine", coarse.refine);
     if (registration_options_.backend == "none" && !coarse.enabled) {
       throw std::invalid_argument("registration.backend none requires registration.coarse.enabled");
@@ -507,8 +508,30 @@ private:
       return;
     }
 
+    if (!debug_dump_dir_.empty()) {
+      dump_submap(result.submap);
+    }
     try_loop_closure(result.submap);
     submap_manager_.add_finalized_submap(result.submap);
+  }
+
+  // Debug aid: <dir>/submap_<id>.xyz (points in the submap frame) and a
+  // header line with the stamp and the 4x4 world pose.
+  void dump_submap(const Submap & submap) const
+  {
+    std::ofstream out(debug_dump_dir_ + "/submap_" + std::to_string(submap.id) + ".xyz");
+    out.precision(10);
+    out << "# " << submap.stamp.seconds();
+    const Eigen::Matrix4d m = submap.pose.matrix();
+    for (int i = 0; i < 4; ++i) {
+      for (int j = 0; j < 4; ++j) {
+        out << ' ' << m(i, j);
+      }
+    }
+    out << '\n';
+    for (const auto & p : submap.cloud->points) {
+      out << p.x << ' ' << p.y << ' ' << p.z << '\n';
+    }
   }
 
   void try_loop_closure(const Submap & current)
@@ -1026,6 +1049,7 @@ private:
   SubmapManagerOptions submap_options_;
   CandidateSelectionOptions candidate_options_;
   RegistrationOptions registration_options_;
+  std::string debug_dump_dir_;
   GateOptions gate_options_;
   DescriptorGateOptions descriptor_options_;
   LoopSuppressionOptions loop_suppression_options_;
