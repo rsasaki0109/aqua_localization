@@ -286,6 +286,9 @@ public:
   // Final estimates of the states that left the smoother window since the
   // last call (smoothed over smoother_lag_s), in time order.
   std::vector<EstimatorOutput> take_smoothed();
+  // Current estimate of every state still in the smoother (with a window
+  // longer than the run this is the full smoothed trajectory), time order.
+  std::vector<EstimatorOutput> window_estimates() const;
 
   // Newest state propagated with the buffered IMU samples up to the latest one.
   std::optional<EstimatorOutput> imu_rate_estimate() const;

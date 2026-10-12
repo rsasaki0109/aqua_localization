@@ -25,6 +25,7 @@
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "geometry_msgs/msg/twist_with_covariance_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "nav_msgs/msg/path.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/fluid_pressure.hpp"
 #include "sensor_msgs/msg/imu.hpp"
@@ -87,6 +88,11 @@ public:
     // (smoothed, delayed by graph.smoother_lag_s); empty disables it.
     const std::string smoothed_topic =
       declare_parameter<std::string>("topics.smoothed_odometry", "");
+    // Every path_every_states states: the current estimate of all states in
+    // the window as nav_msgs/Path (with a window longer than the run, the
+    // full smoothed trajectory). Empty topic disables it.
+    const std::string path_topic = declare_parameter<std::string>("topics.window_path", "");
+    path_every_states_ = declare_parameter<int>("publish.path_every_states", 50);
     map_frame_ = declare_parameter<std::string>("frames.map", "map");
     base_frame_ = declare_parameter<std::string>("frames.base_link", "base_link");
     publish_imu_rate_ = declare_parameter<bool>("publish.imu_rate", true);
@@ -304,6 +310,9 @@ public:
     if (!smoothed_topic.empty()) {
       smoothed_pub_ = create_publisher<nav_msgs::msg::Odometry>(smoothed_topic, rclcpp::QoS(100));
     }
+    if (!path_topic.empty()) {
+      path_pub_ = create_publisher<nav_msgs::msg::Path>(path_topic, rclcpp::QoS(10));
+    }
     status_pub_ =
       create_publisher<aqua_msgs::msg::GraphEstimatorStatus>(status_topic, rclcpp::QoS(10));
 
@@ -389,6 +398,25 @@ private:
     if (smoothed_pub_) {
       for (const auto & state : estimator_->take_smoothed()) {
         smoothed_pub_->publish(to_odometry(state));
+      }
+    }
+    if (path_pub_ && !states.empty()) {
+      states_since_path_ += static_cast<int>(states.size());
+      if (states_since_path_ >= path_every_states_) {
+        states_since_path_ = 0;
+        nav_msgs::msg::Path path;
+        path.header.frame_id = map_frame_;
+        for (const auto & state : estimator_->window_estimates()) {
+          geometry_msgs::msg::PoseStamped pose;
+          const auto odom = to_odometry(state);
+          pose.header = odom.header;
+          pose.pose = odom.pose.pose;
+          path.poses.push_back(pose);
+        }
+        if (!path.poses.empty()) {
+          path.header.stamp = path.poses.back().header.stamp;
+          path_pub_->publish(path);
+        }
       }
     }
     for (const auto & state : states) {
@@ -604,6 +632,9 @@ private:
   rclcpp::Subscription<aqua_msgs::msg::StereoFeatures>::SharedPtr stereo_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr smoothed_pub_;
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+  int path_every_states_{50};
+  int states_since_path_{0};
   rclcpp::Publisher<aqua_msgs::msg::GraphEstimatorStatus>::SharedPtr status_pub_;
 };
 

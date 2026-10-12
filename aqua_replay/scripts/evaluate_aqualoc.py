@@ -40,15 +40,26 @@ def image_stamps(bag: Path, topic: str) -> np.ndarray:
 
 
 def estimate(bag: Path, topic: str):
+    """Odometry stream, or the poses of the last nav_msgs/Path message."""
     t, p, q = [], [], []
     with AnyReader([bag]) as reader:
         conns = [c for c in reader.connections if c.topic == topic]
+        last_path = None
         for c, _, raw in reader.messages(connections=conns):
             m = reader.deserialize(raw, c.msgtype)
+            if c.msgtype == 'nav_msgs/msg/Path':
+                last_path = m
+                continue
             t.append(stamp(m))
             pp, qq = m.pose.pose.position, m.pose.pose.orientation
             p.append((pp.x, pp.y, pp.z))
             q.append((qq.x, qq.y, qq.z, qq.w))
+        if last_path is not None:
+            for ps in last_path.poses:
+                t.append(stamp(ps))
+                pp, qq = ps.pose.position, ps.pose.orientation
+                p.append((pp.x, pp.y, pp.z))
+                q.append((qq.x, qq.y, qq.z, qq.w))
     return np.array(t), np.array(p), np.array(q)
 
 

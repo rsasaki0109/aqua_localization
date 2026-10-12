@@ -227,6 +227,29 @@ void TightlyCoupledEstimator::add_stereo_frame(
   enqueue(std::move(m));
 }
 
+std::vector<EstimatorOutput> TightlyCoupledEstimator::window_estimates() const
+{
+  std::vector<EstimatorOutput> out;
+  if (!smoother_) {
+    return out;
+  }
+  const gtsam::Values values = smoother_->calculateEstimate();
+  for (const auto & state : states_) {
+    if (!values.exists(X(state.index))) {
+      continue;
+    }
+    EstimatorOutput o;
+    o.stamp_s = state.stamp_s;
+    o.state_index = state.index;
+    o.pose = values.at<gtsam::Pose3>(X(state.index));
+    if (values.exists(V(state.index))) {
+      o.velocity_world = values.at<gtsam::Vector3>(V(state.index));
+    }
+    out.push_back(o);
+  }
+  return out;
+}
+
 std::vector<EstimatorOutput> TightlyCoupledEstimator::take_smoothed()
 {
   return std::exchange(smoothed_, {});
