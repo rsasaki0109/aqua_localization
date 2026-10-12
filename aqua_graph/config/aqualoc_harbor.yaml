@@ -1,0 +1,69 @@
+# AQUALOC harbor sequences (Ferrera et al., IJRR 2019): ROV with a
+# monocular uEye camera (640x512, 20 Hz, pinhole-equidistant, undistorted by
+# stereo_frontend mono: true), an MPU-9250 IMU (RTIMULib, 200 Hz) and a
+# barometer (~5 Hz). No DVL. Calibration from the dataset's Kalibr files
+# (harbor_imu_camera_calib.yaml, harbor_imu_noises.yaml).
+aqua_graph:
+  ros__parameters:
+    topics:
+      imu: /rtimulib_node/imu
+      pressure: /barometer_node/pressure
+      dvl_velocity: ""
+      position_odometry: ""
+      stereo_features: /aqua_visual_frontend/stereo_features
+      odometry: /aqua_graph/odometry
+      status: /aqua_graph/status
+
+    graph:
+      state_period_s: 0.1
+      smoother_lag_s: 4.0
+
+    imu:
+      # Kalibr noise model, inflated x2 for the MEMS IMU on a moving ROV.
+      accel_noise_density: 0.04
+      gyro_noise_density: 0.002
+      accel_bias_random_walk: 0.002
+      gyro_bias_random_walk: 0.0001
+
+    init:
+      # The ROV is already moving when the sequences start, and the IMU
+      # carries no orientation (all-zero quaternions).
+      attitude_source: accelerometer
+      static_window_s: 0.5
+      # Until 30 monocular landmarks exist, a weak zero-velocity prior keeps
+      # the IMU from running away (the ROV moves at ~0.1-0.3 m/s); without
+      # it the start diverged on some sequences whatever the attitude window
+      # (0.5 s: harbor 06/07, 2 s: harbor 02/05).
+      bootstrap_velocity_sigma_mps: 0.3
+      bootstrap_landmarks: 30
+      velocity_sigma_mps: 0.5
+      gyro_bias_from_static_window: false
+      gyro_bias_sigma: 0.01
+
+    pressure:
+      use_first_pressure_as_reference: true
+      water_density_kg_m3: 1025.0
+      depth_sigma_m: 0.05
+      # One -267 m glitch in harbor 01.
+      huber_k: 2.0
+
+    visual:
+      # Undistorted pinhole (cv::fisheye, balance 0) of cam0.
+      camera:
+        fx: 348.38842682
+        fy: 348.705382
+        cx: 298.8359283
+        cy: 260.36967265
+      # Kalibr T_imu_cam (camera in the IMU frame), row-major.
+      body_T_camera: [-0.99978035, 0.0169654, 0.01230552, -0.01719238,
+                      0.01210101, -0.01210461, 0.99985351, 0.14944769,
+                      0.01711187, 0.9997828, 0.01189665, -0.01915984,
+                      0.0, 0.0, 0.0, 1.0]
+      pixel_sigma: 1.0
+      huber_k: 1.345
+      max_depth_m: 20.0
+      mono:
+        min_observations: 3
+        min_parallax_rad: 0.03
+        max_reprojection_px: 3.0
+        min_depth_m: 0.2

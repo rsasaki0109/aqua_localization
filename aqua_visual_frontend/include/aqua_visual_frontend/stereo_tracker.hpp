@@ -52,7 +52,8 @@ public:
   explicit StereoTracker(StereoTrackerConfig config = {});
 
   // Track into a new rectified grayscale pair; returns the features that
-  // also matched into the right image.
+  // also matched into the right image. With an empty right image
+  // (monocular) it returns every left-image track with u_right = NaN.
   std::vector<StereoTrack> process(const cv::Mat & left, const cv::Mat & right);
   // Forget all tracks (e.g. after a camera dropout); ids keep increasing.
   void reset();

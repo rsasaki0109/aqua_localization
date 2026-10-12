@@ -31,6 +31,9 @@ datasets and baseline comparisons.
   `beach_pond` full-survey dead reckoning (IMU + DVL, with and without the
   GNSS compass) of `aqua_graph` vs classical DVL dead reckoning, against the
   RTK GNSS-INS reference.
+- [`aqualoc_harbor.md`](aqualoc_harbor.md): AQUALOC harbor, monocular
+  visual-inertial-pressure odometry on all 7 sequences (0.16-0.36 m Sim3
+  ATE), compared with published ORB-SLAM3-VI / -VIP results (behind VIP).
 - [`dutch_island_mbes.md`](dutch_island_mbes.md): MBES-SLAM Dutch Island
   dead reckoning (4.46 m RMSE over 18 km with the compass) and the
   bathymetric loop-closure work (registration bug fix, coarse height-map

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Monocular VIO: `stereo_frontend` mono mode (equidistant undistortion,
+  `stamp_offset_s`), monocular landmarks with delayed triangulation in
+  aqua_graph, bootstrap zero-velocity prior, `evaluate_aqualoc.py`, and the
+  `aqualoc_harbor_vio` scenario. AQUALOC harbor (7 sequences): 0.16-0.36 m
+  Sim3 ATE, behind ORB-SLAM3-VIP (`docs/benchmarks/aqualoc_harbor.md`).
 - Added `aqua_graph`, a GTSAM fixed-lag factor-graph backend fusing IMU
   preintegration, body-frame DVL velocity, pressure depth, and stereo
   reprojection factors with event-anchored states. Tank `short_test`:

@@ -1,0 +1,47 @@
+# AQUALOC harbor sequence (ROS 1 bag converted with rosbags-convert):
+# monocular camera + IMU + barometer through the online frontend (mono,
+# undistorting the pinhole-equidistant camera) and aqua_graph.
+#
+#   rosbags-convert --src harbor_sequence_1.bag --dst harbor_01_ros2 \
+#     --dst-storage mcap --src-typestore ros1_noetic --dst-typestore ros2_jazzy \
+#     --include-topic /rtimulib_node/imu /camera/image_raw /barometer_node/pressure
+#   ros2 run aqua_replay offline_replay \
+#     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/aqualoc_harbor_vio.yaml \
+#     --bag harbor_01_ros2 --out /tmp/aqualoc_harbor_01
+input:
+  topics:
+    - /rtimulib_node/imu
+    - /barometer_node/pressure
+    - /camera/image_raw
+  order: header
+  reorder_window_s: 0.5
+
+nodes:
+  - plugin: aqua_visual_frontend::StereoFrontendNode
+    name: stereo_frontend
+    parameters:
+      mono: true
+      input_format: raw
+      topics:
+        left: /camera/image_raw
+      undistort:
+        intrinsics: [413.32595366566017, 413.70198739483686, 305.9507483284928, 259.4439948946375]
+        distortion: [-0.06125568297136998, -0.003796743395135256, 0.027326634771204592,
+                     -0.030296403142887066]
+        resolution: [640, 512]
+        balance: 0.0
+      # Kalibr timeshift_cam_imu.
+      stamp_offset_s: -0.0403806549886
+      max_features: 150
+      publish_every: 2
+      clahe_clip_limit: 2.0
+  - plugin: aqua_graph::AquaGraphNode
+    name: aqua_graph
+    params_files:
+      - $(find-pkg-share aqua_graph)/config/aqualoc_harbor.yaml
+
+output:
+  storage_id: mcap
+  topics:
+    - /aqua_graph/odometry
+    - /aqua_graph/status
