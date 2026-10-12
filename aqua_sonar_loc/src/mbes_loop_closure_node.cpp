@@ -288,6 +288,8 @@ private:
     coarse.xy_step_m = declare_parameter<double>("registration.coarse.xy_step_m", coarse.xy_step_m);
     coarse.min_overlap_cells =
       declare_parameter<int>("registration.coarse.min_overlap_cells", coarse.min_overlap_cells);
+    coarse.min_overlap_fraction = declare_parameter<double>(
+      "registration.coarse.min_overlap_fraction", coarse.min_overlap_fraction);
     coarse.residual_clip_m =
       declare_parameter<double>("registration.coarse.residual_clip_m", coarse.residual_clip_m);
     coarse.min_relief_m =

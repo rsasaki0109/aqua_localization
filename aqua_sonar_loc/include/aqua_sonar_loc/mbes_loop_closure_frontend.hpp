@@ -121,6 +121,9 @@ struct CoarseAlignOptions
   double xy_range_m{30.0};
   double xy_step_m{2.0};
   int min_overlap_cells{150};
+  // Placements must also cover this fraction of the smaller height map;
+  // otherwise the search drifts to barely overlapping, trivially flat fits.
+  double min_overlap_fraction{0.5};
   double residual_clip_m{0.5};
   // Height std of the overlapping candidate cells after removing a best-fit
   // plane; flatter overlaps do not constrain the horizontal pose.

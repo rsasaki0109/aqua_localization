@@ -261,6 +261,10 @@ CoarseAlignResult coarse_align_heightmaps(
     const int iy = static_cast<int>(std::lround((c.y - min_y) / cell));
     dense[static_cast<std::size_t>(ix) * static_cast<std::size_t>(ny) + static_cast<std::size_t>(iy)] = c.h;
   }
+  const int min_overlap = std::max(
+    o.min_overlap_cells,
+    static_cast<int>(std::ceil(
+      o.min_overlap_fraction * static_cast<double>(std::min(cand_cells.size(), cur_cells.size())))));
   Eigen::Vector2d pivot = Eigen::Vector2d::Zero();
   for (const auto & c : cur_cells) {
     pivot += Eigen::Vector2d(c.x, c.y);
@@ -302,7 +306,7 @@ CoarseAlignResult coarse_align_heightmaps(
           }
         }
         const int n = static_cast<int>(diffs.size());
-        if (n < o.min_overlap_cells) {
+        if (n < min_overlap) {
           continue;
         }
         auto mid = diffs.begin() + n / 2;
