@@ -70,6 +70,13 @@
 - mbes_loop_closure: `registration.match_window` registers windows of
   consecutive submaps. Dutch Island with window 3: 33 loops (31 correct)
   spread over the second half, yaw held after the first loop.
+- aqua_pose_graph: optional per-keyframe odometry attitude prior
+  (`edges.odometry_attitude_prior_information`). Without it, loops with
+  a degree or two of yaw error rotated whole segments of a compass-aided
+  trajectory (Dutch Island: 17.6 m -> 5.5 m pose graph RMSE; dead
+  reckoning 4.4 m).
+- beach_pond_mbes_slam uses the Dutch Island loop pipeline: no loops
+  instead of 6 wrong ones after the registration fix.
 - Fixed MBES loop-closure submaps: `mbes_loop_closure` stacked raw
   sensor-frame pings (single across-track lines) into a submap; with
   `topics.odometry` each ping is now placed at its own odometry pose, and

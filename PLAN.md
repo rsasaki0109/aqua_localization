@@ -194,7 +194,11 @@ can run live without the offline converter.
    loops come throughout the second half (33, 31 correct) and hold yaw
    within a few degrees after the first one (9 m RMSE on that part); the
    whole-run error is now the first 75 min, which have no revisits.
-   Next: place recognition for late-to-early loops, or an initial bias.
+   Neither has a data source here (no early revisits with relief, no
+   heading sensor besides the GNSS compass). With the compass, loops are
+   right but do not beat its 0.2 % drift; the pose graph needed a
+   per-keyframe attitude prior not to degrade it. beach_pond now
+   publishes no loops instead of 6 wrong ones.
 3. Real-time evidence: done for the Tank stack (online C++ frontend
    bit-identical to the offline one; live 1x runs at 0.0095-0.0098 m,
    frontend ~10 ms of a 50 ms camera period). Still open: AQUA-SLAM's own

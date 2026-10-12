@@ -208,6 +208,42 @@ heading source for the start (an initial bias estimate) or loops from
 late to early areas, which the dead-reckoned candidate search cannot
 find after 100 deg of drift (a place-recognition search would).
 
+### With the compass, and on beach_pond (2026-10-12)
+
+The same loop pipeline (63 deg beams, height-map search, 3-submap
+windows, groups of >= 4; no `loop_bias`, the compass observes the bias)
+on Dutch Island with the GNSS compass. Pose-graph overrides on top of
+the scenario: odometry edges at compass quality
+(`edges.default_translation_information: 44`, `..._rotation_information:
+40000`), and in the last two rows the new
+`edges.odometry_attitude_prior_information: 40000`:
+
+| Run | Loops (correct) | Pose graph RMSE m | Dead reckoning at keyframes m |
+|-----|------:|------:|------:|
+| Scenario edge information (no-compass values) | 56 (52) | 67.4 | 4.4 |
+| Compass edge information | 66 (56) | 23.5 | 4.4 |
+| + correction gate 6 m / 0.1 rad | 37 (35) | 17.6 | 4.4 |
+| + attitude prior | 76 (70) | 6.1 | 4.4 |
+| + attitude prior and 6 m / 0.1 rad gate | 66 (63) | 5.5 | 4.4 |
+
+The loops are right, but with relative edges only the pose graph lets the
+attitude random-walk along the chain and so throws away the compass's
+absolute heading: loops with 1-2.5 deg of yaw error (within what counts
+as correct) rotated whole segments, and correct long loops were left
+6-23 m unsatisfied (edge lengths changed by < 5 cm: the distortion was
+pure rotation). The attitude prior fixes that, but the graph still does
+not beat dead reckoning: with the compass it drifts 0.2 % of distance,
+and loops accurate to 1-2 m (plus the few at 3-5 m) have nothing left to
+correct. On this vessel with a compass, MBES loops do not improve the
+trajectory.
+
+beach_pond (`beach_pond_mbes_slam.yaml`, no compass): with GICP alone,
+after the registration fix, all 6 published loops were ~50 m wrong. With
+this pipeline it publishes none (flat basin, see
+[the feasibility note](beach_pond_mbes_loop_feasibility.md)); dead
+reckoning is unchanged (287.6 m RMSE). The scenario now uses it
+(fingerprint `76f38e4f14fd6917`).
+
 ## Reproduce
 
 ```bash
