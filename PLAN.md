@@ -208,9 +208,12 @@ can run live without the offline converter.
    unreachable Tank held-out sequences as the multi-sequence comparison.
    Monocular VIO now runs all 7 harbor sequences (0.16-0.36 m Sim3 ATE)
    but is 3-7x behind ORB-SLAM3-VIP (`docs/benchmarks/aqualoc_harbor.md`).
-   Next: map reuse (descriptors on tracked features, re-observation of
-   landmarks beyond the smoother window) and keyframe bundle adjustment,
-   then the 10 archaeological sequences against SVIn2.
+   Parked (2026-10-12): the gap is not map reuse (harbor 05 never
+   revisits and is as far behind) but the monocular start-up scale and the
+   short-lived KLT landmarks; even full smoothing gives 0.153 m on harbor
+   06 vs 0.026 m for VIP. Closing it needs a keyframe-based visual SLAM
+   back end. ORB map reuse was tried and does not re-identify points on
+   this imagery (branch `claude/map-reuse`, not merged).
 
 ## 2026-06-11 Work-Loss Incident and Reconstruction (READ FIRST)
 
