@@ -21,6 +21,7 @@
 // or synthetic unit tests with identical results.
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <deque>
 #include <map>
@@ -192,6 +193,13 @@ struct VisualConfig
   double map_consensus_px{4.0};
   int map_min_consensus{6};
   double map_max_correction_m{2.0};
+  // Search by projection: a new monocular track with a descriptor is
+  // matched against map points (not currently in the window) that project
+  // within map_search_radius_px of it, Hamming <= map_max_hamming and best <
+  // map_ratio * second best; the matches join the consensus check above.
+  double map_search_radius_px{40.0};
+  int map_max_hamming{50};
+  double map_ratio{0.8};
 };
 
 struct EstimatorConfig
@@ -295,6 +303,8 @@ public:
   void set_gyro_bias(const gtsam::Vector3 & gyro_bias, const std::string & reason);
   // One rectified stereo frame of tracked features (ids persist across frames).
   void add_stereo_frame(double stamp_s, const std::vector<StereoObservation> & observations);
+  // 32-byte appearance descriptor of a feature track (map reuse).
+  void add_feature_descriptor(uint64_t id, const std::array<uint8_t, 32> & descriptor);
 
   bool initialized() const {return initialized_;}
 
@@ -343,6 +353,9 @@ private:
     gtsam::StereoPoint2 first_measurement;
     // Monocular sightings (state index, pixel) waiting for triangulation.
     std::vector<std::pair<uint64_t, gtsam::Point2>> mono_pending;
+    // Map point this track's landmark represents (map reuse); its own id
+    // when unset.
+    std::optional<uint64_t> map_id;
     double last_seen_s{0.0};
   };
 
@@ -394,8 +407,14 @@ private:
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> smoother_;
   gtsam::Cal3_S2Stereo::shared_ptr stereo_calibration_;
   gtsam::Cal3_S2::shared_ptr mono_calibration_;
-  // Track id -> last landmark estimate (map reuse).
-  std::unordered_map<uint64_t, gtsam::Point3> map_points_;
+  // Map reuse: last estimate (and descriptor) of every landmark, by map id.
+  struct MapPoint
+  {
+    gtsam::Point3 position;
+    std::optional<std::array<uint8_t, 32>> descriptor;
+  };
+  std::unordered_map<uint64_t, MapPoint> map_points_;
+  std::unordered_map<uint64_t, std::array<uint8_t, 32>> track_descriptors_;
 
   bool initialized_{false};
   std::optional<double> manual_init_stamp_;

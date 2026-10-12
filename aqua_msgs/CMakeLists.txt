@@ -9,6 +9,7 @@ find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/EstimatorStatus.msg"
+  "msg/FeatureDescriptors.msg"
   "msg/FusionStatus.msg"
   "msg/GraphEstimatorStatus.msg"
   "msg/LoopClosureStatus.msg"

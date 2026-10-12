@@ -18,6 +18,7 @@
 #include "aqua_graph/factors.hpp"
 #include "aqua_graph/loop_bias.hpp"
 #include "aqua_imu_loc/pressure_depth_converter.hpp"
+#include "aqua_msgs/msg/feature_descriptors.hpp"
 #include "aqua_msgs/msg/graph_estimator_status.hpp"
 #include "aqua_msgs/msg/pose_graph_keyframe.hpp"
 #include "aqua_msgs/msg/pose_graph_loop_constraint.hpp"
@@ -252,6 +253,12 @@ public:
       declare_parameter<int>("visual.map.min_consensus", visual.map_min_consensus);
     visual.map_max_correction_m =
       declare_parameter<double>("visual.map.max_correction_m", visual.map_max_correction_m);
+    visual.map_search_radius_px =
+      declare_parameter<double>("visual.map.search_radius_px", visual.map_search_radius_px);
+    visual.map_max_hamming = declare_parameter<int>("visual.map.max_hamming", visual.map_max_hamming);
+    visual.map_ratio = declare_parameter<double>("visual.map.ratio", visual.map_ratio);
+    const std::string descriptors_topic =
+      declare_parameter<std::string>("topics.feature_descriptors", "");
     visual.map_min_gap_s = declare_parameter<double>("visual.map.min_gap_s", visual.map_min_gap_s);
 
     estimator_ = std::make_unique<TightlyCoupledEstimator>(config);
@@ -285,6 +292,20 @@ public:
       position_sub_ = create_subscription<nav_msgs::msg::Odometry>(
         position_topic, rclcpp::QoS(50),
         [this](nav_msgs::msg::Odometry::ConstSharedPtr msg) {on_position(*msg);});
+    }
+    if (!descriptors_topic.empty()) {
+      descriptors_sub_ = create_subscription<aqua_msgs::msg::FeatureDescriptors>(
+        descriptors_topic, rclcpp::QoS(50),
+        [this](aqua_msgs::msg::FeatureDescriptors::ConstSharedPtr msg) {
+          if (msg->descriptor_bytes != 32 || msg->descriptors.size() != 32 * msg->ids.size()) {
+            return;
+          }
+          for (size_t i = 0; i < msg->ids.size(); ++i) {
+            std::array<uint8_t, 32> d{};
+            std::copy_n(msg->descriptors.begin() + static_cast<std::ptrdiff_t>(32 * i), 32, d.begin());
+            estimator_->add_feature_descriptor(msg->ids[i], d);
+          }
+        });
     }
     if (!stereo_topic.empty()) {
       stereo_sub_ = create_subscription<aqua_msgs::msg::StereoFeatures>(
@@ -579,6 +600,7 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr heading_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr position_sub_;
   rclcpp::Subscription<aqua_msgs::msg::StereoFeatures>::SharedPtr stereo_sub_;
+  rclcpp::Subscription<aqua_msgs::msg::FeatureDescriptors>::SharedPtr descriptors_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<aqua_msgs::msg::GraphEstimatorStatus>::SharedPtr status_pub_;
 };

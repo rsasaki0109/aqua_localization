@@ -46,6 +46,8 @@ struct StereoTrackerConfig
   // best < ratio * second best; the newest reuse_max_retired lost tracks
   // are kept. The backend must check the geometry.
   bool reuse_tracks{false};
+  // Compute an ORB descriptor for every new track (take_new_descriptors).
+  bool descriptors{false};
   int reuse_max_hamming{40};
   double reuse_ratio{0.8};
   int reuse_max_retired{5000};
@@ -71,6 +73,9 @@ public:
   // Forget all tracks (e.g. after a camera dropout); ids keep increasing.
   void reset();
   std::uint64_t next_id() const {return next_id_;}
+  // Descriptors of the tracks started since the last call (descriptors or
+  // reuse_tracks), as (id, 32-byte ORB row).
+  std::vector<std::pair<std::uint64_t, cv::Mat>> take_new_descriptors();
   // New corners that took over a lost track's id (reuse_tracks).
   std::uint64_t reused_tracks() const {return reused_tracks_;}
 
@@ -101,6 +106,7 @@ private:
   cv::Ptr<cv::ORB> orb_;
   std::unordered_map<std::uint64_t, cv::Mat> descriptors_;
   std::deque<std::pair<std::uint64_t, cv::Mat>> retired_;
+  std::vector<std::pair<std::uint64_t, cv::Mat>> new_descriptors_;
   std::uint64_t reused_tracks_{0};
 };
 

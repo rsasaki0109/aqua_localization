@@ -20,9 +20,14 @@ StereoTracker::StereoTracker(StereoTrackerConfig config)
     clahe_ = cv::createCLAHE(
       config_.clahe_clip_limit, cv::Size(config_.clahe_tile_grid, config_.clahe_tile_grid));
   }
-  if (config_.reuse_tracks) {
+  if (config_.reuse_tracks || config_.descriptors) {
     orb_ = cv::ORB::create();
   }
+}
+
+std::vector<std::pair<std::uint64_t, cv::Mat>> StereoTracker::take_new_descriptors()
+{
+  return std::exchange(new_descriptors_, {});
 }
 
 void StereoTracker::retire(std::uint64_t id)
@@ -43,7 +48,7 @@ std::vector<std::uint64_t> StereoTracker::assign_ids(
 {
   std::vector<std::uint64_t> ids(corners.size(), 0);
   std::vector<bool> assigned(corners.size(), false);
-  if (config_.reuse_tracks && !corners.empty()) {
+  if ((config_.reuse_tracks || config_.descriptors) && !corners.empty()) {
     std::vector<cv::KeyPoint> keypoints;
     for (size_t i = 0; i < corners.size(); ++i) {
       cv::KeyPoint kp(corners[i], 31.0F);
@@ -52,7 +57,7 @@ std::vector<std::uint64_t> StereoTracker::assign_ids(
     }
     cv::Mat desc;
     orb_->compute(image, keypoints, desc);
-    if (!retired_.empty() && !keypoints.empty()) {
+    if (config_.reuse_tracks && !retired_.empty() && !keypoints.empty()) {
       cv::Mat retired_desc;
       for (const auto & r : retired_) {
         retired_desc.push_back(r.second);
@@ -95,6 +100,9 @@ std::vector<std::uint64_t> StereoTracker::assign_ids(
         assigned[i] = true;
       }
       descriptors_[ids[i]] = desc.row(static_cast<int>(k)).clone();
+      if (config_.descriptors) {
+        new_descriptors_.emplace_back(ids[i], descriptors_[ids[i]]);
+      }
     }
   }
   for (size_t i = 0; i < corners.size(); ++i) {

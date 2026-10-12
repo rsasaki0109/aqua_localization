@@ -231,6 +231,14 @@ void TightlyCoupledEstimator::add_stereo_frame(
   enqueue(std::move(m));
 }
 
+void TightlyCoupledEstimator::add_feature_descriptor(
+  uint64_t id, const std::array<uint8_t, 32> & descriptor)
+{
+  if (config_.visual.map_point_sigma_m > 0.0) {
+    track_descriptors_[id] = descriptor;
+  }
+}
+
 void TightlyCoupledEstimator::enqueue(PendingMeasurement measurement)
 {
   // An anchored measurement newer than the newest state asks for a state at
@@ -580,12 +588,59 @@ void TightlyCoupledEstimator::attach_stereo(
   // frontend, not tracked: check them together against a common camera
   // centre (rotation from the current estimate) before using their
   // landmark, which may still be in the window or only in the map.
-  std::unordered_map<uint64_t, std::pair<gtsam::Point3, std::optional<gtsam::Key>>> reid;
+  struct Reidentified
+  {
+    uint64_t map_id;
+    gtsam::Point3 point;
+    std::optional<gtsam::Key> active_key;
+  };
+  std::unordered_map<uint64_t, Reidentified> reid;
   if (vis.map_point_sigma_m > 0.0) {
     std::vector<uint64_t> ids;
     std::vector<gtsam::Point2> pixels;
-    std::vector<gtsam::Point3> points;
-    std::vector<std::optional<gtsam::Key>> keys;
+    std::vector<Reidentified> found;
+    const gtsam::Pose3 camera_pose = pose_estimate(state.index, batch) * vis.body_P_camera;
+    // Map points already represented in the window are not search targets.
+    std::unordered_map<uint64_t, bool> in_window;
+    for (const auto & [id, track] : tracks_) {
+      if (track.landmark && smoother_stamps.count(*track.landmark)) {
+        in_window[track.map_id.value_or(id)] = true;
+      }
+    }
+    // Map points in front of the camera and inside the image, for the
+    // search by projection.
+    struct Projected
+    {
+      uint64_t map_id;
+      gtsam::Point2 pixel;
+    };
+    std::vector<Projected> projected;
+    const gtsam::PinholeCamera<gtsam::Cal3_S2> camera(camera_pose, *mono_calibration_);
+    for (const auto & [map_id, point] : map_points_) {
+      if (!point.descriptor || in_window.count(map_id)) {
+        continue;
+      }
+      const gtsam::Point3 local = camera_pose.transformTo(point.position);
+      if (local.z() < vis.mono_min_depth_m || local.z() > vis.max_depth_m) {
+        continue;
+      }
+      const gtsam::Point2 pixel = camera.project(point.position);
+      if (pixel.x() < 0.0 || pixel.y() < 0.0 || pixel.x() > 2.0 * vis.cx ||
+        pixel.y() > 2.0 * vis.cy)
+      {
+        continue;
+      }
+      projected.push_back(Projected{map_id, pixel});
+    }
+    auto hamming = [](const std::array<uint8_t, 32> & a, const std::array<uint8_t, 32> & b) {
+        int d = 0;
+        for (size_t k = 0; k < 32; ++k) {
+          d += __builtin_popcount(static_cast<unsigned>(a[k] ^ b[k]));
+        }
+        return d;
+      };
+    std::unordered_map<uint64_t, std::pair<size_t, int>> claimed;  // map id -> (index, distance)
+    std::vector<bool> displaced;
     for (const auto & o : obs) {
       if (std::isfinite(o.u_right)) {
         continue;
@@ -593,39 +648,97 @@ void TightlyCoupledEstimator::attach_stereo(
       const auto it = tracks_.find(o.id);
       const bool seen_before = it != tracks_.end();
       const double gap_s = seen_before ? stamp - it->second.last_seen_s : 1e9;
-      if (gap_s <= kReidentifyGapS) {
+      const gtsam::Point2 uv(o.u_left, o.v);
+      if (seen_before && gap_s > kReidentifyGapS) {
+        // Re-identified by the frontend after a gap.
+        const uint64_t map_id = it->second.map_id.value_or(o.id);
+        if (it->second.landmark && smoother_stamps.count(*it->second.landmark)) {
+          ids.push_back(o.id);
+          pixels.push_back(uv);
+          found.push_back(Reidentified{
+              map_id, smoother_->calculateEstimate<gtsam::Point3>(*it->second.landmark),
+              *it->second.landmark});
+        } else if (gap_s >= vis.map_min_gap_s) {
+          const auto known = map_points_.find(map_id);
+          if (known != map_points_.end()) {
+            ids.push_back(o.id);
+            pixels.push_back(uv);
+            found.push_back(Reidentified{map_id, known->second.position, std::nullopt});
+          }
+        }
         continue;
       }
-      if (seen_before && it->second.landmark && smoother_stamps.count(*it->second.landmark)) {
-        ids.push_back(o.id);
-        pixels.emplace_back(o.u_left, o.v);
-        points.push_back(smoother_->calculateEstimate<gtsam::Point3>(*it->second.landmark));
-        keys.push_back(*it->second.landmark);
-      } else if (gap_s >= vis.map_min_gap_s) {
-        const auto known = map_points_.find(o.id);
-        if (known != map_points_.end()) {
-          ids.push_back(o.id);
-          pixels.emplace_back(o.u_left, o.v);
-          points.push_back(known->second);
-          keys.push_back(std::nullopt);
-        }
+      if (seen_before || projected.empty()) {
+        continue;
       }
-    }
-    if (!ids.empty()) {
-      const gtsam::Pose3 camera_pose = pose_estimate(state.index, batch) * vis.body_P_camera;
-      const auto inlier = reidentification_consensus(camera_pose, pixels, points);
-      for (size_t i = 0; i < ids.size(); ++i) {
-        if (inlier[i]) {
-          reid.emplace(ids[i], std::make_pair(points[i], keys[i]));
+      // A brand-new track: search the map around its position.
+      const auto d = track_descriptors_.find(o.id);
+      if (d == track_descriptors_.end()) {
+        continue;
+      }
+      int best = 1 << 30;
+      int second = 1 << 30;
+      uint64_t best_id = 0;
+      for (const auto & p : projected) {
+        if ((p.pixel - uv).norm() > vis.map_search_radius_px) {
           continue;
         }
-        // A different point under the same id: start the track over.
+        const int dist = hamming(d->second, *map_points_.at(p.map_id).descriptor);
+        if (dist < best) {
+          second = best;
+          best = dist;
+          best_id = p.map_id;
+        } else if (dist < second) {
+          second = dist;
+        }
+      }
+      if (best > vis.map_max_hamming || best >= vis.map_ratio * second) {
+        continue;
+      }
+      const auto c = claimed.find(best_id);
+      if (c != claimed.end()) {
+        if (c->second.second <= best) {
+          continue;
+        }
+        displaced[c->second.first] = true;
+      }
+      claimed[best_id] = {ids.size(), best};
+      displaced.resize(ids.size() + 1, false);
+      ids.push_back(o.id);
+      pixels.push_back(uv);
+      found.push_back(Reidentified{best_id, map_points_.at(best_id).position, std::nullopt});
+    }
+    // Drop displaced search matches.
+    std::vector<uint64_t> ids_kept;
+    std::vector<gtsam::Point2> pixels_kept;
+    std::vector<Reidentified> found_kept;
+    displaced.resize(ids.size(), false);
+    for (size_t i = 0; i < ids.size(); ++i) {
+      if (!displaced[i]) {
+        ids_kept.push_back(ids[i]);
+        pixels_kept.push_back(pixels[i]);
+        found_kept.push_back(found[i]);
+      }
+    }
+    if (!ids_kept.empty()) {
+      std::vector<gtsam::Point3> points;
+      for (const auto & f : found_kept) {
+        points.push_back(f.point);
+      }
+      const auto inlier = reidentification_consensus(camera_pose, pixels_kept, points);
+      for (size_t i = 0; i < ids_kept.size(); ++i) {
+        if (inlier[i]) {
+          reid.emplace(ids_kept[i], found_kept[i]);
+          continue;
+        }
         ++counters_.map_rejections;
-        map_points_.erase(ids[i]);
-        const auto it = tracks_.find(ids[i]);
-        if (it != tracks_.end()) {
+        const auto it = tracks_.find(ids_kept[i]);
+        if (it != tracks_.end() && stamp - it->second.last_seen_s > kReidentifyGapS) {
+          // A different point under a re-identified id: start the track over.
+          map_points_.erase(it->second.map_id.value_or(ids_kept[i]));
           it->second.landmark.reset();
           it->second.mono_pending.clear();
+          it->second.map_id.reset();
         }
       }
     }
@@ -641,16 +754,17 @@ void TightlyCoupledEstimator::attach_stereo(
       FeatureTrack & track = tracks_[o.id];
       track.last_seen_s = stamp;
       track.mono_pending.clear();
+      track.map_id = accepted->second.map_id;
       const gtsam::Point2 uv(o.u_left, o.v);
       gtsam::Key key;
-      if (accepted->second.second) {
-        key = *accepted->second.second;
+      if (accepted->second.active_key) {
+        key = *accepted->second.active_key;
       } else {
         // Back from the map, with a prior at its stored position.
         key = L(next_landmark_++);
-        batch.values.insert(key, accepted->second.first);
+        batch.values.insert(key, accepted->second.point);
         batch.graph.addPrior(
-          key, accepted->second.first,
+          key, accepted->second.point,
           gtsam::noiseModel::Isotropic::Sigma(3, vis.map_point_sigma_m));
         track.landmark = key;
       }
@@ -986,7 +1100,14 @@ void TightlyCoupledEstimator::run_update(UpdateBatch & batch, const StateRecord 
       const auto & stamps = smoother_->timestamps();
       for (const auto & [id, track] : tracks_) {
         if (track.landmark && stamps.count(*track.landmark)) {
-          map_points_[id] = smoother_->calculateEstimate<gtsam::Point3>(*track.landmark);
+          MapPoint & point = map_points_[track.map_id.value_or(id)];
+          point.position = smoother_->calculateEstimate<gtsam::Point3>(*track.landmark);
+          if (!point.descriptor) {
+            const auto d = track_descriptors_.find(id);
+            if (d != track_descriptors_.end()) {
+              point.descriptor = d->second;
+            }
+          }
         }
       }
     }

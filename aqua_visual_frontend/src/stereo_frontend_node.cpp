@@ -19,6 +19,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "aqua_msgs/msg/feature_descriptors.hpp"
 #include "aqua_msgs/msg/stereo_features.hpp"
 #include "builtin_interfaces/msg/time.hpp"
 #include "aqua_visual_frontend/stereo_rectifier.hpp"
@@ -98,6 +99,9 @@ public:
     config.clahe_tile_grid = declare_parameter<int>("clahe_tile_grid", config.clahe_tile_grid);
     config.saturation_level = declare_parameter<int>("saturation_level", config.saturation_level);
     config.reuse_tracks = declare_parameter<bool>("reuse.enabled", config.reuse_tracks);
+    config.descriptors = declare_parameter<bool>("descriptors.enabled", config.descriptors);
+    const auto descriptors_topic = declare_parameter<std::string>(
+      "topics.descriptors", "/aqua_visual_frontend/feature_descriptors");
     config.reuse_max_hamming =
       declare_parameter<int>("reuse.max_hamming", config.reuse_max_hamming);
     config.reuse_ratio = declare_parameter<double>("reuse.ratio", config.reuse_ratio);
@@ -142,6 +146,10 @@ public:
     }
 
     features_pub_ = create_publisher<aqua_msgs::msg::StereoFeatures>(features_topic, 10);
+    if (config.descriptors) {
+      descriptors_pub_ =
+        create_publisher<aqua_msgs::msg::FeatureDescriptors>(descriptors_topic, 10);
+    }
     timing_pub_ = create_publisher<std_msgs::msg::Float64>(timing_topic, 10);
 
     rmw_qos_profile_t qos = rmw_qos_profile_sensor_data;
@@ -281,6 +289,23 @@ private:
     // Track on every frame (short baselines track best) but only emit every
     // Nth frame, which bounds the backend's state rate.
     if ((processed_ - 1) % publish_every_ == 0) {
+      if (descriptors_pub_) {
+        // Before the features, so a backend has them when the ids appear.
+        aqua_msgs::msg::FeatureDescriptors d;
+        d.header.stamp = stamp;
+        d.header.frame_id = frame_id_;
+        d.descriptor_bytes = 32;
+        for (const auto & [id, row] : tracker_->take_new_descriptors()) {
+          if (row.cols != 32 || row.type() != CV_8U) {
+            continue;
+          }
+          d.ids.push_back(id);
+          d.descriptors.insert(d.descriptors.end(), row.data, row.data + 32);
+        }
+        if (!d.ids.empty()) {
+          descriptors_pub_->publish(d);
+        }
+      }
       aqua_msgs::msg::StereoFeatures msg;
       msg.header.stamp = stamp;
       if (stamp_offset_s_ != 0.0) {
@@ -319,6 +344,7 @@ private:
   cv::Mat undistort_map1_;
   cv::Mat undistort_map2_;
   rclcpp::Publisher<aqua_msgs::msg::StereoFeatures>::SharedPtr features_pub_;
+  rclcpp::Publisher<aqua_msgs::msg::FeatureDescriptors>::SharedPtr descriptors_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr timing_pub_;
 };
 
