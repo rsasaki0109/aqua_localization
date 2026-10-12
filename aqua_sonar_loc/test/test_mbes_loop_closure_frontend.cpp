@@ -524,3 +524,90 @@ TEST(MbesLoopClosureFrontendTest, RegistrationUsesPoseOfCurrentInCandidateFrame)
   // The correction undoes the injected guess error.
   EXPECT_NEAR(verdict.correction_translation_m, (guess.inverse() * truth).translation().norm(), 0.3);
 }
+
+namespace
+{
+
+// Dead-reckoned keyframe pose at time t: the true pose with a yaw drift
+// of rate_rad_s * t applied about the origin.
+Eigen::Isometry3d drifted(const Eigen::Isometry3d & truth, double t, double rate_rad_s)
+{
+  return planar_pose(0.0, 0.0, rate_rad_s * t) * truth;
+}
+
+aqua_sonar_loc::PendingLoop make_loop(
+  double ta, const Eigen::Isometry3d & true_a, double tb, const Eigen::Isometry3d & true_b,
+  const Eigen::Isometry3d & measurement_error)
+{
+  aqua_sonar_loc::PendingLoop loop;
+  loop.candidate_stamp_s = ta;
+  loop.current_stamp_s = tb;
+  loop.candidate_pose = drifted(true_a, ta, 3e-4);
+  loop.current_pose = drifted(true_b, tb, 3e-4);
+  loop.candidate_to_current = true_a.inverse() * true_b * measurement_error;
+  return loop;
+}
+
+}  // namespace
+
+TEST(MbesLoopClosureFrontendTest, LoopGroupPublishesOnlyConsistentGroups)
+{
+  aqua_sonar_loc::LoopGroupOptions options;
+  options.enabled = true;
+  options.min_group_size = 3;
+  aqua_sonar_loc::LoopGroupSelector selector(options);
+
+  // A crossing revisited ~600 s later: keyframes a_i on the first pass and
+  // b_j on the second, 10 s apart. Correct loops measure the true relative
+  // pose (small noise); dead reckoning has drifted 10 deg in between.
+  auto pass1 = [](int i) {return planar_pose(20.0 * i, 0.0, 0.0);};
+  auto pass2 = [](int j) {return planar_pose(20.0, 20.0 * j - 20.0, 1.5708);};
+  // A false match first: alone it must stay pending.
+  auto r0 = selector.add(make_loop(100.0, pass1(1), 700.0, pass2(1), planar_pose(9.0, -6.0, 0.4)));
+  EXPECT_TRUE(r0.to_publish.empty());
+  auto r1 = selector.add(make_loop(100.0, pass1(1), 700.0, pass2(1), planar_pose(0.3, 0.1, 0.01)));
+  EXPECT_TRUE(r1.to_publish.empty());
+  auto r2 = selector.add(make_loop(90.0, pass1(0), 710.0, pass2(2), planar_pose(-0.2, 0.3, -0.01)));
+  EXPECT_TRUE(r2.to_publish.empty());
+  // Third consistent loop: the group of three is published, the false
+  // match is not part of it.
+  auto r3 = selector.add(make_loop(110.0, pass1(2), 690.0, pass2(0), planar_pose(0.1, -0.2, 0.005)));
+  ASSERT_EQ(r3.to_publish.size(), 3U);
+  EXPECT_EQ(r3.group_size, 3U);
+  for (const auto & loop : r3.to_publish) {
+    const Eigen::Isometry3d truth =
+      [&]() {
+        for (int i = 0; i < 3; ++i) {
+          for (int j = 0; j < 3; ++j) {
+            if (std::abs(loop.candidate_stamp_s - (90.0 + 10.0 * i)) < 1e-9 &&
+              std::abs(loop.current_stamp_s - (690.0 + 10.0 * j)) < 1e-9)
+            {
+              return Eigen::Isometry3d(pass1(i).inverse() * pass2(j));
+            }
+          }
+        }
+        return Eigen::Isometry3d::Identity();
+      }();
+    EXPECT_LT((truth.inverse() * loop.candidate_to_current).translation().norm(), 1.0);
+  }
+  // A fourth consistent loop joins and is published on its own.
+  auto r4 = selector.add(make_loop(110.0, pass1(2), 700.0, pass2(1), planar_pose(0.2, 0.0, 0.0)));
+  ASSERT_EQ(r4.to_publish.size(), 1U);
+  EXPECT_EQ(r4.group_size, 4U);
+}
+
+TEST(MbesLoopClosureFrontendTest, LoopGroupToleranceGrowsWithOdometrySpan)
+{
+  aqua_sonar_loc::LoopGroupOptions options;
+  options.enabled = true;
+  options.max_span_s = 200.0;
+  const aqua_sonar_loc::LoopGroupSelector selector(options);
+  auto pass1 = [](int i) {return planar_pose(20.0 * i, 0.0, 0.0);};
+  auto pass2 = [](int j) {return planar_pose(20.0, 20.0 * j - 20.0, 1.5708);};
+  const auto a = make_loop(100.0, pass1(1), 700.0, pass2(1), Eigen::Isometry3d::Identity());
+  const auto near = make_loop(110.0, pass1(2), 690.0, pass2(0), Eigen::Isometry3d::Identity());
+  EXPECT_TRUE(selector.consistent(a, near));
+  // Beyond max_span_s loops are never compared.
+  const auto far = make_loop(300.0, pass1(2), 690.0, pass2(0), Eigen::Isometry3d::Identity());
+  EXPECT_FALSE(selector.consistent(a, far));
+}

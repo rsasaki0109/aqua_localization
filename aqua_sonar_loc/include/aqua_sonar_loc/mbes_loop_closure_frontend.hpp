@@ -355,4 +355,60 @@ private:
   std::vector<AcceptedLoop> accepted_loops_;
 };
 
+// Group-k loop selection (pairwise consistency in the spirit of PCM): a
+// loop is only published once it belongs to a set of at least
+// min_group_size mutually consistent loops. Two loops (a->b, z1) and
+// (c->d, z2) are consistent when z1^-1 * (T_a^-1 T_c) * z2 * (T_d^-1 T_b)
+// is near identity, with a tolerance that grows with the odometry span
+// |t_a - t_c| + |t_b - t_d| it relies on. Correct loops agree on the
+// accumulated drift; false bathymetric matches scatter.
+struct LoopGroupOptions
+{
+  bool enabled{false};
+  int min_group_size{4};
+  double translation_tolerance_m{3.0};
+  double translation_tolerance_per_s{0.03};
+  double rotation_tolerance_rad{0.087};
+  double rotation_tolerance_per_s{0.0005};
+  // Loops whose odometry span exceeds this are never compared.
+  double max_span_s{200.0};
+  std::size_t max_pending{1000};
+};
+
+struct PendingLoop
+{
+  std::uint32_t candidate_id{0};
+  std::uint32_t current_id{0};
+  double candidate_stamp_s{0.0};
+  double current_stamp_s{0.0};
+  Eigen::Isometry3d candidate_pose{Eigen::Isometry3d::Identity()};
+  Eigen::Isometry3d current_pose{Eigen::Isometry3d::Identity()};
+  // Measured pose of the current submap in the candidate frame.
+  Eigen::Isometry3d candidate_to_current{Eigen::Isometry3d::Identity()};
+  bool published{false};
+};
+
+struct LoopGroupResult
+{
+  // Size of the largest consistent group containing the new loop.
+  std::size_t group_size{0};
+  // Loops of that group that were not published before (the new loop
+  // included), when the group reached min_group_size.
+  std::vector<PendingLoop> to_publish;
+};
+
+class LoopGroupSelector
+{
+public:
+  explicit LoopGroupSelector(LoopGroupOptions options);
+
+  LoopGroupResult add(const PendingLoop & loop);
+  bool consistent(const PendingLoop & a, const PendingLoop & b) const;
+  std::size_t pending_count() const {return pending_.size();}
+
+private:
+  LoopGroupOptions options_;
+  std::vector<PendingLoop> pending_;
+};
+
 }  // namespace aqua_sonar_loc
