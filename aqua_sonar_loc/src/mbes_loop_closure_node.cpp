@@ -276,6 +276,35 @@ private:
       declare_parameter<double>("registration.ndt.step_size_m", 0.1);
     registration_options_.ndt_outlier_ratio =
       declare_parameter<double>("registration.ndt.outlier_ratio", 0.55);
+    auto & coarse = registration_options_.coarse;
+    coarse.enabled = declare_parameter<bool>("registration.coarse.enabled", coarse.enabled);
+    coarse.cell_m = declare_parameter<double>("registration.coarse.cell_m", coarse.cell_m);
+    coarse.yaw_range_rad =
+      declare_parameter<double>("registration.coarse.yaw_range_rad", coarse.yaw_range_rad);
+    coarse.yaw_step_rad =
+      declare_parameter<double>("registration.coarse.yaw_step_rad", coarse.yaw_step_rad);
+    coarse.xy_range_m =
+      declare_parameter<double>("registration.coarse.xy_range_m", coarse.xy_range_m);
+    coarse.xy_step_m = declare_parameter<double>("registration.coarse.xy_step_m", coarse.xy_step_m);
+    coarse.min_overlap_cells =
+      declare_parameter<int>("registration.coarse.min_overlap_cells", coarse.min_overlap_cells);
+    coarse.min_overlap_fraction = declare_parameter<double>(
+      "registration.coarse.min_overlap_fraction", coarse.min_overlap_fraction);
+    coarse.residual_clip_m =
+      declare_parameter<double>("registration.coarse.residual_clip_m", coarse.residual_clip_m);
+    coarse.min_relief_m =
+      declare_parameter<double>("registration.coarse.min_relief_m", coarse.min_relief_m);
+    coarse.min_distinctiveness = declare_parameter<double>(
+      "registration.coarse.min_distinctiveness", coarse.min_distinctiveness);
+    coarse.distinct_radius_m =
+      declare_parameter<double>("registration.coarse.distinct_radius_m", coarse.distinct_radius_m);
+    coarse.distinct_yaw_rad =
+      declare_parameter<double>("registration.coarse.distinct_yaw_rad", coarse.distinct_yaw_rad);
+    debug_dump_dir_ = declare_parameter<std::string>("debug.submap_dump_dir", "");
+    coarse.refine = declare_parameter<bool>("registration.coarse.refine", coarse.refine);
+    if (registration_options_.backend == "none" && !coarse.enabled) {
+      throw std::invalid_argument("registration.backend none requires registration.coarse.enabled");
+    }
 
     gate_options_.max_fitness_score =
       declare_parameter<double>("gates.max_fitness_score", 2.0);
@@ -479,8 +508,30 @@ private:
       return;
     }
 
+    if (!debug_dump_dir_.empty()) {
+      dump_submap(result.submap);
+    }
     try_loop_closure(result.submap);
     submap_manager_.add_finalized_submap(result.submap);
+  }
+
+  // Debug aid: <dir>/submap_<id>.xyz (points in the submap frame) and a
+  // header line with the stamp and the 4x4 world pose.
+  void dump_submap(const Submap & submap) const
+  {
+    std::ofstream out(debug_dump_dir_ + "/submap_" + std::to_string(submap.id) + ".xyz");
+    out.precision(10);
+    out << "# " << submap.stamp.seconds();
+    const Eigen::Matrix4d m = submap.pose.matrix();
+    for (int i = 0; i < 4; ++i) {
+      for (int j = 0; j < 4; ++j) {
+        out << ' ' << m(i, j);
+      }
+    }
+    out << '\n';
+    for (const auto & p : submap.cloud->points) {
+      out << p.x << ' ' << p.y << ' ' << p.z << '\n';
+    }
   }
 
   void try_loop_closure(const Submap & current)
@@ -501,8 +552,6 @@ private:
 
       const Eigen::Isometry3d candidate_to_current_guess =
         candidate.pose.inverse() * current.pose;
-      const Eigen::Isometry3d current_to_candidate_guess =
-        candidate_to_current_guess.inverse();
       if (accepted_loop_tracker_.is_suppressed(candidate.id, current.id)) {
         MatchResult result;
         result.fitness = std::numeric_limits<double>::quiet_NaN();
@@ -531,7 +580,7 @@ private:
       }
 
       MatchResult result =
-        registration.match(candidate, current, current_to_candidate_guess);
+        registration.match(candidate, current, candidate_to_current_guess);
       GateResult gate = gate_evaluator.evaluate(candidate_to_current_guess, result);
       gate.descriptor_centroid_distance_m =
         descriptor_result.descriptor_centroid_distance_m;
@@ -930,6 +979,9 @@ private:
     msg.descriptor_extent_ratio = gate.descriptor_extent_ratio;
     msg.descriptor_point_count_ratio = gate.descriptor_point_count_ratio;
     msg.status = gate.status;
+    if (!result.coarse_detail.empty()) {
+      msg.status += " [" + result.coarse_detail + "]";
+    }
     status_pub_->publish(msg);
   }
 
@@ -997,6 +1049,7 @@ private:
   SubmapManagerOptions submap_options_;
   CandidateSelectionOptions candidate_options_;
   RegistrationOptions registration_options_;
+  std::string debug_dump_dir_;
   GateOptions gate_options_;
   DescriptorGateOptions descriptor_options_;
   LoopSuppressionOptions loop_suppression_options_;

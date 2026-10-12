@@ -47,6 +47,8 @@ struct MatchResult
   double fitness{0.0};
   Eigen::Isometry3d candidate_to_current{Eigen::Isometry3d::Identity()};
   std::string status;
+  // Coarse height-map search diagnostics, empty when it is disabled.
+  std::string coarse_detail;
 };
 
 struct GateResult
@@ -103,8 +105,67 @@ struct CandidateSelectionOptions
   double descriptor_point_count_ratio_scale{0.10};
 };
 
+// Coarse 2.5D initial alignment for bathymetric submaps: both submaps are
+// gridded as height maps in the gravity-levelled candidate frame and the
+// current one is searched over yaw x horizontal shift (vertical offset = the
+// median height difference), scoring the clipped RMS of the height residual.
+// It lets the fine registration start near the truth after dead-reckoning
+// drift far beyond its convergence basin, and rejects flat (unidentifiable)
+// or ambiguous overlaps.
+struct CoarseAlignOptions
+{
+  bool enabled{false};
+  double cell_m{1.0};
+  double yaw_range_rad{0.52};
+  double yaw_step_rad{0.05};
+  double xy_range_m{30.0};
+  double xy_step_m{2.0};
+  int min_overlap_cells{150};
+  // Placements must also cover this fraction of the smaller height map;
+  // otherwise the search drifts to barely overlapping, trivially flat fits.
+  double min_overlap_fraction{0.3};
+  double residual_clip_m{0.5};
+  // Height std of the overlapping candidate cells after removing a best-fit
+  // plane; flatter overlaps do not constrain the horizontal pose.
+  double min_relief_m{0.5};
+  // Best score elsewhere (outside distinct_radius_m / distinct_yaw_rad of
+  // the best) divided by the best score.
+  double min_distinctiveness{1.2};
+  double distinct_radius_m{6.0};
+  double distinct_yaw_rad{0.1};
+  // Second pass around the best placement at a quarter of the steps.
+  bool refine{true};
+};
+
+struct CoarseAlignResult
+{
+  bool accepted{false};
+  // Refined candidate_to_current guess.
+  Eigen::Isometry3d candidate_to_current{Eigen::Isometry3d::Identity()};
+  double residual_m{std::numeric_limits<double>::quiet_NaN()};
+  double distinctiveness{std::numeric_limits<double>::quiet_NaN()};
+  double relief_m{std::numeric_limits<double>::quiet_NaN()};
+  int overlap_cells{0};
+  std::string status;
+  // "relief 1.23 m, distinct 1.45, rms 0.12 m, cells 420".
+  std::string detail() const;
+};
+
+// candidate_to_current_guess (pose of the current submap in the candidate
+// frame) maps current-submap points into the candidate submap frame;
+// candidate_pose is the candidate submap's world pose (only its
+// roll/pitch are used, to level the height maps).
+CoarseAlignResult coarse_align_heightmaps(
+  const PointCloud & candidate, const PointCloud & current,
+  const Eigen::Isometry3d & candidate_pose,
+  const Eigen::Isometry3d & candidate_to_current_guess, const CoarseAlignOptions & options);
+
 struct RegistrationOptions
 {
+  CoarseAlignOptions coarse;
+  // gicp | icp | ndt | none. "none" (requires coarse.enabled) takes the
+  // height-map search result as the registration: on partially overlapping
+  // 2.5D seafloor patches GICP can slide far from even a perfect guess.
   std::string backend{"gicp"};
   int max_iterations{60};
   double max_correspondence_distance_m{3.0};
@@ -236,10 +297,14 @@ class RegistrationPipeline
 public:
   explicit RegistrationPipeline(RegistrationOptions options);
 
+  // candidate_to_current_guess: pose of the current submap in the candidate
+  // submap frame (candidate.pose^-1 * current.pose), which maps current-submap
+  // points into the candidate frame. The result's candidate_to_current has the
+  // same meaning.
   MatchResult match(
     const Submap & candidate,
     const Submap & current,
-    const Eigen::Isometry3d & current_to_candidate_guess) const;
+    const Eigen::Isometry3d & candidate_to_current_guess) const;
 
 private:
   RegistrationOptions options_;

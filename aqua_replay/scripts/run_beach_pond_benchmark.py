@@ -16,6 +16,12 @@ tables in docs/benchmarks/beach_pond_dead_reckoning.md:
 
 GNSS position is never an input; only the dual-antenna heading is, and only
 in the "compass" rows.
+
+The other Norbit MBES-SLAM survey from the same vessel, Dutch Island
+(`large_area.bag`), carries the DVL twist and heading in its main bag:
+
+    run_beach_pond_benchmark.py --bag large_area_ros2 --start-offset-s 0 \\
+        --out-dir /tmp/dutch_bench
 """
 
 import argparse
@@ -88,8 +94,8 @@ def table(title, rows, labels):
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--bag", required=True, type=Path, help="Converted beach_pond ROS 2 bag.")
-    p.add_argument("--aux-bag", required=True, type=Path,
-                   help="Aux bag with the DVL twist and GNSS heading.")
+    p.add_argument("--aux-bag", type=Path,
+                   help="Aux bag with the DVL twist and GNSS heading, if --bag lacks them.")
     p.add_argument("--out-dir", required=True, type=Path)
     p.add_argument("--start-offset-s", type=float, default=855.0,
                    help="Replay start (the DVL comes up ~853 s into the recording).")
@@ -104,6 +110,8 @@ def main(argv=None) -> int:
     replay_bin = os.environ.get("AQUA_REPLAY_BIN", "")
     replay_cmd = [replay_bin] if replay_bin else ["ros2", "run", "aqua_replay", "offline_replay"]
     window = ["--duration", args.duration_s] if args.duration_s > 0 else []
+    extra = ["--extra-bag", args.aux_bag] if args.aux_bag else []
+    bags = [args.bag] + ([args.aux_bag] if args.aux_bag else [])
 
     replays = {}
     for name, scenario in (("compass", "beach_pond_graph.yaml"),
@@ -111,8 +119,9 @@ def main(argv=None) -> int:
         out = args.out_dir / f"graph_{name}"
         if out.exists():
             raise SystemExit(f"{out} exists; choose a fresh --out-dir")
-        run(replay_cmd + ["--scenario", scenarios / scenario, "--bag", args.bag,
-                          "--extra-bag", args.aux_bag, "--out", out, "--quiet", *window],
+        run(replay_cmd + ["--scenario", scenarios / scenario, "--bag", args.bag, *extra,
+                          "--start-offset", args.start_offset_s, "--out", out, "--quiet",
+                          *window],
             stdout=subprocess.DEVNULL)
         replays[name] = out
 
@@ -120,7 +129,7 @@ def main(argv=None) -> int:
     for yaw in ("heading", "gyro", "ahrs"):
         out = args.out_dir / f"dr_{yaw}"
         cmd = [sys.executable, SCRIPT_DIR / "dvl_dead_reckoning_baseline.py",
-               "--bag", args.bag, "--bag", args.aux_bag, "--dst", out, "--overwrite",
+               *[a for b in bags for a in ("--bag", b)], "--dst", out, "--overwrite",
                "--yaw-source", yaw, "--topic", f"/baseline/dvl_dr_{yaw}/odometry",
                "--start-offset-s", args.start_offset_s]
         if args.duration_s > 0:

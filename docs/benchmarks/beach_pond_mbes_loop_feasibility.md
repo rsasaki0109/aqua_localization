@@ -7,6 +7,13 @@ correct loop constraint is obtainable on this seafloor; the plumbing is
 in place for a dataset with more relief.** Nothing here is a benchmark
 claim.
 
+> **Note (2026-10-12).** `mbes_loop_closure` handed the registration an
+> inverted initial guess and inverted its result (fixed, see
+> [`dutch_island_mbes.md`](dutch_island_mbes.md)). Finding 1 below (GICP
+> cannot converge from the dead-reckoned guess) was measured with that bug
+> and does not stand on its own; findings 2 and 3 used reference poses
+> outside the node and are unaffected.
+
 ## What changed
 
 - **Motion-compensated submaps (correctness fix).** `mbes_loop_closure`

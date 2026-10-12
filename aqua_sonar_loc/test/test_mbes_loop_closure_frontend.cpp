@@ -410,3 +410,117 @@ TEST(TransformCloud, DropsOuterBeamsBeyondAcrossTrackRatio)
   EXPECT_NEAR(out->at(0).y, 5.0F, 1.0e-6F);
   EXPECT_EQ(aqua_sonar_loc::transform_cloud(cloud, Eigen::Isometry3d::Identity(), 0.5)->size(), 2U);
 }
+
+namespace
+{
+
+double seafloor(double x, double y, bool flat)
+{
+  if (flat) {
+    return -20.0 + 0.02 * x;  // a plane: no horizontal information
+  }
+  return -20.0 + 2.0 * std::sin(x / 7.0) * std::cos(y / 5.0) + 0.7 * std::sin(x / 3.1 + y / 4.3) +
+         3.0 * std::exp(-((x - 4.0) * (x - 4.0) + (y + 3.0) * (y + 3.0)) / 30.0);
+}
+
+// Points of a swath patch sampled in the world frame, returned in `frame`.
+aqua_sonar_loc::PointCloud swath(
+  double x0, double x1, double y0, double y1, const Eigen::Isometry3d & frame, bool flat)
+{
+  aqua_sonar_loc::PointCloud cloud;
+  const Eigen::Isometry3d world_to_frame = frame.inverse();
+  for (double x = x0; x <= x1; x += 0.25) {
+    for (double y = y0; y <= y1; y += 0.25) {
+      const Eigen::Vector3d p = world_to_frame * Eigen::Vector3d(x, y, seafloor(x, y, flat));
+      cloud.push_back(pcl::PointXYZ(
+          static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z())));
+    }
+  }
+  return cloud;
+}
+
+Eigen::Isometry3d planar_pose(double x, double y, double yaw)
+{
+  Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
+  pose.linear() = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+  pose.translation() << x, y, 0.0;
+  return pose;
+}
+
+}  // namespace
+
+TEST(MbesLoopClosureFrontendTest, CoarseAlignRecoversCrossingFromDriftedGuess)
+{
+  // Candidate pass along x, current pass crossing it along y.
+  const Eigen::Isometry3d candidate_pose = Eigen::Isometry3d::Identity();
+  const Eigen::Isometry3d current_pose = planar_pose(5.0, 3.0, 0.3);
+  const auto candidate = swath(-30.0, 30.0, -10.0, 10.0, candidate_pose, false);
+  const auto current = swath(-10.0, 10.0, -30.0, 30.0, current_pose, false);
+  const Eigen::Isometry3d truth = candidate_pose.inverse() * current_pose;
+  // Dead-reckoned guess: 0.2 rad and ~10 m off.
+  const Eigen::Isometry3d guess = planar_pose(8.0, -6.0, -0.2) * truth;
+
+  aqua_sonar_loc::CoarseAlignOptions options;
+  options.enabled = true;
+  // A perpendicular crossing covers a third of each swath.
+  options.min_overlap_fraction = 0.2;
+  const auto result = aqua_sonar_loc::coarse_align_heightmaps(
+    candidate, current, candidate_pose, guess, options);
+  ASSERT_TRUE(result.accepted) << result.status;
+  const Eigen::Isometry3d error = truth.inverse() * result.candidate_to_current;
+  EXPECT_LT(Eigen::AngleAxisd(error.linear()).angle(), 0.05);
+  EXPECT_LT(error.translation().head<2>().norm(), 2.0);
+  EXPECT_LT(std::abs(error.translation().z()), 0.3);
+  EXPECT_GT(result.relief_m, 0.5);
+  EXPECT_GT(result.distinctiveness, 1.2);
+}
+
+TEST(MbesLoopClosureFrontendTest, CoarseAlignRejectsFlatSeafloor)
+{
+  const Eigen::Isometry3d candidate_pose = Eigen::Isometry3d::Identity();
+  const Eigen::Isometry3d current_pose = planar_pose(5.0, 3.0, 0.3);
+  const auto candidate = swath(-30.0, 30.0, -10.0, 10.0, candidate_pose, true);
+  const auto current = swath(-10.0, 10.0, -30.0, 30.0, current_pose, true);
+  const Eigen::Isometry3d guess = candidate_pose.inverse() * current_pose;
+
+  aqua_sonar_loc::CoarseAlignOptions options;
+  options.enabled = true;
+  const auto result = aqua_sonar_loc::coarse_align_heightmaps(
+    candidate, current, candidate_pose, guess, options);
+  EXPECT_FALSE(result.accepted);
+  EXPECT_EQ(result.status, "coarse: insufficient relief");
+}
+
+TEST(MbesLoopClosureFrontendTest, RegistrationUsesPoseOfCurrentInCandidateFrame)
+{
+  // Two overlapping passes over the same terrain; the guess is the
+  // dead-reckoned pose of the current submap in the candidate frame, 1 m and
+  // 0.03 rad off. The result must be that same relative pose, corrected.
+  aqua_sonar_loc::Submap candidate;
+  candidate.id = 1;
+  candidate.pose = Eigen::Isometry3d::Identity();
+  aqua_sonar_loc::Submap current;
+  current.id = 2;
+  current.pose = planar_pose(6.0, 2.0, 0.15);
+  candidate.cloud = std::make_shared<aqua_sonar_loc::PointCloud>(
+    swath(-20.0, 20.0, -10.0, 10.0, candidate.pose, false));
+  current.cloud = std::make_shared<aqua_sonar_loc::PointCloud>(
+    swath(-14.0, 26.0, -8.0, 12.0, current.pose, false));
+  const Eigen::Isometry3d truth = candidate.pose.inverse() * current.pose;
+  const Eigen::Isometry3d guess = planar_pose(0.8, -0.6, 0.03) * truth;
+
+  aqua_sonar_loc::RegistrationOptions options;
+  const aqua_sonar_loc::RegistrationPipeline pipeline(options);
+  const auto result = pipeline.match(candidate, current, guess);
+  ASSERT_TRUE(result.success) << result.status;
+  const Eigen::Isometry3d error = truth.inverse() * result.candidate_to_current;
+  EXPECT_LT(error.translation().norm(), 0.3);
+  EXPECT_LT(Eigen::AngleAxisd(error.linear()).angle(), 0.01);
+
+  aqua_sonar_loc::GateOptions gate_options;
+  gate_options.max_fitness_score = 0.0;
+  const aqua_sonar_loc::LoopGateEvaluator gate(gate_options);
+  const auto verdict = gate.evaluate(guess, result);
+  // The correction undoes the injected guess error.
+  EXPECT_NEAR(verdict.correction_translation_m, (guess.inverse() * truth).translation().norm(), 0.3);
+}

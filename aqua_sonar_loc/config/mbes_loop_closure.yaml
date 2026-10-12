@@ -37,6 +37,8 @@ mbes_loop_closure:
       descriptor_point_count_ratio_scale: 0.10
 
     registration:
+      # gicp | icp | ndt | none ("none" needs coarse.enabled and uses the
+      # height-map search result as the registration).
       backend: gicp
       max_iterations: 60
       max_correspondence_distance_m: 3.0
@@ -45,6 +47,24 @@ mbes_loop_closure:
         resolution_m: 1.0
         step_size_m: 0.1
         outlier_ratio: 0.55
+      # Coarse 2.5D height-map search in front of the fine registration
+      # (gravity-levelled candidate frame, yaw x horizontal shift, clipped
+      # RMS of the height residual). Rejects flat and ambiguous overlaps.
+      coarse:
+        enabled: false
+        cell_m: 1.0
+        yaw_range_rad: 0.52
+        yaw_step_rad: 0.05
+        xy_range_m: 30.0
+        xy_step_m: 2.0
+        min_overlap_cells: 150
+        min_overlap_fraction: 0.3
+        residual_clip_m: 0.5
+        min_relief_m: 0.5
+        min_distinctiveness: 1.2
+        distinct_radius_m: 6.0
+        distinct_yaw_rad: 0.1
+        refine: true
 
     gates:
       max_fitness_score: 2.0
@@ -103,3 +123,7 @@ mbes_loop_closure:
         # before other distance-ranked candidates so max_per_keyframe budget is
         # spent on the offline-selected endpoints first.
         prioritize_candidates: true
+
+    debug:
+      # Write every finalized submap to <dir>/submap_<id>.xyz (empty: off).
+      submap_dump_dir: ""

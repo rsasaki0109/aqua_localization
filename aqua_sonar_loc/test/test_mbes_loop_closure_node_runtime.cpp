@@ -847,7 +847,10 @@ TEST_F(MbesLoopClosureNodeRuntimeTest, PrioritizesAllowlistedCandidateBeforeMaxP
   }));
 
   const auto points = asymmetric_points();
-  keyframe_pub->publish(make_keyframe(rclcpp::Time(10, 0, RCL_ROS_TIME), 0, 2.0));
+  // Keyframe 0 is farther from keyframe 2 than keyframe 1 (0.5 m vs 0.1 m),
+  // so only the allowlist puts it first; 0.5 m keeps the 10-point ICP from
+  // that dead-reckoned guess inside its convergence basin.
+  keyframe_pub->publish(make_keyframe(rclcpp::Time(10, 0, RCL_ROS_TIME), 0, 0.5));
   ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));
   points_pub->publish(make_cloud(rclcpp::Time(10, 0, RCL_ROS_TIME), points));
   ASSERT_TRUE(spin_until(executor, []() {return true;}, 100ms));

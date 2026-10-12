@@ -1,0 +1,110 @@
+# MBES bathymetric SLAM on the MBES-SLAM Dutch Island survey (Narragansett
+# Bay, large_area.bag: 2.5 h, 18 km, 4-21 m deep, same vessel and Norbit
+# sonar as beach_pond), without the GNSS compass. Same pipeline as
+# beach_pond_mbes_slam.yaml, plus the coarse height-map search in front of
+# GICP: without a compass the gyro yaw drifts 30 deg in 30 min, far outside
+# GICP's convergence basin, and the search also rejects flat or ambiguous
+# overlaps. The DVL twist and heading are in the main bag.
+#
+#   ros2 run aqua_replay offline_replay \
+#     --scenario $(ros2 pkg prefix aqua_replay)/share/aqua_replay/scenarios/dutch_island_mbes_slam.yaml \
+#     --bag large_area_ros2 --out /tmp/dutch_island_mbes_slam
+input:
+  topics:
+    - /nav/sensors/microstrain/imu/raw
+    - /nav/processed/nortek/dvl_twist
+    - /norbit/detections
+    - /nav/processed/odometry
+  order: header
+  reorder_window_s: 0.5
+  start_offset_s: 0.0
+
+nodes:
+  - plugin: aqua_graph::AquaGraphNode
+    name: aqua_graph
+    params_files: [$(find-pkg-share aqua_graph)/config/beach_pond.yaml]
+    parameters:
+      topics:
+        heading: ""
+      init:
+        gyro_bias_sigma: 0.00001
+      imu:
+        gyro_bias_random_walk: 0.000001
+      publish:
+        imu_rate: true
+  - plugin: aqua_pose_graph::PoseGraphNode
+    name: aqua_pose_graph
+    params_files: [$(find-pkg-share aqua_pose_graph)/config/params.yaml]
+    parameters:
+      topics:
+        odometry: /aqua_graph/odometry
+      keyframe:
+        # One bathymetric submap per keyframe interval: ~30 s of track, a
+        # ~60 m x ~20-40 m swath patch. 20 m patches (beach_pond) overlap a
+        # crossing pass by only ~150 1 m cells, too few to identify the
+        # terrain.
+        translation_m: 60.0
+        rotation_rad: 0.35
+      edges:
+        # Relative dead-reckoning error over one 60 m edge without a compass:
+        # ~2 % of distance in translation, gyro-limited in rotation.
+        default_translation_information: 0.7      # 1 / (1.2 m)^2
+        default_rotation_information: 1100.0      # 1 / (0.03 rad)^2
+  - plugin: aqua_sonar_loc::MbesLoopClosureNode
+    name: mbes_loop_closure
+    params_files: [$(find-pkg-share aqua_sonar_loc)/config/mbes_loop_closure.yaml]
+    parameters:
+      topics:
+        points: /norbit/detections
+        odometry: /aqua_graph/odometry
+      sensor:
+        # norbit in the ustrain_imu (aqua_graph body) frame, from /tf_static.
+        translation_m: [0.089, 0.353, -0.843]
+        rotation_rpy_rad: [3.141592653589793, 0.0, -1.5707963267948966]
+        min_range_m: 1.0
+        # Beams within 45 deg only: outer beams are refraction-limited.
+        max_across_track_ratio: 1.0
+      submaps:
+        # 13 Hz x 512 beams x ~30 s per submap before the voxel filter.
+        max_points: 400000
+        min_points: 500
+        voxel_leaf_m: 0.5
+        max_submaps: 2000
+      candidates:
+        min_keyframe_separation: 5
+        # Anchors of overlapping swaths can be ~2 swath half-widths apart,
+        # plus the dead-reckoning drift between the two visits.
+        max_distance_m: 60.0
+      registration:
+        # GICP slides on these partially overlapping 2.5D patches even from
+        # the true pose; the height-map search is the registration.
+        backend: none
+        coarse:
+          enabled: true
+          yaw_range_rad: 0.52
+          xy_range_m: 30.0
+          # Offline on true overlaps of these submaps, placements with relief
+          # >= 0.5 m and distinctiveness >= 1.2 came back within ~1.5 m of
+          # the truth; online, no candidate with relief >= 0.3 m,
+          # distinctiveness >= 1.2 and >= 300 overlapping cells was a false
+          # match (none passed at all). Conservative on purpose.
+          min_relief_m: 0.5
+          min_distinctiveness: 1.3
+          min_overlap_cells: 300
+      gates:
+        # The coarse search may move the guess by up to its search range.
+        max_correction_translation_m: 35.0
+        max_correction_rotation_rad: 0.6
+
+output:
+  storage_id: mcap
+  topics:
+    - {topic: /nav/processed/odometry, type: nav_msgs/msg/Odometry}
+    - /aqua_graph/odometry
+    - /aqua_graph/status
+    - /aqua_pose_graph/path
+    - /aqua_pose_graph/keyframe
+    - /aqua_pose_graph/loop_constraint
+    - /aqua_pose_graph/loop_constraint_count
+    - /aqua_pose_graph/optimization_count
+    - /mbes_loop_closure/status
