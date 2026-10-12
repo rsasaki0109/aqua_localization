@@ -109,15 +109,36 @@ pair (`--param ... coarse.min_relief_m:=0.0 min_distinctiveness:=0.0`):
   truncated-least-squares "support" score (off-map cells as outliers) was
   tried and did worse (8 correct of 376 placements vs 15 of 329).
 
+### Group-k (PCM-style) loop selection
+
+`loop.group.*` (off by default) holds gated loops in a pending pool and
+publishes them only once at least `min_group_size` of them are mutually
+consistent: for loops (a->b, z1) and (c->d, z2) the cycle
+`z1^-1 (Ta^-1 Tc) z2 (Td^-1 Tb)` must be within 3 m / 5 deg plus
+0.03 m/s and 0.03 deg/s of the odometry span `|ta-tc| + |tb-td|` (<= 200 s).
+
+- Offline, on all 329 placements of the run above: correct loops close
+  in time agree to <= 3 m / 5 deg; with relief >= 0.3 m, distinctiveness
+  >= 1.05 and groups of >= 4, 6 loops survive: 5 correct and one 1.6 m /
+  13 deg off (per-candidate gates alone: 9 correct, 18 false).
+- Online (`--param mbes_loop_closure:loop.group.enabled:=true`,
+  `min_group_size:=4`, `sensor.max_across_track_ratio:=2.0`,
+  `coarse.min_relief_m:=0.3`, `min_distinctiveness:=1.05`,
+  `min_overlap_cells:=150`): 4 loops published, 2 within 1 m / 2.4 deg and
+  2 at 1.7 m / 6.1 deg and 5.9 m / 4.8 deg; no wild false loop. They all
+  sit in one crossing area, so the pose-graph RMSE is unchanged (540.7 m vs
+  540.8 m for dead reckoning at the same keyframes): a handful of local
+  loops cannot undo a 388 deg yaw drift.
+
+The scenario keeps the conservative per-candidate gates (no loops).
+
 What would make it work:
 
-- loop selection by mutual consistency (PCM / group-k): correct loops
-  agree on the accumulated drift, false ones scatter; per-loop gates have
-  reached their limit;
 - larger and longer-overlap submaps than one keyframe interval (the
   successful offline crossings used 40-200 s of track);
 - bounding the gyro-bias yaw drift (the root cause of the 225 m guess
-  errors) rather than searching wider.
+  errors) rather than searching wider: feed accepted loops back into
+  aqua_graph so they constrain the gyro bias, not only the pose graph.
 
 With the compass the drift is 0.2 % of distance, so on this vessel loops
 matter for the compass-free case only.
