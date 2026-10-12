@@ -338,6 +338,21 @@ private:
       declare_parameter<double>("loop.consistency.max_correction_rotation_delta_rad", 0.0);
     loop_suppression_options_.min_consistency_support_count =
       declare_parameter<int>("loop.consistency.min_support_count", 1);
+    LoopGroupOptions group;
+    group.enabled = declare_parameter<bool>("loop.group.enabled", group.enabled);
+    group.min_group_size = declare_parameter<int>("loop.group.min_group_size", group.min_group_size);
+    group.translation_tolerance_m = declare_parameter<double>(
+      "loop.group.translation_tolerance_m", group.translation_tolerance_m);
+    group.translation_tolerance_per_s = declare_parameter<double>(
+      "loop.group.translation_tolerance_per_s", group.translation_tolerance_per_s);
+    group.rotation_tolerance_rad = declare_parameter<double>(
+      "loop.group.rotation_tolerance_rad", group.rotation_tolerance_rad);
+    group.rotation_tolerance_per_s = declare_parameter<double>(
+      "loop.group.rotation_tolerance_per_s", group.rotation_tolerance_per_s);
+    group.max_span_s = declare_parameter<double>("loop.group.max_span_s", group.max_span_s);
+    loop_group_enabled_ = group.enabled;
+    loop_group_min_size_ = group.min_group_size;
+    loop_group_ = LoopGroupSelector(group);
     loop_selection_allowlist_csv_ =
       declare_parameter<std::string>("loop.selection.allowlist_csv", "");
     loop_selection_match_timestamp_window_s_ =
@@ -586,7 +601,29 @@ private:
         descriptor_result.descriptor_centroid_distance_m;
       gate.descriptor_extent_ratio = descriptor_result.descriptor_extent_ratio;
       gate.descriptor_point_count_ratio = descriptor_result.descriptor_point_count_ratio;
-      if (gate.accepted) {
+      std::vector<PendingLoop> group_publish;
+      if (gate.accepted && loop_group_enabled_ && !loop_selection_enabled()) {
+        // Hold the loop until enough mutually consistent loops support it.
+        PendingLoop pending;
+        pending.candidate_id = candidate.id;
+        pending.current_id = current.id;
+        pending.candidate_stamp_s = candidate.stamp.seconds();
+        pending.current_stamp_s = current.stamp.seconds();
+        pending.candidate_pose = candidate.pose;
+        pending.current_pose = current.pose;
+        pending.candidate_to_current = result.candidate_to_current;
+        const LoopGroupResult group = loop_group_.add(pending);
+        group_publish = group.to_publish;
+        gate.consistency_support_count = group.group_size;
+        gate.consistency_required_support_count =
+          static_cast<std::size_t>(loop_group_options_min_size());
+        if (group_publish.empty()) {
+          gate.accepted = false;
+          gate.status = "loop group pending";
+        } else {
+          gate.status = "accepted (group)";
+        }
+      } else if (gate.accepted) {
         if (loop_selection_enabled()) {
           if (!is_selected_loop(candidate, current, result, gate)) {
             gate.accepted = false;
@@ -616,6 +653,16 @@ private:
         continue;
       }
 
+      if (!group_publish.empty()) {
+        // The new loop and any earlier members of its group; keep testing
+        // this keyframe's other candidates, they may join groups too.
+        for (const auto & loop : group_publish) {
+          publish_loop_constraint(
+            loop.candidate_id, loop.current_id, current.stamp, loop.candidate_to_current);
+          accepted_loop_tracker_.record(loop.candidate_id, loop.current_id);
+        }
+        continue;
+      }
       publish_loop_constraint(candidate, current, result.candidate_to_current);
       accepted_loop_tracker_.record(candidate.id, current.id, gate.correction);
       return;
@@ -927,11 +974,18 @@ private:
     const Submap & current,
     const Eigen::Isometry3d & candidate_to_current)
   {
+    publish_loop_constraint(candidate.id, current.id, current.stamp, candidate_to_current);
+  }
+
+  void publish_loop_constraint(
+    std::uint32_t candidate_id, std::uint32_t current_id, const rclcpp::Time & stamp,
+    const Eigen::Isometry3d & candidate_to_current)
+  {
     aqua_msgs::msg::PoseGraphLoopConstraint msg;
-    msg.header.stamp = current.stamp;
+    msg.header.stamp = stamp;
     msg.header.frame_id = map_frame_;
-    msg.from_id = candidate.id;
-    msg.to_id = current.id;
+    msg.from_id = candidate_id;
+    msg.to_id = current_id;
     msg.relative_pose = isometry_to_pose(candidate_to_current);
     msg.information =
       diagonal_information(loop_translation_sigma_m_, loop_rotation_sigma_rad_);
@@ -939,7 +993,7 @@ private:
     loop_pub_->publish(msg);
     RCLCPP_INFO(
       get_logger(), "published MBES loop constraint %u -> %u",
-      candidate.id, current.id);
+      candidate_id, current_id);
   }
 
   void publish_status(
@@ -1081,6 +1135,10 @@ private:
 
   SubmapManager submap_manager_{submap_options_};
   AcceptedLoopTracker accepted_loop_tracker_{loop_suppression_options_};
+  bool loop_group_enabled_{false};
+  LoopGroupSelector loop_group_{LoopGroupOptions{}};
+  int loop_group_options_min_size() const {return loop_group_min_size_;}
+  int loop_group_min_size_{0};
 
   rclcpp::Subscription<aqua_msgs::msg::PoseGraphKeyframe>::SharedPtr keyframe_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr points_sub_;

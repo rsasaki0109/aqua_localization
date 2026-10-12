@@ -86,14 +86,59 @@ already tens of metres off), the rest produced false placements, and no
 gate setting kept a correct loop while dropping the false ones. Lowering
 the gates is not an option.
 
+### Where the online pipeline loses the loops (2026-10-12)
+
+Measured on the node's own submaps (`debug.submap_dump_dir`, beams up to
+63 deg) against the reference, with the coarse search run offline on every
+pair (`--param ... coarse.min_relief_m:=0.0 min_distinctiveness:=0.0`):
+
+- **Overlap geometry.** Outer beams are usable here (salt water): the
+  height disagreement between passes is 0.065 m (inner), 0.12 m (45-63 deg)
+  and 0.23 m (63-72 deg) median. Widening to 63 deg roughly doubles the
+  overlapping 60 s windows (48 -> 106).
+- **Candidates are not the bottleneck.** Of 203 truly overlapping submap
+  pairs, the dead-reckoned guess is within the +-30 m / +-30 deg search
+  range for 45 (median guess error 225 m / 44 deg over all 203), and the
+  candidate search already tests 27 of those 45. A wider candidate radius
+  only adds pairs the search cannot align.
+- **Registration is.** On the 45 in-range true pairs the search returns
+  the truth (3.5 m / 5 deg) for 15; where DR is already within 1 m, flat
+  overlaps (relief < 0.2 m) still pull it tens of metres away. No
+  per-candidate gate separates them: the best combination (relief >= 0.4 m,
+  distinctiveness >= 1.2) keeps 4 correct and 3 false loops. A
+  truncated-least-squares "support" score (off-map cells as outliers) was
+  tried and did worse (8 correct of 376 placements vs 15 of 329).
+
+### Group-k (PCM-style) loop selection
+
+`loop.group.*` (off by default) holds gated loops in a pending pool and
+publishes them only once at least `min_group_size` of them are mutually
+consistent: for loops (a->b, z1) and (c->d, z2) the cycle
+`z1^-1 (Ta^-1 Tc) z2 (Td^-1 Tb)` must be within 3 m / 5 deg plus
+0.03 m/s and 0.03 deg/s of the odometry span `|ta-tc| + |tb-td|` (<= 200 s).
+
+- Offline, on all 329 placements of the run above: correct loops close
+  in time agree to <= 3 m / 5 deg; with relief >= 0.3 m, distinctiveness
+  >= 1.05 and groups of >= 4, 6 loops survive: 5 correct and one 1.6 m /
+  13 deg off (per-candidate gates alone: 9 correct, 18 false).
+- Online (`--param mbes_loop_closure:loop.group.enabled:=true`,
+  `min_group_size:=4`, `sensor.max_across_track_ratio:=2.0`,
+  `coarse.min_relief_m:=0.3`, `min_distinctiveness:=1.05`,
+  `min_overlap_cells:=150`): 4 loops published, 2 within 1 m / 2.4 deg and
+  2 at 1.7 m / 6.1 deg and 5.9 m / 4.8 deg; no wild false loop. They all
+  sit in one crossing area, so the pose-graph RMSE is unchanged (540.7 m vs
+  540.8 m for dead reckoning at the same keyframes): a handful of local
+  loops cannot undo a 388 deg yaw drift.
+
+The scenario keeps the conservative per-candidate gates (no loops).
+
 What would make it work:
 
-- candidate search that accounts for dead-reckoning uncertainty (the
-  yaw drift moves true revisits beyond any fixed radius);
 - larger and longer-overlap submaps than one keyframe interval (the
   successful offline crossings used 40-200 s of track);
-- loop selection by mutual consistency (PCM / group-k) rather than per-loop
-  gates.
+- bounding the gyro-bias yaw drift (the root cause of the 225 m guess
+  errors) rather than searching wider: feed accepted loops back into
+  aqua_graph so they constrain the gyro bias, not only the pose graph.
 
 With the compass the drift is 0.2 % of distance, so on this vessel loops
 matter for the compass-free case only.

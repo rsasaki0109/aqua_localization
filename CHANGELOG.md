@@ -62,6 +62,8 @@
   `debug.submap_dump_dir`. MBES-SLAM Dutch Island (18 km): aqua_graph dead
   reckoning 4.46 m RMSE with the compass; online loop closure accepts no
   loop (and no false one) yet (`docs/benchmarks/dutch_island_mbes.md`).
+  Group-k (PCM-style) loop selection (`loop.group.*`, off by default)
+  publishes loops only as mutually consistent groups.
 - Fixed MBES loop-closure submaps: `mbes_loop_closure` stacked raw
   sensor-frame pings (single across-track lines) into a submap; with
   `topics.odometry` each ping is now placed at its own odometry pose, and

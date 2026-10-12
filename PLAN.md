@@ -183,8 +183,14 @@ can run live without the offline converter.
    shown not to register these 2.5D submaps even from the truth, and a
    coarse height-map search recovers crossings offline; online, with
    conservative gates, no loop is accepted (and none wrong)
-   (`docs/benchmarks/dutch_island_mbes.md`). Next: uncertainty-aware
-   candidate search, multi-keyframe submaps, PCM / group-k loop selection.
+   (`docs/benchmarks/dutch_island_mbes.md`). Candidate search was then
+   measured not to be the bottleneck (27 of the 45 alignable true overlaps
+   are already tested); per-candidate registration gates top out at ~4
+   correct : 3 false. Group-k (PCM-style) selection now exists
+   (`loop.group.*`): online it publishes 4 loops, all within 6 m / 6 deg,
+   but in one area, so the trajectory is unchanged. Next: feed loops back
+   into aqua_graph to bound the gyro-bias yaw drift; multi-keyframe
+   submaps.
 3. Real-time evidence: done for the Tank stack (online C++ frontend
    bit-identical to the offline one; live 1x runs at 0.0095-0.0098 m,
    frontend ~10 ms of a 50 ms camera period). Still open: AQUA-SLAM's own

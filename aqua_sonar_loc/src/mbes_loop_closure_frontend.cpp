@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <string>
@@ -960,6 +961,116 @@ void AcceptedLoopTracker::record(
 const std::vector<AcceptedLoop> & AcceptedLoopTracker::accepted_loops() const
 {
   return accepted_loops_;
+}
+
+LoopGroupSelector::LoopGroupSelector(LoopGroupOptions options)
+: options_(std::move(options))
+{
+}
+
+bool LoopGroupSelector::consistent(const PendingLoop & a, const PendingLoop & b) const
+{
+  const double span = std::abs(a.candidate_stamp_s - b.candidate_stamp_s) +
+    std::abs(a.current_stamp_s - b.current_stamp_s);
+  if (span > options_.max_span_s) {
+    return false;
+  }
+  const Eigen::Isometry3d cycle = a.candidate_to_current.inverse() *
+    (a.candidate_pose.inverse() * b.candidate_pose) * b.candidate_to_current *
+    (b.current_pose.inverse() * a.current_pose);
+  const double translation = cycle.translation().head<2>().norm();
+  const double rotation = std::abs(std::atan2(cycle.linear()(1, 0), cycle.linear()(0, 0)));
+  return translation <= options_.translation_tolerance_m + options_.translation_tolerance_per_s * span &&
+         rotation <= options_.rotation_tolerance_rad + options_.rotation_tolerance_per_s * span;
+}
+
+LoopGroupResult LoopGroupSelector::add(const PendingLoop & loop)
+{
+  LoopGroupResult result;
+  // Neighbours of the new loop, then the largest clique among them
+  // (Bron-Kerbosch with pivoting; the neighbourhood is small because of
+  // max_span_s).
+  std::vector<std::size_t> nbrs;
+  for (std::size_t i = 0; i < pending_.size(); ++i) {
+    if (consistent(loop, pending_[i])) {
+      nbrs.push_back(i);
+    }
+  }
+  const std::size_t n = nbrs.size();
+  std::vector<std::vector<bool>> adj(n, std::vector<bool>(n, false));
+  for (std::size_t i = 0; i < n; ++i) {
+    for (std::size_t j = i + 1; j < n; ++j) {
+      adj[i][j] = adj[j][i] = consistent(pending_[nbrs[i]], pending_[nbrs[j]]);
+    }
+  }
+  std::vector<std::size_t> best;
+  std::function<void(std::vector<std::size_t> &, std::vector<std::size_t>, std::vector<std::size_t>)>
+  bron_kerbosch = [&](std::vector<std::size_t> & r, std::vector<std::size_t> p,
+      std::vector<std::size_t> x) {
+      if (p.empty() && x.empty()) {
+        if (r.size() > best.size()) {
+          best = r;
+        }
+        return;
+      }
+      if (r.size() + p.size() <= best.size()) {
+        return;
+      }
+      std::size_t pivot = p.empty() ? x.front() : p.front();
+      std::size_t pivot_degree = 0;
+      for (const auto u : p) {
+        std::size_t d = 0;
+        for (const auto v : p) {
+          d += adj[u][v] ? 1 : 0;
+        }
+        if (d >= pivot_degree) {
+          pivot_degree = d;
+          pivot = u;
+        }
+      }
+      const std::vector<std::size_t> candidates = p;
+      for (const auto v : candidates) {
+        if (adj[pivot][v]) {
+          continue;
+        }
+        std::vector<std::size_t> p2, x2;
+        for (const auto u : p) {
+          if (adj[v][u]) {p2.push_back(u);}
+        }
+        for (const auto u : x) {
+          if (adj[v][u]) {x2.push_back(u);}
+        }
+        r.push_back(v);
+        bron_kerbosch(r, p2, x2);
+        r.pop_back();
+        p.erase(std::find(p.begin(), p.end(), v));
+        x.push_back(v);
+      }
+    };
+  std::vector<std::size_t> all(n), r;
+  for (std::size_t i = 0; i < n; ++i) {
+    all[i] = i;
+  }
+  bron_kerbosch(r, all, {});
+
+  pending_.push_back(loop);
+  const std::size_t self = pending_.size() - 1;
+  result.group_size = best.size() + 1;
+  if (static_cast<int>(result.group_size) >= options_.min_group_size) {
+    for (const auto i : best) {
+      auto & member = pending_[nbrs[i]];
+      if (!member.published) {
+        member.published = true;
+        result.to_publish.push_back(member);
+      }
+    }
+    pending_[self].published = true;
+    result.to_publish.push_back(pending_[self]);
+  }
+  if (pending_.size() > options_.max_pending) {
+    pending_.erase(pending_.begin());
+  }
+  return result;
 }
 
 }  // namespace aqua_sonar_loc
