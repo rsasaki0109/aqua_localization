@@ -7,6 +7,9 @@
 #include <typeinfo>
 #include <cmath>
 #include <limits>
+#include <optional>
+#include <random>
+#include <unordered_map>
 #include <utility>
 
 #include <gtsam/geometry/StereoCamera.h>
@@ -573,9 +576,89 @@ void TightlyCoupledEstimator::attach_stereo(
   const auto mono_noise =
     robust(gtsam::noiseModel::Isotropic::Sigma(2, vis.pixel_sigma), vis.huber_k);
 
+  // Monocular tracks that come back after a gap were re-identified by the
+  // frontend, not tracked: check them together against a common camera
+  // centre (rotation from the current estimate) before using their
+  // landmark, which may still be in the window or only in the map.
+  std::unordered_map<uint64_t, std::pair<gtsam::Point3, std::optional<gtsam::Key>>> reid;
+  if (vis.map_point_sigma_m > 0.0) {
+    std::vector<uint64_t> ids;
+    std::vector<gtsam::Point2> pixels;
+    std::vector<gtsam::Point3> points;
+    std::vector<std::optional<gtsam::Key>> keys;
+    for (const auto & o : obs) {
+      if (std::isfinite(o.u_right)) {
+        continue;
+      }
+      const auto it = tracks_.find(o.id);
+      const bool seen_before = it != tracks_.end();
+      const double gap_s = seen_before ? stamp - it->second.last_seen_s : 1e9;
+      if (gap_s <= kReidentifyGapS) {
+        continue;
+      }
+      if (seen_before && it->second.landmark && smoother_stamps.count(*it->second.landmark)) {
+        ids.push_back(o.id);
+        pixels.emplace_back(o.u_left, o.v);
+        points.push_back(smoother_->calculateEstimate<gtsam::Point3>(*it->second.landmark));
+        keys.push_back(*it->second.landmark);
+      } else if (gap_s >= vis.map_min_gap_s) {
+        const auto known = map_points_.find(o.id);
+        if (known != map_points_.end()) {
+          ids.push_back(o.id);
+          pixels.emplace_back(o.u_left, o.v);
+          points.push_back(known->second);
+          keys.push_back(std::nullopt);
+        }
+      }
+    }
+    if (!ids.empty()) {
+      const gtsam::Pose3 camera_pose = pose_estimate(state.index, batch) * vis.body_P_camera;
+      const auto inlier = reidentification_consensus(camera_pose, pixels, points);
+      for (size_t i = 0; i < ids.size(); ++i) {
+        if (inlier[i]) {
+          reid.emplace(ids[i], std::make_pair(points[i], keys[i]));
+          continue;
+        }
+        // A different point under the same id: start the track over.
+        ++counters_.map_rejections;
+        map_points_.erase(ids[i]);
+        const auto it = tracks_.find(ids[i]);
+        if (it != tracks_.end()) {
+          it->second.landmark.reset();
+          it->second.mono_pending.clear();
+        }
+      }
+    }
+  }
+
   for (const auto & o : obs) {
     if (!std::isfinite(o.u_right)) {
-      attach_mono(batch, state, o, mono_noise);
+      const auto accepted = reid.find(o.id);
+      if (accepted == reid.end()) {
+        attach_mono(batch, state, o, mono_noise);
+        continue;
+      }
+      FeatureTrack & track = tracks_[o.id];
+      track.last_seen_s = stamp;
+      track.mono_pending.clear();
+      const gtsam::Point2 uv(o.u_left, o.v);
+      gtsam::Key key;
+      if (accepted->second.second) {
+        key = *accepted->second.second;
+      } else {
+        // Back from the map, with a prior at its stored position.
+        key = L(next_landmark_++);
+        batch.values.insert(key, accepted->second.first);
+        batch.graph.addPrior(
+          key, accepted->second.first,
+          gtsam::noiseModel::Isotropic::Sigma(3, vis.map_point_sigma_m));
+        track.landmark = key;
+      }
+      batch.timestamps[key] = stamp;
+      batch.graph.emplace_shared<MonoFactor>(
+        uv, mono_noise, X(state.index), key, mono_calibration_, false, false, vis.body_P_camera);
+      ++counters_.map_reobservations;
+      ++counters_.mono_observations;
       continue;
     }
     const double disparity = o.u_left - o.u_right;
@@ -653,6 +736,114 @@ void TightlyCoupledEstimator::attach_stereo(
   }
 }
 
+namespace
+{
+
+// Camera centre that best explains bearing / point pairs with the rotation
+// held fixed: (P_i - c) x b_i = 0, i.e. [b_i]x c = b_i x P_i.
+std::optional<gtsam::Point3> centre_from_bearings(
+  const std::vector<gtsam::Vector3> & bearings, const std::vector<gtsam::Point3> & points,
+  const std::vector<size_t> & use)
+{
+  gtsam::Matrix3 ata = gtsam::Matrix3::Zero();
+  gtsam::Vector3 aty = gtsam::Vector3::Zero();
+  for (const size_t i : use) {
+    const gtsam::Matrix3 a = gtsam::skewSymmetric(bearings[i]);
+    ata += a.transpose() * a;
+    aty += a.transpose() * bearings[i].cross(points[i]);
+  }
+  Eigen::JacobiSVD<gtsam::Matrix3> svd(ata);
+  if (svd.singularValues()(2) < 1e-6 * svd.singularValues()(0)) {
+    return std::nullopt;
+  }
+  return gtsam::Point3(ata.ldlt().solve(aty));
+}
+
+}  // namespace
+
+std::vector<bool> TightlyCoupledEstimator::reidentification_consensus(
+  const gtsam::Pose3 & camera_pose, const std::vector<gtsam::Point2> & pixels,
+  const std::vector<gtsam::Point3> & points) const
+{
+  const auto & vis = config_.visual;
+  const size_t n = pixels.size();
+  std::vector<bool> best(n, false);
+  if (static_cast<int>(n) < vis.map_min_consensus) {
+    return best;
+  }
+  const gtsam::Rot3 & rotation = camera_pose.rotation();
+  std::vector<gtsam::Vector3> bearings(n);
+  for (size_t i = 0; i < n; ++i) {
+    const gtsam::Point2 m = mono_calibration_->calibrate(pixels[i]);
+    bearings[i] = rotation.rotate(gtsam::Vector3(m.x(), m.y(), 1.0)).normalized();
+  }
+  auto inliers_for = [&](const gtsam::Point3 & centre) {
+      std::vector<bool> in(n, false);
+      const gtsam::PinholeCamera<gtsam::Cal3_S2> camera(
+        gtsam::Pose3(rotation, centre), *mono_calibration_);
+      for (size_t i = 0; i < n; ++i) {
+        const gtsam::Point3 local = camera.pose().transformTo(points[i]);
+        if (local.z() < vis.mono_min_depth_m) {
+          continue;
+        }
+        in[i] = (camera.project(points[i]) - pixels[i]).norm() <= vis.map_consensus_px;
+      }
+      return in;
+    };
+  // Deterministic sampling: every pair when there are few candidates,
+  // otherwise a fixed-seed draw.
+  std::mt19937 rng(12345);
+  std::uniform_int_distribution<size_t> pick(0, n - 1);
+  const size_t pairs = n * (n - 1) / 2;
+  const size_t iterations = std::min<size_t>(pairs, 200);
+  size_t best_count = 0;
+  for (size_t it = 0; it < iterations; ++it) {
+    size_t a, b;
+    if (pairs <= 200) {
+      // it-th pair in lexicographic order
+      size_t k = it;
+      a = 0;
+      while (k >= n - 1 - a) {
+        k -= n - 1 - a;
+        ++a;
+      }
+      b = a + 1 + k;
+    } else {
+      a = pick(rng);
+      do {
+        b = pick(rng);
+      } while (b == a);
+    }
+    const auto centre = centre_from_bearings(bearings, points, {a, b});
+    if (!centre || (*centre - camera_pose.translation()).norm() > vis.map_max_correction_m) {
+      continue;
+    }
+    const auto in = inliers_for(*centre);
+    const size_t count = static_cast<size_t>(std::count(in.begin(), in.end(), true));
+    if (count > best_count) {
+      best_count = count;
+      best = in;
+    }
+  }
+  if (static_cast<int>(best_count) < vis.map_min_consensus) {
+    return std::vector<bool>(n, false);
+  }
+  // Refit on all inliers and take the final inlier set from that centre.
+  std::vector<size_t> use;
+  for (size_t i = 0; i < n; ++i) {
+    if (best[i]) {
+      use.push_back(i);
+    }
+  }
+  if (const auto centre = centre_from_bearings(bearings, points, use)) {
+    const auto refit = inliers_for(*centre);
+    if (static_cast<int>(std::count(refit.begin(), refit.end(), true)) >= vis.map_min_consensus) {
+      return refit;
+    }
+  }
+  return best;
+}
+
 void TightlyCoupledEstimator::attach_mono(
   UpdateBatch & batch, const StateRecord & state, const StereoObservation & o,
   const gtsam::SharedNoiseModel & noise)
@@ -663,64 +854,11 @@ void TightlyCoupledEstimator::attach_mono(
   const bool seen_before = tracks_.count(o.id) > 0;
   FeatureTrack & track = tracks_[o.id];
   const double gap_s = seen_before ? stamp - track.last_seen_s : 0.0;
-  const bool after_gap = !seen_before || gap_s >= vis.map_min_gap_s;
   track.last_seen_s = stamp;
 
   if (track.landmark && !smoother_->timestamps().count(*track.landmark)) {
     track.landmark.reset();
     track.mono_pending.clear();
-  }
-  if (!track.landmark && track.mono_pending.empty() && vis.map_point_sigma_m > 0.0 &&
-    after_gap)
-  {
-    // A track the map already knows (still tracked past the window, or
-    // re-identified by the frontend): bring its landmark back if the
-    // stored position agrees with this sighting.
-    const auto known = map_points_.find(o.id);
-    if (known != map_points_.end()) {
-      const gtsam::Pose3 camera_pose = pose_estimate(state.index, batch) * vis.body_P_camera;
-      const gtsam::Point3 in_camera = camera_pose.transformTo(known->second);
-      bool consistent = in_camera.z() >= vis.mono_min_depth_m && in_camera.z() <= vis.max_depth_m;
-      if (consistent) {
-        const gtsam::PinholeCamera<gtsam::Cal3_S2> camera(camera_pose, *mono_calibration_);
-        consistent = (camera.project(known->second) - uv).norm() <= vis.map_max_reprojection_px;
-      }
-      if (consistent) {
-        const gtsam::Key key = L(next_landmark_++);
-        batch.values.insert(key, known->second);
-        batch.timestamps[key] = stamp;
-        batch.graph.addPrior(
-          key, known->second, gtsam::noiseModel::Isotropic::Sigma(3, vis.map_point_sigma_m));
-        batch.graph.emplace_shared<MonoFactor>(
-          uv, noise, X(state.index), key, mono_calibration_, false, false, vis.body_P_camera);
-        track.landmark = key;
-        ++counters_.map_reobservations;
-        ++counters_.mono_observations;
-        return;
-      }
-      // Wrong re-identification or a moved point: forget it.
-      map_points_.erase(known);
-      ++counters_.map_rejections;
-    }
-  }
-  if (track.landmark && gap_s > kReidentifyGapS) {
-    // The track came back after a gap (the frontend re-identified it by
-    // descriptor): check it against the landmark before trusting the match.
-    const gtsam::Pose3 camera_pose = pose_estimate(state.index, batch) * vis.body_P_camera;
-    const gtsam::Point3 point = smoother_->calculateEstimate<gtsam::Point3>(*track.landmark);
-    const gtsam::Point3 in_camera = camera_pose.transformTo(point);
-    bool consistent = in_camera.z() >= vis.mono_min_depth_m;
-    if (consistent) {
-      const gtsam::PinholeCamera<gtsam::Cal3_S2> camera(camera_pose, *mono_calibration_);
-      consistent = (camera.project(point) - uv).norm() <= vis.map_max_reprojection_px;
-    }
-    if (!consistent) {
-      // A different point under the same id: start a new track.
-      track.landmark.reset();
-      track.mono_pending.clear();
-      map_points_.erase(o.id);
-      ++counters_.map_rejections;
-    }
   }
   if (track.landmark) {
     batch.graph.emplace_shared<MonoFactor>(

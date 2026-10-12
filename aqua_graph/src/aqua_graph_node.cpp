@@ -246,8 +246,12 @@ public:
       declare_parameter<double>("visual.mono.min_depth_m", visual.mono_min_depth_m);
     visual.map_point_sigma_m =
       declare_parameter<double>("visual.map.point_sigma_m", visual.map_point_sigma_m);
-    visual.map_max_reprojection_px = declare_parameter<double>(
-      "visual.map.max_reprojection_px", visual.map_max_reprojection_px);
+    visual.map_consensus_px =
+      declare_parameter<double>("visual.map.consensus_px", visual.map_consensus_px);
+    visual.map_min_consensus =
+      declare_parameter<int>("visual.map.min_consensus", visual.map_min_consensus);
+    visual.map_max_correction_m =
+      declare_parameter<double>("visual.map.max_correction_m", visual.map_max_correction_m);
     visual.map_min_gap_s = declare_parameter<double>("visual.map.min_gap_s", visual.map_min_gap_s);
 
     estimator_ = std::make_unique<TightlyCoupledEstimator>(config);
@@ -541,6 +545,8 @@ private:
     }
     status.heading_received = c.heading_received;
     status.heading_applied = c.heading_applied;
+    status.map_reobservations = c.map_reobservations;
+    status.map_rejections = c.map_rejections;
     status.velocity_world = to_msg(state.velocity_world);
     status.accel_bias = to_msg(state.bias.accelerometer());
     status.gyro_bias = to_msg(state.bias.gyroscope());

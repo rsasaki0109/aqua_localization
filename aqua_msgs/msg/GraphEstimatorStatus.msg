@@ -21,6 +21,10 @@ uint64 smoother_updates
 uint64 smoother_resets
 uint64 heading_received
 uint64 heading_applied
+# Map reuse: landmarks brought back from the map / re-identified tracks
+# rejected by the reprojection check.
+uint64 map_reobservations
+uint64 map_rejections
 
 geometry_msgs/Vector3 velocity_world
 geometry_msgs/Vector3 accel_bias

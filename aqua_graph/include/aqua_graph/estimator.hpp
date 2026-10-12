@@ -177,15 +177,21 @@ struct VisualConfig
   // Map reuse (monocular): keep every landmark's last estimate after it
   // leaves the window. When its track id is observed again (the frontend
   // re-identifies lost tracks by descriptor), the landmark comes back with a
-  // prior of map_point_sigma_m at that position, if it reprojects within
-  // map_max_reprojection_px of the observation. 0 disables map reuse.
+  // prior of map_point_sigma_m at that position, if it passes the consensus
+  // check below. 0 disables map reuse.
   double map_point_sigma_m{0.0};
-  double map_max_reprojection_px{10.0};
   // Only a track unseen for at least this long is re-anchored to the map: a
   // landmark that is still being tracked when it leaves the window has its
   // information in the smoother's marginal already, and re-adding it with an
   // independent prior would count it twice.
   double map_min_gap_s{2.0};
+  // Re-identified tracks (map or still-active landmarks) are accepted only
+  // as a group that agrees on one camera centre (rotation from the current
+  // estimate) within map_consensus_px, at least map_min_consensus of them,
+  // moving the centre by at most map_max_correction_m.
+  double map_consensus_px{4.0};
+  int map_min_consensus{6};
+  double map_max_correction_m{2.0};
 };
 
 struct EstimatorConfig
@@ -367,6 +373,10 @@ private:
     UpdateBatch & batch, const StateRecord & state, const StereoObservation & o,
     const gtsam::SharedNoiseModel & noise);
   gtsam::Pose3 pose_estimate(uint64_t index, const UpdateBatch & batch) const;
+  // Which re-identified observations agree on a common camera centre.
+  std::vector<bool> reidentification_consensus(
+    const gtsam::Pose3 & camera_pose, const std::vector<gtsam::Point2> & pixels,
+    const std::vector<gtsam::Point3> & points) const;
   gtsam::SharedNoiseModel robust(
     const gtsam::SharedNoiseModel & model, double huber_k) const;
   void add_state_priors(
