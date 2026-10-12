@@ -611,3 +611,40 @@ TEST(MbesLoopClosureFrontendTest, LoopGroupToleranceGrowsWithOdometrySpan)
   const auto far = make_loop(300.0, pass1(2), 690.0, pass2(0), Eigen::Isometry3d::Identity());
   EXPECT_FALSE(selector.consistent(a, far));
 }
+
+TEST(MbesLoopClosureFrontendTest, SubmapWindowMergesNeighboursInCentreFrame)
+{
+  // Submaps 3..7 along x, 10 m apart, each holding one point at its origin.
+  std::deque<aqua_sonar_loc::Submap> submaps;
+  for (std::uint32_t id = 3; id <= 7; ++id) {
+    aqua_sonar_loc::Submap s;
+    s.id = id;
+    s.pose = planar_pose(10.0 * id, 0.0, 0.3);
+    s.cloud->push_back(pcl::PointXYZ(0.0F, 0.0F, -5.0F));
+    submaps.push_back(s);
+  }
+  auto x_of = [](const aqua_sonar_loc::Submap & s) {
+      std::vector<double> xs;
+      for (const auto & p : s.cloud->points) {
+        // Back to world x (centre pose has yaw 0.3 about z).
+        const Eigen::Vector3d w = s.pose * Eigen::Vector3d(p.x, p.y, p.z);
+        xs.push_back(std::round(w.x()));
+      }
+      std::sort(xs.begin(), xs.end());
+      return xs;
+    };
+  const auto centred = aqua_sonar_loc::merge_submap_window(
+    submaps, submaps[2], 3, aqua_sonar_loc::SubmapWindow::kCentered, 0.0);
+  EXPECT_EQ(centred.id, 5U);
+  EXPECT_EQ(x_of(centred), (std::vector<double>{40.0, 50.0, 60.0}));
+  const auto trailing = aqua_sonar_loc::merge_submap_window(
+    submaps, submaps[2], 3, aqua_sonar_loc::SubmapWindow::kTrailing, 0.0);
+  EXPECT_EQ(x_of(trailing), (std::vector<double>{30.0, 40.0, 50.0}));
+  // Missing neighbours are skipped; window 1 is the submap itself.
+  const auto edge = aqua_sonar_loc::merge_submap_window(
+    submaps, submaps[4], 5, aqua_sonar_loc::SubmapWindow::kCentered, 0.0);
+  EXPECT_EQ(x_of(edge), (std::vector<double>{50.0, 60.0, 70.0}));
+  const auto single = aqua_sonar_loc::merge_submap_window(
+    submaps, submaps[2], 1, aqua_sonar_loc::SubmapWindow::kCentered, 0.0);
+  EXPECT_EQ(single.cloud->size(), 1U);
+}

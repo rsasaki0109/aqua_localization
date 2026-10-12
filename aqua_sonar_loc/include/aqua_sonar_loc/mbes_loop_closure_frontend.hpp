@@ -260,6 +260,16 @@ PointCloud::Ptr transform_cloud(
   const PointCloud & cloud, const Eigen::Isometry3d & T, double min_range_m,
   double max_across_track_ratio = 0.0);
 
+// Union of `center` and its neighbouring finalized submaps (by id), in
+// `center`'s frame and voxel-downsampled. kCentered takes window / 2
+// neighbours on each side (for old candidate submaps), kTrailing the
+// window - 1 preceding ones (for the newest submap, whose successors do not
+// exist yet). Missing neighbours are skipped; window <= 1 returns `center`.
+enum class SubmapWindow {kCentered, kTrailing};
+Submap merge_submap_window(
+  const std::deque<Submap> & submaps, const Submap & center, int window, SubmapWindow placement,
+  double voxel_leaf_m);
+
 class SubmapManager
 {
 public:
