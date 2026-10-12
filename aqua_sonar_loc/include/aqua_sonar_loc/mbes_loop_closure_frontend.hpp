@@ -123,7 +123,7 @@ struct CoarseAlignOptions
   int min_overlap_cells{150};
   // Placements must also cover this fraction of the smaller height map;
   // otherwise the search drifts to barely overlapping, trivially flat fits.
-  double min_overlap_fraction{0.5};
+  double min_overlap_fraction{0.3};
   double residual_clip_m{0.5};
   // Height std of the overlapping candidate cells after removing a best-fit
   // plane; flatter overlaps do not constrain the horizontal pose.
@@ -138,7 +138,8 @@ struct CoarseAlignOptions
 struct CoarseAlignResult
 {
   bool accepted{false};
-  Eigen::Isometry3d current_to_candidate{Eigen::Isometry3d::Identity()};
+  // Refined candidate_to_current guess.
+  Eigen::Isometry3d candidate_to_current{Eigen::Isometry3d::Identity()};
   double residual_m{std::numeric_limits<double>::quiet_NaN()};
   double distinctiveness{std::numeric_limits<double>::quiet_NaN()};
   double relief_m{std::numeric_limits<double>::quiet_NaN()};
@@ -148,13 +149,14 @@ struct CoarseAlignResult
   std::string detail() const;
 };
 
-// current_to_candidate_guess maps current-submap points into the candidate
-// submap frame; candidate_pose is the candidate submap's world pose (only its
+// candidate_to_current_guess (pose of the current submap in the candidate
+// frame) maps current-submap points into the candidate submap frame;
+// candidate_pose is the candidate submap's world pose (only its
 // roll/pitch are used, to level the height maps).
 CoarseAlignResult coarse_align_heightmaps(
   const PointCloud & candidate, const PointCloud & current,
   const Eigen::Isometry3d & candidate_pose,
-  const Eigen::Isometry3d & current_to_candidate_guess, const CoarseAlignOptions & options);
+  const Eigen::Isometry3d & candidate_to_current_guess, const CoarseAlignOptions & options);
 
 struct RegistrationOptions
 {
@@ -290,10 +292,14 @@ class RegistrationPipeline
 public:
   explicit RegistrationPipeline(RegistrationOptions options);
 
+  // candidate_to_current_guess: pose of the current submap in the candidate
+  // submap frame (candidate.pose^-1 * current.pose), which maps current-submap
+  // points into the candidate frame. The result's candidate_to_current has the
+  // same meaning.
   MatchResult match(
     const Submap & candidate,
     const Submap & current,
-    const Eigen::Isometry3d & current_to_candidate_guess) const;
+    const Eigen::Isometry3d & candidate_to_current_guess) const;
 
 private:
   RegistrationOptions options_;

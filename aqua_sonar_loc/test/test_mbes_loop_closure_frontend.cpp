@@ -462,10 +462,12 @@ TEST(MbesLoopClosureFrontendTest, CoarseAlignRecoversCrossingFromDriftedGuess)
 
   aqua_sonar_loc::CoarseAlignOptions options;
   options.enabled = true;
+  // A perpendicular crossing covers a third of each swath.
+  options.min_overlap_fraction = 0.2;
   const auto result = aqua_sonar_loc::coarse_align_heightmaps(
     candidate, current, candidate_pose, guess, options);
   ASSERT_TRUE(result.accepted) << result.status;
-  const Eigen::Isometry3d error = truth.inverse() * result.current_to_candidate;
+  const Eigen::Isometry3d error = truth.inverse() * result.candidate_to_current;
   EXPECT_LT(Eigen::AngleAxisd(error.linear()).angle(), 0.05);
   EXPECT_LT(error.translation().head<2>().norm(), 2.0);
   EXPECT_LT(std::abs(error.translation().z()), 0.3);
@@ -487,4 +489,38 @@ TEST(MbesLoopClosureFrontendTest, CoarseAlignRejectsFlatSeafloor)
     candidate, current, candidate_pose, guess, options);
   EXPECT_FALSE(result.accepted);
   EXPECT_EQ(result.status, "coarse: insufficient relief");
+}
+
+TEST(MbesLoopClosureFrontendTest, RegistrationUsesPoseOfCurrentInCandidateFrame)
+{
+  // Two overlapping passes over the same terrain; the guess is the
+  // dead-reckoned pose of the current submap in the candidate frame, 1 m and
+  // 0.03 rad off. The result must be that same relative pose, corrected.
+  aqua_sonar_loc::Submap candidate;
+  candidate.id = 1;
+  candidate.pose = Eigen::Isometry3d::Identity();
+  aqua_sonar_loc::Submap current;
+  current.id = 2;
+  current.pose = planar_pose(6.0, 2.0, 0.15);
+  candidate.cloud = std::make_shared<aqua_sonar_loc::PointCloud>(
+    swath(-20.0, 20.0, -10.0, 10.0, candidate.pose, false));
+  current.cloud = std::make_shared<aqua_sonar_loc::PointCloud>(
+    swath(-14.0, 26.0, -8.0, 12.0, current.pose, false));
+  const Eigen::Isometry3d truth = candidate.pose.inverse() * current.pose;
+  const Eigen::Isometry3d guess = planar_pose(0.8, -0.6, 0.03) * truth;
+
+  aqua_sonar_loc::RegistrationOptions options;
+  const aqua_sonar_loc::RegistrationPipeline pipeline(options);
+  const auto result = pipeline.match(candidate, current, guess);
+  ASSERT_TRUE(result.success) << result.status;
+  const Eigen::Isometry3d error = truth.inverse() * result.candidate_to_current;
+  EXPECT_LT(error.translation().norm(), 0.3);
+  EXPECT_LT(Eigen::AngleAxisd(error.linear()).angle(), 0.01);
+
+  aqua_sonar_loc::GateOptions gate_options;
+  gate_options.max_fitness_score = 0.0;
+  const aqua_sonar_loc::LoopGateEvaluator gate(gate_options);
+  const auto verdict = gate.evaluate(guess, result);
+  // The correction undoes the injected guess error.
+  EXPECT_NEAR(verdict.correction_translation_m, (guess.inverse() * truth).translation().norm(), 0.3);
 }

@@ -525,8 +525,6 @@ private:
 
       const Eigen::Isometry3d candidate_to_current_guess =
         candidate.pose.inverse() * current.pose;
-      const Eigen::Isometry3d current_to_candidate_guess =
-        candidate_to_current_guess.inverse();
       if (accepted_loop_tracker_.is_suppressed(candidate.id, current.id)) {
         MatchResult result;
         result.fitness = std::numeric_limits<double>::quiet_NaN();
@@ -555,7 +553,7 @@ private:
       }
 
       MatchResult result =
-        registration.match(candidate, current, current_to_candidate_guess);
+        registration.match(candidate, current, candidate_to_current_guess);
       GateResult gate = gate_evaluator.evaluate(candidate_to_current_guess, result);
       gate.descriptor_centroid_distance_m =
         descriptor_result.descriptor_centroid_distance_m;

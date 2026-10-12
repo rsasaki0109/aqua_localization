@@ -113,7 +113,7 @@ MatchResult run_registration(
   RegistrationT & registration,
   const PointCloud::Ptr & candidate,
   const PointCloud::Ptr & current,
-  const Eigen::Isometry3d & current_to_candidate_guess,
+  const Eigen::Isometry3d & candidate_to_current_guess,
   const RegistrationOptions & options)
 {
   MatchResult result;
@@ -124,7 +124,10 @@ MatchResult run_registration(
   registration.setTransformationEpsilon(options.transformation_epsilon);
 
   PointCloud aligned;
-  registration.align(aligned, current_to_candidate_guess.matrix().cast<float>());
+  // Source = current, target = candidate: the transform maps current-submap
+  // points into the candidate frame, i.e. it is the pose of the current
+  // submap in the candidate frame (candidate.pose^-1 * current.pose).
+  registration.align(aligned, candidate_to_current_guess.matrix().cast<float>());
   result.converged = registration.hasConverged();
   result.fitness = registration.getFitnessScore();
   if (!result.converged || !std::isfinite(result.fitness)) {
@@ -132,9 +135,8 @@ MatchResult run_registration(
     return result;
   }
 
-  const Eigen::Matrix4f current_to_candidate_f = registration.getFinalTransformation();
-  const Eigen::Isometry3d current_to_candidate(current_to_candidate_f.cast<double>());
-  result.candidate_to_current = current_to_candidate.inverse();
+  const Eigen::Matrix4f final_f = registration.getFinalTransformation();
+  result.candidate_to_current = Eigen::Isometry3d(final_f.cast<double>());
   result.success = true;
   result.status = "registration converged";
   return result;
@@ -217,7 +219,7 @@ std::string CoarseAlignResult::detail() const
 CoarseAlignResult coarse_align_heightmaps(
   const PointCloud & candidate, const PointCloud & current,
   const Eigen::Isometry3d & candidate_pose,
-  const Eigen::Isometry3d & current_to_candidate_guess, const CoarseAlignOptions & o)
+  const Eigen::Isometry3d & guess, const CoarseAlignOptions & o)
 {
   CoarseAlignResult result;
   // Level the candidate frame: keep its heading, drop its roll and pitch.
@@ -234,7 +236,7 @@ CoarseAlignResult coarse_align_heightmaps(
   std::vector<Eigen::Vector3d> cur_pts;
   cur_pts.reserve(current.size());
   for (const auto & p : current.points) {
-    cur_pts.push_back(R_level * (current_to_candidate_guess * Eigen::Vector3d(p.x, p.y, p.z)));
+    cur_pts.push_back(R_level * (guess * Eigen::Vector3d(p.x, p.y, p.z)));
   }
   const double cell = o.cell_m;
   const auto cand_cells = grid_heights(cand_pts, cell);
@@ -375,7 +377,7 @@ CoarseAlignResult coarse_align_heightmaps(
     Eigen::Vector3d(best.dx, best.dy, best.dz);
   Eigen::Isometry3d level = Eigen::Isometry3d::Identity();
   level.linear() = R_level;
-  result.current_to_candidate = level.inverse() * delta_level * level * current_to_candidate_guess;
+  result.candidate_to_current = level.inverse() * delta_level * level * guess;
   result.accepted = true;
   result.status = "coarse: aligned";
   return result;
@@ -689,9 +691,9 @@ RegistrationPipeline::RegistrationPipeline(RegistrationOptions options)
 MatchResult RegistrationPipeline::match(
   const Submap & candidate,
   const Submap & current,
-  const Eigen::Isometry3d & current_to_candidate_input) const
+  const Eigen::Isometry3d & candidate_to_current_input) const
 {
-  Eigen::Isometry3d current_to_candidate_guess = current_to_candidate_input;
+  Eigen::Isometry3d guess = candidate_to_current_input;
   std::string coarse_detail;
   auto with_detail = [&coarse_detail](MatchResult r) {
       r.coarse_detail = coarse_detail;
@@ -699,7 +701,7 @@ MatchResult RegistrationPipeline::match(
     };
   if (options_.coarse.enabled) {
     const CoarseAlignResult coarse = coarse_align_heightmaps(
-      *candidate.cloud, *current.cloud, candidate.pose, current_to_candidate_input,
+      *candidate.cloud, *current.cloud, candidate.pose, candidate_to_current_input,
       options_.coarse);
     if (!coarse.accepted) {
       MatchResult rejected;
@@ -708,13 +710,13 @@ MatchResult RegistrationPipeline::match(
       rejected.coarse_detail = coarse.detail();
       return rejected;
     }
-    current_to_candidate_guess = coarse.current_to_candidate;
+    guess = coarse.candidate_to_current;
     coarse_detail = coarse.detail();
   }
   if (options_.backend == "icp") {
     pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
     return with_detail(run_registration(
-      icp, candidate.cloud, current.cloud, current_to_candidate_guess, options_));
+      icp, candidate.cloud, current.cloud, guess, options_));
   }
   if (options_.backend == "ndt") {
     pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt;
@@ -722,12 +724,12 @@ MatchResult RegistrationPipeline::match(
     ndt.setStepSize(options_.ndt_step_size_m);
     ndt.setOulierRatio(options_.ndt_outlier_ratio);
     return with_detail(run_registration(
-      ndt, candidate.cloud, current.cloud, current_to_candidate_guess, options_));
+      ndt, candidate.cloud, current.cloud, guess, options_));
   }
 
   pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
   return with_detail(run_registration(
-    gicp, candidate.cloud, current.cloud, current_to_candidate_guess, options_));
+    gicp, candidate.cloud, current.cloud, guess, options_));
 }
 
 DescriptorGateEvaluator::DescriptorGateEvaluator(DescriptorGateOptions options)
