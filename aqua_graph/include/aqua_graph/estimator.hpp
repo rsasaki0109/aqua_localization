@@ -253,6 +253,8 @@ struct EstimatorCounters
   uint64_t mono_landmarks_created{0};
   uint64_t map_reobservations{0};
   uint64_t map_rejections{0};
+  uint64_t map_candidates{0};
+  uint64_t descriptors_received{0};
   // Measurements whose state already left the smoother window.
   uint64_t measurements_too_old{0};
   uint64_t smoother_updates{0};

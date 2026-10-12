@@ -236,6 +236,7 @@ void TightlyCoupledEstimator::add_feature_descriptor(
 {
   if (config_.visual.map_point_sigma_m > 0.0) {
     track_descriptors_[id] = descriptor;
+    ++counters_.descriptors_received;
   }
 }
 
@@ -720,6 +721,7 @@ void TightlyCoupledEstimator::attach_stereo(
         found_kept.push_back(found[i]);
       }
     }
+    counters_.map_candidates += ids_kept.size();
     if (!ids_kept.empty()) {
       std::vector<gtsam::Point3> points;
       for (const auto & f : found_kept) {

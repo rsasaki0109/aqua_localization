@@ -25,6 +25,10 @@ uint64 heading_applied
 # rejected by the reprojection check.
 uint64 map_reobservations
 uint64 map_rejections
+# Map reuse: re-identified / searched candidates submitted to the consensus
+# check, and descriptors received.
+uint64 map_candidates
+uint64 descriptors_received
 
 geometry_msgs/Vector3 velocity_world
 geometry_msgs/Vector3 accel_bias

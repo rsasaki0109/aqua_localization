@@ -568,6 +568,8 @@ private:
     status.heading_applied = c.heading_applied;
     status.map_reobservations = c.map_reobservations;
     status.map_rejections = c.map_rejections;
+    status.map_candidates = c.map_candidates;
+    status.descriptors_received = c.descriptors_received;
     status.velocity_world = to_msg(state.velocity_world);
     status.accel_bias = to_msg(state.bias.accelerometer());
     status.gyro_bias = to_msg(state.bias.gyroscope());
