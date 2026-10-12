@@ -158,6 +158,9 @@ public:
     cfg.default_rotation_information = declare_parameter<double>(
       "edges.default_rotation_information",
       cfg.default_rotation_information);
+    cfg.odometry_attitude_prior_information = declare_parameter<double>(
+      "edges.odometry_attitude_prior_information",
+      cfg.odometry_attitude_prior_information);
     cfg.optimization_iterations = declare_parameter<int>(
       "optimization.iterations", cfg.optimization_iterations);
     cfg.optimize_every_n_keyframes = declare_parameter<int>(

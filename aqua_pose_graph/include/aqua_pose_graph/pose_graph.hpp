@@ -36,6 +36,12 @@ struct PoseGraphConfig
   // values mean tighter edge constraint.
   double default_translation_information{100.0};   // 1 / (0.1 m)^2
   double default_rotation_information{1000.0};     // 1 / (0.0316 rad)^2
+  // Information of a per-keyframe prior on the odometry attitude (same
+  // convention as default_rotation_information); 0 disables it. Relative
+  // edges alone let the attitude random-walk along the chain, which throws
+  // away an absolute heading (e.g. a GNSS compass) the odometry already has:
+  // loops with a degree or two of yaw error then rotate whole segments.
+  double odometry_attitude_prior_information{0.0};
   // How many g2o iterations to run when optimize() is called.
   int optimization_iterations{20};
   // Number of keyframes added between automatic optimize() calls. 0 disables
