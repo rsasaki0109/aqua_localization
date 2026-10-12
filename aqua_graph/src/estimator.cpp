@@ -411,6 +411,13 @@ EstimatorOutput TightlyCoupledEstimator::create_state(double stamp_s)
   batch.values.insert(X(k), predicted.pose());
   batch.values.insert(V(k), predicted.v());
   batch.values.insert(B(k), current_bias_);
+  if (config_.init.bootstrap_velocity_sigma_mps > 0.0 &&
+    counters_.landmarks_created < static_cast<uint64_t>(config_.init.bootstrap_landmarks))
+  {
+    batch.graph.addPrior(
+      V(k), gtsam::Vector3(gtsam::Vector3::Zero()),
+      gtsam::noiseModel::Isotropic::Sigma(3, config_.init.bootstrap_velocity_sigma_mps));
+  }
 
   states_.push_back(StateRecord{k, stamp_s});
   // Mirror the smoother's marginalization: keys older than the lag go away.

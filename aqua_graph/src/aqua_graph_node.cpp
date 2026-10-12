@@ -148,6 +148,10 @@ public:
     init.accel_bias_sigma =
       declare_parameter<double>("init.accel_bias_sigma", init.accel_bias_sigma);
     init.gyro_bias_sigma = declare_parameter<double>("init.gyro_bias_sigma", init.gyro_bias_sigma);
+    init.bootstrap_velocity_sigma_mps = declare_parameter<double>(
+      "init.bootstrap_velocity_sigma_mps", init.bootstrap_velocity_sigma_mps);
+    init.bootstrap_landmarks =
+      declare_parameter<int>("init.bootstrap_landmarks", init.bootstrap_landmarks);
 
     auto & dvl = config.dvl;
     dvl.enabled = !dvl_topic.empty() || !dvl_cov_topic.empty();

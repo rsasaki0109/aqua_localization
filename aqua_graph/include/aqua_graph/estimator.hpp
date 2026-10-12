@@ -86,6 +86,12 @@ struct InitConfig
   double velocity_sigma_mps{0.2};
   double accel_bias_sigma{0.1};
   double gyro_bias_sigma{0.01};
+  // Slow vehicles without DVL (monocular VIO): until bootstrap_landmarks
+  // visual landmarks exist, give every new state a weak zero-velocity prior
+  // with this sigma so the IMU alone cannot run away before the first
+  // monocular landmarks can be triangulated. <= 0 disables it.
+  double bootstrap_velocity_sigma_mps{0.0};
+  int bootstrap_landmarks{30};
 };
 
 struct DvlConfig
