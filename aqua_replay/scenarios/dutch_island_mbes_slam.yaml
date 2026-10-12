@@ -32,6 +32,10 @@ nodes:
         gyro_bias_random_walk: 0.000001
       publish:
         imu_rate: true
+      # Accepted loops observe the mean vertical gyro bias over their span;
+      # the bias is otherwise locked at zero (unobservable without compass).
+      loop_bias:
+        loop_topic: /aqua_pose_graph/loop_constraint
   - plugin: aqua_pose_graph::PoseGraphNode
     name: aqua_pose_graph
     params_files: [$(find-pkg-share aqua_pose_graph)/config/params.yaml]
@@ -62,8 +66,9 @@ nodes:
         translation_m: [0.089, 0.353, -0.843]
         rotation_rpy_rad: [3.141592653589793, 0.0, -1.5707963267948966]
         min_range_m: 1.0
-        # Beams within 45 deg only: outer beams are refraction-limited.
-        max_across_track_ratio: 1.0
+        # Beams within 63 deg: in this salt-water survey passes still agree
+        # to 0.12 m there (median), and twice as many passes overlap.
+        max_across_track_ratio: 2.0
       submaps:
         # 13 Hz x 512 beams x ~30 s per submap before the voxel filter.
         max_points: 400000
@@ -83,14 +88,16 @@ nodes:
           enabled: true
           yaw_range_rad: 0.52
           xy_range_m: 30.0
-          # Offline on true overlaps of these submaps, placements with relief
-          # >= 0.5 m and distinctiveness >= 1.2 came back within ~1.5 m of
-          # the truth; online, no candidate with relief >= 0.3 m,
-          # distinctiveness >= 1.2 and >= 300 overlapping cells was a false
-          # match (none passed at all). Conservative on purpose.
-          min_relief_m: 0.5
-          min_distinctiveness: 1.3
+          # Loose per-candidate gates: about 1 in 3 placements passing them
+          # is correct; loop.group below rejects the rest.
+          min_relief_m: 0.3
+          min_distinctiveness: 1.05
           min_overlap_cells: 300
+      loop:
+        # Publish loops only as groups of >= 4 mutually consistent ones.
+        group:
+          enabled: true
+          min_group_size: 4
       gates:
         # The coarse search may move the guess by up to its search range.
         max_correction_translation_m: 35.0

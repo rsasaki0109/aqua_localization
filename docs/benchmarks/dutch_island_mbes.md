@@ -71,9 +71,9 @@ unique (`min_distinctiveness`: best score elsewhere / best score), and
   started 5 m / 6 deg off at true overlaps: within ~1.5 m wherever relief
   >= 0.5 m and distinctiveness >= 1.2; small or flat overlaps fail.
 
-### Online result: no loop accepted, none wrong
+### First online result: no loop accepted, none wrong
 
-`dutch_island_mbes_slam.yaml` (no compass, 60 m keyframes, coarse search
+The first version of `dutch_island_mbes_slam.yaml` (no compass, 60 m keyframes, coarse search
 with relief >= 0.5 m, distinctiveness >= 1.3, >= 300 overlapping cells,
 `backend: none`): 516 candidates tested, **0 accepted** (187 too few
 cells, 174 insufficient relief, 147 no overlap in range, 8 ambiguous). The
@@ -130,15 +130,51 @@ consistent: for loops (a->b, z1) and (c->d, z2) the cycle
   540.8 m for dead reckoning at the same keyframes): a handful of local
   loops cannot undo a 388 deg yaw drift.
 
-The scenario keeps the conservative per-candidate gates (no loops).
+### Loop closures -> gyro bias in aqua_graph
 
-What would make it work:
+The no-compass yaw drift is the vertical gyro bias, Earth rate included,
+which the scenario locks at zero: measured against the reference, it is
+~60 deg/h for the first hour and climbs to ~160 deg/h after 70 min
+(5 min windows). A yaw-only model (dead reckoning = reference velocity
+rotated by that integrated bias) reproduces the run (513 m vs 499 m RMSE;
+1 m without the yaw error). In that model, one bias correction from a
+single cluster of loops brings the RMSE to 340-430 m; tracking the bias
+with loops every 5-15 min to 60-160 m.
 
-- larger and longer-overlap submaps than one keyframe interval (the
+`loop_bias.*` in aqua_graph (off unless `loop_bias.loop_topic` is set):
+aqua_graph keeps its attitude and gyro-bias history and the keyframe
+stamps. For each published loop, the dead-reckoned minus measured
+relative yaw over the span observes the mean vertical bias over that
+span (sigma `yaw_sigma_rad` / span). A scalar random-walk filter fuses
+the observations, and the estimator is re-anchored with the fused bias.
+The pose graph still handles the past; the bias fix stops future drift.
+
+Online, full run, no compass (63 deg beams, relief >= 0.3 m,
+distinctiveness >= 1.05, >= 300 cells, groups of >= 4):
+
+| Run | Loops (correct) | aqua_graph RMSE m | Max m | Final m |
+|-----|----------------:|------:|------:|------:|
+| No loop feedback (group-k only) | 4 (2 within 2.4 deg) | 498.7 | 1403.2 | 307.0 |
+| Loop -> gyro bias, groups >= 4 (scenario) | 4 (3) | **292.5** | 957.3 | 133.7 |
+| Loop -> gyro bias, groups >= 3 | 3 (3) | 280.7 | 931.6 | 131.0 |
+
+The loops all come from one crossing at ~75 min; the fused bias jumps
+from ~-25 deg/h (slow drift of the locked bias) to 174 deg/h (truth
+~130-150 deg/h at that time) and ends at 153 deg/h. No further group
+forms afterwards: the second half is flatter (282 of 538 candidates fail
+the relief gate), and the 21 gated loops there never reach a consistent
+group. The pose graph adds nothing on top (RMSE at keyframes 314 m vs
+317 m for its path). `dutch_island_mbes_slam.yaml` now runs this
+configuration (fingerprint `3f1d5af9af6de2e5`).
+
+What would make it work further:
+
+- loops spread over the run: the yaw-only model says a bias update every
+  15 min is worth another 2x; the later lines are flat, so this needs
+  larger and longer-overlap submaps than one keyframe interval (the
   successful offline crossings used 40-200 s of track);
-- bounding the gyro-bias yaw drift (the root cause of the 225 m guess
-  errors) rather than searching wider: feed accepted loops back into
-  aqua_graph so they constrain the gyro bias, not only the pose graph.
+- an initial bias estimate before the first loop (half the remaining
+  error accumulates in the first 75 min).
 
 With the compass the drift is 0.2 % of distance, so on this vessel loops
 matter for the compass-free case only.

@@ -188,9 +188,10 @@ can run live without the offline converter.
    are already tested); per-candidate registration gates top out at ~4
    correct : 3 false. Group-k (PCM-style) selection now exists
    (`loop.group.*`): online it publishes 4 loops, all within 6 m / 6 deg,
-   but in one area, so the trajectory is unchanged. Next: feed loops back
-   into aqua_graph to bound the gyro-bias yaw drift; multi-keyframe
-   submaps.
+   in one area. Fed back into aqua_graph as a vertical gyro-bias
+   observation (`loop_bias.*`), those loops cut the no-compass
+   dead-reckoning RMSE from 499 m to 293 m. Next: loops spread over the
+   run (multi-keyframe submaps for the flat second half).
 3. Real-time evidence: done for the Tank stack (online C++ frontend
    bit-identical to the offline one; live 1x runs at 0.0095-0.0098 m,
    frontend ~10 ms of a 50 ms camera period). Still open: AQUA-SLAM's own

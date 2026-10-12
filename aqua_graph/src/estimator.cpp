@@ -691,6 +691,17 @@ void TightlyCoupledEstimator::run_update(UpdateBatch & batch, const StateRecord 
   }
 }
 
+void TightlyCoupledEstimator::set_gyro_bias(
+  const gtsam::Vector3 & gyro_bias, const std::string & reason)
+{
+  if (!initialized_ || states_.empty()) {
+    return;
+  }
+  current_bias_ = gtsam::imuBias::ConstantBias(current_bias_.accelerometer(), gyro_bias);
+  last_reset_reason_ = reason;
+  reset_smoother(states_.back());
+}
+
 void TightlyCoupledEstimator::reset_smoother(const StateRecord newest_state)
 {
   // By value: callers pass states_.back(), which is cleared below.

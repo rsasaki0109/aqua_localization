@@ -25,6 +25,7 @@ find_package(sensor_msgs REQUIRED)
 add_library(aqua_graph_core
   src/factors.cpp
   src/estimator.cpp
+  src/loop_bias.cpp
   src/synthetic_trajectory.cpp
 )
 target_compile_features(aqua_graph_core PUBLIC cxx_std_17)
@@ -83,6 +84,9 @@ if(BUILD_TESTING)
   ament_add_gtest(test_aqua_graph_estimator_synthetic test/test_estimator_synthetic.cpp
     TIMEOUT 300)
   target_link_libraries(test_aqua_graph_estimator_synthetic aqua_graph_core)
+
+  ament_add_gtest(test_aqua_graph_loop_bias test/test_loop_bias.cpp)
+  target_link_libraries(test_aqua_graph_loop_bias aqua_graph_core)
 endif()
 
 ament_package()
