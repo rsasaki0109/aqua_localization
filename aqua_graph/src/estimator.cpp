@@ -90,8 +90,10 @@ void TightlyCoupledEstimator::make_smoother()
   isam_params.relinearizeThreshold = config_.relinearize_threshold;
   isam_params.relinearizeSkip = std::max(1, config_.relinearize_skip);
   isam_params.findUnusedFactorSlots = true;
-  smoother_ = std::make_unique<gtsam::IncrementalFixedLagSmoother>(
-    config_.smoother_lag_s, isam_params);
+  if (lag_s_ <= 0.0) {
+    lag_s_ = std::max(config_.smoother_lag_s, config_.initial_lag_s);
+  }
+  smoother_ = std::make_unique<gtsam::IncrementalFixedLagSmoother>(lag_s_, isam_params);
 }
 
 TightlyCoupledEstimator::~TightlyCoupledEstimator() = default;
@@ -225,6 +227,11 @@ void TightlyCoupledEstimator::add_stereo_frame(
   enqueue(std::move(m));
 }
 
+std::vector<EstimatorOutput> TightlyCoupledEstimator::take_smoothed()
+{
+  return std::exchange(smoothed_, {});
+}
+
 void TightlyCoupledEstimator::enqueue(PendingMeasurement measurement)
 {
   // An anchored measurement newer than the newest state asks for a state at
@@ -338,6 +345,7 @@ void TightlyCoupledEstimator::start_graph(
   double stamp_s, const gtsam::NavState & state, const gtsam::imuBias::ConstantBias & bias)
 {
   const auto & init = config_.init;
+  start_stamp_s_ = stamp_s;
   current_state_ = state;
   current_bias_ = bias;
   preint_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(preint_params_, bias);
@@ -421,7 +429,27 @@ EstimatorOutput TightlyCoupledEstimator::create_state(double stamp_s)
 
   states_.push_back(StateRecord{k, stamp_s});
   // Mirror the smoother's marginalization: keys older than the lag go away.
-  while (!states_.empty() && states_.front().stamp_s < stamp_s - config_.smoother_lag_s) {
+  if (lag_s_ > config_.smoother_lag_s &&
+    stamp_s - start_stamp_s_ >= config_.initial_lag_duration_s)
+  {
+    // Start-up over: shrink the window to its normal length.
+    lag_s_ = config_.smoother_lag_s;
+    smoother_->smootherLag() = lag_s_;
+  }
+  while (!states_.empty() && states_.front().stamp_s < stamp_s - lag_s_) {
+    // Final (smoothed) estimate of a state about to leave the window.
+    const StateRecord & leaving = states_.front();
+    try {
+      EstimatorOutput out;
+      out.stamp_s = leaving.stamp_s;
+      out.state_index = leaving.index;
+      out.pose = smoother_->calculateEstimate<gtsam::Pose3>(X(leaving.index));
+      out.velocity_world = smoother_->calculateEstimate<gtsam::Vector3>(V(leaving.index));
+      out.bias = smoother_->calculateEstimate<gtsam::imuBias::ConstantBias>(B(leaving.index));
+      smoothed_.push_back(out);
+    } catch (const std::exception &) {
+      // Not in the smoother (e.g. dropped by a re-anchor): nothing final.
+    }
     states_.pop_front();
   }
   current_state_ = predicted;
@@ -451,7 +479,7 @@ TightlyCoupledEstimator::find_state(double stamp_s) const
   // Keep one grid period of margin to the window edge so a factor never
   // references a key the smoother is about to marginalize.
   const double oldest_safe =
-    states_.back().stamp_s - config_.smoother_lag_s + config_.state_period_s;
+    states_.back().stamp_s - lag_s_ + config_.state_period_s;
   auto it = std::lower_bound(
     states_.begin(), states_.end(), stamp_s,
     [](const StateRecord & s, double t) {return s.stamp_s < t;});
@@ -602,7 +630,7 @@ void TightlyCoupledEstimator::attach_stereo(
     }
 
     // The first sighting's pose must still be safely inside the window.
-    const double oldest_safe = stamp - config_.smoother_lag_s + config_.state_period_s;
+    const double oldest_safe = stamp - lag_s_ + config_.state_period_s;
     const bool first_usable = track.first_state && *track.first_state != state.index &&
       std::any_of(
       states_.begin(), states_.end(),
@@ -642,7 +670,7 @@ void TightlyCoupledEstimator::attach_stereo(
 
   // Forget tracks that have not been seen for a whole smoother window.
   for (auto it = tracks_.begin(); it != tracks_.end(); ) {
-    if (it->second.last_seen_s < stamp - config_.smoother_lag_s) {
+    if (it->second.last_seen_s < stamp - lag_s_) {
       it = tracks_.erase(it);
     } else {
       ++it;
@@ -674,7 +702,7 @@ void TightlyCoupledEstimator::attach_mono(
   }
 
   // Keep only sightings whose states are still safely inside the window.
-  const double oldest_safe = stamp - config_.smoother_lag_s + config_.state_period_s;
+  const double oldest_safe = stamp - lag_s_ + config_.state_period_s;
   auto & pending = track.mono_pending;
   pending.erase(
     std::remove_if(

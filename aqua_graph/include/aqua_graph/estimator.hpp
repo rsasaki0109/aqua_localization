@@ -191,6 +191,13 @@ struct EstimatorConfig
   double processing_delay_s{0.05};
   // Fixed-lag smoother window.
   double smoother_lag_s{5.0};
+  // Start-up: keep a longer window (initial_lag_s) for the first
+  // initial_lag_duration_s after initialization, so the poorly constrained
+  // start (gravity direction, velocity, biases, monocular scale) is
+  // optimized together with the data that follows instead of being frozen
+  // after smoother_lag_s. <= smoother_lag_s disables it.
+  double initial_lag_s{0.0};
+  double initial_lag_duration_s{0.0};
   // iSAM2 relinearization.
   double relinearize_threshold{0.01};
   int relinearize_skip{1};
@@ -276,6 +283,9 @@ public:
   void add_stereo_frame(double stamp_s, const std::vector<StereoObservation> & observations);
 
   bool initialized() const {return initialized_;}
+  // Final estimates of the states that left the smoother window since the
+  // last call (smoothed over smoother_lag_s), in time order.
+  std::vector<EstimatorOutput> take_smoothed();
 
   // Newest state propagated with the buffered IMU samples up to the latest one.
   std::optional<EstimatorOutput> imu_rate_estimate() const;
@@ -371,6 +381,10 @@ private:
   gtsam::Cal3_S2::shared_ptr mono_calibration_;
 
   bool initialized_{false};
+  std::vector<EstimatorOutput> smoothed_;
+  // Window currently in use (initial_lag_s during start-up).
+  double lag_s_{0.0};
+  double start_stamp_s_{0.0};
   std::optional<double> manual_init_stamp_;
   gtsam::Pose3 manual_init_pose_;
   gtsam::Vector3 manual_init_velocity_{gtsam::Vector3::Zero()};

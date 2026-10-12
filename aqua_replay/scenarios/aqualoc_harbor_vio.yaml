@@ -39,9 +39,13 @@ nodes:
     name: aqua_graph
     params_files:
       - $(find-pkg-share aqua_graph)/config/aqualoc_harbor.yaml
+    parameters:
+      topics:
+        smoothed_odometry: /aqua_graph/smoothed_odometry
 
 output:
   storage_id: mcap
   topics:
     - /aqua_graph/odometry
+    - {topic: /aqua_graph/smoothed_odometry, type: nav_msgs/msg/Odometry}
     - /aqua_graph/status

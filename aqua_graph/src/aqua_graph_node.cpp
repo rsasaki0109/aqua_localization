@@ -83,6 +83,10 @@ public:
       declare_parameter<std::string>("topics.odometry", "/aqua_graph/odometry");
     const std::string status_topic =
       declare_parameter<std::string>("topics.status", "/aqua_graph/status");
+    // Final estimate of every state as it leaves the fixed-lag window
+    // (smoothed, delayed by graph.smoother_lag_s); empty disables it.
+    const std::string smoothed_topic =
+      declare_parameter<std::string>("topics.smoothed_odometry", "");
     map_frame_ = declare_parameter<std::string>("frames.map", "map");
     base_frame_ = declare_parameter<std::string>("frames.base_link", "base_link");
     publish_imu_rate_ = declare_parameter<bool>("publish.imu_rate", true);
@@ -105,6 +109,9 @@ public:
     EstimatorConfig config;
     config.state_period_s = declare_parameter<double>("graph.state_period_s", config.state_period_s);
     config.smoother_lag_s = declare_parameter<double>("graph.smoother_lag_s", config.smoother_lag_s);
+    config.initial_lag_s = declare_parameter<double>("graph.initial_lag_s", config.initial_lag_s);
+    config.initial_lag_duration_s =
+      declare_parameter<double>("graph.initial_lag_duration_s", config.initial_lag_duration_s);
     config.processing_delay_s =
       declare_parameter<double>("graph.processing_delay_s", config.processing_delay_s);
     config.relinearize_threshold =
@@ -294,6 +301,9 @@ public:
         [this](aqua_msgs::msg::PoseGraphLoopConstraint::ConstSharedPtr msg) {on_loop(*msg);});
     }
     odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(odometry_topic, rclcpp::QoS(100));
+    if (!smoothed_topic.empty()) {
+      smoothed_pub_ = create_publisher<nav_msgs::msg::Odometry>(smoothed_topic, rclcpp::QoS(100));
+    }
     status_pub_ =
       create_publisher<aqua_msgs::msg::GraphEstimatorStatus>(status_topic, rclcpp::QoS(10));
 
@@ -375,6 +385,11 @@ private:
     last_gyro_ = gyro;
     if (!was_initialized && estimator_->initialized()) {
       RCLCPP_INFO(get_logger(), "aqua_graph initialized at t=%.3f", t);
+    }
+    if (smoothed_pub_) {
+      for (const auto & state : estimator_->take_smoothed()) {
+        smoothed_pub_->publish(to_odometry(state));
+      }
     }
     for (const auto & state : states) {
       publish_status(state);
@@ -477,6 +492,25 @@ private:
     estimator_->add_position(to_seconds(msg.header.stamp), gtsam::Point3(p.x, p.y, p.z), cov);
   }
 
+  nav_msgs::msg::Odometry to_odometry(const EstimatorOutput & state) const
+  {
+    nav_msgs::msg::Odometry odom;
+    odom.header.stamp = to_stamp(state.stamp_s);
+    odom.header.frame_id = map_frame_;
+    odom.child_frame_id = base_frame_;
+    const gtsam::Point3 & t = state.pose.translation();
+    const gtsam::Quaternion q = state.pose.rotation().toQuaternion();
+    odom.pose.pose.position.x = t.x();
+    odom.pose.pose.position.y = t.y();
+    odom.pose.pose.position.z = t.z();
+    odom.pose.pose.orientation.w = q.w();
+    odom.pose.pose.orientation.x = q.x();
+    odom.pose.pose.orientation.y = q.y();
+    odom.pose.pose.orientation.z = q.z();
+    odom.twist.twist.linear = to_msg(state.pose.rotation().unrotate(state.velocity_world));
+    return odom;
+  }
+
   void publish_odometry(const EstimatorOutput & state)
   {
     if (loop_bias_enabled_) {
@@ -569,6 +603,7 @@ private:
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr position_sub_;
   rclcpp::Subscription<aqua_msgs::msg::StereoFeatures>::SharedPtr stereo_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr smoothed_pub_;
   rclcpp::Publisher<aqua_msgs::msg::GraphEstimatorStatus>::SharedPtr status_pub_;
 };
 
