@@ -67,6 +67,9 @@
 - aqua_graph: vertical gyro bias from loop closures (`loop_bias.*`, off
   unless a loop topic is set). On Dutch Island without a compass the
   dead-reckoning RMSE drops from 499 m to 293 m; the scenario runs it.
+- mbes_loop_closure: `registration.match_window` registers windows of
+  consecutive submaps. Dutch Island with window 3: 33 loops (31 correct)
+  spread over the second half, yaw held after the first loop.
 - Fixed MBES loop-closure submaps: `mbes_loop_closure` stacked raw
   sensor-frame pings (single across-track lines) into a submap; with
   `topics.odometry` each ping is now placed at its own odometry pose, and

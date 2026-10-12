@@ -521,6 +521,31 @@ PointCloud::Ptr downsample(const PointCloud & cloud, double voxel_leaf_m)
   return out;
 }
 
+Submap merge_submap_window(
+  const std::deque<Submap> & submaps, const Submap & center, int window, SubmapWindow placement,
+  double voxel_leaf_m)
+{
+  if (window <= 1) {
+    return center;
+  }
+  const std::int64_t first = placement == SubmapWindow::kCentered ?
+    static_cast<std::int64_t>(center.id) - window / 2 :
+    static_cast<std::int64_t>(center.id) - (window - 1);
+  const std::int64_t last = first + window - 1;
+  PointCloud merged = *center.cloud;
+  const Eigen::Isometry3d center_inv = center.pose.inverse();
+  for (const auto & submap : submaps) {
+    const auto id = static_cast<std::int64_t>(submap.id);
+    if (id < first || id > last || submap.id == center.id) {
+      continue;
+    }
+    merged += *transform_cloud(*submap.cloud, center_inv * submap.pose, 0.0);
+  }
+  Submap out = center;
+  out.cloud = downsample(merged, voxel_leaf_m);
+  return out;
+}
+
 SubmapDescriptor describe_cloud(const PointCloud & cloud)
 {
   SubmapDescriptor descriptor;

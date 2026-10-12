@@ -245,6 +245,11 @@ private:
     submap_options_.min_points_per_submap = declare_parameter<int>("submaps.min_points", 300);
     submap_options_.max_points_per_submap = declare_parameter<int>("submaps.max_points", 20000);
     submap_options_.voxel_leaf_m = declare_parameter<double>("submaps.voxel_leaf_m", 0.5);
+    // Register windows of this many consecutive submaps (centred on the
+    // candidate, trailing the current one) instead of single submaps.
+    // Raise candidates.min_keyframe_separation along with it so the two
+    // windows do not share keyframes.
+    match_window_ = declare_parameter<int>("registration.match_window", 1);
     submap_finalize_delay_keyframes_ = static_cast<int>(
       std::max<long>(0, declare_parameter<long>("submaps.finalize_delay_keyframes", 0)));
 
@@ -559,6 +564,9 @@ private:
 
     auto candidates = selector.ranked_candidates(submap_manager_.submaps(), current);
     prioritize_selected_candidates(candidates, current, descriptor_gate);
+    const Submap current_window = merge_submap_window(
+      submap_manager_.submaps(), current, match_window_, SubmapWindow::kTrailing,
+      submap_options_.voxel_leaf_m);
     for (const auto & candidate : candidates) {
       if (tested >= candidate_options_.max_per_keyframe) {
         break;
@@ -594,8 +602,11 @@ private:
         continue;
       }
 
+      const Submap candidate_window = merge_submap_window(
+        submap_manager_.submaps(), candidate, match_window_, SubmapWindow::kCentered,
+        submap_options_.voxel_leaf_m);
       MatchResult result =
-        registration.match(candidate, current, candidate_to_current_guess);
+        registration.match(candidate_window, current_window, candidate_to_current_guess);
       GateResult gate = gate_evaluator.evaluate(candidate_to_current_guess, result);
       gate.descriptor_centroid_distance_m =
         descriptor_result.descriptor_centroid_distance_m;
@@ -1135,6 +1146,7 @@ private:
 
   SubmapManager submap_manager_{submap_options_};
   AcceptedLoopTracker accepted_loop_tracker_{loop_suppression_options_};
+  int match_window_{1};
   bool loop_group_enabled_{false};
   LoopGroupSelector loop_group_{LoopGroupOptions{}};
   int loop_group_options_min_size() const {return loop_group_min_size_;}
