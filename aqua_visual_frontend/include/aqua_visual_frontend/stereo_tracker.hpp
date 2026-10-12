@@ -8,9 +8,13 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <opencv2/core.hpp>
+#include <opencv2/features2d.hpp>
 #include <opencv2/imgproc.hpp>
 
 namespace aqua_visual_frontend
@@ -36,6 +40,15 @@ struct StereoTrackerConfig
   // Pixels at or above this level (sun glare, strobes) and a min_distance_px
   // band around them get no new corners and drop tracks; 256 disables it.
   int saturation_level{256};
+  // Map reuse: give a new corner the id of a lost track whose ORB
+  // descriptor (taken when that track started) it matches, so the backend
+  // can re-observe that track's landmark. Hamming distance <= max and
+  // best < ratio * second best; the newest reuse_max_retired lost tracks
+  // are kept. The backend must check the geometry.
+  bool reuse_tracks{false};
+  int reuse_max_hamming{40};
+  double reuse_ratio{0.8};
+  int reuse_max_retired{5000};
 };
 
 struct StereoTrack
@@ -58,6 +71,8 @@ public:
   // Forget all tracks (e.g. after a camera dropout); ids keep increasing.
   void reset();
   std::uint64_t next_id() const {return next_id_;}
+  // New corners that took over a lost track's id (reuse_tracks).
+  std::uint64_t reused_tracks() const {return reused_tracks_;}
 
 private:
   // LK with a forward-backward check; returns tracked points and a mask.
@@ -78,6 +93,15 @@ private:
   std::vector<std::uint64_t> ids_;
   std::uint64_t next_id_{0};
   double disparity_guess_{0.0};
+  // Ids for new corners: lost tracks they match (reuse_tracks) or fresh ids.
+  std::vector<std::uint64_t> assign_ids(
+    const cv::Mat & image, const std::vector<cv::Point2f> & corners);
+  void retire(std::uint64_t id);
+
+  cv::Ptr<cv::ORB> orb_;
+  std::unordered_map<std::uint64_t, cv::Mat> descriptors_;
+  std::deque<std::pair<std::uint64_t, cv::Mat>> retired_;
+  std::uint64_t reused_tracks_{0};
 };
 
 }  // namespace aqua_visual_frontend

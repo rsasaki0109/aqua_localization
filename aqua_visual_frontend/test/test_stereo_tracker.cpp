@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <unordered_map>
 #include <map>
 
 #include <opencv2/imgproc.hpp>
@@ -155,4 +156,45 @@ TEST(StereoTracker, MonocularTracksKeepIdsAndHaveNoRightCoordinate)
     }
   }
   EXPECT_GT(matched, static_cast<int>(first.size()) / 2);
+}
+
+TEST(StereoTracker, ReusesIdsOfLostTracksWhenTheSceneReturns)
+{
+  aqua_visual_frontend::StereoTrackerConfig config;
+  config.reuse_tracks = true;
+  aqua_visual_frontend::StereoTracker tracker(config);
+  const cv::Mat scene_a = texture(400, 300);
+  cv::Mat scene_b = texture(400, 300);
+  cv::flip(scene_b, scene_b, -1);  // a different scene
+
+  const auto first = tracker.process(view(scene_a, 40, 30, 320, 240), cv::Mat());
+  ASSERT_GT(first.size(), 50U);
+  // Everything is lost on the other scene, then scene A comes back.
+  tracker.process(view(scene_b, 40, 30, 320, 240), cv::Mat());
+  const std::uint64_t reused_on_b = tracker.reused_tracks();
+  const auto back = tracker.process(view(scene_a, 40, 30, 320, 240), cv::Mat());
+
+  std::unordered_map<std::uint64_t, cv::Point2f> before;
+  for (const auto & t : first) {
+    before[t.id] = cv::Point2f(t.u_left, t.v);
+  }
+  int reused = 0;
+  int misplaced = 0;
+  for (const auto & t : back) {
+    const auto it = before.find(t.id);
+    if (it == before.end()) {
+      continue;
+    }
+    ++reused;
+    if (cv::norm(it->second - cv::Point2f(t.u_left, t.v)) > 2.0) {
+      ++misplaced;
+    }
+  }
+  EXPECT_GT(reused, static_cast<int>(first.size()) / 2);
+  EXPECT_LE(misplaced, reused / 10);
+  // A different scene takes over few ids (the backend checks geometry).
+  EXPECT_LT(reused_on_b, first.size() / 10);
+  // Nearly all of them came back through descriptor reuse (a stray KLT
+  // track can survive the scene change).
+  EXPECT_GE(tracker.reused_tracks() - reused_on_b, static_cast<std::uint64_t>(reused * 9 / 10));
 }

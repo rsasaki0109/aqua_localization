@@ -244,6 +244,10 @@ public:
       "visual.mono.max_reprojection_px", visual.mono_max_reprojection_px);
     visual.mono_min_depth_m =
       declare_parameter<double>("visual.mono.min_depth_m", visual.mono_min_depth_m);
+    visual.map_point_sigma_m =
+      declare_parameter<double>("visual.map.point_sigma_m", visual.map_point_sigma_m);
+    visual.map_max_reprojection_px = declare_parameter<double>(
+      "visual.map.max_reprojection_px", visual.map_max_reprojection_px);
 
     estimator_ = std::make_unique<TightlyCoupledEstimator>(config);
 

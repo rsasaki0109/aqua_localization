@@ -10,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs video calib3d)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs video calib3d features2d)
 find_package(aqua_msgs REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(rclcpp REQUIRED)

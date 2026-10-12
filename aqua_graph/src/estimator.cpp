@@ -664,6 +664,37 @@ void TightlyCoupledEstimator::attach_mono(
     track.landmark.reset();
     track.mono_pending.clear();
   }
+  if (!track.landmark && track.mono_pending.empty() && vis.map_point_sigma_m > 0.0) {
+    // A track the map already knows (still tracked past the window, or
+    // re-identified by the frontend): bring its landmark back if the
+    // stored position agrees with this sighting.
+    const auto known = map_points_.find(o.id);
+    if (known != map_points_.end()) {
+      const gtsam::Pose3 camera_pose = pose_estimate(state.index, batch) * vis.body_P_camera;
+      const gtsam::Point3 in_camera = camera_pose.transformTo(known->second);
+      bool consistent = in_camera.z() >= vis.mono_min_depth_m && in_camera.z() <= vis.max_depth_m;
+      if (consistent) {
+        const gtsam::PinholeCamera<gtsam::Cal3_S2> camera(camera_pose, *mono_calibration_);
+        consistent = (camera.project(known->second) - uv).norm() <= vis.map_max_reprojection_px;
+      }
+      if (consistent) {
+        const gtsam::Key key = L(next_landmark_++);
+        batch.values.insert(key, known->second);
+        batch.timestamps[key] = stamp;
+        batch.graph.addPrior(
+          key, known->second, gtsam::noiseModel::Isotropic::Sigma(3, vis.map_point_sigma_m));
+        batch.graph.emplace_shared<MonoFactor>(
+          uv, noise, X(state.index), key, mono_calibration_, false, false, vis.body_P_camera);
+        track.landmark = key;
+        ++counters_.map_reobservations;
+        ++counters_.mono_observations;
+        return;
+      }
+      // Wrong re-identification or a moved point: forget it.
+      map_points_.erase(known);
+      ++counters_.map_rejections;
+    }
+  }
   if (track.landmark) {
     batch.graph.emplace_shared<MonoFactor>(
       uv, noise, X(state.index), *track.landmark, mono_calibration_, false, false,
@@ -783,6 +814,14 @@ void TightlyCoupledEstimator::run_update(UpdateBatch & batch, const StateRecord 
     ++counters_.smoother_updates;
     current_state_ = state;
     current_bias_ = bias;
+    if (config_.visual.map_point_sigma_m > 0.0) {
+      const auto & stamps = smoother_->timestamps();
+      for (const auto & [id, track] : tracks_) {
+        if (track.landmark && stamps.count(*track.landmark)) {
+          map_points_[id] = smoother_->calculateEstimate<gtsam::Point3>(*track.landmark);
+        }
+      }
+    }
   } catch (const gtsam::IndeterminantLinearSystemException & e) {
     last_reset_reason_ = "IndeterminantLinearSystem near " +
       gtsam::DefaultKeyFormatter(e.nearbyVariable());
@@ -828,6 +867,7 @@ void TightlyCoupledEstimator::reset_smoother(const StateRecord newest_state)
   states_.clear();
   states_.push_back(newest);
   tracks_.clear();
+  // map_points_ stay: the world frame is continuous across a re-anchor.
   // Keep observable directions tight but let absolute sensors move the
   // gauge directions they observe.
   const double yaw_sigma = config_.heading.enabled ? 0.1 : config_.init.yaw_sigma_rad;

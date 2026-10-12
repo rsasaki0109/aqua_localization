@@ -97,6 +97,12 @@ public:
       declare_parameter<double>("clahe_clip_limit", config.clahe_clip_limit);
     config.clahe_tile_grid = declare_parameter<int>("clahe_tile_grid", config.clahe_tile_grid);
     config.saturation_level = declare_parameter<int>("saturation_level", config.saturation_level);
+    config.reuse_tracks = declare_parameter<bool>("reuse.enabled", config.reuse_tracks);
+    config.reuse_max_hamming =
+      declare_parameter<int>("reuse.max_hamming", config.reuse_max_hamming);
+    config.reuse_ratio = declare_parameter<double>("reuse.ratio", config.reuse_ratio);
+    config.reuse_max_retired =
+      declare_parameter<int>("reuse.max_retired", config.reuse_max_retired);
     tracker_ = std::make_unique<StereoTracker>(config);
     if (!camchain.empty()) {
       rectifier_ = std::make_unique<StereoRectifier>(camchain, left_camera, right_camera, balance);

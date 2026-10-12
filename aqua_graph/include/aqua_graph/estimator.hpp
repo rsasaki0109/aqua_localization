@@ -28,6 +28,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <gtsam/geometry/Cal3_S2.h>
@@ -173,6 +174,13 @@ struct VisualConfig
   double mono_min_parallax_rad{0.03};
   double mono_max_reprojection_px{3.0};
   double mono_min_depth_m{0.2};
+  // Map reuse (monocular): keep every landmark's last estimate after it
+  // leaves the window. When its track id is observed again (the frontend
+  // re-identifies lost tracks by descriptor), the landmark comes back with a
+  // prior of map_point_sigma_m at that position, if it reprojects within
+  // map_max_reprojection_px of the observation. 0 disables map reuse.
+  double map_point_sigma_m{0.0};
+  double map_max_reprojection_px{10.0};
 };
 
 struct EstimatorConfig
@@ -224,6 +232,8 @@ struct EstimatorCounters
   uint64_t landmarks_created{0};
   uint64_t mono_observations{0};
   uint64_t mono_landmarks_created{0};
+  uint64_t map_reobservations{0};
+  uint64_t map_rejections{0};
   // Measurements whose state already left the smoother window.
   uint64_t measurements_too_old{0};
   uint64_t smoother_updates{0};
@@ -369,6 +379,8 @@ private:
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> smoother_;
   gtsam::Cal3_S2Stereo::shared_ptr stereo_calibration_;
   gtsam::Cal3_S2::shared_ptr mono_calibration_;
+  // Track id -> last landmark estimate (map reuse).
+  std::unordered_map<uint64_t, gtsam::Point3> map_points_;
 
   bool initialized_{false};
   std::optional<double> manual_init_stamp_;

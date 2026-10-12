@@ -20,6 +20,89 @@ StereoTracker::StereoTracker(StereoTrackerConfig config)
     clahe_ = cv::createCLAHE(
       config_.clahe_clip_limit, cv::Size(config_.clahe_tile_grid, config_.clahe_tile_grid));
   }
+  if (config_.reuse_tracks) {
+    orb_ = cv::ORB::create();
+  }
+}
+
+void StereoTracker::retire(std::uint64_t id)
+{
+  const auto it = descriptors_.find(id);
+  if (it == descriptors_.end()) {
+    return;
+  }
+  retired_.emplace_back(id, it->second);
+  descriptors_.erase(it);
+  while (static_cast<int>(retired_.size()) > config_.reuse_max_retired) {
+    retired_.pop_front();
+  }
+}
+
+std::vector<std::uint64_t> StereoTracker::assign_ids(
+  const cv::Mat & image, const std::vector<cv::Point2f> & corners)
+{
+  std::vector<std::uint64_t> ids(corners.size(), 0);
+  std::vector<bool> assigned(corners.size(), false);
+  if (config_.reuse_tracks && !corners.empty()) {
+    std::vector<cv::KeyPoint> keypoints;
+    for (size_t i = 0; i < corners.size(); ++i) {
+      cv::KeyPoint kp(corners[i], 31.0F);
+      kp.class_id = static_cast<int>(i);
+      keypoints.push_back(kp);
+    }
+    cv::Mat desc;
+    orb_->compute(image, keypoints, desc);
+    if (!retired_.empty() && !keypoints.empty()) {
+      cv::Mat retired_desc;
+      for (const auto & r : retired_) {
+        retired_desc.push_back(r.second);
+      }
+      std::vector<std::vector<cv::DMatch>> matches;
+      cv::BFMatcher(cv::NORM_HAMMING).knnMatch(desc, retired_desc, matches, 2);
+      std::vector<bool> taken(retired_.size(), false);
+      std::vector<size_t> used;
+      for (size_t k = 0; k < matches.size(); ++k) {
+        if (matches[k].empty()) {
+          continue;
+        }
+        const cv::DMatch & best = matches[k][0];
+        const bool distinct = matches[k].size() < 2 ||
+          best.distance < config_.reuse_ratio * matches[k][1].distance;
+        if (best.distance > config_.reuse_max_hamming || !distinct ||
+          taken[static_cast<size_t>(best.trainIdx)])
+        {
+          continue;
+        }
+        taken[static_cast<size_t>(best.trainIdx)] = true;
+        const auto i = static_cast<size_t>(keypoints[k].class_id);
+        ids[i] = retired_[static_cast<size_t>(best.trainIdx)].first;
+        assigned[i] = true;
+        ++reused_tracks_;
+      }
+      // Drop the reused entries from the retired set.
+      std::deque<std::pair<std::uint64_t, cv::Mat>> kept;
+      for (size_t r = 0; r < retired_.size(); ++r) {
+        if (!taken[r]) {
+          kept.push_back(std::move(retired_[r]));
+        }
+      }
+      retired_ = std::move(kept);
+    }
+    for (size_t k = 0; k < keypoints.size(); ++k) {
+      const auto i = static_cast<size_t>(keypoints[k].class_id);
+      if (!assigned[i]) {
+        ids[i] = next_id_++;
+        assigned[i] = true;
+      }
+      descriptors_[ids[i]] = desc.row(static_cast<int>(k)).clone();
+    }
+  }
+  for (size_t i = 0; i < corners.size(); ++i) {
+    if (!assigned[i]) {
+      ids[i] = next_id_++;
+    }
+  }
+  return ids;
 }
 
 cv::Mat StereoTracker::prepare(const cv::Mat & image) const
@@ -49,6 +132,9 @@ cv::Mat StereoTracker::valid_mask(const cv::Mat & image) const
 
 void StereoTracker::reset()
 {
+  for (const auto id : ids_) {
+    retire(id);
+  }
   prev_left_.release();
   prev_pts_.clear();
   ids_.clear();
@@ -136,6 +222,16 @@ std::vector<StereoTrack> StereoTracker::process(
     }
   }
 
+  if (config_.reuse_tracks) {
+    std::vector<std::uint64_t> kept = ids;
+    std::sort(kept.begin(), kept.end());
+    for (const auto id : ids_) {
+      if (!std::binary_search(kept.begin(), kept.end(), id)) {
+        retire(id);
+      }
+    }
+  }
+
   // 2) Top up with new corners away from existing tracks.
   const int missing = c.max_features - static_cast<int>(pts.size());
   if (missing > 0) {
@@ -147,9 +243,10 @@ std::vector<StereoTrack> StereoTracker::process(
     }
     std::vector<cv::Point2f> corners;
     cv::goodFeaturesToTrack(left, corners, missing, c.quality_level, c.min_distance_px, mask);
-    for (const auto & corner : corners) {
-      pts.push_back(corner);
-      ids.push_back(next_id_++);
+    const std::vector<std::uint64_t> corner_ids = assign_ids(left, corners);
+    for (size_t i = 0; i < corners.size(); ++i) {
+      pts.push_back(corners[i]);
+      ids.push_back(corner_ids[i]);
     }
   }
 
