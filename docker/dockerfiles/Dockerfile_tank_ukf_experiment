@@ -1,0 +1,44 @@
+# Use ros-base for a lightweight image, pinned to a specific digest for reproducibility
+FROM ros:jazzy-ros-base@sha256:31daab66eef9139933379fb67159449944f4e2dcf2e22c2d12cc715f29873e0f
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    git \
+    wget \
+    python3-pip \
+    python3-colcon-common-extensions \
+    sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install gdown rosbags --break-system-packages
+
+WORKDIR /root/ros2_ws/src
+RUN git clone https://github.com/rsasaki0109/aqua_localization.git
+
+WORKDIR /root/ros2_ws
+RUN apt-get update && \
+    rosdep init || true && \
+    rosdep update && \
+    rosdep install --from-paths src --ignore-src -y && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN /bin/bash -c "source /opt/ros/jazzy/setup.bash && colcon build --symlink-install"
+
+# Update repos and install Foxglove bridge package
+RUN apt-get update && apt-get install -y \
+    ros-jazzy-foxglove-bridge \
+    && rm -rf /var/lib/apt/lists/*
+
+# 7. Configurar el entorno para que cargue automáticamente al entrar
+# With Humble: RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
+# With Humble:     echo "source /root/ros2_ws/install/setup.bash" >> /root/.bashrc
+RUN echo "source /opt/ros/jazzy/setup.bash" >> /root/.bashrc && \
+    echo "source /root/ros2_ws/install/setup.bash" >> /root/.bashrc && \
+    echo "source /opt/ros/jazzy/setup.bash" >> /root/.bashrc
+
+# 8. Crear la carpeta de trabajo final y establecerla como directorio por defecto
+#WORKDIR /root/tank_dataset
+
+# Let source ready to work when a user enters the container
+#RUN echo "source /opt/ros/jazzy/setup.bash" >> /root/.bashrc
